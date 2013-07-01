@@ -10,4 +10,3 @@ Other directories:
 
 import numpy
 
-import constants

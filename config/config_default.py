@@ -5,7 +5,7 @@
              #'infile': '/home/s1/bechtol/des10.a/projects/dust_maps/cluster_fields/bullet/image_riz_starcat_slr.fits',
              'lon_field': 'RA',
              'lat_field': 'DEC',
-             'coordsys': 'cel'
+             'coordsys': 'cel',
              'mag_1_field': 'MAG_PSF_R', # Color is defined as mag_1 - mag_2
              'mag_err_1_field': 'MAGERR_PSF_R',
              'mag_2_field': 'MAG_PSF_I',
