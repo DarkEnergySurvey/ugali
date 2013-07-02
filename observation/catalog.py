@@ -143,10 +143,12 @@ class Catalog:
         self.lat = self.data.field(self.config.params['catalog']['lat_field'])
 
         if self.config.params['catalog']['coordsys'].lower() == 'cel' \
-           and self.config.params['catalog']['coordsys'].lower() == 'gal':
+           and self.config.params['coords']['coordsys'].lower() == 'gal':
+            print 'Converting catalog objects from CELESTIAL to GALACTIC coordinates'
             self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
         elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
-           and self.config.params['catalog']['coordsys'].lower() == 'cel':
+           and self.config.params['coords']['coordsys'].lower() == 'cel':
+            print 'Converting catalog objects from GALACTIC to CELESTIAL coordinates'
             self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
 
         self.mag_1 = self.data.field(self.config.params['catalog']['mag_1_field'])

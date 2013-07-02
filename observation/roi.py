@@ -45,10 +45,10 @@ class ROI():
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
         self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
 
-        self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_target'],
+        self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_likelihood_segmentation'],
                                                                         numpy.radians(90. - self.lat),
                                                                         numpy.radians(self.lon)),
-                                                         self.config.params['coords']['nside_target'],
+                                                         self.config.params['coords']['nside_likelihood_segmentation'],
                                                          self.config.params['coords']['nside_pixel'])
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels_target)
         self.centers_lon_target, self.centers_lat_target = numpy.degrees(phi), 90. - numpy.degrees(theta)

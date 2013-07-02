@@ -27,3 +27,8 @@ IMF: initial mass function
 CMD: color-magnitude diagram
 ROI: region of interest
 PDF: probability distribution function
+
+=== TO DO ===
+
+* Change name of ugali.utils.projector to ugali.utils.coords
+* Consistent naming convention for pix vs. pixel

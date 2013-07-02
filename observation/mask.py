@@ -16,6 +16,7 @@ import healpy
 import ugali.observation.roi
 import ugali.utils.plotting
 import ugali.utils.binning
+import ugali.utils.skymap
 
 ############################################################
 
@@ -288,70 +289,48 @@ def readMangleFile(infile, lon, lat, index = None):
     if index is None:
         index = numpy.random.randint(0, 1.e10)
     
-    coordinates_file = 'temp_coordinates_%010i.dat'%(index)
-    maglims_file = 'temp_maglims_%010i.dat'%(index)
+    coordinate_file = 'temp_coordinate_%010i.dat'%(index)
+    maglim_file = 'temp_maglim_%010i.dat'%(index)
 
-    writer = open(coordinates_file, 'w')
+    writer = open(coordinate_file, 'w')
     for ii in range(0, len(lon)):
         writer.write('%12.5f%12.5f\n'%(lon[ii], lat[ii]))
     writer.close()
 
     os.system('polyid -W %s %s %s || exit'%(infile,
-                                            coordinates_file,
-                                            maglims_file))
+                                            coordinate_file,
+                                            maglim_file))
 
-    reader = open(maglims_file)
+    reader = open(maglim_file)
     lines = reader.readlines()
     reader.close()
 
-    os.remove(maglims_file)
-    os.remove(coordinates_file)
+    os.remove(maglim_file)
+    os.remove(coordinate_file)
 
-    maglims = []
+    maglim = []
     for ii in range(1, len(lines)):
         if len(lines[ii].split()) == 3:
-            maglims.append(float(lines[ii].split()[2]))
+            maglim.append(float(lines[ii].split()[2]))
         elif len(lines[ii].split()) == 2:
-            maglims.append(0.) # Coordinates outside of the MANGLE ploygon
+            maglim.append(0.) # Coordinates outside of the MANGLE ploygon
         elif len(lines[ii].split()) > 3:
             #print 'WARNING: coordinate inside multiple polygons, using weight from first polygon'
-            #maglims.append(float(lines[ii].split()[2])) # Mask out the pixels inside multiple polygons
-            print 'WARNING: coordinate inside multiple polygons, masking that coordinate'
-            maglims.append(0.)
+            #maglim.append(float(lines[ii].split()[2])) # Mask out the pixels inside multiple polygons
+            print 'WARNING: coordinate inside multiple polygons, masking that coordinate.'
+            maglim.append(0.)
         else:
-            print 'WARNING: cannot parse maglims file, unexpected number of columns, stop reading now'
+            print 'WARNING: cannot parse maglim file, unexpected number of columns, stop reading now.'
             break
             
-    maglims = numpy.array(maglims)
-    return maglims
+    maglim = numpy.array(maglim)
+    return maglim
 
 ############################################################
 
-def farmMaskFromCatalog(catalog, infile_mangle, nside_pix, nside_subpix, writedir):
-    """
-    Given an object catalog, farm out the task of creating a mask.
-    """
-
-    if not os.path.exists(writedir):
-        os.mkdir(writedir)
-    
-    if self.config.params['coords']['coordsys'].lower() == 'cel' \
-           and self.config.params['mask']['coordsys'].lower() == 'gal':
-        lon_catalog, lat_catalog = ugali.utils.projector.celToGal(catalog.lon, catalog.lat)
-    elif self.config.params['coords']['coordsys'].lower() == 'gal' \
-             and self.config.params['mask']['coordsys'].lower() == 'cel':
-        lon_catalog, lat_catalog = ugali.utils.projector.galToCel(catalog.lon, catalog.lat)
-    else:
-        lon_catalog, lat_catalog = catalog.lon, catalog.lat
-
-    pix, subpix = ugali.utils.skymap.surveyPixel(lon_catalog, lat_catalog, nside_pix, nside_subpix)
-
-    for ii in range(0, len(pix)):
-        theta, phi =  healpy.pix2ang(nside_subpix, subpix[ii])
-        lon, lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
-        outfile = '%s/mask_%010i.fits'%(writedir, pix[ii])
-        print '(%i/%i) %s %i (%.3f, %.3f)'%(ii, len(pix), outfile, len(lon), lon[0], lat[0])
-        maglims = readMangleFile(infile_mangle, lon, lat, index = pix[ii])
-        ugali.utils.skymap.writeSparseHealpixMap(subpix[ii], maglims, nside_subpix, outfile)
+def allSkyMask(infile, nside):
+    lon, lat = ugali.utils.skymap.allSkyCoordinates(nside)
+    maglim = readMangleFile(infile, lon, lat, index = None)
+    return maglim
 
 ############################################################

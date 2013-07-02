@@ -2,6 +2,7 @@
 Tools for making maps of the sky with healpix.
 """
 
+import sys
 import numpy
 import pyfits
 import healpy
@@ -40,25 +41,70 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
 
 ############################################################
 
-def writeSparseHealpixMap(pix, value, nside, outfile,
+def allSkyCoordinates(nside):
+    """
+    Generate a set of coordinates at the centers of pixels of resolutions nside across the full sky. 
+    """
+    theta, phi =  healpy.pix2ang(nside, range(0, healpy.nside2npix(nside)))
+    lon = numpy.degrees(phi)
+    lat = 90. - numpy.degrees(theta)                    
+    return lon, lat
+
+############################################################
+
+def writeSparseHealpixMap(pix, data_dict, nside, outfile,
+                          distance_modulus_array = None,
                           coordsys = 'NULL', ordering = 'NULL'):
     """
+    Sparse HEALPix maps are used to efficiently store maps of the sky by only
+    writing out the pixels that contain data.
+
+    Three-dimensional data can be saved by supplying a distance modulus array
+    which is stored in a separate extension.
+    
     coordsys [gal, cel]
     ordering [ring, nest]
     """
 
+    hdul = pyfits.HDUList()
+
+    # Pixel data extension
     columns_array = [pyfits.Column(name = 'PIX',
                                    format = 'K',
-                                   array = pix),
-                     pyfits.Column(name = 'VALUE',
-                                   format = 'E',
-                                   array = value)]
+                                   array = pix)]
+    for key in data_dict.keys():
+        if data_dict[key].shape[0] != len(pix):
+            print 'WARNING: first dimension of column %s (%i) does not match number of pixels (%i).'%(key,
+                                                                                                      data_dict[key].shape[0],
+                                                                                                      len(pix))
+        
+        if len(data_dict[key].shape) == 1:
+            columns_array.append(pyfits.Column(name = key,
+                                               format = 'E',
+                                               array = data_dict[key]))
+        elif len(data_dict[key].shape) == 2:
+            columns_array.append(pyfits.Column(name = key,
+                                               format = '%iE'%(data_dict[key].shape[1]),
+                                               array = data_dict[key]))
+        else:
+            print 'WARNING: unexpected number of data dimensions for column %s.'%(key)
     
-    hdu = pyfits.new_table(columns_array)
-    hdu.header.update('NSIDE', nside)
-    hdu.header.update('COORDSYS', coordsys)
-    hdu.header.update('ORDERING', ordering)
-    hdu.writeto(outfile, clobber = True)
+    hdu_pix_data = pyfits.new_table(columns_array)
+    hdu_pix_data.header.update('NSIDE', nside)
+    hdu_pix_data.header.update('COORDSYS', coordsys.upper())
+    hdu_pix_data.header.update('ORDERING', ordering.upper())
+    hdu_pix_data.name = 'PIX_DATA'
+    hdul.append(hdu_pix_data)
+
+    # Distance modulus extension
+    if distance_modulus_array is not None:
+        hdu_distance_modulus = pyfits.new_table(pyfits.Column(name = 'DISTANCE_MODULUS',
+                                                              format = 'E',
+                                                              array = distance_modulus_array))
+        hdu_distance_modulus.name = 'DISTANCE_MODULUS'
+        hdul = pyfits.append(hdu_distance_modulus)
+
+    hdul.writeto(outfile, clobber = True)
     
 ############################################################
 
