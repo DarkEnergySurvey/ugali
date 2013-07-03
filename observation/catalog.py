@@ -18,6 +18,9 @@ class Catalog:
         """
         Class to store information about detected objects.
 
+        The raw data from the fits file is stored. lon and lat are derived quantities
+        based on chosen coordinate system.
+
         INPUTS:
             config: Config object
             data[None]: pyfits table data (fitsrec) object.
@@ -28,7 +31,7 @@ class Catalog:
         if data is None:
             self._parse()
         else:
-            self.data = data 
+            self.data = data
     
         self._defineVariables()
 

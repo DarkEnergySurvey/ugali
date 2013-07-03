@@ -1,7 +1,7 @@
 {'output': {'chatter': 4, # 0 = silent; 1 = text output; 2 = more text output; 3 = text output and figures; 4 = paranoid
             'savedir_mag_1_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_r',
             'savedir_mag_2_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_i',
-            'savedir_likelihood': None},
+            'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/likelihood'},
 
  'catalog': {'infile': '/home/s1/bechtol/des10.a/projects/mw_substructure/mangle_test/y1c1_coadd_BulletClustersmask/data/starcat_y1c1_coadd_bullet.fits',
              #'infile': '/home/s1/bechtol/des10.a/projects/dust_maps/cluster_fields/bullet/image_riz_starcat_slr.fits',
@@ -50,7 +50,7 @@
             'coordsys': 'gal',
             'proj_type': 'ait'},
 
- 'kernel': {'type': 'disk',
+ 'kernel': {'type': 'plummer',
             'params': [0.1]},
  
  'isochrone': {'dir': '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/',
@@ -60,5 +60,7 @@
                'mag_2_field': 'i',
                'stage_field': 'stage',
                'imf': 'chabrier',
-               'mass_steps': 400}
+               'mass_steps': 400},
+
+ 'likelihood': {'distance_modulus_array': [18., 19.]}
  }
