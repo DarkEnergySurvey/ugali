@@ -231,7 +231,7 @@ class MaskBand:
         Infile is a HEALPix map.
         """
         self.roi = roi
-        self.mask = ugali.utils.skymap.readSparseHealpixMap(infile)
+        self.mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
         
         self.mask_roi = numpy.zeros(len(self.mask))
         self.mask_roi[self.roi.pixels] =  self.mask[self.roi.pixels] # ROI specific

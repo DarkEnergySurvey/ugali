@@ -21,8 +21,8 @@
             'coordsys': 'cel'},
  #'manglebindir': '/home/s1/bechtol/des10.a/code/mangle/mangle2.2/bin'},
 
- 'mask': {'infile_1': None,
-          'infile_2': None,
+ 'mask': {'infile_1': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_r.fits',
+          'infile_2': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_i.fits',
           'minimum_solid_angle': 0.1}, # deg^2
           
  'color': {'min': -0.5,

@@ -108,30 +108,41 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
     
 ############################################################
 
-def readSparseHealpixMap(infile, extension=1, default_value=healpy.UNSEEN, construct_map=True):
+def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
     """
     Open a sparse HEALPix map fits file.
     Convert the contents into a HEALPix map or simply return the contents.
+    Flexibility to handle 
     """
     reader = pyfits.open(infile)
     pix = reader[extension].data.field('PIX')
-    value = reader[extension].data.field('VALUE')
-
+    value = reader[extension].data.field(field)
+    
     if construct_map:
-        map = default_value * numpy.ones(healpy.nside2npix(reader[extension].header['NSIDE']))
-        map[pix] = value
+        if len(value.shape) == 1:
+            map = default_value * numpy.ones(healpy.nside2npix(reader[extension].header['NSIDE']))
+            map[pix] = value
+        else:
+            map = default_value * numpy.ones([value.shape[1], healpy.nside2npix(reader[extension].header['NSIDE'])])
+            for ii in range(0, value.shape[1]):
+                map[ii][pix] = numpy.take(value, [ii], axis=1)
         reader.close()
         return map
     else:
         reader.close()
-        return pix, value
+        if len(value.shape) == 1:
+            return pix, value
+        else:
+            return pix, value.transpose()
 
 ############################################################
 
-def mergeSparseHealpixMaps(infiles, extension=1, default_value=healpy.UNSEEN, construct_map=True):
+def mergeSparseHealpixMaps2(infiles, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
     """
     Ideas: store only the pixels with data for each roi, merge results later
     """
+
+    # TODO: THIS FUNCTION NEEDS TO BE GENERALIZED TO HANDLE 3D MAPS AND MULTIPLE FIELDS
 
     pix_array = [] #* len(infiles)
     value_array = [] #* len(infiles)
@@ -165,5 +176,75 @@ def mergeSparseHealpixMaps(infiles, extension=1, default_value=healpy.UNSEEN, co
         else:
             pix_valid = numpy.nonzero(map != default_value)[0]
             return pix_valid, map[pix_valid]
+
+############################################################
+
+def mergeSparseHealpixMaps(infiles, outfile,
+                           pix_data_extension='PIX_DATA',
+                           pix_field='PIX',
+                           distance_modulus_extension='DISTANCE_MODULUS',
+                           distance_modulus_field='DISTANCE_MODULUS',
+                           default_value=healpy.UNSEEN):
+    """
+    Use the first infile to determine the basic contents to expect for the other files.
+    """
+
+    # Setup
+    
+    distance_modulus_array = None
+    pix_array = []
+    data_dict = {}
+
+    reader = pyfits.open(infiles[0])
+    nside = reader[pix_data_extension].header['NSIDE']
+
+    for ii in range(0, len(reader)):
+        if reader[ii].name == distance_modulus_extension:
+            distance_modulus_array = reader[distance_modulus_extension].data.field(distance_modulus_field)
+
+    for key in reader[pix_data_extension].data.names:
+        if key == pix_field:
+            continue
+        data_dict[key] = []
+        #if distance_modulus_array is None:
+        #    data_dict[key] = default_value * numpy.ones(healpy.nside2npix(nside))
+        #else:
+        #    data_dict[key] = default_value * numpy.ones([len(distance_modulus_array),
+        #                                                 healpy.nside2npix(nside)])
+    
+    reader.close()
+
+    # Now loop over the infiles
+
+    for ii in range(0, len(infiles)):
+        print '(%i/%i) %s'%(ii, len(infiles), infiles[ii])
+
+        pix_array_current = readSparseHealpixMap(infiles[ii], pix_field,
+                                                 extension=pix_data_extension, construct_map=False)[0]
+        pix_array.append(pix_array_current)
+
+        for key in data_dict.keys():
+            data_dict[key].append(readSparseHealpixMap(infiles[ii], key,
+                                                       extension=pix_data_extension, construct_map=False)[1])
+            #if distance_modulus_array is None:
+            #    data_dict[key][pix_array_current] = value
+            #else:
+            #    for jj in range(0, len(distance_modulus_array)):
+            #        data_dict[key][jj] = value[jj]
+
+    pix_master = numpy.concatenate(pix_array)
+    n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
+    if n_conflicting_pixels != 0:
+        print 'WARNING: %i conflicting pixels during merge.'%(n_conflicting_pixels)
+
+    for key in data_dict.keys():
+        if distance_modulus_array is not None:
+            data_dict[key] = numpy.concatenate(data_dict[key], axis=1).transpose()
+        else:
+            data_dict[key] = numpy.concatenate(data_dict[key])
+    
+    writeSparseHealpixMap(pix_master, data_dict, nside, outfile,
+                          distance_modulus_array=distance_modulus_array,
+                          coordsys='NULL', ordering='NULL')
 
 ############################################################
