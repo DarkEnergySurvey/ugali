@@ -129,6 +129,11 @@ class Farm:
 
         print '=== Likelihood From Catalog ==='
         for ii in range(0, len(pix)):
+
+            # Just for testing
+            #if ii >= 2:
+            #    continue
+            
             theta, phi =  healpy.pix2ang(self.config.params['coords']['nside_likelihood_segmentation'], pix[ii])
             lon, lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
 
@@ -159,7 +164,7 @@ class Farm:
                 # Submit to queue
                 pass
 
-            return likelihood
+            #return likelihood
 
     def farmLikelihoodFromCatalogNow(self, pix, outfile):
         """
@@ -197,7 +202,11 @@ class Farm:
         
         likelihood.precomputeGridSearch(self.config.params['likelihood']['distance_modulus_array'])
 
-        return likelihood
+        likelihood.gridSearch()
+
+        likelihood.write(outfile)
+
+        #return likelihood
     
 ############################################################
 

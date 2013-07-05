@@ -5,9 +5,33 @@ classes and functions used to search for ultra-faint satellite
 galaxies of the Milky Way using the point-source catalogs 
 derived from optical photometric surveys.
 
+Keith Bechtol
+bechtol@kicp.uchicago.edu
+
+=== USAGE EXAMPLES ===
+
+Examples go here.
+
 === CODE REPOSITORY ===
 
 https://bitbucket.org/bechtol/ugali/
+
+=== DEPENDENCIES ===
+
+Python packages:
+numpy
+scipy
+pyfits - http://www.stsci.edu/institute/software_hardware/pyfits
+healpy - https://github.com/healpy/healpy
+
+Mangle:
+Not a strict dependency. Used to interface with masks produced by
+the Dark Energy Survey Data Mangement group. Download and documentation 
+available at http://space.mit.edu/~molly/mangle/
+
+Isochrones:
+Currently set up to use isochrones in the format produced by Leo Girardi's (Padova)
+CMD tool, which has a web interface at http://stev.oapd.inaf.it/cgi-bin/cmd
 
 === CONVENTIONS ===
 
@@ -32,3 +56,4 @@ PDF: probability distribution function
 
 * Change name of ugali.utils.projector to ugali.utils.coords
 * Consistent naming convention for pix vs. pixel
+* Simulator tools

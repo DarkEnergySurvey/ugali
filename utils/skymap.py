@@ -98,11 +98,11 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
 
     # Distance modulus extension
     if distance_modulus_array is not None:
-        hdu_distance_modulus = pyfits.new_table(pyfits.Column(name = 'DISTANCE_MODULUS',
-                                                              format = 'E',
-                                                              array = distance_modulus_array))
+        hdu_distance_modulus = pyfits.new_table([pyfits.Column(name = 'DISTANCE_MODULUS',
+                                                               format = 'E',
+                                                               array = distance_modulus_array)])
         hdu_distance_modulus.name = 'DISTANCE_MODULUS'
-        hdul = pyfits.append(hdu_distance_modulus)
+        hdul.append(hdu_distance_modulus)
 
     hdul.writeto(outfile, clobber = True)
     

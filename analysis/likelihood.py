@@ -15,6 +15,7 @@ import pylab
 
 import ugali.utils.binning
 import ugali.utils.parabola
+import ugali.utils.skymap
 
 ############################################################
 
@@ -355,5 +356,21 @@ class Likelihood:
             
         log_likelihood, p, f = self.logLikelihood(distance_modulus, richness, grid_search=True)
         return p
+
+    def write(self, outfile):
+        """
+
+        """
+
+        data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
+                     'RICHNESS': self.richness_sparse_array.transpose(),
+                     'RICHNESS_LIM': self.richness_upper_limit_sparse_array.transpose()}
+
+        ugali.utils.skymap.writeSparseHealpixMap(self.roi.pixels_target,
+                                                 data_dict,
+                                                 self.config.params['coords']['nside_pixel'],
+                                                 outfile,
+                                                 distance_modulus_array=self.distance_modulus_array,
+                                                 coordsys='NULL', ordering='NULL')
 
 ############################################################
