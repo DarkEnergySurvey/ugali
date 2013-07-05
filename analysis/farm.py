@@ -173,13 +173,6 @@ class Farm:
 
         theta, phi =  healpy.pix2ang(self.config.params['coords']['nside_likelihood_segmentation'], pix)
         lon, lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
-
-        # Make these config parameters
-        isochronedir = '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/'
-        isochrone_names = ['isota1010z0.1.dat',
-                           'isota1010z0.2.dat',
-                           'isota1015z0.1.dat',
-                           'isota1015z0.2.dat']
         
         roi = ugali.observation.roi.ROI(self.config, lon, lat)
 
@@ -189,12 +182,11 @@ class Farm:
 
         cut = mask.restrictCatalogToObservableSpace(self.catalog)
         catalog = self.catalog.applyCut(cut)
-
+        
         isochrones = []
-        for ii, name in enumerate(isochrone_names):
-            isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, '%s/%s'%(isochronedir, name)))
-
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, [0.25, 0.25, 0.25, 0.25])
+        for ii, name in enumerate(self.config.params['isochrone']['infiles']):
+            isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, name))
+        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config.params['isochrone']['weights'])
 
         kernel = ugali.analysis.kernel.Plummer(lon, lat, 0.1)
 

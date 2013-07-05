@@ -53,13 +53,17 @@
  'kernel': {'type': 'plummer',
             'params': [0.1]},
  
- 'isochrone': {'dir': '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/',
-               'mass_init_field': 'M_ini',
+ 'isochrone': {'mass_init_field': 'M_ini',
                'mass_act_field': 'M_act',
                'mag_1_field': 'r',
                'mag_2_field': 'i',
                'stage_field': 'stage',
                'imf': 'chabrier',
+               'infiles': ['/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.1.dat',
+                           '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.2.dat',
+                           '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1015z0.1.dat',
+                           '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1015z0.2.dat'],
+               'weights': [0.25, 0.25, 0.25, 0.25],
                'mass_steps': 400},
 
  'likelihood': {'distance_modulus_array': [18., 19.]}

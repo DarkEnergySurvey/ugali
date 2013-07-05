@@ -224,17 +224,3 @@ def halfLightRadius(m_stellar):
     return 10**(A + B * numpy.log10(m_stellar / m_stellar_0))
 
 ############################################################
-
-def distance_to_distance_modulus(distance):
-    """
-    Return distance modulus for a given distance (kpc).
-    """
-    return 5. * (numpy.log10(distance * 1.e3) - 1.)
-
-def distance_modulus_to_distance(distance_modulus):
-    """
-    Return distance (kpc) for a given distance modulus.
-    """
-    return 10**((0.2 * distance_modulus) - 2.)
-
-############################################################

@@ -57,3 +57,4 @@ PDF: probability distribution function
 * Change name of ugali.utils.projector to ugali.utils.coords
 * Consistent naming convention for pix vs. pixel
 * Simulator tools
+* Farm should write out config file for future reference
