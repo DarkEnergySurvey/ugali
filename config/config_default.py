@@ -1,7 +1,7 @@
 {'output': {'chatter': 4, # 0 = silent; 1 = text output; 2 = more text output; 3 = text output and figures; 4 = paranoid
-            'savedir_mag_1_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_r',
-            'savedir_mag_2_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_i',
-            'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/likelihood'},
+            'savedir_mag_1_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_r',
+            'savedir_mag_2_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_i',
+            'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/likelihood'},
 
  'catalog': {'infile': '/home/s1/bechtol/des10.a/projects/mw_substructure/mangle_test/y1c1_coadd_BulletClustersmask/data/starcat_y1c1_coadd_bullet.fits',
              #'infile': '/home/s1/bechtol/des10.a/projects/dust_maps/cluster_fields/bullet/image_riz_starcat_slr.fits',
@@ -21,8 +21,8 @@
             'coordsys': 'cel'},
  #'manglebindir': '/home/s1/bechtol/des10.a/code/mangle/mangle2.2/bin'},
 
- 'mask': {'infile_1': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_r.fits',
-          'infile_2': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/mask_i.fits',
+ 'mask': {'infile_1': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_r.fits',
+          'infile_2': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_i.fits',
           'minimum_solid_angle': 0.1}, # deg^2
           
  'color': {'min': -0.5,

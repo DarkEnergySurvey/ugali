@@ -81,11 +81,11 @@ def twoDimensionalScatter(title, title_x, title_y,
 ############################################################
 
 def zoomedHealpixMap(title, map, lon, lat, radius,
-                     xsize=1000):
+                     xsize=1000, **kwargs):
     """
     Inputs: lon (deg), lat (deg), radius (deg)
     """
     reso = 60. * 2. * radius / xsize # Deg to arcmin
-    healpy.gnomview(map=map, rot=[lon, lat, 0], title=title, xsize=xsize, reso=reso, degree=False)
+    healpy.gnomview(map=map, rot=[lon, lat, 0], title=title, xsize=xsize, reso=reso, degree=False, **kwargs)
     
 ############################################################

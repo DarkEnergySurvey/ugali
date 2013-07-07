@@ -226,3 +226,22 @@ def distanceModulusToDistance(distance_modulus):
     return 10**((0.2 * distance_modulus) - 2.)
 
 ############################################################
+
+def pixToAng(nside, pix):
+    """
+    Return (lon, lat) in degrees instead of (theta, phi) in radians
+    """
+    theta, phi =  healpy.pix2ang(nside, pix)
+    lon = numpy.degrees(phi)
+    lat = 90. - numpy.degrees(theta)                    
+    return lon, lat
+
+def angToPix(nside, lon, lat):
+    """
+    Input (lon, lat) in degrees instead of (theta, phi) in radians
+    """
+    theta = numpy.radians(90. - lat)
+    phi = numpy.radians(lon)
+    pix = numpy.unique(healpy.ang2pix(nside, theta, phi))
+
+############################################################

@@ -59,6 +59,36 @@ class Parabola:
         self.vertex_x = -self.p_1 / (2. * self.p_2)
         self.vertex_y = self.p_0 - (self.p_1**2 / (4. * self.p_2))
 
+    def __call__(self, x):
+        """
+        Evaluate the parabola.
+        """
+        return (self.p_2 * x**2) + (self.p_1 * x) + self.p_0
+
+    def densify(self, factor=10):
+        """
+        Increase the density of points along the parabolic curve.
+        """
+        x = []
+        y = []
+        for ii in range(0, len(self.x) - 2):
+            p = Parabola(self.x[ii: ii + 3], self.y[ii: ii + 3])
+            x.append(numpy.linspace(self.x[ii], self.x[ii + 1], factor)[0: -1])
+            y.append(p(x[-1]))
+
+        p = Parabola(self.x[len(self.x) - 3:], self.y[len(self.y) - 3:])
+        x.append(numpy.linspace(self.x[-2], self.x[-1], factor)[0: -1])
+        y.append(p(x[-1]))
+
+        x.append([self.x[-1]])
+        y.append([self.y[-1]])
+
+        #f = scipy.interpolate.interp1d(numpy.concatenate(x), numpy.concatenate(y))
+        #x = numpy.linspace(self.x[0], self.x[-1], len(x) * factor)   
+        #return x, f(x)
+        
+        return numpy.concatenate(x), numpy.concatenate(y)
+
     def profileUpperLimit(self, delta = 2.71):
         """
         Compute one-sided upperlimit via profile method.
@@ -76,30 +106,92 @@ class Parabola:
             
         return max((numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
 
-    def bayesianUpperLimit2(self, alpha, steps = 1.e5):
-        """
-        Compute one-sided upper limit using Bayesian Method of Helene.
-        """
-        # Need a check to see whether limit is reliable
-        pdf = scipy.interpolate.interp1d(self.x, numpy.exp(self.y / 2.)) # Convert from 2 * log(likelihood) to likelihood
-        x_pdf = numpy.linspace(self.x[0], self.x[-1], steps)
-        cdf = numpy.cumsum(pdf(x_pdf))
-        cdf /= cdf[-1]
-        cdf_reflect = scipy.interpolate.interp1d(cdf, x_pdf)
-        return cdf_reflect(alpha)
-        #return self.x[numpy.argmin((cdf - alpha)**2)]
+    #def bayesianUpperLimit3(self, alpha, steps = 1.e5):
+    #    """
+    #    Compute one-sided upper limit using Bayesian Method of Helene.
+    #    """
+    #    # Need a check to see whether limit is reliable
+    #    pdf = scipy.interpolate.interp1d(self.x, numpy.exp(self.y / 2.)) # Convert from 2 * log(likelihood) to likelihood
+    #    x_pdf = numpy.linspace(self.x[0], self.x[-1], steps)
+    #    cdf = numpy.cumsum(pdf(x_pdf))
+    #    cdf /= cdf[-1]
+    #    cdf_reflect = scipy.interpolate.interp1d(cdf, x_pdf)
+    #    return cdf_reflect(alpha)
+    #    #return self.x[numpy.argmin((cdf - alpha)**2)]
 
-    def bayesianUpperLimit(self, alpha, steps=1.e5):
+    def bayesianUpperLimit(self, alpha, steps=1.e5, plot=False):
+        """
+        Compute one-sided upper limit using Bayesian Method of Helene.
+        Several methods of increasing numerical stability have been implemented.
+        """
+        x_dense, y_dense = self.densify()
+        y_dense -= numpy.max(y_dense) # Numeric stability
+        f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
+        x = numpy.linspace(0., numpy.max(x_dense), steps)
+        pdf = numpy.exp(f(x) / 2.)
+        cut = (pdf / numpy.max(pdf)) > 1.e-10
+        x = x[cut]
+        pdf = pdf[cut]
+        #pdf /= pdf[0]
+        #forbidden = numpy.nonzero(pdf < 1.e-10)[0]
+        #if len(forbidden) > 0:
+        #    index = forbidden[0] # Numeric stability
+        #    x = x[0: index]
+        #    pdf = pdf[0: index]
+        cdf = numpy.cumsum(pdf)
+        cdf /= cdf[-1]
+        cdf_reflect = scipy.interpolate.interp1d(cdf, x)
+
+        if plot:
+            import pylab
+            
+            pylab.figure()
+            pylab.plot(x, f(x))
+            pylab.scatter(self.x, self.y, c='red')
+            
+            pylab.figure()
+            pylab.plot(x, pdf)
+            
+            pylab.figure()
+            pylab.plot(cdf, x)
+        
+        return cdf_reflect(alpha)
+
+    def bayesianUpperLimit2(self, alpha, steps=1.e5, plot=False):
         """
         Compute one-sided upper limit using Bayesian Method of Helene.
         """
-        #argsort = numpy.argsort(self.x)
-        f = scipy.interpolate.interp1d(self.x, self.y, kind='cubic')
-        x = numpy.linspace(0., numpy.max(self.x), steps)
+        cut = ((self.y / 2.) > -30.) # Numeric stability
+        try:
+            f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='cubic')
+        except:
+            f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='linear')
+        x = numpy.linspace(0., numpy.max(self.x[cut]), steps)
         y = numpy.exp(f(x) / 2.)
+        #forbidden = numpy.nonzero((y / numpy.exp(self.vertex_y / 2.)) < 1.e-10)[0]
+        forbidden = numpy.nonzero((y / self.vertex_y) < 1.e-10)[0]
+        if len(forbidden) > 0:
+            index = forbidden[0] # Numeric stability
+            x = x[0: index]
+            y = y[0: index]
         cdf = numpy.cumsum(y)
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
+
+        if plot:
+            import pylab
+            pylab.figure()
+            pylab.scatter(self.x, self.y)
+
+            pylab.figure()
+            pylab.plot(x, f(x))
+            
+            pylab.figure()
+            pylab.plot(x, y)
+            
+            pylab.figure()
+            pylab.plot(cdf, x)
+        
         return cdf_reflect(alpha)
 
         """

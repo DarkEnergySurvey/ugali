@@ -13,6 +13,7 @@ import pyfits
 import pylab
 import healpy
 
+import ugali.analysis.farm
 import ugali.utils.parse_config
 import ugali.utils.plotting
 import ugali.utils.projector
@@ -69,7 +70,7 @@ class Collector:
             print 'WARNING: could not determine stellar mass conversion factor, please supply config file.'
             self.stellar_mass = 1.
 
-    def map(self, mode='ts', distance_modulus_index=None):
+    def map(self, mode='ts', distance_modulus_index=None, **kwargs):
         """
         Documentation.
         """
@@ -100,7 +101,7 @@ class Collector:
                 map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
                 map[self.pixels] = self.richness_lim_sparse[ii]
                         
-            ugali.utils.plotting.zoomedHealpixMap(title, map, lon_median, lat_median, radius)
+            ugali.utils.plotting.zoomedHealpixMap(title, map, lon_median, lat_median, radius, **kwargs)
 
     def testStatistic(self):
         """
@@ -122,10 +123,8 @@ class Collector:
         """
         stellar_mass is the average stellar mass (M_Sol) of the isochrone, i.e., the average mass per star.
         """
-
-        # NEED TO CONVERT TO PROPER STELLAR MASS UNITS
         
-        richness_lim_array = self.stellar_mass * numpy.linspace(numpy.min(self.richness_lim_sparse), numpy.max(self.richness_lim_sparse), 50)
+        richness_lim_array = self.stellar_mass * numpy.linspace(numpy.min(self.richness_lim_sparse), numpy.max(self.richness_lim_sparse), 100)
 
         sensitivity_curve_array = []
 
@@ -149,3 +148,19 @@ class Collector:
         pylab.title('Upper Limits (0.95 CL)')
 
         pylab.legend(loc='lower right')
+
+    def inspect(self, coords, distance_modulus_index):
+        """
+        A useful tool would be to recreate the likelihood object for a given set of coordinates.
+        """
+        farm = ugali.analysis.farm.Farm(self.config)
+        likelihood = farm.farmLikelihoodFromCatalog(local=True, coords=coords)
+
+        likelihood.precomputeGridSearch([self.distance_modulus_array[distance_modulus_index]])
+
+        richness, log_likelihood = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
+
+        #pylab.figure()
+        #pylab.scatter(richness, log_likelihood, c='b')
+
+        return likelihood, richness, log_likelihood
