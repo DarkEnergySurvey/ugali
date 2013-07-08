@@ -242,6 +242,6 @@ def angToPix(nside, lon, lat):
     """
     theta = numpy.radians(90. - lat)
     phi = numpy.radians(lon)
-    pix = numpy.unique(healpy.ang2pix(nside, theta, phi))
+    return healpy.ang2pix(nside, theta, phi)
 
 ############################################################

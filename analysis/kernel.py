@@ -209,6 +209,18 @@ class Plummer:
             r_max = self.r_h * self.u_t
         return norm * numpy.pi * self.r_h**2 \
                * (((r_min / self.r_h)**2 + 1.)**(-1) - ((r_max / self.r_h)**2 + 1.)**(-1))
+
+    def simulate(self, n):
+        """
+        Return n simulated angular separations (deg) from center.
+        """
+        r = numpy.linspace(0, 20. * self.r_h, 1.e5)
+        pdf = self.surfaceIntensity(r) * numpy.sin(numpy.radians(r))
+        cdf = numpy.cumsum(pdf)
+        cdf /= cdf[-1]
+        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
+        index = numpy.floor(f(numpy.random.rand(n))).astype(int)
+        return r[index]
     
 ############################################################
 

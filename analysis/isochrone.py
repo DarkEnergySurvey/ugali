@@ -490,4 +490,17 @@ class CompositeIsochrone:
             value += self.weights[ii] * self.isochrones[ii].observableFraction(mask, distance_modulus)
         return value
 
+    def simulate(self, stellar_mass, distance_modulus=0.):
+        """
+
+        """
+        n = stellar_mass / self.stellarMass() # Number of stars in system
+        mass_init_array, mass_pdf_array, mass_act_array, mag_1_array, mag_2_array = self.sample()
+        cdf = numpy.cumsum(mass_pdf_array)
+        cdf = numpy.insert(cdf, 0, 0.)
+        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
+        index = numpy.floor(f(numpy.random.rand(n))).astype(int)
+        index = index[index >= 0]
+        return mag_1_array[index] + distance_modulus, mag_2_array[index] + distance_modulus
+
 ############################################################
