@@ -119,12 +119,14 @@ class Collector:
         pylab.xlabel('Test Statistic')
         pylab.title('Significance Distribution')
 
-    def sensitivity(self):
+    def sensitivity(self, steps=1000):
         """
         stellar_mass is the average stellar mass (M_Sol) of the isochrone, i.e., the average mass per star.
         """
         
-        richness_lim_array = self.stellar_mass * numpy.linspace(numpy.min(self.richness_lim_sparse), numpy.max(self.richness_lim_sparse), 100)
+        richness_lim_array = self.stellar_mass * numpy.linspace(numpy.min(self.richness_lim_sparse), numpy.max(self.richness_lim_sparse), steps)
+
+        print len(richness_lim_array)
 
         sensitivity_curve_array = []
 
@@ -146,7 +148,8 @@ class Collector:
         pylab.xlabel(r'Stellar Mass ($M_{\odot}$)')
         pylab.ylabel(r'Area (deg$^2$)')
         pylab.title('Upper Limits (0.95 CL)')
-
+        #pylab.xscale('log')
+        #pylab.yscale('log')
         pylab.legend(loc='lower right')
 
     def inspect(self, coords, distance_modulus_index):
@@ -164,3 +167,62 @@ class Collector:
         #pylab.scatter(richness, log_likelihood, c='b')
 
         return likelihood, richness, log_likelihood
+
+    def findPeaks(self, ts_threshold):
+        """
+        Return a list of peaks in the TS maps.
+        """
+        peaks = []
+        for distance_modulus_index in range(0, len(self.distance_modulus_array)):
+            peaks.append([])
+
+            pix_index = numpy.nonzero((2. * self.log_likelihood_sparse[distance_modulus_index]) > ts_threshold)[0]
+            if len(pix_index) == 0:
+                continue
+            
+            pix = self.pixels[pix_index]
+
+            peaks[distance_modulus_index].append([pix[0]])
+
+            peak_index = 0
+            pix_assigned = numpy.concatenate(peaks[distance_modulus_index])
+
+            while len(pix_assigned) < len(pix):
+
+                pix_neighbors = numpy.unique(healpy.pixelfunc.get_all_neighbours(self.nside,
+                                                                                 peaks[distance_modulus_index][peak_index]))
+                pix_neighbors_valid = numpy.intersect1d(pix_neighbors, pix)
+                pix_neighbors_valid_new = numpy.setdiff1d(pix_neighbors_valid, peaks[distance_modulus_index][peak_index])
+
+                if len(pix_neighbors_valid_new) == 0:
+                    peaks[distance_modulus_index].append([numpy.min(numpy.setdiff1d(pix, pix_assigned))])
+                else:
+                    peaks[distance_modulus_index][peak_index] = numpy.concatenate([peaks[distance_modulus_index][peak_index],
+                                                                                   pix_neighbors_valid_new])
+
+                peak_index = len(peaks[distance_modulus_index]) - 1
+                pix_assigned = numpy.concatenate(peaks[distance_modulus_index])
+
+        for distance_modulus_index in range(0, len(self.distance_modulus_array)):
+            print '  distance modulus = %.2f'%(self.distance_modulus_array[distance_modulus_index])
+
+            map_log_likelihood = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
+            map_log_likelihood[self.pixels] = self.log_likelihood_sparse[distance_modulus_index]
+
+            for peak_index in range(0, len(peaks[distance_modulus_index])):
+                log_likelihood_peak = map_log_likelihood[peaks[distance_modulus_index][peak_index]]
+                lon, lat = ugali.utils.projector.pixToAng(self.nside,
+                                                          peaks[distance_modulus_index][peak_index][numpy.argmax(log_likelihood_peak)])
+                print '    TS_peak = %.2f, (lon, lat) = (%.3f, %.3f), size = %.4f deg^2 (%i pix)'%(numpy.max(2. * log_likelihood_peak),
+                                                                                                   lon, lat,
+                                                                                                   self.area_pixel * len(peaks[distance_modulus_index][peak_index]),
+                                                                                                   len(peaks[distance_modulus_index][peak_index]))
+
+        # Merge peaks on distance modulus slices??
+
+        #for distance_modulus_index in range(0, len(self.distance_modulus_array)):
+        #    for peak_index in range(0, len(peaks[distance_modulus_index])):       
+                
+        return peaks
+
+############################################################

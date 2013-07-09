@@ -12,8 +12,8 @@
              'mag_err_1_field': 'MAGERR_PSF_R',
              'mag_2_field': 'MAG_PSF_I',
              'mag_err_2_field': 'MAGERR_PSF_I',
-             #'mc_source_id_field': 'mc_source_id',
-             'mc_source_id_field': None,
+             'mc_source_id_field': 'MC_SOURCE_ID',
+             #'mc_source_id_field': None,
              'band_1_detection': False}, # True = band 1 is detection band; False = band 2 is detection band
 
  'mangle': {'infile_1': '/home/s1/bechtol/des10.a/projects/mw_substructure/mangle_test/y1c1_coadd_BulletClustersmask/y1c1_coadd_BulletClusters_holymolys_maglims_r.pol',

@@ -14,7 +14,7 @@ import ugali.utils.plotting
 
 class Catalog:
 
-    def __init__(self, config, data = None):
+    def __init__(self, config, data=None):
         """
         Class to store information about detected objects.
 
@@ -160,8 +160,16 @@ class Catalog:
         self.mag_err_2 = self.data.field(self.config.params['catalog']['mag_err_2_field'])
 
         if self.config.params['catalog']['mc_source_id_field'] is not None:
-            self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
-            print 'Found %i MC source objects'%(numpy.sum(self.mc_source_id == 1))
+            if self.config.params['catalog']['mc_source_id_field'] in self.data.names:
+                self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
+                print 'Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0))
+            else:
+                columns_array = [pyfits.Column(name = self.config.params['catalog']['mc_source_id_field'],
+                                               format = 'I',
+                                               array = numpy.zeros(len(self.data)))]
+                hdu = pyfits.new_table(columns_array)
+                self.data = pyfits.new_table(pyfits.new_table(self.data).columns + hdu.columns).data
+                self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
 
         if self.config.params['catalog']['band_1_detection']:
             self.mag = self.mag_1
@@ -172,5 +180,29 @@ class Catalog:
             
         self.color = self.mag_1 - self.mag_2
         self.color_err = numpy.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
+
+############################################################
+
+def mergeCatalogs(catalog_array):
+    """
+    Input is an array of Catalog objects. Output is a merged catalog object.
+    Column names are derived from first Catalog in the input array.
+    """
+    len_array = []
+    for ii in range(0, len(catalog_array)):
+        len_array.append(len(catalog_array[ii].data))
+    cumulative_len_array = numpy.cumsum(len_array)
+    cumulative_len_array = numpy.insert(cumulative_len_array, 0, 0)
+
+    columns = pyfits.new_table(catalog_array[0].data).columns
+    hdu = pyfits.new_table(columns, nrows=cumulative_len_array[-1])
+    for name in columns.names:
+        for ii in range(0, len(catalog_array)):
+            if name not in catalog_array[ii].data.names:
+                continue
+            hdu.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = catalog_array[ii].data.field(name)
+
+    catalog_merged = Catalog(catalog_array[0].config, data=hdu.data)
+    return catalog_merged
 
 ############################################################
