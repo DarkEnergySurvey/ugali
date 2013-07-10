@@ -71,7 +71,7 @@ class Catalog:
         #    self.pixel_roi[numpy.nonzero(pix == roi.pixels[ii])[0]] = ii
 
         # No for loop, but overhead of creating a full map
-        map_roi = numpy.array(-1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel'])))
+        map_roi = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
         map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels) - 1, len(roi.pixels))
         self.pixel_roi = map_roi[pix]
 

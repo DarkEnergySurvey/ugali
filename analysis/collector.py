@@ -161,12 +161,14 @@ class Collector:
 
         likelihood.precomputeGridSearch([self.distance_modulus_array[distance_modulus_index]])
 
-        richness, log_likelihood = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
+        #richness, log_likelihood = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
+        richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
 
         #pylab.figure()
         #pylab.scatter(richness, log_likelihood, c='b')
 
-        return likelihood, richness, log_likelihood
+        #return likelihood, richness, log_likelihood
+        return likelihood, richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
 
     def findPeaks(self, ts_threshold):
         """

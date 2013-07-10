@@ -251,12 +251,24 @@ class Likelihood:
                 self.angsep_sparse = self.roi.angsep[jj] # deg
                 self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi] # deg
 
-                richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
-                log_likelihood = numpy.array([0.,
-                                              self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0],
-                                              self.logLikelihood(distance_modulus, richness[2], grid_search=True)[0],
-                                              self.logLikelihood(distance_modulus, richness[3], grid_search=True)[0],
-                                              self.logLikelihood(distance_modulus, richness[4], grid_search=True)[0]])
+                #richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
+                #log_likelihood = numpy.array([0.,
+                #                              self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0],
+                #                              self.logLikelihood(distance_modulus, richness[2], grid_search=True)[0],
+                #                              self.logLikelihood(distance_modulus, richness[3], grid_search=True)[0],
+                #                              self.logLikelihood(distance_modulus, richness[4], grid_search=True)[0]])
+
+                richness = numpy.array([0., 0., 0.])
+                log_likelihood = numpy.array([0., 0., 0.])
+                power = 0.
+                while True:
+                    richness[1] = 10.**power
+                    log_likelihood[1] = self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0]
+                    power += 1.
+                    if numpy.fabs(log_likelihood[1]) > 1.e-1:
+                        break
+                richness[2] = 10. * richness[1]
+                log_likelihood[2] = self.logLikelihood(distance_modulus, richness[2], grid_search=True)[0]
                 
                 # First search for maximum likelihood richness
                 found_maximum = False
@@ -270,16 +282,16 @@ class Likelihood:
                                                       self.logLikelihood(distance_modulus,
                                                                          richness[-1], grid_search=True)[0])    
                         if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
-                            found_maximum = True
+                            found_maximum = True 
 
                 # Use parabolic shape to begin filling in likelihoods at high richness values
                 parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
-                for delta in [10., 20., 30.]:
+                for delta in [1., 3., 10., 30.]:
                     richness = numpy.append(richness, parabola.profileUpperLimit(delta))
                     log_likelihood = numpy.append(log_likelihood,
                                                   self.logLikelihood(distance_modulus,
                                                                      richness[-1], grid_search=True)[0])
-
+                
                 # Continue to large enough richness values to ensure that richness upper limit can be computed
                 found_upper_limit = False
                 while not found_upper_limit:
@@ -309,7 +321,7 @@ class Likelihood:
                 else:
                     self.richness_sparse_array[ii][jj] = 0.
                     self.log_likelihood_sparse_array[ii][jj] = 0.
-                
+
                 self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
                 
                 print 'TS = %.3f richness = %.3f richness < %.3f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
@@ -323,7 +335,10 @@ class Likelihood:
                 #    raw_input('WAIT')
 
                 if coords is not None and distance_modulus_index is not None:
-                    return richness, log_likelihood
+                    p, f = self.logLikelihood(distance_modulus,
+                                              self.richness_sparse_array[ii][jj],
+                                              grid_search=True)[1:3]
+                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
 
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
@@ -338,6 +353,7 @@ class Likelihood:
             f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
                           * self.observable_fraction_sparse)            
         else:
+            # Not implemented yet
             pass
 
         p = (richness * u) / ((richness * u) + self.b)

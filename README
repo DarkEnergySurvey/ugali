@@ -59,3 +59,4 @@ PDF: probability distribution function
 * Simulator tools
 * Farm should write out config file for future reference
 * Make use of angToPix and pixToAng
+* Use only sparse matrices, never retain full healpix maps

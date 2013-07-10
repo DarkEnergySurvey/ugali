@@ -29,10 +29,13 @@ class Farm:
     The Farm class is the master analysis coordinator.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, catalog=None):
         
         self.config = ugali.utils.parse_config.Config(config)
-        self.catalog = ugali.observation.catalog.Catalog(self.config)
+        if catalog is not None:
+            self.catalog = catalog
+        else:
+            self.catalog = ugali.observation.catalog.Catalog(self.config)
 
     def farmMaskFromCatalog(self, local=True):
         """

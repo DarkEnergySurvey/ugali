@@ -98,11 +98,20 @@ class Parabola:
         if self.vertex_x < 0:
             c = self.p_0 + delta
         else:
-            c = delta - self.vertex_y
+            c = self.p_0 - self.vertex_y + delta
 
         if b**2 - 4. * a * c < 0.:
             print 'WARNING'
+
+            print a, b, c
+
+            import pylab
+            pylab.figure()
+            pylab.scatter(self.x, self.y)
+            raw_input('WAIT')
             return 0.
+
+        
             
         return max((numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
 

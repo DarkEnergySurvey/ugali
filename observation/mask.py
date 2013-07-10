@@ -69,8 +69,8 @@ class Mask:
                     mag_2 = mag + (0.5 * self.roi.delta_mag)
 
                 #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
-                n_unmasked_pixels = numpy.sum((self.mask_1.mask[self.roi.pixels] > mag_1) \
-                                              * (self.mask_2.mask[self.roi.pixels] > mag_2))
+                n_unmasked_pixels = numpy.sum((self.mask_1.mask_roi[self.roi.pixels] > mag_1) \
+                                              * (self.mask_2.mask_roi[self.roi.pixels] > mag_2))
                 self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * n_unmasked_pixels
 
     def _pruneCMD(self, minimum_solid_angle):
@@ -103,8 +103,10 @@ class Mask:
 
         print 'Clipping mask 1 at %.2f mag'%(self.mag_1_clip)
         print 'Clipping mask 2 at %.2f mag'%(self.mag_2_clip)
-        self.mask_1.mask_roi = numpy.clip(self.mask_1.mask_roi, 0., self.mag_1_clip)
-        self.mask_2.mask_roi = numpy.clip(self.mask_2.mask_roi, 0., self.mag_2_clip)
+        #self.mask_1.mask_roi = numpy.clip(self.mask_1.mask_roi, 0., self.mag_1_clip) # Original, but memory error
+        #self.mask_2.mask_roi = numpy.clip(self.mask_2.mask_roi, 0., self.mag_2_clip) # Original, but memory error
+        self.mask_1.mask_roi[self.roi.pixels] = numpy.clip(self.mask_1.mask_roi[self.roi.pixels], 0., self.mag_1_clip)
+        self.mask_2.mask_roi[self.roi.pixels] = numpy.clip(self.mask_2.mask_roi[self.roi.pixels], 0., self.mag_2_clip)
         
     def plotSolidAngleCMD(self):
         """
@@ -231,10 +233,14 @@ class MaskBand:
         Infile is a HEALPix map.
         """
         self.roi = roi
-        self.mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
-        
-        self.mask_roi = numpy.zeros(len(self.mask))
-        self.mask_roi[self.roi.pixels] =  self.mask[self.roi.pixels] # ROI specific
+        # ORIGINAL
+        #self.mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
+        #self.mask_roi = numpy.zeros(len(self.mask))
+        #self.mask_roi[self.roi.pixels] =  self.mask[self.roi.pixels] # ROI specific
+        # ORIGINAL
+        mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
+        self.mask_roi = numpy.zeros(len(mask))
+        self.mask_roi[self.roi.pixels] = mask[self.roi.pixels] # ROI specific
 
     def depth(self, x, y):
         """
