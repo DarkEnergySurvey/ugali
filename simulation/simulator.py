@@ -115,7 +115,8 @@ class Simulator:
            and self.config.params['coords']['coordsys'].lower() == 'cel':
             lon, lat = ugali.utils.projector.celToGal(lon, lat)
 
-        hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
+        #hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
+        hdu = self.makeHDU(mag_obs_1[cut], mag_err_1[cut], mag_obs_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
