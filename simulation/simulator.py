@@ -29,7 +29,7 @@ class Simulator:
         mask_1 = ugali.observation.mask.MaskBand(self.config.params['mask']['infile_1'], self.roi)
         mask_2 = ugali.observation.mask.MaskBand(self.config.params['mask']['infile_2'], self.roi)
         self.mask = ugali.observation.mask.Mask(self.config, mask_1, mask_2)
-
+        
         cut = self.mask.restrictCatalogToObservableSpace(self.catalog)
         self.catalog = self.catalog.applyCut(cut)
 
@@ -40,6 +40,7 @@ class Simulator:
     def _photometricErrors(self, n_per_bin=100, plot=False):
         """
         Realistic photometric errors estimated from catalog objects and mask.
+        Extend below the magnitude threshold with a flat extrapolation.
         """
 
         self.catalog.spatialBin(self.roi)
@@ -56,7 +57,7 @@ class Simulator:
         for ii in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
             mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
             mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
-
+        
         if mag_1_thresh_medians[0] > 0.:
             mag_1_thresh_medians = numpy.insert(mag_1_thresh_medians, 0, -99.)
             mag_err_1_medians = numpy.insert(mag_err_1_medians, 0, mag_err_1_medians[0])

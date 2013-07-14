@@ -56,7 +56,8 @@ PDF: probability distribution function
 
 * Change name of ugali.utils.projector to ugali.utils.coords
 * Consistent naming convention for pix vs. pixel
-* Simulator tools
+* Simulator tool to place satellites randomly in the survey
 * Farm should write out config file for future reference
 * Make use of angToPix and pixToAng
 * Use only sparse matrices, never retain full healpix maps
+* Iterative procedure to determine field model
