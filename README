@@ -2,7 +2,7 @@
 
 Ultra-faint Galaxy Likelihood (UGaLi) is a set of python 
 classes and functions used to search for ultra-faint satellite 
-galaxies of the Milky Way using the point-source catalogs 
+galaxies of the Milky Way using the stellar object samples 
 derived from optical photometric surveys.
 
 Keith Bechtol
@@ -60,4 +60,5 @@ PDF: probability distribution function
 * Farm should write out config file for future reference
 * Make use of angToPix and pixToAng
 * Use only sparse matrices, never retain full healpix maps
-* Iterative procedure to determine field model
+* Residual maps
+* Compute observable fraction including photometric errors

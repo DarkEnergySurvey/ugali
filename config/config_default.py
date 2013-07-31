@@ -26,8 +26,8 @@
           'minimum_solid_angle': 0.1}, # deg^2
           
  'color': {'min': -0.5,
-           'max': 1., # 1.5
-           'n_bins': 15}, # 0.1, 0.02
+           'max': 0.5, # 1.0
+           'n_bins': 10}, # 15
 
  'mag': {'min': 18,
          'max': 25, # 25
@@ -46,7 +46,8 @@
  'coords': {'nside_likelihood_segmentation': 2**8, # Size of patches for likelihood analysis
             'nside_mask_segmentation': 2**6, # Size of patches for mask creation
             'nside_pixel': 2**12, 
-            'roi_radius': 1.,
+            'roi_radius': 1.25, # Outer radius of annulus used to make empirical background model
+            'roi_radius_annulus': 0.5, # Inner radius of annulus used to make empirical background model
             'coordsys': 'gal',
             'proj_type': 'ait'},
 

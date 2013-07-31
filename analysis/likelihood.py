@@ -16,6 +16,7 @@ import healpy
 
 import ugali.utils.binning
 import ugali.utils.parabola
+import ugali.utils.projector
 import ugali.utils.skymap
 
 ############################################################
@@ -150,59 +151,105 @@ class Likelihood:
         u_color = numpy.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
         return u_color
 
-    def signalColor2(self, distance_modulus, mass_steps=250, intrinsic_width=0.02):
+    def gridSearch2(self, coords=None, distance_modulus_index=None, tolerance=1.e-2):
         """
-        Compute u_color for each object. Intrinsic width (mag).
+        Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
+        Uses iterative procedure.
         """
-        isochrone_mass_init, isochrone_mass_pdf, isochrone_mass_act, isochrone_mag_1, isochrone_mag_2 = self.isochrone.sample(mass_steps=mass_steps)
-        n_sample = len(isochrone_mass_init)
-        n_catalog = len(self.catalog.lon)
+        self.log_likelihood_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                        len(self.roi.pixels_target)])
+        self.richness_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                  len(self.roi.pixels_target)])
+        self.richness_error_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                        len(self.roi.pixels_target)])
+        self.richness_upper_limit_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                              len(self.roi.pixels_target)])
 
-        delta_mag_1 = self.catalog.mag_1 * numpy.ones([n_sample, n_catalog]) \
-                      - (isochrone_mag_1 + distance_modulus).reshape([n_sample, 1]) * numpy.ones([n_sample, n_catalog])
-        
-        delta_mag_2 = self.catalog.mag_2 * numpy.ones([n_sample, n_catalog]) \
-                      - (isochrone_mag_2 + distance_modulus).reshape([n_sample, 1]) * numpy.ones([n_sample, n_catalog])
-        
-        mag_err_1 = self.catalog.mag_err_1 * numpy.ones([n_sample, n_catalog])
-        mag_err_2 = self.catalog.mag_err_2 * numpy.ones([n_sample, n_catalog])
-        # Add in quadrature some minimum magnitude uncertainty??
-        mag_err_1 = numpy.sqrt(mag_err_1**2 + intrinsic_width**2)
-        mag_err_2 = numpy.sqrt(mag_err_2**2 + intrinsic_width**2)
-        
-        arg_mag_1_hi = (delta_mag_1 + (0.5 * self.delta_mag)) / mag_err_1
-        arg_mag_1_lo = (delta_mag_1 - (0.5 * self.delta_mag)) / mag_err_1
+        # Specific pixel
+        if coords is not None and distance_modulus_index is not None:
+            lon, lat = coords
+            pix_coords = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], lon, lat)
+            
+        print 'Begin loop over distance moduli ...'
+        for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
-        arg_mag_2_hi = (delta_mag_2 + (0.5 * self.delta_mag)) / mag_err_2
-        arg_mag_2_lo = (delta_mag_2 - (0.5 * self.delta_mag)) / mag_err_2
+            # Specific pixel
+            if coords is not None and distance_modulus_index is not None:
+                if ii != distance_modulus_index:
+                    continue
+            
+            print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus)
+            self.u_color = self.u_color_array[ii]
+            self.observable_fraction_sparse = self.observable_fraction_sparse_array[ii]
+            
+            for jj in range(0, len(self.roi.pixels_target)):
 
-        arg_mag_1_hi = arg_mag_1_hi.flatten()
-        arg_mag_1_lo = arg_mag_1_lo.flatten()
-        arg_mag_2_hi = arg_mag_2_hi.flatten()
-        arg_mag_2_lo = arg_mag_2_lo.flatten()
+                # Specific pixel
+                if coords is not None and distance_modulus_index is not None:
+                    if self.roi.pixels_target[jj] != pix_coords:
+                        continue
 
-        index_nonzero = numpy.nonzero(numpy.logical_or(numpy.fabs(arg_mag_1_hi) < 5.,
-                                                       numpy.fabs(arg_mag_1_lo) < 5.) \
-                                      * numpy.logical_or(numpy.fabs(arg_mag_2_hi) < 5.,
-                                                         numpy.fabs(arg_mag_2_lo) < 5.))[0]
+                self.kernel.lon = self.roi.centers_lon_target[jj]
+                self.kernel.lat = self.roi.centers_lat_target[jj]
 
-        u_mag_1 = numpy.zeros(n_sample * n_catalog)
-        u_mag_2 = numpy.zeros(n_sample * n_catalog)
+                print '    (%i/%i) Candidate at (%.3f, %.3f) ... '%(jj, len(self.roi.pixels_target),
+                                                                    self.kernel.lon, self.kernel.lat),
 
-        u_mag_1[index_nonzero] = scipy.stats.norm.cdf(arg_mag_1_hi[index_nonzero]) \
-                                 - scipy.stats.norm.cdf(arg_mag_1_lo[index_nonzero])
-        u_mag_2[index_nonzero] = scipy.stats.norm.cdf(arg_mag_2_hi[index_nonzero]) \
-                                 - scipy.stats.norm.cdf(arg_mag_2_lo[index_nonzero])
-        
-        u_mag_1 = u_mag_1.reshape([n_sample, n_catalog])
-        u_mag_2 = u_mag_2.reshape([n_sample, n_catalog])
+                self.angsep_sparse = self.roi.angsep[jj] # deg
+                self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi] # deg
 
-        isochrone_mass_pdf_matrix = isochrone_mass_pdf.reshape([n_sample, 1]) \
-                                    * numpy.ones([n_sample, n_catalog])
+                # Define a starting point for richness estimation
+                f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
+                              * self.observable_fraction_sparse)
+                richness = numpy.array([1. / f])
 
-        u_color = numpy.sum(isochrone_mass_pdf_matrix * u_mag_1 * u_mag_2, axis = 0)
+                cmd_background = self.mask.backgroundCMD(self.catalog, weights=None)
+                b_density = ugali.utils.binning.take2D(cmd_background,
+                                                       self.catalog.color, self.catalog.mag,
+                                                       self.roi.bins_color, self.roi.bins_mag) 
+                self.b = b_density * self.roi.area_pixel * self.delta_mag**2
+                
+                log_likelihood_current, p = self.logLikelihood(distance_modulus, richness[-1], grid_search=True)[0: 2]
+                log_likelihood = numpy.array([log_likelihood_current])
 
-        return u_color
+                # Begin iterative procedure using membership probabilities
+                while True:
+                    # Update the empirical field number density model (deg^-2 mag^-2)
+                    #cmd_background = self.mask.backgroundCMD(self.catalog, weights=(1. - p))
+                    #b_density = ugali.utils.binning.take2D(cmd_background,
+                    #                                       self.catalog.color, self.catalog.mag,
+                    #                                       self.roi.bins_color, self.roi.bins_mag) 
+                    #self.b = b_density * self.roi.area_pixel * self.delta_mag**2
+
+                    # Update the richness
+                    richness = numpy.append(richness, numpy.sum(p) / f)
+                    
+                    log_likelihood_current, p, f = self.logLikelihood(distance_modulus, richness[-1], grid_search=True)
+                    log_likelihood = numpy.append(log_likelihood, log_likelihood_current)
+
+                    print richness[-1], log_likelihood[-1], len(richness)
+                    raw_input('Continue')
+
+                    # Convergence condition
+                    if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
+                        break
+                    
+                # Store results
+                self.richness_sparse_array[ii][jj] = richness[-1]
+                self.richness_error_sparse_array[ii][jj] = numpy.sqrt(numpy.sum(p * (1. - p))) / f
+                self.log_likelihood_sparse_array[ii][jj] = log_likelihood[-1]
+                # Skip upper limits for the moment
+                self.richness_upper_limit_sparse_array[ii][jj] = healpy.UNSEEN
+
+                print 'TS = %.3f richness = %.3f +/- %.3f iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                                                                            self.richness_sparse_array[ii][jj],
+                                                                            self.richness_error_sparse_array[ii][jj],
+                                                                            len(richness))
+
+                if coords is not None and distance_modulus_index is not None:
+                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_error_sparse_array[ii][jj], richness, log_likelihood, p, f
+
+
 
     def gridSearch(self, coords=None, distance_modulus_index=None, tolerance=1.e-2):
         """
@@ -322,6 +369,10 @@ class Likelihood:
                     self.richness_sparse_array[ii][jj] = 0.
                     self.log_likelihood_sparse_array[ii][jj] = 0.
 
+
+                richness_lower = parabola.bayesianUpperLimit(0.16)
+                richness_upper = parabola.bayesianUpperLimit(0.84)
+                print richness_lower, richness_upper 
                 self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
                 
                 print 'TS = %.3f richness = %.3f richness < %.3f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
@@ -351,7 +402,7 @@ class Likelihood:
             u_spatial = self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_object)
             u = u_spatial * self.u_color
             f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
-                          * self.observable_fraction_sparse)            
+                          * self.observable_fraction_sparse)
         else:
             # Not implemented yet
             pass

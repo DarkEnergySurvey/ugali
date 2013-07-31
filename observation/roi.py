@@ -42,6 +42,12 @@ class ROI():
         self.pixels = healpy.query_disc(self.config.params['coords']['nside_pixel'],
                                         vec,
                                         self.config.params['coords']['roi_radius'])
+
+
+        self.pixels_annulus = numpy.setdiff1d(self.pixels, healpy.query_disc(self.config.params['coords']['nside_pixel'],
+                                                                             vec,
+                                                                             self.config.params['coords']['roi_radius_annulus']))
+
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
         self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
 
@@ -105,9 +111,10 @@ class ROI():
                               * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel'])))
         
         if value is None:
-            map_roi[self.pixels] = ugali.utils.projector.angsep(self.lon, self.lat, self.centers_lon, self.centers_lat)
-            #map[self.pixels] = 1
-            map_roi[self.pixels_target] = 0
+            #map_roi[self.pixels] = ugali.utils.projector.angsep(self.lon, self.lat, self.centers_lon, self.centers_lat)
+            map_roi[self.pixels] = 1
+            map_roi[self.pixels_annulus] = 0
+            map_roi[self.pixels_target] = 2
         elif value is not None and pixel is None:
             map_roi[self.pixels] = value
         elif value is not None and pixel is not None:

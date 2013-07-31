@@ -42,7 +42,7 @@ def take2D(histogram, x, y, bins_x, bins_y):
     
 ############################################################
 
-def cloudInCells(x, y, bins, weights = None):
+def cloudInCells(x, y, bins, weights=None):
     """
     Use cloud-in-cells binning algorithm. Only valid for equal-spaced linear bins.
 

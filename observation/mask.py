@@ -16,6 +16,7 @@ import healpy
 import ugali.observation.roi
 import ugali.utils.plotting
 import ugali.utils.binning
+import ugali.utils.projector
 import ugali.utils.skymap
 
 ############################################################
@@ -69,8 +70,8 @@ class Mask:
                     mag_2 = mag + (0.5 * self.roi.delta_mag)
 
                 #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
-                n_unmasked_pixels = numpy.sum((self.mask_1.mask_roi[self.roi.pixels] > mag_1) \
-                                              * (self.mask_2.mask_roi[self.roi.pixels] > mag_2))
+                n_unmasked_pixels = numpy.sum((self.mask_1.mask_roi[self.roi.pixels_annulus] > mag_1) \
+                                              * (self.mask_2.mask_roi[self.roi.pixels_annulus] > mag_2))
                 self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * n_unmasked_pixels
 
     def _pruneCMD(self, minimum_solid_angle):
@@ -121,7 +122,7 @@ class Mask:
                                                      lim_y = [self.roi.bins_mag[-1],
                                                               self.roi.bins_mag[0]])
 
-    def backgroundCMD(self, catalog, mode='cloud-in-cells', plot=False):
+    def backgroundCMD(self, catalog, mode='cloud-in-cells', weights=None, plot=False):
         """
         Generate an empirical background model in color-magnitude space.
         
@@ -132,23 +133,35 @@ class Mask:
         """
 
         if mode == 'cloud-in-cells':
+            # Select objects in annulus
+            cut_annulus = numpy.in1d(ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'],
+                                                                    catalog.lon, catalog.lat),
+                                     self.roi.pixels_annulus)
+            color = catalog.color[cut_annulus]
+            mag = catalog.mag[cut_annulus]
 
             # Weight each object before binning
-            # Divide by solid angle and bin size in magnitudes
+            # Divide by solid angle and bin size in magnitudes to get number density
             # Units are (deg^-2 mag^-2)
             solid_angle = ugali.utils.binning.take2D(self.solid_angle_cmd,
-                                                     catalog.color, catalog.mag,
+                                                     color, mag,
                                                      self.roi.bins_color, self.roi.bins_mag)
-            weights = (solid_angle * self.roi.delta_color * self.roi.delta_mag)**(-1)
+
+            # Optionally weight each catalog object
+            if weights is None:
+                number_density = (solid_angle * self.roi.delta_color * self.roi.delta_mag)**(-1)
+            else:
+                number_density = weights * (solid_angle * self.roi.delta_color * self.roi.delta_mag)**(-1)
             
             # Apply cloud-in-cells algorithm
-            cmd_background = ugali.utils.binning.cloudInCells(catalog.color,
-                                                              catalog.mag,
+            cmd_background = ugali.utils.binning.cloudInCells(color,
+                                                              mag,
                                                               [self.roi.bins_color,
                                                                self.roi.bins_mag],
-                                                              weights)[0]
+                                                              weights=number_density)[0]
 
-            # Account for the events that spill out of observable space
+            # Account for the events that spill out of the observable space
+            # But what about the objects that spill out to red colors??
             for index_color in range(0, len(self.roi.centers_color)):
                 for index_mag in range(0, len(self.roi.centers_mag)):
                     if self.solid_angle_cmd[index_mag][index_color] < self.minimum_solid_angle:
@@ -162,9 +175,13 @@ class Mask:
             #epsilon = 1.e-10
             #cmd_background /= (self.solid_angle_cmd + epsilon) * self.roi.delta_color * self.roi.delta_mag
             #cmd_background *= self.solid_angle_cmd > epsilon
+
+            # Avoid dividing by zero
+            cmd_background[numpy.logical_and(self.solid_angle_cmd > 0.,
+                                             cmd_background == 0.)] = numpy.min(cmd_background[cmd_background > 0.])
                   
         elif mode == 'bootstrap':
-            #
+            # Not yet implemented
             mag_1_array = catalog.mag_1
             mag_2_array = catalog.mag_2
 
@@ -182,7 +199,7 @@ class Mask:
                                                          lim_y = [self.roi.bins_mag[-1],
                                                                   self.roi.bins_mag[0]])
 
-        return cmd_background 
+        return cmd_background
         
     def restrictCatalogToObservableSpace(self, catalog):
         """
@@ -201,9 +218,10 @@ class Mask:
                                       catalog.color < self.roi.bins_color[-1])
 
         # and are observable in the ROI-specific mask for both bands
-        theta = numpy.radians(90. - catalog.lat)
-        phi = numpy.radians(catalog.lon)
-        pix = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
+        #theta = numpy.radians(90. - catalog.lat)
+        #phi = numpy.radians(catalog.lon)
+        #pix = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
+        pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], catalog.lon, catalog.lat)
         cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi[pix]
         cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi[pix]
 

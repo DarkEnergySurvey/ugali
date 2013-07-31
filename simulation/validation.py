@@ -69,6 +69,7 @@ def validateMembership(likelihood, p, mc_source_id=1):
     projector = ugali.utils.projector.Projector(likelihood.kernel.lon, likelihood.kernel.lat)
     x, y = projector.sphereToImage(likelihood.catalog.lon, likelihood.catalog.lat)
 
+    
     pylab.figure()
     pylab.scatter(x[cut_mc_source_id], y[cut_mc_source_id], c='gray', s=100, edgecolors='none')
     pylab.scatter(x, y, c=p, edgecolors='none')
@@ -76,9 +77,11 @@ def validateMembership(likelihood, p, mc_source_id=1):
     pylab.title('Membership Probability')
     pylab.xlabel(r'$\delta$ Lon (deg)')
     pylab.ylabel(r'$\delta$ Lat (deg)')
+    
 
     # Spectral
 
+    
     pylab.figure()
     pylab.scatter(likelihood.catalog.color[cut_mc_source_id], likelihood.catalog.mag[cut_mc_source_id], c='gray', s=100, edgecolors='none')
     pylab.scatter(likelihood.catalog.color, likelihood.catalog.mag, c=p, edgecolors='none')
@@ -88,6 +91,7 @@ def validateMembership(likelihood, p, mc_source_id=1):
     pylab.ylim(likelihood.roi.bins_mag[-1], likelihood.roi.bins_mag[0])
     pylab.xlabel('Color (mag)')
     pylab.ylabel('Magnitude (mag)')
+    
 
     # Membership accuracy
 
@@ -96,13 +100,15 @@ def validateMembership(likelihood, p, mc_source_id=1):
     frac_members_array_low = []
     frac_members_array_high = []
 
-    probability_bins = numpy.arange(0.1, 1. + 1.e-10, 0.1)
+    probability_bins = numpy.arange(0., 1. + 1.e-10, 0.1)
     for ii in range(0, len(probability_bins) - 1):
 
         if not numpy.any(numpy.logical_and(p >= probability_bins[ii], p < probability_bins[ii + 1])):
             continue
-
-        p_array.append(0.5 * (probability_bins[ii] + probability_bins[ii + 1]))
+        
+        #p_array.append(0.5 * (probability_bins[ii] + probability_bins[ii + 1]))
+        cut = numpy.logical_and(p >= probability_bins[ii], p < probability_bins[ii + 1])
+        p_array.append(numpy.median(p[cut]))
 
         n_members = numpy.sum(numpy.all([likelihood.catalog.mc_source_id == mc_source_id,
                                          p >= probability_bins[ii],
@@ -126,5 +132,56 @@ def validateMembership(likelihood, p, mc_source_id=1):
     pylab.ylim(0, 1)
     pylab.xlabel('Membership Probability')
     pylab.ylabel('Fraction of True Satellite Members')
+
+    # Where does richness come from?
+    
+    p_array = []
+    p_sum_array = []
+    n_members_array = []
+
+    for ii in range(0, len(probability_bins) - 1):
+        p_array.append(0.5 * (probability_bins[ii] + probability_bins[ii + 1]))
+        p_sum_array.append(numpy.sum(p[numpy.logical_and(p >= probability_bins[ii],
+                                                         p < probability_bins[ii + 1])]))
+        n_members_array.append(numpy.sum(numpy.all([likelihood.catalog.mc_source_id == mc_source_id,
+                                                    p >= probability_bins[ii],
+                                                    p < probability_bins[ii + 1]], axis=0)))
+
+    pylab.figure()
+    pylab.scatter(p_array, p_sum_array, marker='o', c='blue')
+    pylab.scatter(p_array, n_members_array, marker='o', c='red')
+    pylab.xlim(0, 1)
+    #pylab.ylim(0, 1)
+    pylab.xlabel('Membership Probability')
+    pylab.ylabel('Membership Probability Sum')
+
+    # Purity and completeness
+
+    x = numpy.linspace(0., 1., 1001) 
+    purity = []
+    completeness = []
+
+    for ii in range(0, len(x)):
+        cut = p > (1 - x[ii])
+
+        if numpy.sum(cut) < 1:
+            purity.append(1.)
+            completeness.append(0.)
+            continue
+        
+        purity_cut = numpy.logical_and(cut, likelihood.catalog.mc_source_id == mc_source_id)
+        completeness_cut = likelihood.catalog.mc_source_id == mc_source_id
+        
+        purity.append(float(numpy.sum(purity_cut)) / numpy.sum(cut))
+        completeness.append(float(numpy.sum(purity_cut)) / numpy.sum(completeness_cut))
+        
+    pylab.figure()
+    pylab.plot(x, purity, c='red', label='Purity')
+    pylab.plot(x, completeness, c='blue', label='Completeness')
+    pylab.xlim(0, 1)
+    pylab.ylim(0, 1)
+    pylab.xlabel('1 - Membership Probability')
+    #pylab.ylabel('Purity or Completeness')
+    pylab.legend(loc='lower center')
         
 ############################################################
