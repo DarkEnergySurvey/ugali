@@ -58,7 +58,7 @@ PDF: probability distribution function
 * Consistent naming convention for pix vs. pixel
 * Simulator tool to place satellites randomly in the survey
 * Farm should write out config file for future reference
-* Make use of angToPix and pixToAng
-* Use only sparse matrices, never retain full healpix maps
+* Consistently make use of angToPix and pixToAng
+* Be careful with spatialBin function when objects fall outside of ROI (CHECK!)
 * Residual maps
 * Compute observable fraction including photometric errors

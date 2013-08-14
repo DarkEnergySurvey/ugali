@@ -65,19 +65,13 @@ class Catalog:
         phi = numpy.radians(self.lon)
         pix = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
 
-        # There must be a better way than using this loop??
-        #self.pixel_roi = -1. * numpy.ones(len(self.lon))
-        #for ii in range(0, len(roi.pixels)):
-        #    self.pixel_roi[numpy.nonzero(pix == roi.pixels[ii])[0]] = ii
-
-        # No for loop, but overhead of creating a full map
+        # Involves overhead of creating a full HEALPix map
         map_roi = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
         map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels) - 1, len(roi.pixels))
-        self.pixel_roi = map_roi[pix]
+        self.pixel_roi_index = map_roi[pix]
+        self.pixel_roi_index = self.pixel_roi_index.astype(int)
 
-        self.pixel_roi = self.pixel_roi.astype(int)
-
-        if numpy.any(self.pixel_roi < 0):
+        if numpy.any(self.pixel_roi_index < 0):
             print "WARNING: objects found that are not contained within ROI"
 
     def write(self, outfile):

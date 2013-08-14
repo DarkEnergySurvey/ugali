@@ -22,28 +22,11 @@ class ROI():
 
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
-        """
-        self.projector = ugali.utils.projector.Projector(self.config.params['coords']['reference'][0],
-                                                         self.config.params['coords']['reference'][1])
-
-        self.bins_x = numpy.linspace(-0.5 * self.config.params['coords']['n_pixels'] \
-                                     * self.config.params['coords']['pixel_size'],
-                                     0.5 * self.config.params['coords']['n_pixels'] \
-                                     * self.config.params['coords']['pixel_size'],
-                                     self.config.params['coords']['n_pixels'] + 1)
-        self.bins_y = numpy.linspace(-0.5 * self.config.params['coords']['n_pixels'] \
-                                     * self.config.params['coords']['pixel_size'],
-                                     0.5 * self.config.params['coords']['n_pixels'] \
-                                     * self.config.params['coords']['pixel_size'],
-                                     self.config.params['coords']['n_pixels'] + 1)
-        """
-
         vec = healpy.ang2vec(numpy.radians(90. - self.lat), numpy.radians(self.lon))
         self.pixels = healpy.query_disc(self.config.params['coords']['nside_pixel'],
                                         vec,
                                         self.config.params['coords']['roi_radius'])
-
-
+        
         self.pixels_annulus = numpy.setdiff1d(self.pixels, healpy.query_disc(self.config.params['coords']['nside_pixel'],
                                                                              vec,
                                                                              self.config.params['coords']['roi_radius_annulus']))

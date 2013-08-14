@@ -70,8 +70,8 @@ class Mask:
                     mag_2 = mag + (0.5 * self.roi.delta_mag)
 
                 #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
-                n_unmasked_pixels = numpy.sum((self.mask_1.mask_roi[self.roi.pixels_annulus] > mag_1) \
-                                              * (self.mask_2.mask_roi[self.roi.pixels_annulus] > mag_2))
+                n_unmasked_pixels = numpy.sum((self.mask_1.mask_annulus_sparse > mag_1) \
+                                              * (self.mask_2.mask_annulus_sparse > mag_2))
                 self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * n_unmasked_pixels
 
     def _pruneCMD(self, minimum_solid_angle):
@@ -104,10 +104,10 @@ class Mask:
 
         print 'Clipping mask 1 at %.2f mag'%(self.mag_1_clip)
         print 'Clipping mask 2 at %.2f mag'%(self.mag_2_clip)
-        #self.mask_1.mask_roi = numpy.clip(self.mask_1.mask_roi, 0., self.mag_1_clip) # Original, but memory error
-        #self.mask_2.mask_roi = numpy.clip(self.mask_2.mask_roi, 0., self.mag_2_clip) # Original, but memory error
-        self.mask_1.mask_roi[self.roi.pixels] = numpy.clip(self.mask_1.mask_roi[self.roi.pixels], 0., self.mag_1_clip)
-        self.mask_2.mask_roi[self.roi.pixels] = numpy.clip(self.mask_2.mask_roi[self.roi.pixels], 0., self.mag_2_clip)
+        self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
+        self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
+        self.mask_1.mask_annulus_sparse = numpy.clip(self.mask_1.mask_annulus_sparse, 0., self.mag_1_clip)
+        self.mask_2.mask_annulus_sparse = numpy.clip(self.mask_2.mask_annulus_sparse, 0., self.mag_2_clip)
         
     def plotSolidAngleCMD(self):
         """
@@ -218,12 +218,11 @@ class Mask:
                                       catalog.color < self.roi.bins_color[-1])
 
         # and are observable in the ROI-specific mask for both bands
-        #theta = numpy.radians(90. - catalog.lat)
-        #phi = numpy.radians(catalog.lon)
-        #pix = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
-        pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], catalog.lon, catalog.lat)
-        cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi[pix]
-        cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi[pix]
+        if not hasattr(catalog, 'pixel_roi_index'):
+            catalog.spatialBin(self.roi)
+        cut_roi = catalog.pixel_roi_index >= 0 # Objects outside ROI have pixel_roi_index of -1
+        cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
+        cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 
         # and are located in the region of color-magnitude space where background can be estimated
         cut_cmd = ugali.utils.binning.take2D(self.solid_angle_cmd,
@@ -232,6 +231,7 @@ class Mask:
 
         cut = numpy.all([cut_mag,
                          cut_color,
+                         cut_roi,
                          cut_mag_1,
                          cut_mag_2,
                          cut_cmd], axis=0)
@@ -248,34 +248,26 @@ class MaskBand:
 
     def __init__(self, infile, roi):
         """
-        Infile is a HEALPix map.
+        Infile is a sparse HEALPix map fits file.
         """
         self.roi = roi
-        # ORIGINAL
-        #self.mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
-        #self.mask_roi = numpy.zeros(len(self.mask))
-        #self.mask_roi[self.roi.pixels] =  self.mask[self.roi.pixels] # ROI specific
-        # ORIGINAL
         mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
-        self.mask_roi = numpy.zeros(len(mask))
-        self.mask_roi[self.roi.pixels] = mask[self.roi.pixels] # ROI specific
+        self.mask_roi_sparse = mask[self.roi.pixels] # Sparse map for pixels in ROI
+        self.mask_annulus_sparse = mask[self.roi.pixels_annulus] # Sparse map for pixels in annulus part of ROI
+        self.nside = healpy.npix2nside(len(mask))
 
     def depth(self, x, y):
         """
-        Return completeness depth in magnitudes at given image coordinates
+        Return completeness depth in magnitudes at given image coordinates.
         """
         pass
 
-    def plot(self, roi = False):
+    def plot(self):
         """
         Plot the magnitude depth.
         """
-
-        if roi:
-            mask = self.mask_roi
-        else:
-            mask = self.mask
-        
+        mask = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
+        mask[self.roi.pixels] = self.mask_roi_sparse
         ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
                                               mask,
                                               self.roi.lon, self.roi.lat,
@@ -362,6 +354,7 @@ def allSkyMask(infile, nside):
 def scale(mask, mag_scale, outfile=None):
         """
         Scale the completeness depth of a mask such that mag_new = mag + mag_scale.
+        Input is a full HEALPix map.
         Optionally write out the scaled mask as an sparse HEALPix map.
         """
         mask_new = healpy.UNSEEN * numpy.ones(len(mask))

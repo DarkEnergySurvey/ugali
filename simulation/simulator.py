@@ -5,6 +5,7 @@ Documentation.
 import numpy
 import scipy.interpolate
 import pyfits
+import healpy
 import pylab
 
 import ugali.observation.catalog
@@ -47,7 +48,7 @@ class Simulator:
 
         # Band 1
         
-        mag_1_thresh = self.mask.mask_1.mask_roi[self.roi.pixels][self.catalog.pixel_roi] - self.catalog.mag_1
+        mag_1_thresh = self.mask.mask_1.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_1
         sorting_indices = numpy.argsort(mag_1_thresh)
         mag_1_thresh_sort = mag_1_thresh[sorting_indices]
         mag_err_1_sort = self.catalog.mag_err_1[sorting_indices]
@@ -67,7 +68,7 @@ class Simulator:
 
         # Band 2
 
-        mag_2_thresh = self.mask.mask_2.mask_roi[self.roi.pixels][self.catalog.pixel_roi] - self.catalog.mag_2
+        mag_2_thresh = self.mask.mask_2.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_2
         sorting_indices = numpy.argsort(mag_2_thresh)
         mag_2_thresh_sort = mag_2_thresh[sorting_indices]
         mag_err_2_sort = self.catalog.mag_err_2[sorting_indices]
@@ -94,12 +95,19 @@ class Simulator:
 
     def satellite(self, isochrone, kernel, stellar_mass, distance_modulus, mc_source_id=1):
         """
-
+        Create a simulated satellite. Returns a catalog object.
         """
         mag_1, mag_2, lon, lat = satellite(isochrone, kernel, stellar_mass, distance_modulus)
         pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], lon, lat)
-        mag_lim_1 = self.mask.mask_1.mask_roi[pix]
-        mag_lim_2 = self.mask.mask_2.mask_roi[pix]
+
+        # There is probably a better way to do this step without creating the full HEALPix map
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
+        mag_lim_1 = mask[pix]
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
+        mag_lim_2 = mask[pix]
+
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
         mag_obs_1 = mag_1 + (numpy.random.normal(size=len(mag_1)) * mag_err_1)

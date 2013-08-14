@@ -312,8 +312,8 @@ class Isochrone:
         observable_fraction = numpy.zeros(len(mask.roi.pixels))
 
         for ii in range(0, len(mask.roi.pixels)):
-            mag_1_mask = mask.mask_1.mask_roi[mask.roi.pixels[ii]]
-            mag_2_mask = mask.mask_2.mask_roi[mask.roi.pixels[ii]]
+            mag_1_mask = mask.mask_1.mask_roi_sparse[ii]
+            mag_2_mask = mask.mask_2.mask_roi_sparse[ii]
             observable_fraction[ii] = numpy.sum(mass_pdf_array \
                                                 * (mag_1_array + distance_modulus < mag_1_mask) \
                                                 * (mag_2_array + distance_modulus < mag_2_mask) \

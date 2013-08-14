@@ -196,7 +196,7 @@ class Likelihood:
                                                                     self.kernel.lon, self.kernel.lat),
 
                 self.angsep_sparse = self.roi.angsep[jj] # deg
-                self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi] # deg
+                self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
 
                 # Define a starting point for richness estimation
                 f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
@@ -296,7 +296,7 @@ class Likelihood:
                                                                     self.kernel.lon, self.kernel.lat),
 
                 self.angsep_sparse = self.roi.angsep[jj] # deg
-                self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi] # deg
+                self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
 
                 #richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
                 #log_likelihood = numpy.array([0.,
@@ -432,7 +432,7 @@ class Likelihood:
         self.kernel.lon = self.roi.centers_lon_target[index_pixel_target]
         self.kernel.lat = self.roi.centers_lat_target[index_pixel_target]
         self.angsep_sparse = self.roi.angsep[index_pixel_target] # deg
-        self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi] # deg
+        self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
             
         log_likelihood, p, f = self.logLikelihood(distance_modulus, richness, grid_search=True)
         return p
