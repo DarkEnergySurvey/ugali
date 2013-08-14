@@ -358,3 +358,22 @@ def allSkyMask(infile, nside):
     return maglim
 
 ############################################################
+
+def scale(mask, mag_scale, outfile=None):
+        """
+        Scale the completeness depth of a mask such that mag_new = mag + mag_scale.
+        Optionally write out the scaled mask as an sparse HEALPix map.
+        """
+        mask_new = healpy.UNSEEN * numpy.ones(len(mask))
+        mask_new[mask == 0.] = 0.
+        mask_new[mask > 0.] = mask[mask > 0.] + mag_scale
+
+        if outfile is not None:
+            pix = numpy.nonzero(mask_new > 0.)[0]
+            data_dict = {'MAGLIM': mask_new[pix]}
+            nside = healpy.npix2nside(len(mask_new))
+            ugali.utils.skymap.writeSparseHealpixMap(pix, data_dict, nside, outfile)
+
+        return mask_new
+
+############################################################
