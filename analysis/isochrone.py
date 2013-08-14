@@ -10,7 +10,7 @@ import scipy.stats
 import pylab
 
 import ugali.analysis.imf
-import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
+#import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
 import ugali.utils.plotting
 
 ############################################################
