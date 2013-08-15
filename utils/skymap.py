@@ -15,7 +15,7 @@ def subpixel(pix, nside_pix, nside_subpix):
     """
     vec = healpy.pix2vec(nside_pix, pix)
     radius = numpy.degrees(2. * healpy.nside2resol(nside_pix))
-    subpix = healpy.query_disc(nside_subpix, vec, radius)
+    subpix = healpy.query_disc(nside_subpix, vec, radius, deg=True)
     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
     pix_for_subpix = healpy.ang2pix(nside_pix, theta, phi)
     return subpix[pix_for_subpix == pix]

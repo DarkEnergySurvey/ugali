@@ -25,11 +25,13 @@ class ROI():
         vec = healpy.ang2vec(numpy.radians(90. - self.lat), numpy.radians(self.lon))
         self.pixels = healpy.query_disc(self.config.params['coords']['nside_pixel'],
                                         vec,
-                                        self.config.params['coords']['roi_radius'])
+                                        self.config.params['coords']['roi_radius'],
+                                        deg=True)
         
         self.pixels_annulus = numpy.setdiff1d(self.pixels, healpy.query_disc(self.config.params['coords']['nside_pixel'],
                                                                              vec,
-                                                                             self.config.params['coords']['roi_radius_annulus']))
+                                                                             self.config.params['coords']['roi_radius_annulus'],
+                                                                             deg=True))
 
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
         self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
