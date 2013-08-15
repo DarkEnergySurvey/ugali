@@ -249,8 +249,7 @@ class Likelihood:
                 if coords is not None and distance_modulus_index is not None:
                     return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_error_sparse_array[ii][jj], richness, log_likelihood, p, f
 
-
-
+                
     def gridSearch(self, coords=None, distance_modulus_index=None, tolerance=1.e-2):
         """
         Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
@@ -260,6 +259,10 @@ class Likelihood:
                                                         len(self.roi.pixels_target)])
         self.richness_sparse_array = numpy.zeros([len(self.distance_modulus_array),
                                                   len(self.roi.pixels_target)])
+        self.richness_lower_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                        len(self.roi.pixels_target)])
+        self.richness_upper_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                        len(self.roi.pixels_target)])
         self.richness_upper_limit_sparse_array = numpy.zeros([len(self.distance_modulus_array),
                                                               len(self.roi.pixels_target)])
 
@@ -369,16 +372,19 @@ class Likelihood:
                     self.richness_sparse_array[ii][jj] = 0.
                     self.log_likelihood_sparse_array[ii][jj] = 0.
 
+                #richness_lower = parabola.bayesianUpperLimit(0.159) # 1-sigma low
+                #richness_upper = parabola.bayesianUpperLimit(0.841) # 1-sigma high
+                #print richness_lower, richness_upper
 
-                richness_lower = parabola.bayesianUpperLimit(0.16)
-                richness_upper = parabola.bayesianUpperLimit(0.84)
-                print richness_lower, richness_upper 
+                self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                 self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
                 
-                print 'TS = %.3f richness = %.3f richness < %.3f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                                                                             self.richness_sparse_array[ii][jj],
-                                                                                             self.richness_upper_limit_sparse_array[ii][jj],
-                                                                                             len(richness))
+                print 'TS = %.2f richness = %.1f (%.1f -- %.1f, 0.68 CL) richness < %.1f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                                                                                                                     self.richness_sparse_array[ii][jj],
+                                                                                                                     self.richness_lower_sparse_array[ii][jj],
+                                                                                                                     self.richness_upper_sparse_array[ii][jj],
+                                                                                                                     self.richness_upper_limit_sparse_array[ii][jj],
+                                                                                                                     len(richness))
 
                 #if self.log_likelihood_sparse_array[ii][jj] == 0.:
                 #    pylab.figure()
@@ -389,7 +395,7 @@ class Likelihood:
                     p, f = self.logLikelihood(distance_modulus,
                                               self.richness_sparse_array[ii][jj],
                                               grid_search=True)[1:3]
-                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
+                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
 
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
@@ -439,12 +445,13 @@ class Likelihood:
 
     def write(self, outfile):
         """
-
+        Save the likelihood fitting results as a sparse HEALPix map.
         """
-
         data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
                      'RICHNESS': self.richness_sparse_array.transpose(),
-                     'RICHNESS_LIM': self.richness_upper_limit_sparse_array.transpose()}
+                     'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
+                     'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
+                     'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose()}
 
         ugali.utils.skymap.writeSparseHealpixMap(self.roi.pixels_target,
                                                  data_dict,

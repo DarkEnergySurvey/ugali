@@ -51,7 +51,7 @@ class Collector:
         self.richness_sparse = ugali.utils.skymap.readSparseHealpixMap(self.infile, 'RICHNESS',
                                                                        construct_map=False)[1]
         print 'Richness Limit'
-        self.richness_lim_sparse = ugali.utils.skymap.readSparseHealpixMap(self.infile, 'RICHNESS_LIM',
+        self.richness_lim_sparse = ugali.utils.skymap.readSparseHealpixMap(self.infile, 'RICHNESS_LIMIT',
                                                                            construct_map=False)[1]
 
         print 'Data covers %.2f deg^2'%(len(self.pixels) * self.area_pixel)
@@ -161,14 +161,13 @@ class Collector:
 
         likelihood.precomputeGridSearch([self.distance_modulus_array[distance_modulus_index]])
 
-        #richness, log_likelihood = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
-        richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
+        richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
 
         #pylab.figure()
         #pylab.scatter(richness, log_likelihood, c='b')
 
         #return likelihood, richness, log_likelihood
-        return likelihood, richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
+        return likelihood, richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
 
     def findPeaks(self, ts_threshold):
         """

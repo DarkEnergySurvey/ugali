@@ -28,7 +28,9 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
 
     results = {'richness': [],
                'log_likelihood': [],
-               'richness_lim': [],
+               'richness_lower': [],
+               'richness_upper': [],
+               'richness_limit': [],
                'f': [],
                'stellar_mass': []}
 
@@ -42,16 +44,18 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
         farm = ugali.analysis.farm.Farm(config, catalog=catalog_merge)
         likelihood = farm.farmLikelihoodFromCatalog(local=True, coords=coords)
         likelihood.precomputeGridSearch([distance_modulus])
-        richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
+        richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
 
         results['richness'].append(richness)
         results['log_likelihood'].append(log_likelihood)
-        results['richness_lim'].append(richness_upper_limit)
+        results['richness_lower'].append(richness_lower)
+        results['richness_upper'].append(richness_upper)
+        results['richness_limit'].append(richness_upper_limit)
         results['f'].append(f)
         results['stellar_mass'].append(richness * isochrone.stellarMass())
 
         if debug:
-            return likelihood, richness, log_likelihood, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
+            return likelihood, richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
 
     return results
 
@@ -68,7 +72,6 @@ def validateMembership(likelihood, p, mc_source_id=1):
 
     projector = ugali.utils.projector.Projector(likelihood.kernel.lon, likelihood.kernel.lat)
     x, y = projector.sphereToImage(likelihood.catalog.lon, likelihood.catalog.lat)
-
     
     pylab.figure()
     pylab.scatter(x[cut_mc_source_id], y[cut_mc_source_id], c='gray', s=100, edgecolors='none')
@@ -78,9 +81,7 @@ def validateMembership(likelihood, p, mc_source_id=1):
     pylab.xlabel(r'$\delta$ Lon (deg)')
     pylab.ylabel(r'$\delta$ Lat (deg)')
     
-
     # Spectral
-
     
     pylab.figure()
     pylab.scatter(likelihood.catalog.color[cut_mc_source_id], likelihood.catalog.mag[cut_mc_source_id], c='gray', s=100, edgecolors='none')
@@ -92,7 +93,6 @@ def validateMembership(likelihood, p, mc_source_id=1):
     pylab.xlabel('Color (mag)')
     pylab.ylabel('Magnitude (mag)')
     
-
     # Membership accuracy
 
     p_array = []

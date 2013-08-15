@@ -5,6 +5,9 @@ Class to construct parabolas from 3 points.
 import numpy
 import scipy.stats
 import scipy.interpolate
+import pylab
+
+pylab.ion()
 
 ############################################################
 
@@ -104,8 +107,7 @@ class Parabola:
             print 'WARNING'
 
             print a, b, c
-
-            import pylab
+            
             pylab.figure()
             pylab.scatter(self.x, self.y)
             raw_input('WAIT')
@@ -151,9 +153,7 @@ class Parabola:
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
-        if plot:
-            import pylab
-            
+        if plot:            
             pylab.figure()
             pylab.plot(x, f(x))
             pylab.scatter(self.x, self.y, c='red')
@@ -188,7 +188,6 @@ class Parabola:
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
         if plot:
-            import pylab
             pylab.figure()
             pylab.scatter(self.x, self.y)
 
@@ -218,6 +217,40 @@ class Parabola:
         
         return result
         """
+
+    def confidenceInterval(self, alpha, steps=1.e5, plot=False):
+        """
+        Compute two-sided confidence interval by taking x-values corresponding to the largest PDF-values first.
+        """
+        x_dense, y_dense = self.densify()
+        y_dense -= numpy.max(y_dense) # Numeric stability
+        f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
+        x = numpy.linspace(0., numpy.max(x_dense), steps)
+        pdf = numpy.exp(f(x) / 2.)
+        cut = (pdf / numpy.max(pdf)) > 1.e-10
+        x = x[cut]
+        pdf = pdf[cut]
+
+        sorted_pdf_indices = numpy.argsort(pdf)[::-1] # Indices of PDF in descending value
+        cdf = numpy.cumsum(pdf[sorted_pdf_indices])
+        cdf /= cdf[-1]
+        sorted_pdf_index_max = numpy.argmin((cdf - alpha)**2)
+        x_select = x[sorted_pdf_indices[0: sorted_pdf_index_max]]
+
+        if plot:
+            cdf = numpy.cumsum(pdf)
+            cdf /= cdf[-1]
+            print cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
+                  - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])]
+            
+            pylab.figure()
+            pylab.plot(x, f(x))
+            pylab.scatter(self.x, self.y, c='red')
+            
+            pylab.figure()
+            pylab.plot(x, pdf)
+            
+        return numpy.min(x_select), numpy.max(x_select) 
 
 ############################################################
 
