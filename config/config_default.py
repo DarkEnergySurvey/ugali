@@ -56,6 +56,7 @@
  
  'isochrone': {'mass_init_field': 'M_ini',
                'mass_act_field': 'M_act',
+               'luminosity_field': 'logL/Lo',
                'mag_1_field': 'r',
                'mag_2_field': 'i',
                'stage_field': 'stage',

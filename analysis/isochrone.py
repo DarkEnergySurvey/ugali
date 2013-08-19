@@ -114,12 +114,14 @@ class Isochrone:
         """
         mass_init_field = self.config.params['isochrone']['mass_init_field']
         mass_act_field = self.config.params['isochrone']['mass_act_field']
+        luminosity_field = self.config.params['isochrone']['luminosity_field']
         mag_1_field = self.config.params['isochrone']['mag_1_field']
         mag_2_field = self.config.params['isochrone']['mag_2_field']
         stage_field = self.config.params['isochrone']['stage_field']
         
         index_dict = {mass_init_field: 1,
                       mass_act_field: 2,
+                      luminosity_field: 3,
                       'g': 7,
                       'r': 8,
                       'i': 9,
@@ -145,6 +147,7 @@ class Isochrone:
     
         mass_init = []
         mass_act = []
+        luminosity = []
         mag_1 = []
         mag_2 = []
         stage = []
@@ -154,6 +157,7 @@ class Isochrone:
                 continue
             mass_init.append(float(parts[index_dict[mass_init_field]]))
             mass_act.append(float(parts[index_dict[mass_act_field]]))
+            luminosity.append(10.**float(parts[index_dict[luminosity_field]])) # Convert from log-space
             mag_1.append(float(parts[index_dict[mag_1_field]]))
             mag_2.append(float(parts[index_dict[mag_2_field]]))
 
@@ -163,7 +167,7 @@ class Isochrone:
                 stage.append('')
 
             for key in index_dict.keys():
-                if key in [mass_init_field, mass_act_field, stage_field]:
+                if key in [mass_init_field, mass_act_field, luminosity_field, stage_field]:
                     continue
                 self.color_data[key].append(float(parts[index_dict[key]]))
 
@@ -177,6 +181,7 @@ class Isochrone:
         self.feh = feh
         self.mass_init = numpy.array(mass_init)
         self.mass_act = numpy.array(mass_act)
+        self.luminosity = numpy.array(luminosity)
         self.mag_1 = numpy.array(mag_1)
         self.mag_2 = numpy.array(mag_2)
         self.stage = numpy.array(stage)
@@ -193,7 +198,7 @@ class Isochrone:
             mag_1 = self.mag_1
             mag_2 = self.mag_2
         else:
-            # Not generating points for the post-AGN stars,
+            # Not generating points for the post-AGB stars,
             # but still count those stars towards the normalization
             mass_init = self.mass_init[0: self.index]
             mass_act = self.mass_act[0: self.index]
@@ -230,7 +235,7 @@ class Isochrone:
 
     def stellarMass(self, mass_min=0.1, steps=10000):
         """
-        Compute the stellar mass. PDF comes from IMF, but weight by actual stellar mass.
+        Compute the stellar mass (M_Sol; average per star). PDF comes from IMF, but weight by actual stellar mass.
         """
         mass_max = self.mass_init_upper_bound
             
@@ -246,7 +251,31 @@ class Isochrone:
 
         mass_act = mass_act_interpolation(mass)
         return numpy.sum(mass_act * d_log_mass * self.imf.pdf(mass, log_mode=True))
+
+    def stellarLuminosity(self, steps=10000):
+        """
+        Compute the stellar luminosity (L_Sol; average per star). PDF comes from IMF.
+        The range of integration only covers the input isochrone data (no extrapolation used),
+        but this seems like a sub-percent effect if the isochrone goes to 0.15 stellar masses for the
+        old and metal-poor stellar populations of interest.
+
+        Note that the stellar luminosity is very sensitive to the post-AGB population.
+        """
+        mass_min = numpy.min(self.mass_init)
+        mass_max = self.mass_init_upper_bound
+            
+        d_log_mass = (numpy.log10(mass_max) - numpy.log10(mass_min)) / float(steps)
+        log_mass = numpy.linspace(numpy.log10(mass_min), numpy.log10(mass_max), steps)
+        mass = 10.**log_mass
         
+        luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity)
+        luminosity = luminosity_interpolation(mass)
+
+        pylab.scatter(mass, luminosity)
+        #pylab.scatter(mass, numpy.cumsum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True)) / (numpy.cumsum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))[-1]))
+        
+        return numpy.sum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))
+    
     def addPhotometricErrors(self, mag_delta_1, mag_delta_2):
         """
         Add photometric errors.
@@ -474,11 +503,20 @@ class CompositeIsochrone:
 
     def stellarMass(self):
         """
-        Compute stellar mass (M_Sol) for composite stellar population.
+        Compute stellar mass (M_Sol) for composite stellar population. Average per star.
         """
         sum = 0.
         for ii in range(0, len(self.isochrones)):
             sum += self.weights[ii] * self.isochrones[ii].stellarMass()
+        return sum
+
+    def stellarLuminosity(self):
+        """
+        Compute the stellar luminosity (L_Sol) for composite stellar population. Average per star.
+        """
+        sum = 0.
+        for ii in range(0, len(self.isochrones)):
+            sum += self.weights[ii] * self.isochrones[ii].stellarLuminosity()
         return sum
 
     def observableFraction(self, mask, distance_modulus):

@@ -45,7 +45,7 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
         likelihood = farm.farmLikelihoodFromCatalog(local=True, coords=coords)
         likelihood.precomputeGridSearch([distance_modulus])
         richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
-
+        
         results['richness'].append(richness)
         results['log_likelihood'].append(log_likelihood)
         results['richness_lower'].append(richness_lower)
