@@ -7,6 +7,8 @@ import numpy
 import pyfits
 import healpy
 
+import ugali.utils.projector
+
 ############################################################
 
 def subpixel(pix, nside_pix, nside_subpix):
@@ -249,5 +251,52 @@ def mergeSparseHealpixMaps(infiles, outfile,
     writeSparseHealpixMap(pix_master, data_dict, nside, outfile,
                           distance_modulus_array=distance_modulus_array,
                           coordsys='NULL', ordering='NULL')
+
+############################################################
+
+def randomPositions(mask, nside_pix, n=1):
+    """
+    Generate n random positions within a full HEALPix mask of booleans.
+    nside_pix is meant to be at coarser resolution than the input mask
+    so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
+    Return the longitude and latitude of the random positions and the total area (deg^2).
+
+    Probably there is a faster algorithm, but limited much more by the simulation and fitting time
+    than by the time it takes to generate random positions within the mask.
+    """
+
+    subpix = numpy.nonzero(mask)[0] # All the valid pixels in the mask at the NSIDE for the input mask
+    lon_subpix, lat_subpix = ugali.utils.projector.pixToAng(healpy.npix2nside(len(mask)), subpix)
+    pix = surveyPixel(lon_subpix, lat_subpix, nside_pix)
+
+    # Area with which the random points are thrown
+    area = len(pix) * healpy.nside2pixarea(nside_pix, degrees=True)
+    
+    lon = []
+    lat = []
+    for ii in range(0, n):
+        # Choose an unmasked pixel at random, which is OK because HEALPix is an equal area scheme
+        pix_ii = pix[numpy.random.randint(0, len(pix))]
+        lon_ii, lat_ii = ugali.utils.projector.pixToAng(nside_pix, pix_ii)
+        projector = ugali.utils.projector.Projector(lon_ii, lat_ii)
+
+        inside = False
+        while not inside:
+            # Apply random offset
+            arcminToDegree = 1 / 60.
+            resolution = arcminToDegree * healpy.nside2resol(nside_pix, arcmin=True)
+            x = 2. * (numpy.random.rand() - 0.5) * resolution # Using factor 2 to be conservative
+            y = 2. * (numpy.random.rand() - 0.5) * resolution
+            
+            lon_candidate, lat_candidate = projector.imageToSphere(x, y)
+
+            # Make sure that the random position does indeed fall within the randomly selected pixel 
+            if ugali.utils.projector.angToPix(nside_pix, lon_candidate, lat_candidate) == pix_ii:
+                inside = True
+                                    
+        lon.append(lon_candidate)
+        lat.append(lat_candidate)
+
+    return numpy.array(lon), numpy.array(lat), area
 
 ############################################################

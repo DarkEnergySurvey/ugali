@@ -56,14 +56,13 @@ PDF: probability distribution function
 
 * Change name of ugali.utils.projector to ugali.utils.coords
 * Consistent naming convention for pix vs. pixel
-* Simulator tool to place satellites randomly in the survey
 * Farm should write out config file for future reference
 * Consistently make use of angToPix and pixToAng
 * Be careful with spatialBin function when objects fall outside of ROI (CHECK!)
 * Residual maps / how to deal with gradients in background (important mainly for LMC region)
 * Compute observable fraction including photometric errors
 * Check for numerical issues with very small Plummer radii
-* Alternative IMFs
+* Add alternative IMFs
 * Collector function to find peaks (in 3D)
 * Save stellar mass instead of richness?
-* Compute the visual magnitude, or luminosity
+* Compute the absolute visual magnitude? Seems less stable than stellar mass...
