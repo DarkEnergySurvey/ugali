@@ -18,6 +18,8 @@ def take2D(histogram, x, y, bins_x, bins_y):
     """
     Take the value from a two-dimensional histogram from the bin corresponding to (x, y).
     """
+    histogram = numpy.array(histogram)
+    
     if numpy.isscalar(x):
         x = [x]
     if numpy.isscalar(y):

@@ -228,7 +228,10 @@ def halfLightRadius(m_stellar):
     """
     Return the half-light radius (kpc) given stellar mass (M_sol).
 
-    Based on plot from Andrey Kravtsov with fit by hand. 
+    Three-dimensional to two-dimensional conversion needed?
+
+    Based on plot from Andrey Kravtsov with fit by hand.
+    http://adsabs.harvard.edu/abs/2013ApJ...764L..31K
     """
     A = -1.
     B = 0.194
