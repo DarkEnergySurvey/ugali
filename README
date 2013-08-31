@@ -51,6 +51,7 @@ IMF: initial mass function
 CMD: color-magnitude diagram
 ROI: region of interest
 PDF: probability distribution function
+LUT: look-up table
 
 === TO DO ===
 

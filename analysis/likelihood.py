@@ -18,6 +18,7 @@ import ugali.utils.binning
 import ugali.utils.parabola
 import ugali.utils.projector
 import ugali.utils.skymap
+import ugali.analysis.color_lut
 
 ############################################################
 
@@ -73,17 +74,29 @@ class Likelihood:
 
         print 'Begin loop over distance moduli ...'
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
-            print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus),
+            print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus)#,
             time_start = time.time()
-            self.u_color_array[ii] = self.signalColor(distance_modulus)
+
+            self.u_color_array[ii] = False
+            if self.config.params['likelihood']['color_lut_infile'] is not None:
+                print '  Using look-up table %s'%(self.config.params['likelihood']['color_lut_infile'])
+                self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config.params['likelihood']['color_lut_infile'],
+                                                                               distance_modulus,
+                                                                               self.catalog.mag_1,
+                                                                               self.catalog.mag_2,
+                                                                               self.catalog.mag_err_1,
+                                                                               self.catalog.mag_err_2)
+            if not numpy.any(self.u_color_array[ii]):
+                self.u_color_array[ii] = self.signalColor(distance_modulus) # Compute on the fly instead
+            
             self.observable_fraction_sparse_array[ii] = self.isochrone.observableFraction(self.mask,
                                                                                           distance_modulus)
             time_end = time.time()
-            print '%.2f s'%(time_end - time_start)
+            #print '%.2f s'%(time_end - time_start)
 
     def signalColor(self, distance_modulus, mass_steps=10000):
         """
-        Compute color probability (u_color) for each catalog object.
+        Compute signal color probability (u_color) for each catalog object on the fly.
         """
         
         # Isochrone will be binned in next step, so can sample many points efficiently

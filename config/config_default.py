@@ -68,5 +68,8 @@
                'weights': [0.25, 0.25, 0.25, 0.25],
                'mass_steps': 400},
 
- 'likelihood': {'distance_modulus_array': [18., 19.]}
+ 'likelihood': {'distance_modulus_array': [19., 20.],
+                'color_lut_infile': None,
+                'color_lut_delta_mag': 0.03,
+                'color_lut_mag_err_array': [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04]}
  }
