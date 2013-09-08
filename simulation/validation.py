@@ -22,11 +22,18 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
     """
     print '=== Validate Satellite ==='
 
+    config.params['kernel']['params'] = [kernel.r_h] # TODO: Need better solution to update size??
+    print 'Using Plummer profile spatial model with half-light radius %.2f deg'%(config.params['kernel']['params'][0])
     catalog_base = ugali.observation.catalog.Catalog(config)
     coords = (kernel.lon, kernel.lat)
     simulator = ugali.simulation.simulator.Simulator(config, kernel.lon, kernel.lat)
 
-    results = {'richness': [],
+    results = {'mc_lon': [],
+               'mc_lat': [],
+               'mc_distance_modulus': [],
+               'mc_stellar_mass': [],
+               'mc_radius': [],
+               'richness': [],
                'log_likelihood': [],
                'richness_lower': [],
                'richness_upper': [],

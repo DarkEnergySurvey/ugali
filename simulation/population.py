@@ -45,7 +45,7 @@ def satellitePopulation(config, n,
         pylab.figure()
         pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
         pylab.colorbar()
-        xmin, xmax = pylab.xlim()
+        xmin, xmax = pylab.xlim() # Reverse azimuthal axis
         pylab.xlim([xmax, xmin])
         
         #pylab.scatter(numpy.log10(stellar_mass), distance_modulus, c=distance_modulus, s=500 * half_light_radius)

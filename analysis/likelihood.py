@@ -278,7 +278,14 @@ class Likelihood:
                                                         len(self.roi.pixels_target)])
         self.richness_upper_limit_sparse_array = numpy.zeros([len(self.distance_modulus_array),
                                                               len(self.roi.pixels_target)])
+        self.stellar_mass_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                      len(self.roi.pixels_target)])
+        self.fraction_observable_sparse_array = numpy.zeros([len(self.distance_modulus_array),
+                                                             len(self.roi.pixels_target)])
 
+        # Calculate the average stellar mass per star in the ischrone once
+        stellar_mass_conversion = self.isochrone.stellarMass()
+        
         # Specific pixel
         if coords is not None and distance_modulus_index is not None:
             lon, lat = coords
@@ -331,7 +338,7 @@ class Likelihood:
                     if numpy.fabs(log_likelihood[1]) > 1.e-1:
                         break
                 richness[2] = 10. * richness[1]
-                log_likelihood[2] = self.logLikelihood(distance_modulus, richness[2], grid_search=True)[0]
+                log_likelihood[2], p, f = self.logLikelihood(distance_modulus, richness[2], grid_search=True)
                 
                 # First search for maximum likelihood richness
                 found_maximum = False
@@ -391,13 +398,22 @@ class Likelihood:
 
                 self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                 self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
+                self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
+                self.fraction_observable_sparse_array[ii][jj] = f
                 
-                print 'TS = %.2f richness = %.1f (%.1f -- %.1f, 0.68 CL) richness < %.1f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                                                                                                     self.richness_sparse_array[ii][jj],
-                                                                                                                     self.richness_lower_sparse_array[ii][jj],
-                                                                                                                     self.richness_upper_sparse_array[ii][jj],
-                                                                                                                     self.richness_upper_limit_sparse_array[ii][jj],
-                                                                                                                     len(richness))
+                #print 'TS = %.2f richness = %.1f (%.1f -- %.1f, 0.68 CL) richness < %.1f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                #                                                                                                     self.richness_sparse_array[ii][jj],
+                #                                                                                                     self.richness_lower_sparse_array[ii][jj],
+                #                                                                                                     self.richness_upper_sparse_array[ii][jj],
+                #                                                                                                     self.richness_upper_limit_sparse_array[ii][jj],
+                #                                                                                                     len(richness))
+                print 'TS = %.2f stellar_mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                                                                                                                  self.stellar_mass_sparse_array[ii][jj],
+                                                                                                                  stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
+                                                                                                                  stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
+                                                                                                                  stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj],
+                                                                                                                  len(richness))
+
 
                 #if self.log_likelihood_sparse_array[ii][jj] == 0.:
                 #    pylab.figure()
@@ -464,7 +480,9 @@ class Likelihood:
                      'RICHNESS': self.richness_sparse_array.transpose(),
                      'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
                      'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
-                     'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose()}
+                     'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose(),
+                     'STELLAR_MASS': self.richness_upper_limit_sparse_array.transpose(),
+                     'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
 
         ugali.utils.skymap.writeSparseHealpixMap(self.roi.pixels_target,
                                                  data_dict,

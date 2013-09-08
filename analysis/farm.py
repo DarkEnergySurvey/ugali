@@ -207,7 +207,8 @@ class Farm:
             isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, name))
         isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config.params['isochrone']['weights'])
 
-        kernel = ugali.analysis.kernel.Plummer(lon, lat, 0.1)
+        # TODO: Only set up to use Plummer profile at the moment
+        kernel = ugali.analysis.kernel.Plummer(lon, lat, self.config.params['kernel']['params'][0])
 
         likelihood = ugali.analysis.likelihood.Likelihood(self.config, roi, mask, self.catalog, isochrone, kernel)
         
