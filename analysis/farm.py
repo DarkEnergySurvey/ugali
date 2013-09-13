@@ -189,12 +189,12 @@ class Farm:
             else:
                 # Submit to queue
                 if self.config.params['queue']['cluster'] == 'midway':
-                    logfile = '%s_%i.log'%(self.config.params['queue']['jobname'], pix[ii])
+                    logfile = '%s/%s_%i.log'%(self.config.params['output']['logdir_likelihood'], self.config.params['queue']['jobname'], pix[ii])
                     command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
                     command_queue = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 %s'%(logfile, self.config.params['queue']['jobname'], command)
-                    print command
-                    os.system(command)
-                    break
+                    print command_queue
+                    os.system(command_queue)
+                    #break
 
     def runFarmLikelihoodFromCatalog(self, pix, outfile, debug=False):
         """
