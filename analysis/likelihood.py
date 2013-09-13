@@ -72,7 +72,7 @@ class Likelihood:
         self.u_color_array = [[]] * len(self.distance_modulus_array)
         self.observable_fraction_sparse_array = [[]] * len(self.distance_modulus_array)
 
-        print 'Begin loop over distance moduli ...'
+        print 'Begin loop over distance moduli in precompute step ...'
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
             print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus)#,
             time_start = time.time()
@@ -293,7 +293,7 @@ class Likelihood:
             phi = numpy.radians(lon)
             pix_coords = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
             
-        print 'Begin loop over distance moduli ...'
+        print 'Begin loop over distance moduli in likelihood fitting ...'
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
@@ -396,6 +396,10 @@ class Likelihood:
                 #richness_upper = parabola.bayesianUpperLimit(0.841) # 1-sigma high
                 #print richness_lower, richness_upper
 
+                #if 2. * self.log_likelihood_sparse_array[ii][jj] < 9.:
+                #    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = 0., 0.
+                #    #self.richness_upper_limit_sparse_array[ii][jj] = 0.
+                #else:
                 self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                 self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
                 self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
@@ -481,8 +485,13 @@ class Likelihood:
                      'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
                      'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
                      'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose(),
-                     'STELLAR_MASS': self.richness_upper_limit_sparse_array.transpose(),
+                     'STELLAR_MASS': self.stellar_mass_sparse_array.transpose(),
                      'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+
+        # In case there is only a single distance modulus
+        if len(self.distance_modulus_array) == 1:
+            for key in data_dict:
+                data_dict[key] = data_dict[key].flatten()
 
         ugali.utils.skymap.writeSparseHealpixMap(self.roi.pixels_target,
                                                  data_dict,

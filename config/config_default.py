@@ -3,6 +3,10 @@
             'savedir_mag_2_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_i',
             'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/likelihood'},
 
+ 'queue': {'cluster': 'midway',
+           'script': '/home/bechtol/code/ugali/analysis/farm.py',
+           'jobname': 'ugali'},
+
  'catalog': {'infile': '/home/s1/bechtol/des10.a/projects/mw_substructure/mangle_test/y1c1_coadd_BulletClustersmask/data/starcat_y1c1_coadd_bullet.fits',
              #'infile': '/home/s1/bechtol/des10.a/projects/dust_maps/cluster_fields/bullet/image_riz_starcat_slr.fits',
              'lon_field': 'RA',

@@ -218,9 +218,10 @@ class Mask:
                                       catalog.color < self.roi.bins_color[-1])
 
         # and are observable in the ROI-specific mask for both bands
-        if not hasattr(catalog, 'pixel_roi_index'):
-            catalog.spatialBin(self.roi)
-        cut_roi = catalog.pixel_roi_index >= 0 # Objects outside ROI have pixel_roi_index of -1
+        #if not hasattr(catalog, 'pixel_roi_index'): # TODO: An attempt to save computations, but not robust
+        #    catalog.spatialBin(self.roi)
+        catalog.spatialBin(self.roi)
+        cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
         cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
         cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 

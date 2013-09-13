@@ -61,9 +61,7 @@ class Catalog:
         """
         Return indices of ROI pixels corresponding to object locations.
         """
-        theta = numpy.radians(90. - self.lat)
-        phi = numpy.radians(self.lon)
-        pix = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
+        pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], self.lon, self.lat)
 
         # Involves overhead of creating a full HEALPix map
         map_roi = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
@@ -130,7 +128,7 @@ class Catalog:
         else:
             print 'WARNING: did not recognize catalog file extension %s'%(file_type)
             
-        print 'Found %i objects'%(len(self.data))
+        #print 'Found %i objects'%(len(self.data))
 
     def _defineVariables(self):
         """
@@ -174,6 +172,8 @@ class Catalog:
             
         self.color = self.mag_1 - self.mag_2
         self.color_err = numpy.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
+
+        print 'Current catalog contains %i objects'%(len(self.data))
 
 ############################################################
 

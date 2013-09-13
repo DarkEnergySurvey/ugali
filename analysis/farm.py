@@ -11,6 +11,7 @@ Functions
 """
 
 import os
+import sys
 import numpy
 import healpy
 
@@ -76,28 +77,26 @@ class Farm:
                                                                                                     self.config.params['coords']['coordsys'],
                                                                                                     lon, lat)
 
-                # Should actually check to see if outfile exists
                 outfile = '%s/mask_%010i_nside_pix_%i_nside_subpix_%i_%s.fits'%(savedir,
                                                                                 pix[ii],
                                                                                 self.config.params['coords']['nside_mask_segmentation'],
                                                                                 self.config.params['coords']['nside_pixel'],
                                                                                 self.config.params['coords']['coordsys'].lower())
-
+                # Check to see if outfile exists
                 if os.path.exists(outfile):
                     print '  %s already exists. Skipping ...'%(outfile)
                     continue
                 
                 if local:
-                    self.farmMaskFromCatalogNow(pix[ii], infile, outfile)
+                    self.runFarmMaskFromCatalog(pix[ii], infile, outfile)
                 else:
                     # Submit to queue
                     pass                
 
-    def farmMaskFromCatalogNow(self, pix, infile, outfile):
+    def runFarmMaskFromCatalog(self, pix, infile, outfile):
         """
         
         """
-
         subpix = ugali.utils.skymap.subpixel(pix,
                                              self.config.params['coords']['nside_mask_segmentation'],
                                              self.config.params['coords']['nside_pixel'])
@@ -142,6 +141,11 @@ class Farm:
                 print 'WARNING: coordinates (%.3f, %.3f) not in analysis region'%(lon, lat)
                 return -999
 
+        # Save the current configuation settings
+        if not local:
+            configfile_queue = '%s/config_queue.py'%(self.config.params['output']['savedir_likelihood'])
+            self.config.writeConfig(configfile_queue)
+
         print '=== Likelihood From Catalog ==='
         for ii in range(0, len(pix)):
 
@@ -178,15 +182,21 @@ class Farm:
                 
             if local:
                 if coords is None:
-                    likelihood = self.farmLikelihoodFromCatalogNow(pix[ii], outfile)
+                    likelihood = self.runFarmLikelihoodFromCatalog(pix[ii], outfile)
                 else:
-                    likelihood = self.farmLikelihoodFromCatalogNow(pix[ii], outfile, debug=True)
+                    likelihood = self.runFarmLikelihoodFromCatalog(pix[ii], outfile, debug=True)
                     return likelihood
             else:
                 # Submit to queue
-                pass
+                if self.config.params['queue']['cluster'] == 'midway':
+                    logfile = '%s_%i.log'%(self.config.params['queue']['jobname'], pix[ii])
+                    command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
+                    command_queue = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 %s'%(logfile, self.config.params['queue']['jobname'], command)
+                    print command
+                    os.system(command)
+                    break
 
-    def farmLikelihoodFromCatalogNow(self, pix, outfile, debug=False):
+    def runFarmLikelihoodFromCatalog(self, pix, outfile, debug=False):
         """
         Set up and run the likelihood analysis
         """
@@ -221,11 +231,16 @@ class Farm:
     
 ############################################################
 
-def main():
-    """
-    Placeholder for when users want to call this script as an executable
-    """
-    from optparse import OptionParser
+#def main():
+#    """
+#    Placeholder for when users want to call this script as an executable
+#    """
+#    from optparse import OptionParser
     
 if __name__ == "__main__":
-    main()
+    #main()
+    config = sys.argv[1]
+    pix = int(sys.argv[2])
+    outfile = sys.argv[3]
+    my_farm = Farm(config)
+    my_farm.runFarmLikelihoodFromCatalog(pix, outfile)

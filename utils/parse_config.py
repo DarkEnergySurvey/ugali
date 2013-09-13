@@ -57,10 +57,10 @@ class Config(object):
 
         return params
     
-    def write(self, config_outfile):
+    def writeConfig(self, config_outfile):
         writer = open(config_outfile, 'w')
         writer.write(pprint.pformat(self.params))
-        write.close()
+        writer.close()
 
     def show(self):
         print pprint.pformat(self.params)

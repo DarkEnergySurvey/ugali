@@ -53,6 +53,12 @@ class Collector:
         print 'Richness Limit'
         self.richness_lim_sparse = ugali.utils.skymap.readSparseHealpixMap(self.infile, 'RICHNESS_LIMIT',
                                                                            construct_map=False)[1]
+        
+        # In case there is only a single distance modulus
+        if len(self.distance_modulus_array) == 1:
+            self.log_likelihood_sparse = numpy.array([self.log_likelihood_sparse])
+            self.richness_sparse = numpy.array([self.richness_sparse])
+            self.richness_lim_sparse = numpy.array([self.richness_lim_sparse])
 
         print 'Data covers %.2f deg^2'%(len(self.pixels) * self.area_pixel)
 
