@@ -14,6 +14,8 @@ import os
 import sys
 import numpy
 import healpy
+import subprocess
+import time
 
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
@@ -193,6 +195,16 @@ class Farm:
                     command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
                     command_queue = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 %s'%(logfile, self.config.params['queue']['jobname'], command)
                     print command_queue
+                    
+                    while True:
+                        n_submitted = int(subprocess.Popen('squeue -u bechtol | wc\n', 
+                                                           shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].split()[0]) - 1
+                        if n_submitted < 100:
+                            break
+                        else:
+                            print '%i jobs already in queue, waiting ...'%(n_submitted)
+                            time.sleep(15)
+
                     os.system(command_queue)
                     #break
 
