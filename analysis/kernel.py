@@ -195,7 +195,10 @@ class Plummer:
         #return result
         # ORIGINAL
         
-        return (numpy.pi * self.r_h**2)**(-1) * (1. + (r / self.r_h)**2)**(-2)
+        # SLOW
+        #return (numpy.pi * self.r_h**2)**(-1) * (1. + (r / self.r_h)**2)**(-2)
+        # EXACT SAME FUNCTIONALITY BUT FAST
+        return 1. / (numpy.pi * self.r_h**2 * (1. + (r / self.r_h)**2)**2)
 
     def integratePDF(self, r_min, r_max, prenormalized = True):
         """

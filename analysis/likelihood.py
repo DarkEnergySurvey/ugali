@@ -321,6 +321,20 @@ class Likelihood:
                 self.angsep_sparse = self.roi.angsep[jj] # deg
                 self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
 
+                """
+                EXCLUSIVELY FOR TESTING TIMING
+                for kk in range(0, 10):
+                    richness = 0.
+                    u_spatial = self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_object)
+                    #u = u_spatial * self.u_color
+                    #f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
+                    #                  * self.observable_fraction_sparse)
+                    #p = (richness * u) / ((richness * u) + self.b)
+                    #log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (f * richness)
+                    
+                    #log_likelihood, p, f = self.logLikelihood(distance_modulus, self.richness_sparse_array[ii][jj], grid_search=True)
+                """
+
                 #richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
                 #log_likelihood = numpy.array([0.,
                 #                              self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0],
@@ -434,7 +448,7 @@ class Likelihood:
                     p, f = self.logLikelihood(distance_modulus,
                                               self.richness_sparse_array[ii][jj],
                                               grid_search=True)[1:3]
-                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
+                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f                
 
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
