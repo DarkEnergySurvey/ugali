@@ -396,12 +396,18 @@ class Likelihood:
                 #richness_upper = parabola.bayesianUpperLimit(0.841) # 1-sigma high
                 #print richness_lower, richness_upper
 
+                if self.config.params['likelihood']['full_calculation']:
+                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
+                    self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)    
+                else:
+                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = 0., 0.
+                    self.richness_upper_limit_sparse_array[ii][jj] = 0.
                 #if 2. * self.log_likelihood_sparse_array[ii][jj] < 9.:
                 #    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = 0., 0.
                 #    #self.richness_upper_limit_sparse_array[ii][jj] = 0.
                 #else:
-                self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
-                self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
+                #self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
+                #self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
                 self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
                 self.fraction_observable_sparse_array[ii][jj] = f
                 
