@@ -11,6 +11,7 @@ Functions
 import time
 import numpy
 import scipy.stats
+import scipy.optimize
 import pylab
 import healpy
 
@@ -321,6 +322,19 @@ class Likelihood:
                 self.angsep_sparse = self.roi.angsep[jj] # deg
                 self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
 
+                # TESTING
+                u_spatial = self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_object)
+                self.u = u_spatial * self.u_color
+                self.f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
+                                   * self.observable_fraction_sparse)
+                log_likelihood, richness, p = self.maximizeLogLikelihood()
+                self.log_likelihood_sparse_array[ii][jj] = log_likelihood
+                self.richness_sparse_array[ii][jj] = richness
+                print 'TS = %.2f stellar_mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                                                       stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                # TESTING
+
+                """
                 #richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
                 #log_likelihood = numpy.array([0.,
                 #                              self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0],
@@ -434,7 +448,8 @@ class Likelihood:
                     p, f = self.logLikelihood(distance_modulus,
                                               self.richness_sparse_array[ii][jj],
                                               grid_search=True)[1:3]
-                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f                
+                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
+                """
 
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
@@ -455,6 +470,22 @@ class Likelihood:
         p = (richness * u) / ((richness * u) + self.b)
         log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (f * richness)
         return log_likelihood, p, f
+
+    def maximizeLogLikelihood(self):
+        """
+        Maximize the log(likelihood) and return the result.
+        """
+        richness, negative_log_likelihood = scipy.optimize.brent(negativeLogLikelihood, full_output=True)[0:2]
+        p = (richness * self.u) / ((richness * self.u) + self.b)
+        return -1. * negative_log_likelihood, richness, p
+
+    def negativeLogLikelihood(self, richness):
+        """
+        Return log(likelihood) given the richness.
+        """
+        p = (richness * self.u) / ((richness * self.u) + self.b)
+        log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
+        return -1. * log_likelihood
 
     def membershipGridSearch(self, index_distance_modulus = None, index_pixel_target = None):
         """
