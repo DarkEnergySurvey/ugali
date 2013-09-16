@@ -1,7 +1,8 @@
 {'output': {'chatter': 4, # 0 = silent; 1 = text output; 2 = more text output; 3 = text output and figures; 4 = paranoid
             'savedir_mag_1_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_r',
             'savedir_mag_2_mask': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/mask_i',
-            'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/likelihood'},
+            'savedir_likelihood': '/home/s1/bechtol/des10.a/projects/mw_substructure/sv_test/bullet/trial_v5/likelihood',
+            'logdir_likelihood': ''},
 
  'queue': {'cluster': 'midway',
            'script': '/home/bechtol/code/ugali/analysis/farm.py',
@@ -73,7 +74,7 @@
                'mass_steps': 400},
 
  'likelihood': {'distance_modulus_array': [19., 20.],
-                'full_calculation': False,
+                'full_pdf': False,
                 'color_lut_infile': None,
                 'color_lut_delta_mag': 0.03,
                 'color_lut_mag_err_array': [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04]}
