@@ -332,6 +332,7 @@ class Likelihood:
                 self.richness_sparse_array[ii][jj] = richness
                 print 'TS = %.2f stellar_mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj],
                                                        stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                #raw_input('WAIT')
                 # TESTING
 
                 """
@@ -471,13 +472,67 @@ class Likelihood:
         log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (f * richness)
         return log_likelihood, p, f
 
-    def maximizeLogLikelihood(self):
+    def logLikelihoodSimple(self, richness):
+        """
+        Evaluate log(likelihood)
+        """
+        p = (richness * self.u) / ((richness * self.u) + self.b)
+        return -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
+
+    def maximizeLogLikelihood(self, tolerance=1.e-3):
         """
         Maximize the log(likelihood) and return the result.
         """
-        richness, negative_log_likelihood = scipy.optimize.brent(negativeLogLikelihood, full_output=True)[0:2]
-        p = (richness * self.u) / ((richness * self.u) + self.b)
-        return -1. * negative_log_likelihood, richness, p
+        #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
+        #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
+        
+        richness = numpy.array([0., 
+                                #0.1 / self.f, 
+                                1. / self.f, 
+                                10. / self.f]) # Richness corresponding to 0, 1, and 10 observable stars
+        log_likelihood = numpy.array([0., 
+                                      #self.logLikelihoodSimple(richness[1]), 
+                                      self.logLikelihoodSimple(richness[1]), 
+                                      self.logLikelihoodSimple(richness[2])])
+
+        found_maximum = False
+        while not found_maximum:
+            #print richness
+            #print log_likelihood
+            #raw_input('WAIT')
+            parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
+            if parabola.vertex_x < 0.:
+                found_maximum = True
+            else:
+                richness = numpy.append(richness, parabola.vertex_x)
+                log_likelihood = numpy.append(log_likelihood, self.logLikelihoodSimple(richness[-1]))    
+                if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
+                    found_maximum = True
+
+        index = numpy.argmax(log_likelihood)
+        p = (richness[index] * self.u) / ((richness[index] * self.u) + self.b)
+        return log_likelihood[index], richness[index], p
+
+        #while True:
+        #    p = (richness_array[-1] * self.u) / ((richness_array[-1] * self.u) + self.b)
+        #    log_likelihood_array.append(-1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness_array[-1]))
+        #    richness_array.append(numpy.sum(p) / self.f)
+        #    if log_likelihood_array[-1] < 0.:
+        #        return 0., 0., numpy.zeros(len(p))
+        #    if numpy.fabs(log_likelihood_array[-1] - log_likelihood_array[-2]) < tol or len(richness_array) == 500:
+        #        p = (richness_array[-1] * self.u) / ((richness_array[-1] * self.u) + self.b)
+        #        log_likelihood_array.append(-1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness_array[-1]))
+        #        return log_likelihood_array[-1], richness_array[-1], p       
+        #        #break
+
+        #for ii in range(0, len(richness_array)):
+        #    print '%10.2f %10.2f'%(log_likelihood_array[ii], richness_array[ii])
+        #if numpy.max(log_likelihood_array) == 0.:
+        #    return 0., 0., numpy.zeros(len(p))
+        #else:
+        #return log_likelihood_array[-1], richness_array[-1], p
+        #p = (richness * self.u) / ((richness * self.u) + self.b)
+        #return -1. * negative_log_likelihood, richness, p
 
     def negativeLogLikelihood(self, richness):
         """
@@ -485,6 +540,7 @@ class Likelihood:
         """
         p = (richness * self.u) / ((richness * self.u) + self.b)
         log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
+        print richness, log_likelihood
         return -1. * log_likelihood
 
     def membershipGridSearch(self, index_distance_modulus = None, index_pixel_target = None):

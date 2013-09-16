@@ -196,6 +196,9 @@ class Farm:
                     command_queue = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 %s'%(logfile, self.config.params['queue']['jobname'], command)
                     print command_queue
                     
+                    if not os.path.exists(self.config.params['output']['logdir_likelihood']):
+                        os.mkdir(self.config.params['output']['logdir_likelihood'])
+
                     while True:
                         n_submitted = int(subprocess.Popen('squeue -u bechtol | wc\n', 
                                                            shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].split()[0]) - 1
