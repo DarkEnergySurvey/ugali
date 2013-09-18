@@ -43,12 +43,25 @@ def satellitePopulation(config, n,
 
     if plot:
         pylab.figure()
-        pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
-        pylab.colorbar()
+        #pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
+        #pylab.colorbar()
+        pylab.scatter(lon, lat, edgecolors='none')
         xmin, xmax = pylab.xlim() # Reverse azimuthal axis
         pylab.xlim([xmax, xmin])
-        
-        #pylab.scatter(numpy.log10(stellar_mass), distance_modulus, c=distance_modulus, s=500 * half_light_radius)
+        pylab.title('Random Positions in Survey Footprint')
+        pylab.xlabel('Longitude (deg)')
+        pylab.ylabel('Latitude (deg)')
+
+        pylab.figure()
+        pylab.scatter(stellar_mass, ugali.utils.projector.distanceModulusToDistance(distance_modulus),
+                      c=(60. * half_light_radius), s=500 * half_light_radius, edgecolors='none')
+        pylab.xscale('log')
+        pylab.yscale('log')
+        pylab.xlim([0.5 * range_stellar_mass[0], 2. * range_stellar_mass[1]])
+        pylab.colorbar()
+        pylab.title('Half-light Radius (arcmin)')
+        pylab.xlabel('Stellar Mass (arcmin)')
+        pylab.ylabel('Distance (kpc)')
 
     return simulation_area, lon, lat, distance_modulus, stellar_mass, half_light_radius 
 
