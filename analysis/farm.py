@@ -141,7 +141,7 @@ class Farm:
             pix_coords = healpy.ang2pix(self.config.params['coords']['nside_likelihood_segmentation'], theta, phi)
             if pix_coords not in pix:
                 print 'WARNING: coordinates (%.3f, %.3f) not in analysis region'%(lon, lat)
-                return -999
+                #return -999
 
         # Save the current configuation settings
         if not local:
