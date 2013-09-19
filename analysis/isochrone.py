@@ -271,7 +271,7 @@ class Isochrone:
         luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity)
         luminosity = luminosity_interpolation(mass)
 
-        pylab.scatter(mass, luminosity)
+        #pylab.scatter(mass, luminosity)
         #pylab.scatter(mass, numpy.cumsum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True)) / (numpy.cumsum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))[-1]))
         
         return numpy.sum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))

@@ -254,20 +254,26 @@ def mergeSparseHealpixMaps(infiles, outfile,
 
 ############################################################
 
-def randomPositions(mask, nside_pix, n=1):
+def randomPositions(input, nside_pix, n=1):
     """
-    Generate n random positions within a full HEALPix mask of booleans.
-    nside_pix is meant to be at coarser resolution than the input mask
+    Generate n random positions within a full HEALPix mask of booleans, or a set of (lon, lat) coordinates.
+
+    nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
     Return the longitude and latitude of the random positions and the total area (deg^2).
 
     Probably there is a faster algorithm, but limited much more by the simulation and fitting time
     than by the time it takes to generate random positions within the mask.
     """
-
-    subpix = numpy.nonzero(mask)[0] # All the valid pixels in the mask at the NSIDE for the input mask
-    lon_subpix, lat_subpix = ugali.utils.projector.pixToAng(healpy.npix2nside(len(mask)), subpix)
-    pix = surveyPixel(lon_subpix, lat_subpix, nside_pix)
+    input = numpy.array(input)
+    if len(input.shape) == 1:
+        subpix = numpy.nonzero(input)[0] # All the valid pixels in the mask at the NSIDE for the input mask
+        lon, lat = ugali.utils.projector.pixToAng(healpy.npix2nside(len(input)), subpix)
+    elif len(input.shape) == 2:
+        lon, lat = input[0], input[1] # All catalog object positions
+    else:
+        print 'WARNING: unexpected input dimensions for skymap.randomPositions'
+    pix = surveyPixel(lon, lat, nside_pix)
 
     # Area with which the random points are thrown
     area = len(pix) * healpy.nside2pixarea(nside_pix, degrees=True)
@@ -300,3 +306,4 @@ def randomPositions(mask, nside_pix, n=1):
     return numpy.array(lon), numpy.array(lat), area
 
 ############################################################
+

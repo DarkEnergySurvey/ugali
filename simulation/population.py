@@ -9,6 +9,7 @@ import ugali.utils.parse_config
 import ugali.utils.projector
 import ugali.utils.skymap
 import ugali.analysis.kernel
+import ugali.observation.catalog
 
 pylab.ion()
 
@@ -17,9 +18,10 @@ pylab.ion()
 def satellitePopulation(config, n,
                         range_distance_modulus=[16.5, 24.],
                         range_stellar_mass=[1.e2, 1.e5],
+                        mode='mask',
                         plot=False):
     """
-    Create a population of n randomly placed satellites within a survey mask specified in the config file.
+    Create a population of n randomly placed satellites within a survey mask or catalog specified in the config file.
     Satellites are uniformly placed in distance modulus, and uniformly generated in log(stellar_mass) (M_sol).
     The ranges can be set by the user.
 
@@ -30,11 +32,15 @@ def satellitePopulation(config, n,
     if type(config) == str:
         config = ugali.utils.parse_config.Config(config)
 
-    mask_1 = ugali.utils.skymap.readSparseHealpixMap(config.params['mask']['infile_1'], 'MAGLIM')
-    mask_2 = ugali.utils.skymap.readSparseHealpixMap(config.params['mask']['infile_2'], 'MAGLIM')
-    mask = (mask_1 > 0.) * (mask_2 > 0.)
+    if mode == 'mask':
+        mask_1 = ugali.utils.skymap.readSparseHealpixMap(config.params['mask']['infile_1'], 'MAGLIM')
+        mask_2 = ugali.utils.skymap.readSparseHealpixMap(config.params['mask']['infile_2'], 'MAGLIM')
+        input = (mask_1 > 0.) * (mask_2 > 0.)
+    elif mode == 'catalog':
+        catalog = ugali.observation.catalog.Catalog(config)
+        input = numpy.array([catalog.lon, catalog.lat])
     
-    lon, lat, simulation_area = ugali.utils.skymap.randomPositions(mask,
+    lon, lat, simulation_area = ugali.utils.skymap.randomPositions(input,
                                                                    config.params['coords']['nside_likelihood_segmentation'],
                                                                    n=n)
     distance_modulus = numpy.random.uniform(range_distance_modulus[0], range_distance_modulus[1], n)

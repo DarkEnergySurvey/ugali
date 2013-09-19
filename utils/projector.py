@@ -217,13 +217,13 @@ def distanceToDistanceModulus(distance):
     """
     Return distance modulus for a given distance (kpc).
     """
-    return 5. * (numpy.log10(distance * 1.e3) - 1.)
+    return 5. * (numpy.log10(numpy.array(distance) * 1.e3) - 1.)
 
 def distanceModulusToDistance(distance_modulus):
     """
     Return distance (kpc) for a given distance modulus.
     """
-    return 10**((0.2 * distance_modulus) - 2.)
+    return 10**((0.2 * numpy.array(distance_modulus)) - 2.)
 
 ############################################################
 
