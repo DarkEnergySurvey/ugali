@@ -16,6 +16,7 @@ import numpy
 import healpy
 import subprocess
 import time
+import getpass
 
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
@@ -190,26 +191,39 @@ class Farm:
                     return likelihood
             else:
                 # Submit to queue
+                logfile = '%s/%s_%i.log'%(self.config.params['output']['logdir_likelihood'], self.config.params['queue']['jobname'], pix[ii])
+                command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
+                username = getpass.getuser()
+                # Midway cluster
                 if self.config.params['queue']['cluster'] == 'midway':
-                    logfile = '%s/%s_%i.log'%(self.config.params['output']['logdir_likelihood'], self.config.params['queue']['jobname'], pix[ii])
-                    command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
-                    command_queue = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 %s'%(logfile, self.config.params['queue']['jobname'], command)
-                    print command_queue
+                    batch = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 '%(logfile, self.config.params['queue']['jobname'])
+                    check_jobs = 'squeue -u %s | wc\n'%username
+                # SLAC cluster
+                elif self.config.params['queue']['cluster'] == 'slac':
+                    # Need to add an option for which slac queue [short/long/kipac-ibq]
+                    batch = 'bsub -q kipac-ibq -R \"rhel60&&scratch>1\" -oo %s -J %s '%(logfile, self.config.params['queue']['jobname'])
+                    check_jobs = 'bjobs -u %s | wc\n'%username
+                # FNAL cluster
+                elif self.config.params['queue']['cluster'] == 'fnal':
+                    raise Exception("FNAL cluster not implemented")
+
+                command_queue = batch + command
+                print command_queue
                     
-                    if not os.path.exists(self.config.params['output']['logdir_likelihood']):
-                        os.mkdir(self.config.params['output']['logdir_likelihood'])
+                if not os.path.exists(self.config.params['output']['logdir_likelihood']):
+                    os.mkdir(self.config.params['output']['logdir_likelihood'])
 
-                    while True:
-                        n_submitted = int(subprocess.Popen('squeue -u bechtol | wc\n', 
-                                                           shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].split()[0]) - 1
-                        if n_submitted < 100:
-                            break
-                        else:
-                            print '%i jobs already in queue, waiting ...'%(n_submitted)
-                            time.sleep(15)
+                while True:
+                    n_submitted = int(subprocess.Popen(check_jobs, shell=True, 
+                                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].split()[0]) - 1
+                    if n_submitted < 100:
+                        break
+                    else:
+                        print '%i jobs already in queue, waiting ...'%(n_submitted)
+                        time.sleep(15)
 
-                    os.system(command_queue)
-                    #break
+                os.system(command_queue)
+                #break
 
     def runFarmLikelihoodFromCatalog(self, pix, outfile, debug=False):
         """

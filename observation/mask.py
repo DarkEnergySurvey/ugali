@@ -269,6 +269,7 @@ class MaskBand:
         """
         mask = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
         mask[self.roi.pixels] = self.mask_roi_sparse
+        mask[mask == 0.] = healpy.UNSEEN
         ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
                                               mask,
                                               self.roi.lon, self.roi.lat,

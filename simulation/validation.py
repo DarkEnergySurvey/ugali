@@ -158,7 +158,7 @@ def validateMembership(likelihood, p, mc_source_id=1):
         n_members_array.append(numpy.sum(numpy.all([likelihood.catalog.mc_source_id == mc_source_id,
                                                     p >= probability_bins[ii],
                                                     p < probability_bins[ii + 1]], axis=0)))
-
+        
     pylab.figure()
     pylab.scatter(p_array, p_sum_array, marker='o', c='blue')
     pylab.scatter(p_array, n_members_array, marker='o', c='red')
@@ -173,12 +173,17 @@ def validateMembership(likelihood, p, mc_source_id=1):
     purity = []
     completeness = []
 
+    purity_reconstructed = []
+    completeness_reconstructed = []
+
     for ii in range(0, len(x)):
         cut = p > (1 - x[ii])
 
         if numpy.sum(cut) < 1:
             purity.append(1.)
             completeness.append(0.)
+            purity_reconstructed.append(1.)
+            completeness_reconstructed.append(0.)
             continue
         
         purity_cut = numpy.logical_and(cut, likelihood.catalog.mc_source_id == mc_source_id)
@@ -186,10 +191,15 @@ def validateMembership(likelihood, p, mc_source_id=1):
         
         purity.append(float(numpy.sum(purity_cut)) / numpy.sum(cut))
         completeness.append(float(numpy.sum(purity_cut)) / numpy.sum(completeness_cut))
+
+        purity_reconstructed.append(numpy.mean(p[cut]))
+        completeness_reconstructed.append(numpy.sum(p[cut]) / numpy.sum(p))
         
     pylab.figure()
     pylab.plot(x, purity, c='red', label='Purity')
     pylab.plot(x, completeness, c='blue', label='Completeness')
+    pylab.plot(x, purity_reconstructed, c='red', linestyle='--', label='Purity Reconstructed')
+    pylab.plot(x, completeness_reconstructed, c='blue', linestyle='--', label='Completeness Reconstructed')
     pylab.xlim(0, 1)
     pylab.ylim(0, 1)
     pylab.xlabel('1 - Membership Probability')
