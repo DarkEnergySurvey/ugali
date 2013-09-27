@@ -70,7 +70,9 @@ LUT: look-up table
 * Collector function to find peaks (in 3D)
 * Save stellar mass instead of richness?
 * Compute the absolute visual magnitude in addition to bolometric luminosity
-* Reduce memory usage
+* Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
+* Separate ROIs for field evaluation and likelihood fitting
+* Search multiple ROIs in same batch job
 
 === TEST ===
 
