@@ -245,3 +245,34 @@ def angToPix(nside, lon, lat):
     return healpy.ang2pix(nside, theta, phi)
 
 ############################################################
+
+def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
+    """
+    Wrapper around healpy.query_disc to deal with old healpy implementation.
+
+    nside : int
+      The nside of the Healpix map.
+    vec : float, sequence of 3 elements
+      The coordinates of unit vector defining the disk center.
+    radius : float
+      The radius (in radians) of the disk
+    inclusive : bool, optional
+      If False, return the exact set of pixels whose pixel centers lie 
+      within the disk; if True, return all pixels that overlap with the disk,
+      and maybe a few more. Default: False
+    fact : int, optional
+      Only used when inclusive=True. The overlapping test will be done at
+      the resolution fact*nside. For NESTED ordering, fact must be a power of 2,
+      else it can be any positive integer. Default: 4.
+    nest: bool, optional
+      if True, assume NESTED pixel ordering, otherwise, RING pixel ordering
+
+    """
+    try: 
+        # New-style call (healpy 1.6.3)
+        return healpy.query_disc(nside, vec, radius, inclusive, fact, nest)
+    except: 
+        # Old-style call (healpy 0.10.2)
+        return healpy.query_disc(nside, vec, radius, nest, deg=False)
+                          
+    
