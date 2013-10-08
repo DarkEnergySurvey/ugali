@@ -8,6 +8,9 @@ derived from optical photometric surveys.
 Keith Bechtol
 bechtol@kicp.uchicago.edu
 
+Alex Drlica-Wagner
+kadrlica@fnal.gov
+
 === USAGE EXAMPLES ===
 
 Examples go here.
@@ -66,7 +69,10 @@ LUT: look-up table
 * Add alternative IMFs
 * Collector function to find peaks (in 3D)
 * Save stellar mass instead of richness?
-* Compute the absolute visual magnitude? Seems less stable than stellar mass...
-* Look-up table for u_color
+* Compute the absolute visual magnitude in addition to bolometric luminosity
+* Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
+* Separate ROIs for field evaluation and likelihood fitting
+* Search multiple ROIs in same batch job
 
 === TEST ===
+
