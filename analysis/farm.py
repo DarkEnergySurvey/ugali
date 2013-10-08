@@ -25,6 +25,7 @@ import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.utils.parse_config
 import ugali.utils.skymap
+from ugali.utils.logger import logger
 
 ############################################################
 
@@ -50,35 +51,31 @@ class Farm:
                                                      self.config.params['coords']['nside_mask_segmentation'],
                                                      self.config.params['coords']['nside_pixel'])
 
-        print '=== Mask From Catalog ==='
+        logger.info('=== Mask From Catalog ===')
 
         for infile in [self.config.params['mangle']['infile_1'],
                        self.config.params['mangle']['infile_2']]:
-
-            print 'Mangle infile = %s'%(infile)
+            
+            logger.info('Mangle infile = %s'%(infile))
 
             if infile == self.config.params['mangle']['infile_1']:
                 savedir = self.config.params['output']['savedir_mag_1_mask']
             elif infile == self.config.params['mangle']['infile_2']:
                 savedir = self.config.params['output']['savedir_mag_2_mask']
             else:
-                print 'WARNING: did not recognize the Mangle file %s.'%(infile)
+                logger.warning('Unrecognized Mangle file %s.'%(infile))
 
             if not os.path.exists(savedir):
                 os.mkdir(savedir)
             
-            print 'Savedir = %s'%(savedir)
+            logger.info('Savedir = %s'%(savedir))
             
             for ii in range(0, len(pix)):
 
                 theta, phi =  healpy.pix2ang(self.config.params['coords']['nside_mask_segmentation'], pix[ii])
                 lon, lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
                 
-                print '  (%i/%i) pixel %i nside %i; %i query points; %s (lon, lat) = (%.3f, %.3f)'%(ii, len(pix), pix[ii],
-                                                                                                    self.config.params['coords']['nside_mask_segmentation'],
-                                                                                                    len(subpix[ii]),
-                                                                                                    self.config.params['coords']['coordsys'],
-                                                                                                    lon, lat)
+                logger.info('  (%i/%i) pixel %i nside %i; %i query points; %s (lon, lat) = (%.3f, %.3f)'%(ii, len(pix), pix[ii],self.config.params['coords']['nside_mask_segmentation'],len(subpix[ii]),self.config.params['coords']['coordsys'],lon, lat))
 
                 outfile = '%s/mask_%010i_nside_pix_%i_nside_subpix_%i_%s.fits'%(savedir,
                                                                                 pix[ii],
@@ -87,7 +84,7 @@ class Farm:
                                                                                 self.config.params['coords']['coordsys'].lower())
                 # Check to see if outfile exists
                 if os.path.exists(outfile):
-                    print '  %s already exists. Skipping ...'%(outfile)
+                    logger.info('  %s already exists. Skipping ...'%(outfile))
                     continue
                 
                 if local:
@@ -141,7 +138,7 @@ class Farm:
             phi = numpy.radians(lon)
             pix_coords = healpy.ang2pix(self.config.params['coords']['nside_likelihood_segmentation'], theta, phi)
             if pix_coords not in pix:
-                print 'WARNING: coordinates (%.3f, %.3f) not in analysis region'%(lon, lat)
+                logger.warning('Coordinates (%.3f, %.3f) outside analysis region'%(lon, lat))
                 #return -999
 
         # Save the current configuation settings
@@ -149,7 +146,7 @@ class Farm:
             configfile_queue = '%s/config_queue.py'%(self.config.params['output']['savedir_likelihood'])
             self.config.writeConfig(configfile_queue)
 
-        print '=== Likelihood From Catalog ==='
+        logger.info('=== Likelihood From Catalog ===')
         for ii in range(0, len(pix)):
 
             # Just for testing
@@ -165,12 +162,8 @@ class Farm:
 
             n_query_points = healpy.nside2npix(self.config.params['coords']['nside_pixel']) \
                              / healpy.nside2npix(self.config.params['coords']['nside_likelihood_segmentation'])
-
-            print '  (%i/%i) pixel %i nside %i; %i query points; %s (lon, lat) = (%.3f, %.3f)'%(ii, len(pix), pix[ii],
-                                                                                                self.config.params['coords']['nside_likelihood_segmentation'],
-                                                                                                n_query_points,
-                                                                                                self.config.params['coords']['coordsys'],
-                                                                                                lon, lat)
+        
+            logger.info('  (%i/%i) pixel %i nside %i; %i query points; %s (lon, lat) = (%.3f, %.3f)'%(ii+1, len(pix), pix[ii],self.config.params['coords']['nside_likelihood_segmentation'],n_query_points,self.config.params['coords']['coordsys'],lon, lat))
 
             # Should actually check to see if outfile exists
             outfile = '%s/likelihood_%010i_nside_pix_%i_nside_subpix_%i_%s.fits'%(self.config.params['output']['savedir_likelihood'],
@@ -180,10 +173,10 @@ class Farm:
                                                                                   self.config.params['coords']['coordsys'].lower())
             
             if os.path.exists(outfile) and coords is None:
-                print '  %s already exists. Skipping ...'%(outfile)
+                logger.info('  %s already exists. Skipping ...'%(outfile))
                 continue
                 
-            if local:
+            if local or self.config.params['queue']['cluster'] == 'local':
                 if coords is None:
                     likelihood = self.runFarmLikelihoodFromCatalog(pix[ii], outfile)
                 else:
@@ -194,21 +187,25 @@ class Farm:
                 logfile = '%s/%s_%i.log'%(self.config.params['output']['logdir_likelihood'], self.config.params['queue']['jobname'], pix[ii])
                 command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile_queue, pix[ii], outfile)
                 username = getpass.getuser()
+
                 # Midway cluster
                 if self.config.params['queue']['cluster'] == 'midway':
-                    batch = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 '%(logfile, self.config.params['queue']['jobname'])
+                    #batch = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 '%(logfile, self.config.params['queue']['jobname'])
+                    batch = """sbatch --account=kicp --partition=kicp-ht --output=%(logfile)s --job-name=%(jobname)s --mem=10000 """
                     check_jobs = 'squeue -u %s | wc\n'%username
                 # SLAC cluster
                 elif self.config.params['queue']['cluster'] == 'slac':
                     # Need to add an option for which slac queue [short/long/kipac-ibq]
-                    batch = 'bsub -q kipac-ibq -R \"rhel60&&scratch>1\" -oo %s -J %s '%(logfile, self.config.params['queue']['jobname'])
+                    batch = """bsub -q %(queue)s -R \"%(require)s\" -oo %(logfile)s -J %(jobname)s """
                     check_jobs = 'bjobs -u %s | wc\n'%username
                 # FNAL cluster
                 elif self.config.params['queue']['cluster'] == 'fnal':
+                    # Need to learn how to use condor first...
                     raise Exception("FNAL cluster not implemented")
 
+                batch = batch % dict(self.config.params['queue'],logfile=logfile)
                 command_queue = batch + command
-                print command_queue
+                logger.debug(command_queue)
                     
                 if not os.path.exists(self.config.params['output']['logdir_likelihood']):
                     os.mkdir(self.config.params['output']['logdir_likelihood'])
@@ -219,7 +216,7 @@ class Farm:
                     if n_submitted < 100:
                         break
                     else:
-                        print '%i jobs already in queue, waiting ...'%(n_submitted)
+                        logger.info('%i jobs already in queue, waiting ...'%(n_submitted))
                         time.sleep(15)
 
                 os.system(command_queue)
@@ -246,8 +243,13 @@ class Farm:
             isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, name))
         isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config.params['isochrone']['weights'])
 
-        # TODO: Only set up to use Plummer profile at the moment
-        kernel = ugali.analysis.kernel.Plummer(lon, lat, self.config.params['kernel']['params'][0])
+        if self.config.params['kernel']['type'].lower() == 'plummer':
+            # ADW: Use old Plummer for now, should be about ready to switch over...
+            kernel = ugali.analysis.kernel.Plummer(lon, lat, self.config.params['kernel']['params'][0])
+            #kernel = ugali.analysis.kernel.PlummerKernel(lon, lat, *self.config.params['kernel']['params'])
+        elif self.config.params['kernel']['type'].lower() == 'disk':
+            kernel = ugali.analysis.kernel.DiskKernel(lon, lat, *self.config.params['kernel']['params'])
+
 
         likelihood = ugali.analysis.likelihood.Likelihood(self.config, roi, mask, self.catalog, isochrone, kernel)
         
