@@ -4,8 +4,11 @@ Documentation.
 
 import numpy
 import scipy.signal
+import scipy.integrate
+from abc import abstractmethod
 
 import ugali.utils.plotting
+import ugali.utils.projector
 
 ############################################################
 
@@ -64,10 +67,152 @@ def disk(params, pixel_size):
 
 ############################################################
 
-class RadialProfile:
+class RadialKernel(object):
+    """
+    Base class for radially symmetric kernel profiles.
+    Each subclass must implement:
+        pdf       : value of the pdf as a function of angular radius
+        extension : parameter for controlling extension
+        edge      : parameter for defining effective edge of the kernel
+    """
+    def __init__(self, lon, lat, *args):
+        self.name = self.__class__.__name__
 
-    def __init__(self, lon, lat, params):
+        self.setCenter(lon,lat)
+        self.setParams(*args)
+
+    def setParams(self, *args):
+        self.params = args
+        self.norm = 1.0
+        #self.norm /= self.integrate()
+
+    def __call__(self, radius):
+        return self.pdf(radius)
+
+    @abstractmethod
+    def extension(self):
         pass
+
+    @abstractmethod
+    def edge(self):
+        pass
+
+    @abstractmethod
+    def pdf(self, radius):
+        """
+        Evaluate the PDF (deg^2) at a given radius (deg).
+        """
+        pass
+
+    def integrate(self, r_min=0, r_max=numpy.inf):
+        """
+        Calculate the 2D integral of the PDF.
+        """
+        if r_min < 0: raise Exception('r_min must be >= 0')
+        r_max = r_max if r_max < self.edge() else self.edge()
+        r_min,r_max = numpy.radians([r_min,r_max])
+        integrand = lambda r: self.pdf(numpy.degrees(r)) * 2*numpy.pi*r
+        return scipy.integrate.quad(integrand, r_min, r_max, full_output=True, epsabs=0)[0]
+
+    # For back-compatibility
+    def integratePDF(self, r_min, r_max, steps=1e4, prenormalized=True): 
+        return self.integrate(r_min, r_max)
+
+    # For back-compatibility
+    def surfaceIntensity(self, radius): 
+        return self.pdf(radius)
+
+    def setCenter(self, lon, lat):
+        self.lon = lon
+        self.lat = lat
+        self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
+
+    def sample_radius(self, n):
+        """
+        Sample the radial distribution (deg) from the 2D stellar density.
+        """
+        radius = numpy.linspace(0, self.edge(), 1.e5)
+        rpdf = self.pdf(r) * numpy.sin(numpy.radians(radius))
+        rcdf = numpy.cumsum(rpdf)
+        rcdf /= rcdf[-1]
+        fn = scipy.interpolate.interp1d(rcdf, range(0, len(rcdf)), bounds_error=False, fill_value=-1)
+        index = numpy.floor(fn(numpy.random.rand(n))).astype(int)
+        return radius[index]
+
+    def sample_lonlat(self, n):
+        """
+        Sample 2D distribution of points in lon, lat
+        Careful, doesn't respect sky projections
+        """
+        radius = self.sample_radius(n)
+        phi = 2. * numpy.pi * numpy.random.rand(n)
+        x = radius * numpy.cos(phi)
+        y = radius * numpy.sin(phi)
+        lon, lat = projector.imageToSphere(x, y)
+        return lon, lat
+
+class DiskKernel(RadialKernel):
+    def setParams(self, *args):
+        self.r_0 = args[0]
+        super(DiskKernel,self).setParams(*args)
+
+    ### Need to figure out a stellar mass conversion...
+    def pdf(self, radius):
+        """
+        Disk stellar density distribution:
+        f(r) = C  for r <= r_0
+        f(r) = 0  for r > r_0
+        """
+        return numpy.where(radius<=self.r_0,self.norm,0)
+
+    def extension(self):
+        return self.r_0
+
+    def edge(self):
+        return self.r_0
+        
+class PlummerKernel(RadialKernel):
+    def setParams(self, *args):
+        self.r_h = args[0]
+        self.u_t = args[1] if len(args) > 1 else 5.
+        super(PlummerKernel,self).setParams(*args)
+
+    def pdf(self, radius):
+        """
+        Stellar density distribution for Plummer profile:
+        f(r) = C * r_h**2 / (r_h**2 + r**2)**2
+        http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 6)
+        """
+        return self.norm / (numpy.pi * self.r_h**2 * (1. + (radius / self.r_h)**2)**2)
+
+    def extension(self):
+        return self.r_h
+
+    def edge(self):
+        return self.u_t * self.r_h
+
+class KingKernel(RadialKernel):
+    def setParams(self, *args):
+        self.r_c = args[0] # Critical radius
+        self.c   = args[1] # Concentration
+        self.r_t = self.r_c * (10**self.c) # Tidal radius
+        super(KingKernel,self).setParams(*args)
+
+    def pdf(self, radius):
+        """
+        Stellar density distribution for King profile:
+        f(r) = C * [ 1/sqrt(1 + (r/r_c)**2) - 1/sqrt(1 + (r_t/r_c)**2) ]**2
+        http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 4)
+        """
+        kernel = self.norm * ((1. / numpy.sqrt(1. + (radius / self.r_c)**2)) - (1. / numpy.sqrt(1. + (self.r_t / self.r_c)**2)))**2
+        return numpy.where( radius < r_t, kernel, 0 )
+
+    def extension(self):
+        return self.r_c
+
+    def edge(self):
+        return self.r_t
+
 
 ############################################################
 
@@ -92,7 +237,7 @@ class King:
 
     def surfaceIntensity(self, r, prenormalized = True):
         """
-        Evaluate surface intensity (deg^-2) at an arbitrary radius.
+        Evaluate surface intensity (deg^-2) at an arbitrary radius (deg).
         """
         if prenormalized:
             norm = self.norm
@@ -200,7 +345,7 @@ class Plummer:
 
     def integratePDF(self, r_min, r_max, prenormalized = True):
         """
-        Integrate the King function PDF between r_min and r_max (deg).
+        Integrate the Plummer function PDF between r_min and r_max (deg).
         """
         if prenormalized:
             norm = self.norm
