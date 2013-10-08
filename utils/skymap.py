@@ -13,14 +13,11 @@ import ugali.utils.projector
 
 def subpixel(pix, nside_pix, nside_subpix):
     """
-    Return the pixel indices at resolution nside_subpix that are within pixel pix at resolution nside_pix.
+    Return the indices of pixels with resolution nside_subpix that are within larger pixel pix with resolution nside_pix.
     """
     vec = healpy.pix2vec(nside_pix, pix)
-    radius = numpy.degrees(2. * healpy.nside2resol(nside_pix))
-    try:
-        subpix = healpy.query_disc(nside_subpix, vec, radius, deg=True)
-    except:
-        subpix = healpy.query_disc(nside_subpix, vec, numpy.radians(radius))
+    radius = 2. * healpy.nside2resol(nside_pix)
+    subpix = ugali.utils.projector.query_disc(nside_subpix, vec, radius)
     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
     pix_for_subpix = healpy.ang2pix(nside_pix, theta, phi)
     return subpix[pix_for_subpix == pix]
