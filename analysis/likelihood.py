@@ -20,6 +20,7 @@ import ugali.utils.parabola
 import ugali.utils.projector
 import ugali.utils.skymap
 import ugali.analysis.color_lut
+from ugali.utils.logger import logger
 
 ############################################################
 
@@ -35,12 +36,37 @@ class Likelihood:
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
         # ROI-specific setup for catalog
+        logger.debug("Creating full catalog")
         self.catalog_full = catalog_full
         cut_observable = self.mask.restrictCatalogToObservableSpace(self.catalog_full)
-        self.catalog = self.catalog_full.applyCut(cut_observable)
-        self.catalog.project(self.roi.projector)
-        self.catalog.spatialBin(self.roi)
-        
+
+        # All objects within disk ROI
+        logger.debug("Creating roi catalog")
+        self.catalog_roi = self.catalog_full.applyCut(cut_observable)
+        self.catalog_roi.project(self.roi.projector)
+        self.catalog_roi.spatialBin(self.roi)
+
+        # All objects interior to the background annulus
+        logger.debug("Creating interior catalog")
+        cut_interior = numpy.in1d(ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
+        self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
+        self.catalog_interior.project(self.roi.projector)
+        self.catalog_interior.spatialBin(self.roi)
+
+        # ADW: Temporary hack for backcompatibility (we may not want this to be a config parameter)
+        if 'interior_roi' not in config.params['likelihood'].keys():
+            config.params['likelihood']['interior_roi'] = False
+
+        # Set the default catalog
+        if config.params['likelihood']['interior_roi']:
+            logger.info("Using interior ROI for likelihood calculation")
+            self.catalog = self.catalog_interior
+            self.pixel_roi_cut = self.roi.pixel_interior_cut
+        else:
+            logger.info("Using full ROI for likelihood calculation")
+            self.catalog = self.catalog_roi
+            self.pixel_roi_cut = (self.roi.pixel_interior_cut) | (self.roi.pixel_annulus_cut)
+
         self.isochrone = isochrone
         self.kernel = kernel
 
@@ -52,35 +78,36 @@ class Likelihood:
         """
         Precompute u_background and u_color for each star in catalog.
         Precompute observable fraction in each ROI pixel.
+        # Precompute still operates over the full ROI, not just the likelihood region
         """
 
         self.distance_modulus_array = distance_modulus_array
 
-        print 'Precompute angular separations between %i target pixels and %i other ROI pixels ...'%(len(self.roi.pixels_target),
-                                                                                                     len(self.roi.pixels))
+        # Performed over the full ROI
+        logger.info('Precompute angular separation between %i target pixels and %i other ROI pixels ...'%(len(self.roi.pixels_target),len(self.roi.pixels)))
         self.roi.precomputeAngsep()
         
-        print 'Precompute field CMD ...'
-        self.cmd_background = self.mask.backgroundCMD(self.catalog)
+        logger.info('Precompute field CMD ...')
+        self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
 
-        # Background density (deg^-2 mag^-2)
-        print 'Precompute background probability for each object ...'
+        # Background density (deg^-2 mag^-2) and background probability for each object
+        logger.info('Precompute background probability for each object ...')
         b_density = ugali.utils.binning.take2D(self.cmd_background,
                                                self.catalog.color, self.catalog.mag,
                                                self.roi.bins_color, self.roi.bins_mag)
         self.b = b_density * self.roi.area_pixel * self.delta_mag**2
         
+        # Observable fraction for each pixel
         self.u_color_array = [[]] * len(self.distance_modulus_array)
         self.observable_fraction_sparse_array = [[]] * len(self.distance_modulus_array)
 
-        print 'Begin loop over distance moduli in precompute step ...'
+        logger.info('Begin loop over distance moduli in precompute step ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
-            print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus)#,
-            time_start = time.time()
+            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len(self.distance_modulus_array), distance_modulus))
 
             self.u_color_array[ii] = False
             if self.config.params['likelihood']['color_lut_infile'] is not None:
-                print '  Using look-up table %s'%(self.config.params['likelihood']['color_lut_infile'])
+                logger.info('  Using look-up table %s'%(self.config.params['likelihood']['color_lut_infile']))
                 self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config.params['likelihood']['color_lut_infile'],
                                                                                distance_modulus,
                                                                                self.catalog.mag_1,
@@ -90,10 +117,13 @@ class Likelihood:
             if not numpy.any(self.u_color_array[ii]):
                 self.u_color_array[ii] = self.signalColor(distance_modulus) # Compute on the fly instead
             
+            # Calculate over all pixels in ROI
             self.observable_fraction_sparse_array[ii] = self.isochrone.observableFraction(self.mask,
                                                                                           distance_modulus)
+            
             time_end = time.time()
-            #print '%.2f s'%(time_end - time_start)
+
+        self.u_color_array = numpy.array(self.u_color_array)
 
     def signalColor(self, distance_modulus, mass_steps=10000):
         """
@@ -268,21 +298,15 @@ class Likelihood:
         """
         Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
         """
-
-        self.log_likelihood_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                        len(self.roi.pixels_target)])
-        self.richness_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                  len(self.roi.pixels_target)])
-        self.richness_lower_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                        len(self.roi.pixels_target)])
-        self.richness_upper_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                        len(self.roi.pixels_target)])
-        self.richness_upper_limit_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                              len(self.roi.pixels_target)])
-        self.stellar_mass_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                      len(self.roi.pixels_target)])
-        self.fraction_observable_sparse_array = numpy.zeros([len(self.distance_modulus_array),
-                                                             len(self.roi.pixels_target)])
+        len_distance_modulus = len(self.distance_modulus_array)
+        len_pixels_target    = len(self.roi.pixels_target)
+        self.log_likelihood_sparse_array       = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.richness_sparse_array             = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.richness_lower_sparse_array       = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.richness_upper_sparse_array       = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.richness_upper_limit_sparse_array = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.stellar_mass_sparse_array         = numpy.zeros([len_distance_modulus, len_pixels_target])
+        self.fraction_observable_sparse_array  = numpy.zeros([len_distance_modulus, len_pixels_target])
 
         # Calculate the average stellar mass per star in the ischrone once
         stellar_mass_conversion = self.isochrone.stellarMass()
@@ -294,7 +318,7 @@ class Likelihood:
             phi = numpy.radians(lon)
             pix_coords = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
             
-        print 'Begin loop over distance moduli in likelihood fitting ...'
+        logger.info('Begin loop over distance moduli in likelihood fitting ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
@@ -302,11 +326,11 @@ class Likelihood:
                 if ii != distance_modulus_index:
                     continue
             
-            print '  (%i/%i) distance modulus = %.2f ...'%(ii, len(self.distance_modulus_array), distance_modulus)
+            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len_distance_modulus, distance_modulus))
             self.u_color = self.u_color_array[ii]
             self.observable_fraction_sparse = self.observable_fraction_sparse_array[ii]
             
-            for jj in range(0, len(self.roi.pixels_target)):
+            for jj in range(0, len_pixels_target):
 
                 # Specific pixel
                 if coords is not None and distance_modulus_index is not None:
@@ -316,22 +340,32 @@ class Likelihood:
                 self.kernel.lon = self.roi.centers_lon_target[jj]
                 self.kernel.lat = self.roi.centers_lat_target[jj]
 
-                print '    (%i/%i) Candidate at (%.3f, %.3f) ... '%(jj, len(self.roi.pixels_target),
-                                                                    self.kernel.lon, self.kernel.lat),
+                message = """    (%i/%i) Candidate at (%.3f, %.3f) ... """%(jj+1, len_pixels_target, self.kernel.lon, self.kernel.lat)
 
+                # Angular seperation calculated over full ROI; downselect to interior region
                 self.angsep_sparse = self.roi.angsep[jj] # deg
                 self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
 
+                surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+                surface_intensity_object = surface_intensity_sparse[self.catalog.pixel_roi_index]
+
                 # TESTING
-                u_spatial = self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_object)
+                u_spatial = self.roi.area_pixel * surface_intensity_object
                 self.u = u_spatial * self.u_color
-                self.f = numpy.sum(self.roi.area_pixel * self.kernel.surfaceIntensity(self.angsep_sparse) \
-                                   * self.observable_fraction_sparse)
-                
+
+                ## This is the fraction calcuated over the entire ROI
+                #self.f = numpy.sum(self.roi.area_pixel * surface_intensity_sparse * self.observable_fraction_sparse)
+
+                ## This is the fraction calcuated over a subsample of the ROI
+                self.f = self.roi.area_pixel * numpy.sum(
+                    surface_intensity_sparse[self.pixel_roi_cut] * 
+                    self.observable_fraction_sparse[self.pixel_roi_cut])
+
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], p, parabola = self.maximizeLogLikelihood()
-                
+                logger.debug('test')                
                 if self.config.params['likelihood']['full_pdf'] \
                    or (coords is not None and distance_modulus_index is not None):
+
                     n_pdf_points = 100
                     richness_range = parabola.profileUpperLimit(delta=25.) - self.richness_sparse_array[ii][jj]
                     richness = numpy.linspace(max(0., self.richness_sparse_array[ii][jj] - richness_range),
@@ -348,15 +382,14 @@ class Likelihood:
                     self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                     self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
 
-                    string_out = 'TS = %.2f stellar_mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'
-                    print string_out%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                      stellar_mass_conversion * self.richness_sparse_array[ii][jj],
-                                      stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
-                                      stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
-                                      stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj])
+                    message += 'TS = %.2f stellar_mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                                                                                                           stellar_mass_conversion * self.richness_sparse_array[ii][jj],
+                                                                                                           stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
+                                                                                                           stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
+                                                                                                           stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj])
                 else:
-                    print 'TS = %.2f stellar_mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                                           stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                    message += 'TS = %.2f stellar_mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj], stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                logger.debug( message )
 
                 if coords is not None and distance_modulus_index is not None:
                     results = [self.richness_sparse_array[ii][jj],
@@ -520,6 +553,13 @@ class Likelihood:
         """
         #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
         #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
+
+        # Check whether the signal probability for all objects are zero
+        # This can occur for finite kernels on the edge of the survey footprint
+        if not numpy.any(self.u):
+            logger.warning("Signal probability is zero for all objects")
+            return 0., 0., 0., None
+
         richness = numpy.array([0., 
                                 1. / self.f, 
                                 10. / self.f]) # Richness corresponding to 0, 1, and 10 observable stars
@@ -527,6 +567,7 @@ class Likelihood:
                                       self.logLikelihoodSimple(richness[1]), 
                                       self.logLikelihoodSimple(richness[2])])
 
+        
         found_maximum = False
         while not found_maximum:
             parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
@@ -623,3 +664,4 @@ class Likelihood:
                                                  coordsys='NULL', ordering='NULL')
 
 ############################################################
+
