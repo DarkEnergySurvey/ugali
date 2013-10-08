@@ -12,7 +12,7 @@ import ugali.utils.skymap
 
 ############################################################
 
-class ROI():
+class ROI(object):
 
     def __init__(self, config, lon, lat):
 
@@ -23,26 +23,21 @@ class ROI():
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
         vec = healpy.ang2vec(numpy.radians(90. - self.lat), numpy.radians(self.lon))
-        try:
-            self.pixels = healpy.query_disc(self.config.params['coords']['nside_pixel'],
-                                            vec,
-                                            self.config.params['coords']['roi_radius'],
-                                            deg=True)
-            self.pixels_annulus = numpy.setdiff1d(self.pixels, healpy.query_disc(self.config.params['coords']['nside_pixel'],
-                                                                                 vec,
-                                                                                 self.config.params['coords']['roi_radius_annulus'],
-                                                                                 deg=True))
-        except:
-            self.pixels = healpy.query_disc(self.config.params['coords']['nside_pixel'],
-                                            vec,
-                                            numpy.radians(self.config.params['coords']['roi_radius']))
-            self.pixels_annulus = numpy.setdiff1d(self.pixels, healpy.query_disc(self.config.params['coords']['nside_pixel'],
-                                                                                 vec,
-                                                                                 numpy.radians(self.config.params['coords']['roi_radius_annulus'])))
-                                                  
+        
+        # Pixels from the entire ROI disk
+        self.pixels = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, numpy.radians(self.config.params['coords']['roi_radius']))
+        # Pixels inside the ROI annulus
+        self.pixels_interior = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, numpy.radians(self.config.params['coords']['roi_radius_annulus']))
+        # Pixels in the outer annulus
+        self.pixels_annulus = numpy.setdiff1d(self.pixels, self.pixels_interior)
+        # Boolean arrays for selecting given pixels
+        self.pixel_interior_cut = numpy.in1d(self.pixels, self.pixels_interior)
+        self.pixel_annulus_cut  = ~self.pixel_interior_cut
+
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
         self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
 
+        # Pixels within target healpix region
         self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_likelihood_segmentation'],
                                                                         numpy.radians(90. - self.lat),
                                                                         numpy.radians(self.lon)),
