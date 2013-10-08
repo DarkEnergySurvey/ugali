@@ -10,6 +10,8 @@ import ugali.observation.catalog
 import ugali.simulation.simulator
 import ugali.utils.bayesian_efficiency
 
+from ugali.utils.logger import logger
+
 pylab.ion()
 
 ############################################################
@@ -42,6 +44,7 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
                'stellar_mass': []}
 
     for ii in range(0, trials):
+        numpy.random.seed(ii)
 
         # Simulate
         catalog_satellite = simulator.satellite(isochrone, kernel, stellar_mass, distance_modulus, mc_source_id=1)
