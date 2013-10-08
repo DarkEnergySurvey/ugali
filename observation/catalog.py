@@ -9,7 +9,8 @@ import healpy
 
 import ugali.utils.projector
 import ugali.utils.plotting
-
+import ugali.utils.parse_config
+from ugali.utils.logger import logger
 ############################################################
 
 class Catalog:
@@ -50,7 +51,7 @@ class Catalog:
                 self.projector = ugali.utils.projector.Projector(self.config.params['coords']['reference'][0],
                                                                  self.config.params['coords']['reference'][1])
             except KeyError:
-                print 'WARNING: projection reference point is median (lon, lat) of catalog objects'
+                logger.warning('Projection reference point is median (lon, lat) of catalog objects')
                 self.projector = ugali.utils.projector.Projector(numpy.median(self.lon), numpy.median(self.lat))
         else:
             self.projector = projector
@@ -70,12 +71,13 @@ class Catalog:
         self.pixel_roi_index = self.pixel_roi_index.astype(int)
 
         if numpy.any(self.pixel_roi_index < 0):
-            print "WARNING: objects found that are not contained within ROI"
+            logger.warning("Objects found that are not contained within ROI")
 
     def write(self, outfile):
         """
         Write the current object catalog to fits file.
         """
+            
         hdu = pyfits.BinTableHDU(self.data)
         hdu.writeto(outfile, clobber=True)
 
@@ -92,7 +94,7 @@ class Catalog:
             # ROI object needed here
             pass
         else:
-            print 'WARNING: did not recognize plotting mode %s'%(mode)
+            logger.warning('Unrecognized plotting mode %s'%(mode))
 
     def plotMap(self, mode='scatter'):
         """
@@ -104,8 +106,7 @@ class Catalog:
                                                        #lim_x = lim_x
                                                        #lim_y = lim_y)
         else:
-            print 'WARNING: did not recognize plotting mode %s'%(mode)
-
+            logger.warning('Unrecognized plotting mode %s'%(mode))
 
     def plotMag(self):
         """
@@ -126,24 +127,24 @@ class Catalog:
         elif file_type in ['fit', 'fits']:
             self.data = pyfits.open(self.config.params['catalog']['infile'])[1].data
         else:
-            print 'WARNING: did not recognize catalog file extension %s'%(file_type)
+            logger.warning('Unrecognized catalog file extension %s'%(file_type))
             
         #print 'Found %i objects'%(len(self.data))
 
     def _defineVariables(self):
         """
-        Helper funtion to define pertinent variables from catatalog data.
+        Helper funtion to define pertinent variables from catalog data.
         """
         self.lon = self.data.field(self.config.params['catalog']['lon_field'])
         self.lat = self.data.field(self.config.params['catalog']['lat_field'])
 
         if self.config.params['catalog']['coordsys'].lower() == 'cel' \
            and self.config.params['coords']['coordsys'].lower() == 'gal':
-            print 'Converting catalog objects from CELESTIAL to GALACTIC coordinates'
+            logger.info('Converting catalog objects from CELESTIAL to GALACTIC cboordinates')
             self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
         elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
            and self.config.params['coords']['coordsys'].lower() == 'cel':
-            print 'Converting catalog objects from GALACTIC to CELESTIAL coordinates'
+            logger.info('Converting catalog objects from GALACTIC to CELESTIAL coordinates')
             self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
 
         self.mag_1 = self.data.field(self.config.params['catalog']['mag_1_field'])
@@ -154,7 +155,7 @@ class Catalog:
         if self.config.params['catalog']['mc_source_id_field'] is not None:
             if self.config.params['catalog']['mc_source_id_field'] in self.data.names:
                 self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
-                print 'Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0))
+                logger.info('Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0)))
             else:
                 columns_array = [pyfits.Column(name = self.config.params['catalog']['mc_source_id_field'],
                                                format = 'I',
@@ -173,7 +174,7 @@ class Catalog:
         self.color = self.mag_1 - self.mag_2
         self.color_err = numpy.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
 
-        print 'Current catalog contains %i objects'%(len(self.data))
+        logger.info('Catalog contains %i objects'%(len(self.data)))
 
 ############################################################
 
@@ -200,3 +201,24 @@ def mergeCatalogs(catalog_array):
     return catalog_merged
 
 ############################################################
+
+def precomputeCoordinates(infile, outfile):
+    import numpy.lib.recfunctions as rec
+    hdu = pyfits.open(infile)
+    data = hdu[1].data
+    columns = hdu[1].columns
+    names = [n.lower() for n in hdu[1].data.names]
+
+    if 'glon' not in names and 'glat' not in names:
+        logger.info("Writing 'GLON' and 'GLAT' columns")
+        glon, glat = ugali.utils.projector.celToGal(data['ra'], data['dec'])
+        out = rec.append_fields(data,['GLON','GLAT'],[glon,glat],
+                                usemask=False,asrecarray=True)
+    elif 'ra' not in names and 'dec' not in names:
+        logger.info("Writing 'RA' and 'DEC' columns")
+        ra, dec = ugali.utils.projector.galToCel(data['glat'], data['glon'])
+        out = rec.append_fields(data,['RA','DEC'],[ra,dec],
+                                usemask=False,asrecarray=True)
+    
+    hdu_out = pyfits.BinTableHDU(out)
+    hdu_out.writeto(outfile, clobber=True)
