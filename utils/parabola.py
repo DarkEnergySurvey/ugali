@@ -57,10 +57,22 @@ class Parabola:
         self.p_2 = p[0]
         self.p_1 = p[1]
         self.p_0 = p[2]
-
+         
         # Vertex
         self.vertex_x = -self.p_1 / (2. * self.p_2)
         self.vertex_y = self.p_0 - (self.p_1**2 / (4. * self.p_2))
+
+    def __eq__(self,other):
+        return numpy.allclose([self.p_0,self.p_1,self.p_2],[other.p_0,other.p_1,other.p_2])
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+        
+    def __repr__(self):
+        return "y = %.2g * x**2 + %.2g * x + %.2g"%(self.p_2, self.p_1, self.p_0)
+
+    def __str__(self):
+        return self.__repr__()
 
     def __call__(self, x):
         """
