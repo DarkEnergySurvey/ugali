@@ -18,6 +18,7 @@ import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.utils.projector
 import ugali.utils.skymap
+from ugali.utils.logger import logger
 
 ############################################################
 
@@ -83,7 +84,7 @@ class Mask:
             solid_angle[1]: minimum solid angle (deg^2)
         """
 
-        print 'Prunning CMD based on minimum solid angle of %.2f deg^2'%(minimum_solid_angle)
+        logger.info('Prunning CMD based on minimum solid angle of %.2f deg^2'%(minimum_solid_angle))
         
         self.solid_angle_cmd *= self.solid_angle_cmd > minimum_solid_angle
 
@@ -102,8 +103,8 @@ class Mask:
             self.mag_1_clip = numpy.max(mag_1) + (0.5 * self.roi.delta_color)
             self.mag_2_clip = numpy.max(mag_2) + (0.5 * self.roi.delta_mag)
 
-        print 'Clipping mask 1 at %.2f mag'%(self.mag_1_clip)
-        print 'Clipping mask 2 at %.2f mag'%(self.mag_2_clip)
+        logger.info('Clipping mask 1 at %.2f mag'%(self.mag_1_clip) )
+        logger.info('Clipping mask 2 at %.2f mag'%(self.mag_2_clip) )
         self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
         self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
         self.mask_1.mask_annulus_sparse = numpy.clip(self.mask_1.mask_annulus_sparse, 0., self.mag_1_clip)
@@ -160,7 +161,7 @@ class Mask:
                                                                self.roi.bins_mag],
                                                               weights=number_density)[0]
 
-            # Account for the events that spill out of the observable space
+            # Account for the objects that spill out of the observable space
             # But what about the objects that spill out to red colors??
             for index_color in range(0, len(self.roi.centers_color)):
                 for index_mag in range(0, len(self.roi.centers_mag)):
@@ -334,10 +335,10 @@ def readMangleFile(infile, lon, lat, index = None):
         elif len(lines[ii].split()) > 3:
             #print 'WARNING: coordinate inside multiple polygons, using weight from first polygon'
             #maglim.append(float(lines[ii].split()[2])) # Mask out the pixels inside multiple polygons
-            print 'WARNING: coordinate inside multiple polygons, masking that coordinate.'
+            logger.warning('Coordinate inside multiple polygons, masking that coordinate.')
             maglim.append(0.)
         else:
-            print 'WARNING: cannot parse maglim file, unexpected number of columns, stop reading now.'
+            logger.warning('Cannot parse maglim file, unexpected number of columns, stop reading now.')
             break
             
     maglim = numpy.array(maglim)
