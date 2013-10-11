@@ -63,16 +63,16 @@ a, b, c = rank by current importance (a > b)
 
 Code:
 * (2c) Change name of ugali.utils.projector to ugali.utils.coords
-* (3c) Consistent naming convention for pix vs. pixel
-* () Farm should write out config file for future reference
-* Consistently make use of angToPix and pixToAng
-* Be careful with spatialBin function when objects fall outside of ROI (CHECK!)
-* Residual maps / how to deal with gradients in background (important mainly for LMC region)
-* Compute observable fraction including photometric errors
+* (2c) Consistent naming convention for pix vs. pixel
+* (3c) Farm should write out config file for future reference
+* (3c) Consistently make use of angToPix and pixToAng
+* (2c) Be careful with spatialBin function when objects fall outside of ROI (CHECK!)
+* (1b) Residual maps / how to deal with gradients in background (important mainly for LMC region)
+* (1c) Compute observable fraction including photometric errors
 * (2c) Check for numerical issues with very small Plummer radii, sampling kernel (ADD WARNING)
 * (1c) Add alternative IMFs
 * (1c) Collector function to find peaks (in 3D)
-* () Save stellar mass instead of richness?
+* (2c) Save stellar mass instead of richness?
 * (2c) Compute the absolute visual magnitude in addition to bolometric luminosity
 * (1c) Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
 * (3b) Rename PDF in kernels
