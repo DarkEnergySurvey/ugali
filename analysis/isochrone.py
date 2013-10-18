@@ -4,6 +4,7 @@ Object for isochrone storage and basic calculations.
 NOTE: only absolute magnitudes are used in the Isochrone class
 """
 
+import sys
 import numpy
 import scipy.interpolate
 import scipy.stats
@@ -17,18 +18,16 @@ import ugali.utils.plotting
 
 class Isochrone:
 
-    def __init__(self, config, infile, infile_format='padova_des'):
+    def __init__(self, config, infile, infile_format='padova'):
         """
         Initialize an isochrone instance.
         """
         
         self.config = config
         self.infile = infile
-
-        if infile_format.lower() == 'padova_des':
-            self._parseIsochronePadovaDES()
-        elif infile_format.lower() == 'padova':
-            self._parseIsochronePadovaDES()
+        
+        if infile_format.lower() == 'padova':
+            self._parseIsochronePadova(self.config.params['isochrone']['instrument'])
         else:
             print 'WARNING: did not recognize infile format %s'%(infile_format)
 
@@ -62,7 +61,7 @@ class Isochrone:
         y_min, y_max = pylab.axis()[2], pylab.axis()[3]
         pylab.ylim(y_max, y_min)
 
-    def _parseIsochronePadova(self):
+    def _parseIsochronePadova2(self):
         """
         Reads an isochrone file in the Padova format and returns the age (log yrs), metallicity (Z), and an
         array with initial stellar mass and corresponding magnitudes.
@@ -107,10 +106,11 @@ class Isochrone:
         self.mag_2 = numpy.array(mag_2)
 
     # NOTE: Would a better solution be to convert data files into a uniform format?
-    def _parseIsochronePadovaDES(self):
+    def _parseIsochronePadova(self, instrument='DES'):
         """
-        Reads an isochrone file in the Padova DES format and returns the age (log10 yrs), metallicity (Z), and an
-        array with initial stellar mass and corresponding magnitudes.
+        Reads an isochrone file in the Padova (Marigo 2008) format and determines
+        the age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and creates arrays with
+        the initial stellar mass and corresponding magnitudes for each step along the isochrone.
         """
         mass_init_field = self.config.params['isochrone']['mass_init_field']
         mass_act_field = self.config.params['isochrone']['mass_act_field']
@@ -118,16 +118,29 @@ class Isochrone:
         mag_1_field = self.config.params['isochrone']['mag_1_field']
         mag_2_field = self.config.params['isochrone']['mag_2_field']
         stage_field = self.config.params['isochrone']['stage_field']
-        
-        index_dict = {mass_init_field: 1,
-                      mass_act_field: 2,
-                      luminosity_field: 3,
-                      'g': 7,
-                      'r': 8,
-                      'i': 9,
-                      'z': 10,
-                      'Y': 11,
-                      stage_field: 18}
+
+        if instrument == 'DES':
+            index_dict = {mass_init_field: 1,
+                          mass_act_field: 2,
+                          luminosity_field: 3,
+                          'g': 7,
+                          'r': 8,
+                          'i': 9,
+                          'z': 10,
+                          'Y': 11,
+                          stage_field: 18}
+        elif instrument == 'SDSS':
+            index_dict = {mass_init_field: 1,
+                          mass_act_field: 2,
+                          luminosity_field: 3,
+                          'u': 7,
+                          'g': 8,
+                          'r': 9,
+                          'i': 10,
+                          'z': 11,
+                          stage_field: 18}
+        else:
+            print 'WARNING: did not recognize instrument %s'%(instrument)
     
         reader = open(self.infile)
         lines = reader.readlines()

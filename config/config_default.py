@@ -59,7 +59,8 @@
  'kernel': {'type': 'plummer',
             'params': [0.1]},
  
- 'isochrone': {'mass_init_field': 'M_ini',
+ 'isochrone': {'instrument': 'DES',
+               'mass_init_field': 'M_ini',
                'mass_act_field': 'M_act',
                'luminosity_field': 'logL/Lo',
                'mag_1_field': 'r',
