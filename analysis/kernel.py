@@ -84,7 +84,7 @@ class RadialKernel(object):
     def setParams(self, *args):
         self.params = args
         self.norm = 1.0
-        #self.norm /= self.integrate()
+        self.norm /= self.integrate()
 
     def __call__(self, radius):
         return self.pdf(radius)
@@ -100,27 +100,35 @@ class RadialKernel(object):
     @abstractmethod
     def pdf(self, radius):
         """
-        Evaluate the PDF (deg^2) at a given radius (deg).
+        Evaluate the surface brightness profile, I(R), at a given radius (deg).
+        The surface brightness profiles should be defined in the manner of
+        second convention of Binney and Tremain, 2008 (Box 2.1)
+        radius : radius to evaluate the local surface brightness
+        return : surface brightness (1/deg^2)
         """
         pass
 
+    # For back-compatibility
+    def surfaceIntensity(self, radius): 
+        return self.pdf(radius)
+
     def integrate(self, r_min=0, r_max=numpy.inf):
         """
-        Calculate the 2D integral of the PDF.
+        Calculate the 2D integral of the surface brightness profile (i.e, the flux) 
+        between r_min and r_max.
+        r_min : minimum integration radius
+        r_max : maximum integration radius
+        return : Solid angle integral 
         """
         if r_min < 0: raise Exception('r_min must be >= 0')
         r_max = r_max if r_max < self.edge() else self.edge()
         r_min,r_max = numpy.radians([r_min,r_max])
-        integrand = lambda r: self.pdf(numpy.degrees(r)) * 2*numpy.pi*r
+        integrand = lambda r: self.pdf(r) * 2*numpy.pi * r
         return scipy.integrate.quad(integrand, r_min, r_max, full_output=True, epsabs=0)[0]
 
     # For back-compatibility
     def integratePDF(self, r_min, r_max, steps=1e4, prenormalized=True): 
         return self.integrate(r_min, r_max)
-
-    # For back-compatibility
-    def surfaceIntensity(self, radius): 
-        return self.pdf(radius)
 
     def setCenter(self, lon, lat):
         self.lon = lon
