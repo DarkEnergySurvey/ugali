@@ -8,20 +8,28 @@ import pyfits
 import healpy
 
 import ugali.utils.projector
+from ugali.utils.logger import logger
 
 ############################################################
 
-def subpixel(pix, nside_pix, nside_subpix):
+def superpixel(subpix, nside_subpix, nside_superpix):
     """
-    Return the indices of pixels with resolution nside_subpix that are within larger pixel pix with resolution nside_pix.
+    Return the indices of the super-pixels which contain each of the sub-pixels.
     """
-    vec = healpy.pix2vec(nside_pix, pix)
-    radius = 2. * healpy.nside2resol(nside_pix)
-    subpix = ugali.utils.projector.query_disc(nside_subpix, vec, radius)
     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
-    pix_for_subpix = healpy.ang2pix(nside_pix, theta, phi)
-    return subpix[pix_for_subpix == pix]
-    
+    return healpy.ang2pix(nside_superpix, theta, phi)
+
+def subpixel(superpix, nside_superpix, nside_subpix):
+    """
+    Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
+    """
+    vec = healpy.pix2vec(nside_superpix, superpix)
+    radius = 2. * healpy.nside2resol(nside_superpix)
+    subpix = ugali.utils.projector.query_disc(nside_subpix, vec, radius)
+    pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
+    # Might be able to speed up array indexing...
+    return subpix[pix_for_subpix == superpix]
+
 ############################################################
 
 def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
@@ -76,9 +84,9 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
                                    array = pix)]
     for key in data_dict.keys():
         if data_dict[key].shape[0] != len(pix):
-            print 'WARNING: first dimension of column %s (%i) does not match number of pixels (%i).'%(key,
+            logger.warning('First dimension of column %s (%i) does not match number of pixels (%i).'%(key,
                                                                                                       data_dict[key].shape[0],
-                                                                                                      len(pix))
+                                                                                                      len(pix)))
         
         if len(data_dict[key].shape) == 1:
             columns_array.append(pyfits.Column(name = key,
@@ -89,7 +97,7 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
                                                format = '%iE'%(data_dict[key].shape[1]),
                                                array = data_dict[key]))
         else:
-            print 'WARNING: unexpected number of data dimensions for column %s.'%(key)
+            logger.warning('Unexpected number of data dimensions for column %s.'%(key))
     
     hdu_pix_data = pyfits.new_table(columns_array)
     hdu_pix_data.header.update('NSIDE', nside)
@@ -116,45 +124,46 @@ def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=heal
     Convert the contents into a HEALPix map or simply return the contents.
     Flexibility to handle 
     """
-    reader = pyfits.open(infile)
+    reader = pyfits.open(infile,memmap=False)
     pix = reader[extension].data.field('PIX')
     value = reader[extension].data.field(field)
+    nside = reader[extension].header['NSIDE']
+    reader.close()
     
     if construct_map:
         if len(value.shape) == 1:
-            map = default_value * numpy.ones(healpy.nside2npix(reader[extension].header['NSIDE']))
+            map = default_value * numpy.ones(healpy.nside2npix(nside))
             map[pix] = value
         else:
-            map = default_value * numpy.ones([value.shape[1], healpy.nside2npix(reader[extension].header['NSIDE'])])
+            map = default_value * numpy.ones([value.shape[1], healpy.nside2npix(nside)])
             for ii in range(0, value.shape[1]):
                 map[ii][pix] = numpy.take(value, [ii], axis=1)
-        reader.close()
-        return map
+        ret = map
     else:
-        reader.close()
         if len(value.shape) == 1:
-            return pix, value
+            ret = (pix,value)
         else:
-            return pix, value.transpose()
+            ret = (pix,value.transpose())
+    return ret
 
 ############################################################
 
-def mergeSparseHealpixMaps2(infiles, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
+def readSparseHealpixMaps(infiles, field, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
     """
-    Ideas: store only the pixels with data for each roi, merge results later
+    Read multiple sparse healpix maps and output the results
+    identically to a single file read.
     """
+    if isinstance(infiles,basestring): infiles = [infiles]
 
-    # TODO: THIS FUNCTION NEEDS TO BE GENERALIZED TO HANDLE 3D MAPS AND MULTIPLE FIELDS
-
-    pix_array = [] #* len(infiles)
-    value_array = [] #* len(infiles)
+    pix_array   = []
+    value_array = []
 
     # Create a map based on the first file in the list
-    map = readSparseHealpixMap(infiles[0], extension=extension, default_value=healpy.UNSEEN, construct_map=True)
+    map = readSparseHealpixMap(infiles[0], field, extension=extension, default_value=healpy.UNSEEN, construct_map=True)
 
     for ii in range(0, len(infiles)):
-        print '(%i/%i) %s'%(ii, len(infiles), infiles[ii])
-        pix_array_current, value_array_current = readSparseHealpixMap(infiles[ii],
+        logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
+        pix_array_current, value_array_current = readSparseHealpixMap(infiles[ii], field,
                                                                       extension=extension,
                                                                       construct_map=False)
         pix_array.append(pix_array_current)
@@ -167,7 +176,7 @@ def mergeSparseHealpixMaps2(infiles, extension='PIX_DATA', default_value=healpy.
 
     n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
     if n_conflicting_pixels != 0:
-        print 'WARNING: %i conflicting pixels during merge.'%(n_conflicting_pixels)
+        logger.warning('%i conflicting pixels during merge.'%(n_conflicting_pixels))
 
     if construct_map:
         return map
@@ -181,7 +190,7 @@ def mergeSparseHealpixMaps2(infiles, extension='PIX_DATA', default_value=healpy.
 
 ############################################################
 
-def mergeSparseHealpixMaps(infiles, outfile,
+def mergeSparseHealpixMaps(infiles, outfile=None,
                            pix_data_extension='PIX_DATA',
                            pix_field='PIX',
                            distance_modulus_extension='DISTANCE_MODULUS',
@@ -190,8 +199,8 @@ def mergeSparseHealpixMaps(infiles, outfile,
     """
     Use the first infile to determine the basic contents to expect for the other files.
     """
-
     # Setup
+    if isinstance(infiles,basestring): infiles = [infiles]
     
     distance_modulus_array = None
     pix_array = []
@@ -213,21 +222,26 @@ def mergeSparseHealpixMaps(infiles, outfile,
         #else:
         #    data_dict[key] = default_value * numpy.ones([len(distance_modulus_array),
         #                                                 healpy.nside2npix(nside)])
-    
     reader.close()
 
     # Now loop over the infiles
 
     for ii in range(0, len(infiles)):
-        print '(%i/%i) %s'%(ii, len(infiles), infiles[ii])
+        logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
+
+        reader = pyfits.open(infiles[ii])
+        if not numpy.array_equal(reader[distance_modulus_extension].data.field(distance_modulus_field),distance_modulus_array):
+            logger.warning("Distance moduli do not match; skipping...")
+            continue
 
         pix_array_current = readSparseHealpixMap(infiles[ii], pix_field,
                                                  extension=pix_data_extension, construct_map=False)[0]
         pix_array.append(pix_array_current)
 
         for key in data_dict.keys():
-            data_dict[key].append(readSparseHealpixMap(infiles[ii], key,
-                                                       extension=pix_data_extension, construct_map=False)[1])
+            value_array_current = readSparseHealpixMap(infiles[ii], key,
+                                                       extension=pix_data_extension, construct_map=False)[1]
+            data_dict[key].append(value_array_current)
             #if distance_modulus_array is None:
             #    data_dict[key][pix_array_current] = value
             #else:
@@ -237,17 +251,20 @@ def mergeSparseHealpixMaps(infiles, outfile,
     pix_master = numpy.concatenate(pix_array)
     n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
     if n_conflicting_pixels != 0:
-        print 'WARNING: %i conflicting pixels during merge.'%(n_conflicting_pixels)
+        logger.warning('%i conflicting pixels during merge.'%(n_conflicting_pixels))
 
     for key in data_dict.keys():
         if distance_modulus_array is not None:
             data_dict[key] = numpy.concatenate(data_dict[key], axis=1).transpose()
         else:
             data_dict[key] = numpy.concatenate(data_dict[key])
-    
-    writeSparseHealpixMap(pix_master, data_dict, nside, outfile,
-                          distance_modulus_array=distance_modulus_array,
-                          coordsys='NULL', ordering='NULL')
+
+    if outfile is not None:
+        writeSparseHealpixMap(pix_master, data_dict, nside, outfile,
+                              distance_modulus_array=distance_modulus_array,
+                              coordsys='NULL', ordering='NULL')
+    else:
+        return data_dict
 
 ############################################################
 
@@ -269,7 +286,7 @@ def randomPositions(input, nside_pix, n=1):
     elif len(input.shape) == 2:
         lon, lat = input[0], input[1] # All catalog object positions
     else:
-        print 'WARNING: unexpected input dimensions for skymap.randomPositions'
+        logger.warning('Unexpected input dimensions for skymap.randomPositions')
     pix = surveyPixel(lon, lat, nside_pix)
 
     # Area with which the random points are thrown

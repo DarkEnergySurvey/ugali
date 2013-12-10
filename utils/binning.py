@@ -3,6 +3,7 @@ Tools for binning data.
 """
 
 import numpy
+import collections
 
 ############################################################
 
@@ -133,3 +134,36 @@ def cloudInCells(x, y, bins, weights=None):
     return result, x_bins, y_bins
     
 ############################################################
+
+def reverseHistogram(data,bins=None):
+    """                                                                                                    Bins data using numpy.histogram and calculates the
+    reverse indices for the entries like IDL.
+    Parameters:
+    data  : data to pass to numpy.histogram
+    bins  : bins to pass to numpy.histogram 
+    Returns: 
+    hist  : bin content output by numpy.histogram 
+    edges : edges output from numpy.histogram 
+    rev   : reverse indices of entries in each bin 
+    Using Reverse Indices: 
+        h,e,rev = histogram(data, bins=bins) 
+        for i in range(h.size):  
+            if rev[i] != rev[i+1]: 
+                # data points were found in this bin, get their indices
+                indices = rev[ rev[i]:rev[i+1] ] 
+                # do calculations with data[indices] ...  
+    """
+    if bins is None: bins = numpy.arange(data.max()+2)
+    hist, edges = numpy.histogram(data, bins=bins)
+    digi = numpy.digitize(data.flat,bins=numpy.unique(data)).argsort()
+    rev = numpy.hstack( (len(edges), len(edges) + numpy.cumsum(hist), digi) )
+    return hist,edges,rev
+    
+def binnedMedian(x,y,xbins=None):
+    hist,edges,rev = reverseHistogram(x,bins=xbins)
+    avg_x = (edges[:-1]+edges[1:])/2.
+    med_y = []
+    for i,n in enumerate(hist):
+        indices = rev[ rev[i]:rev[i+1] ] 
+        med_y.append( numpy.median(y[indices]) )
+    return avg_x, numpy.array(med_y)

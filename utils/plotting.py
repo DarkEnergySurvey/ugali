@@ -6,6 +6,8 @@ import numpy
 import pylab
 import healpy
 
+import ugali.utils.skymap
+
 pylab.ion()
 
 ############################################################
@@ -87,5 +89,27 @@ def zoomedHealpixMap(title, map, lon, lat, radius,
     """
     reso = 60. * 2. * radius / xsize # Deg to arcmin
     healpy.gnomview(map=map, rot=[lon, lat, 0], title=title, xsize=xsize, reso=reso, degree=False, **kwargs)
+
+############################################################
+
+def projScatter(ax, lon, lat, **kwargs):
+    """
+    Create a scatter plot on HEALPix projected axes.
+    Inputs: lon (deg), lat (deg)
+    """
+    healpy.projscatter(x,y, lonlat=True, **kwargs)
+
+############################################################
+
+
+def sparseHealpixFiles(title, infiles, field='MAGLIM',**kwargs):
+                       
+    """
+    Inputs: field
+    """
+    map = ugali.utils.skymap.readSparseHealpixMaps(infiles,field)
+    ax = healpy.mollview(map=map, title=title, **kwargs)
+    return ax, map
     
 ############################################################
+

@@ -14,6 +14,7 @@ import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
 import ugali.utils.plotting
 
+from ugali.utils.logger import logger
 ############################################################
 
 class Isochrone:
@@ -27,9 +28,10 @@ class Isochrone:
         self.infile = infile
         
         if infile_format.lower() == 'padova':
-            self._parseIsochronePadova(self.config.params['isochrone']['instrument'])
+            #self._parseIsochronePadova(self.config.params['isochrone']['instrument'])
+            self._parseIsochronePadova(self.config.params['data']['survey'])
         else:
-            print 'WARNING: did not recognize infile format %s'%(infile_format)
+            logger.warning('did not recognize infile format %s'%(infile_format))
 
         self.imf = ugali.analysis.imf.IMF(self.config.params['isochrone']['imf'])
 
@@ -106,7 +108,7 @@ class Isochrone:
         self.mag_2 = numpy.array(mag_2)
 
     # NOTE: Would a better solution be to convert data files into a uniform format?
-    def _parseIsochronePadova(self, instrument='DES'):
+    def _parseIsochronePadova(self, survey='DES'):
         """
         Reads an isochrone file in the Padova (Marigo 2008) format and determines
         the age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and creates arrays with
@@ -119,7 +121,7 @@ class Isochrone:
         mag_2_field = self.config.params['isochrone']['mag_2_field']
         stage_field = self.config.params['isochrone']['stage_field']
 
-        if instrument == 'DES':
+        if survey.lower() == 'des':
             index_dict = {mass_init_field: 1,
                           mass_act_field: 2,
                           luminosity_field: 3,
@@ -129,7 +131,7 @@ class Isochrone:
                           'z': 10,
                           'Y': 11,
                           stage_field: 18}
-        elif instrument == 'SDSS':
+        elif survey.lower() == 'sdss':
             index_dict = {mass_init_field: 1,
                           mass_act_field: 2,
                           luminosity_field: 3,
@@ -140,7 +142,7 @@ class Isochrone:
                           'z': 11,
                           stage_field: 18}
         else:
-            print 'WARNING: did not recognize instrument %s'%(instrument)
+            logger.warning('did not recognize survey %s'%(survey))
     
         reader = open(self.infile)
         lines = reader.readlines()

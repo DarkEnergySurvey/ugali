@@ -26,13 +26,14 @@ class Mask:
     """
     Contains maps of completeness depth in magnitudes for multiple observing bands, and associated products.
     """
-    def __init__(self, config, mask_1, mask_2):
+    def __init__(self, config, roi):
 
         self.config = config
-        self.mask_1 = mask_1
-        self.mask_2 = mask_2
-
-        self.roi = self.mask_1.roi
+        self.roi = roi
+        filenames = self.config.getFilenames()
+        catalog_pixels = self.roi.getCatalogPixels()
+        self.mask_1 = MaskBand(filenames['mask_1'][catalog_pixels],self.roi)
+        self.mask_2 = MaskBand(filenames['mask_2'][catalog_pixels],self.roi)
 
         self.minimum_solid_angle = self.config.params['mask']['minimum_solid_angle'] # deg^2
 
@@ -223,6 +224,8 @@ class Mask:
         #    catalog.spatialBin(self.roi)
         catalog.spatialBin(self.roi)
         cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
+        # ADW: This creates a slope in color-magnitude space near the magnitude limit
+        # i.e., if color=g-r then you can't have an object with g-r=1 and mag_r > mask_r-1
         cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
         cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 
@@ -248,12 +251,12 @@ class MaskBand:
     Map of completeness depth in magnitudes for a single observing band.
     """
 
-    def __init__(self, infile, roi):
+    def __init__(self, infiles, roi):
         """
         Infile is a sparse HEALPix map fits file.
         """
         self.roi = roi
-        mask = ugali.utils.skymap.readSparseHealpixMap(infile, 'MAGLIM')
+        mask = ugali.utils.skymap.readSparseHealpixMaps(infiles, field='MAGLIM')
         self.mask_roi_sparse = mask[self.roi.pixels] # Sparse map for pixels in ROI
         self.mask_annulus_sparse = mask[self.roi.pixels_annulus] # Sparse map for pixels in annulus part of ROI
         self.nside = healpy.npix2nside(len(mask))
@@ -373,3 +376,4 @@ def scale(mask, mag_scale, outfile=None):
         return mask_new
 
 ############################################################
+

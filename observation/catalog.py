@@ -6,16 +6,19 @@ import numpy
 import pyfits
 import pylab
 import healpy
+import copy
 
 import ugali.utils.projector
 import ugali.utils.plotting
 import ugali.utils.parse_config
+
+from ugali.utils.skymap import superpixel
 from ugali.utils.logger import logger
 ############################################################
 
 class Catalog:
 
-    def __init__(self, config, data=None):
+    def __init__(self, config, roi=None, data=None):
         """
         Class to store information about detected objects.
 
@@ -24,13 +27,14 @@ class Catalog:
 
         INPUTS:
             config: Config object
+            roi[None] : Region of Interest to load catalog data for
             data[None]: pyfits table data (fitsrec) object.
         """
         #self.params = config.merge(config_merge) # Maybe you would want to update parameters??
         self.config = config
 
         if data is None:
-            self._parse()
+            self._parse(roi)
         else:
             self.data = data
     
@@ -40,7 +44,21 @@ class Catalog:
         """
         Return a new catalog which is a subset of objects selected using the input cut array.
         """
-        return Catalog(self.config, self.data[cut])
+        return Catalog(self.config, data=self.data[cut])
+
+    def bootstrap(self, mc_bit=0x10, seed=None):
+        """
+        Return a random catalog by boostrapping the colors of the objects in the current catalog.
+        """
+        if seed is not None: numpy.random.seed(seed)
+        data = copy.deepcopy(self.data)
+        idx = numpy.random.randint(0,len(data),len(data))
+        data[self.config.params['catalog']['mag_1_field']][:] = self.mag_1[idx]
+        data[self.config.params['catalog']['mag_err_1_field']][:] = self.mag_err_1[idx]
+        data[self.config.params['catalog']['mag_2_field']][:] = self.mag_2[idx]
+        data[self.config.params['catalog']['mag_err_2_field']][:] = self.mag_err_2[idx]
+        data[self.config.params['catalog']['mc_source_id_field']][:] |= mc_bit
+        return Catalog(self.config, data=data)
 
     def project(self, projector = None):
         """
@@ -114,21 +132,32 @@ class Catalog:
         """
         pass
 
-    def _parse(self):
+    def _parse(self, roi=None):
         """
         Helper function to parse a catalog file and return a pyfits table.
 
         CSV format not yet validated.
-        """
-        file_type = self.config.params['catalog']['infile'].split('.')[-1].strip().lower()
 
-        if file_type == 'csv':
-            self.data = numpy.recfromcsv(self.config.params['catalog']['infile'], delimiter = ',')
-        elif file_type in ['fit', 'fits']:
-            self.data = pyfits.open(self.config.params['catalog']['infile'])[1].data
+        !!! Careful, reading a large catalog is memory intensive !!!
+        """
+        
+        filenames = self.config.getFilenames()
+
+        if len(filenames['catalog'].compressed()) == 0:
+            raise Exception("No catalog file found")
+        elif roi is not None:
+            pixels = roi.getCatalogPixels()
+            self.data = readCatalogData(filenames['catalog'][pixels])
+        elif len(filenames['catalog'].compressed()) == 1:
+            file_type = filenames[0].split('.')[-1].strip().lower()
+            if file_type == 'csv':
+                self.data = numpy.recfromcsv(filenames[0], delimiter = ',')
+            elif file_type in ['fit', 'fits']:
+                self.data = pyfits.open(filenames[0])[1].data
+            else:
+                logger.warning('Unrecognized catalog file extension %s'%(file_type))
         else:
-            logger.warning('Unrecognized catalog file extension %s'%(file_type))
-            
+            self.data = readCatalogData(filenames['catalog'].compressed())
         #print 'Found %i objects'%(len(self.data))
 
     def _defineVariables(self):
@@ -200,6 +229,7 @@ def mergeCatalogs(catalog_array):
     catalog_merged = Catalog(catalog_array[0].config, data=hdu.data)
     return catalog_merged
 
+
 ############################################################
 
 def precomputeCoordinates(infile, outfile):
@@ -222,3 +252,25 @@ def precomputeCoordinates(infile, outfile):
     
     hdu_out = pyfits.BinTableHDU(out)
     hdu_out.writeto(outfile, clobber=True)
+
+############################################################
+
+def readCatalogData(infiles):
+    """ Read a set of catalog FITS files into a single recarray. """
+    if isinstance(infiles,basestring): infiles = [infiles]
+    data, len_data = [],[]
+    for f in infiles:
+        data.append(pyfits.open(f)[1].data)
+        len_data.append(len(data[-1]))
+
+    cumulative_len_array = numpy.cumsum(len_data)
+    cumulative_len_array = numpy.insert(cumulative_len_array, 0, 0)
+    columns = data[0].columns
+    table = pyfits.new_table(columns, nrows=cumulative_len_array[-1])
+
+    for name in columns.names:
+        for ii in range(0, len(data)):
+            if name not in data[ii].names:
+                raise Exception("Column %s not found in %"(name,infiles[ii]))
+            table.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = data[ii].field(name)
+    return table.data

@@ -23,9 +23,14 @@ handler = logging.StreamHandler()
 handler.setFormatter(SpecialFormatter())
 logger.addHandler(handler)
 
-logger.setLevel(logging.DEBUG) # Most verbose
-#logger.setLevel(logging.INFO)
-#logger.setLevel(logging.WARNING)
-#logger.setLevel(logging.ERROR)
-#logger.setLevel(logging.CRITICAL) # Least verbose
+logger.DEBUG    = logging.DEBUG
+logger.INFO     = logging.INFO
+logger.WARNING  = logging.WARNING
+logger.ERROR    = logging.ERROR
+logger.CRITICAL = logging.CRITICAL
 
+#logger.setLevel(logger.DEBUG) # Most verbose
+logger.setLevel(logger.INFO)
+#logger.setLevel(logger.WARNING)
+#logger.setLevel(logger.ERROR)
+#logger.setLevel(logger.CRITICAL) # Least verbose

@@ -7,6 +7,8 @@ import pylab
 
 import ugali.analysis.farm
 import ugali.observation.catalog
+import ugali.observation.roi
+import ugali.observation.mask
 import ugali.simulation.simulator
 import ugali.utils.bayesian_efficiency
 
@@ -16,20 +18,23 @@ pylab.ion()
 
 ############################################################
 
-def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus, trials=1, debug=False):
+def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus, trials=1, debug=False, seed=0):
     """
-    Tool for MC validation studies -- specifically to create multiple realizations of
+    Tool for simple MC validation studies -- specifically to create multiple realizations of
     a satellite given an CompositeIsochrone object, Kernel object, stellar mass (M_sol) for normalization,
     and distance_modulus.
     """
-    print '=== Validate Satellite ==='
+    logger.info('=== Validate Satellite ===')
 
     config.params['kernel']['params'] = [kernel.r_h] # TODO: Need better solution to update size??
-    print 'Using Plummer profile spatial model with half-light radius %.2f deg'%(config.params['kernel']['params'][0])
-    catalog_base = ugali.observation.catalog.Catalog(config)
-    coords = (kernel.lon, kernel.lat)
-    simulator = ugali.simulation.simulator.Simulator(config, kernel.lon, kernel.lat)
+    logger.debug('Using Plummer profile spatial model with half-light radius %.2f deg'%(config.params['kernel']['params'][0]))
+    roi = ugali.observation.roi.ROI(config, kernel.lon, kernel.lat)
+    simulator = ugali.simulation.simulator.Simulator(config, roi=roi)
+    catalog_base = ugali.observation.catalog.Catalog(config,roi=roi)
+    mask = ugali.observation.mask.Mask(config, roi)
 
+    coords = (kernel.lon, kernel.lat)
+    
     results = {'mc_lon': [],
                'mc_lat': [],
                'mc_distance_modulus': [],
@@ -43,16 +48,19 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
                'f': [],
                'stellar_mass': []}
 
+    numpy.random.seed(seed)
+
     for ii in range(0, trials):
-        numpy.random.seed(ii)
+        logger.info('=== Running Satellite %i ==='%ii)
 
         # Simulate
         catalog_satellite = simulator.satellite(isochrone, kernel, stellar_mass, distance_modulus, mc_source_id=1)
-        catalog_merge = ugali.observation.catalog.mergeCatalogs([catalog_base, catalog_satellite])
+        catalog_bootstrap = catalog_base.bootstrap()
+        catalog_merge = ugali.observation.catalog.mergeCatalogs([catalog_bootstrap, catalog_satellite])
 
         # Analyze
-        farm = ugali.analysis.farm.Farm(config, catalog=catalog_merge)
-        likelihood = farm.farmLikelihoodFromCatalog(local=True, coords=coords)
+        likelihood = ugali.analysis.likelihood.Likelihood(config, roi, mask, catalog_merge, isochrone, kernel)
+                                                               
         likelihood.precomputeGridSearch([distance_modulus])
         richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f = likelihood.gridSearch(coords=coords, distance_modulus_index=0)
 
@@ -69,6 +77,7 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
         results['f'].append(f)
         results['stellar_mass'].append(richness * isochrone.stellarMass())
 
+        logger.info('MC Stellar Mass = %.2f, Measured Stellar Mass = %.2f'%(stellar_mass,richness * isochrone.stellarMass()))
         if debug:
             return likelihood, richness, log_likelihood, richness_lower, richness_upper, richness_upper_limit, richness_raw, log_likelihood_raw, p, f
 

@@ -1,4 +1,4 @@
-"""
+u"""
 Documentation.
 """
 
@@ -20,16 +20,14 @@ pylab.ion()
 
 class Simulator:
 
-    def __init__(self, config, lon, lat):
+    def __init__(self, config, roi):
 
         self.config = ugali.utils.parse_config.Config(config)
-        self.catalog = ugali.observation.catalog.Catalog(self.config)
+        
+        self.roi = roi
 
-        self.roi = ugali.observation.roi.ROI(self.config, lon, lat)
-
-        mask_1 = ugali.observation.mask.MaskBand(self.config.params['mask']['infile_1'], self.roi)
-        mask_2 = ugali.observation.mask.MaskBand(self.config.params['mask']['infile_2'], self.roi)
-        self.mask = ugali.observation.mask.Mask(self.config, mask_1, mask_2)
+        self.catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        self.mask = ugali.observation.mask.Mask(self.config, roi=self.roi)
         
         cut = self.mask.restrictCatalogToObservableSpace(self.catalog)
         self.catalog = self.catalog.applyCut(cut)
@@ -172,11 +170,9 @@ def satellite(isochrone, kernel, stellar_mass, distance_modulus):
     """
     projector = ugali.utils.projector.Projector(kernel.lon, kernel.lat)
     mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
-    r = kernel.simulate(len(mag_1))
-    phi = 2. * numpy.pi * numpy.random.rand(len(r))
-    x = r * numpy.cos(phi)
-    y = r * numpy.sin(phi)
-    lon, lat = projector.imageToSphere(x, y)
+    # ADW: Updated kernel
+    lon, lat = kernel.simulate(len(mag_1))
+
     return mag_1, mag_2, lon, lat
 
 ############################################################

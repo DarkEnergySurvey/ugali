@@ -115,6 +115,7 @@ class Likelihood:
                                                                                self.catalog.mag_err_1,
                                                                                self.catalog.mag_err_2)
             if not numpy.any(self.u_color_array[ii]):
+                logger.info('  Calculating signal color on the fly...')
                 self.u_color_array[ii] = self.signalColor(distance_modulus) # Compute on the fly instead
             
             # Calculate over all pixels in ROI
@@ -317,52 +318,51 @@ class Likelihood:
             theta = numpy.radians(90. - lat)
             phi = numpy.radians(lon)
             pix_coords = healpy.ang2pix(self.config.params['coords']['nside_pixel'], theta, phi)
+
+        lon, lat = self.roi.centers_lon_target, self.roi.centers_lat_target
             
         logger.info('Begin loop over distance moduli in likelihood fitting ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
             if coords is not None and distance_modulus_index is not None:
-                if ii != distance_modulus_index:
-                    continue
+                if ii != distance_modulus_index: continue
             
             logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len_distance_modulus, distance_modulus))
             self.u_color = self.u_color_array[ii]
             self.observable_fraction_sparse = self.observable_fraction_sparse_array[ii]
-            
-            for jj in range(0, len_pixels_target):
 
+            for jj in range(0, len_pixels_target):
                 # Specific pixel
                 if coords is not None and distance_modulus_index is not None:
                     if self.roi.pixels_target[jj] != pix_coords:
                         continue
 
-                self.kernel.lon = self.roi.centers_lon_target[jj]
-                self.kernel.lat = self.roi.centers_lat_target[jj]
+                self.kernel.lon = lon[jj]
+                self.kernel.lat = lat[jj]
 
                 message = """    (%i/%i) Candidate at (%.3f, %.3f) ... """%(jj+1, len_pixels_target, self.kernel.lon, self.kernel.lat)
 
                 # Angular seperation calculated over full ROI; downselect to interior region
                 self.angsep_sparse = self.roi.angsep[jj] # deg
                 self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg
-
                 surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
                 surface_intensity_object = surface_intensity_sparse[self.catalog.pixel_roi_index]
 
                 # TESTING
                 u_spatial = self.roi.area_pixel * surface_intensity_object
                 self.u = u_spatial * self.u_color
-
                 ## This is the fraction calcuated over the entire ROI
                 #self.f = numpy.sum(self.roi.area_pixel * surface_intensity_sparse * self.observable_fraction_sparse)
 
-                ## This is the fraction calcuated over a subsample of the ROI
+                # This is the fraction calcuated over a subsample of the ROI
                 self.f = self.roi.area_pixel * numpy.sum(
                     surface_intensity_sparse[self.pixel_roi_cut] * 
                     self.observable_fraction_sparse[self.pixel_roi_cut])
 
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], p, parabola = self.maximizeLogLikelihood()
-                logger.debug('test')                
+                self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
+                self.fraction_observable_sparse_array[ii][jj] = self.f
                 if self.config.params['likelihood']['full_pdf'] \
                    or (coords is not None and distance_modulus_index is not None):
 
@@ -382,15 +382,16 @@ class Likelihood:
                     self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                     self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
 
-                    message += 'TS = %.2f stellar_mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(2. * self.log_likelihood_sparse_array[ii][jj],
+                    message += 'TS = %.2f, Stellar Mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(2. * self.log_likelihood_sparse_array[ii][jj],
                                                                                                            stellar_mass_conversion * self.richness_sparse_array[ii][jj],
                                                                                                            stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
                                                                                                            stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
                                                                                                            stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj])
                 else:
-                    message += 'TS = %.2f stellar_mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj], stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                    message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj], stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                    message += ', Fraction = %.2f'%self.fraction_observable_sparse_array[ii][jj]
                 logger.debug( message )
-
+                
                 if coords is not None and distance_modulus_index is not None:
                     results = [self.richness_sparse_array[ii][jj],
                                self.log_likelihood_sparse_array[ii][jj],
@@ -399,126 +400,13 @@ class Likelihood:
                                self.richness_upper_limit_sparse_array[ii][jj],
                                richness, log_likelihood, p, self.f]
                     return results
-                
                 #raw_input('WAIT')
                 # TESTING
 
-                """
-                #richness = numpy.array([0., 1., 1.e1, 1.e2, 1.e3])
-                #log_likelihood = numpy.array([0.,
-                #                              self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0],
-                #                              self.logLikelihood(distance_modulus, richness[2], grid_search=True)[0],
-                #                              self.logLikelihood(distance_modulus, richness[3], grid_search=True)[0],
-                #                              self.logLikelihood(distance_modulus, richness[4], grid_search=True)[0]])
-
-                richness = numpy.array([0., 0., 0.])
-                log_likelihood = numpy.array([0., 0., 0.])
-                power = 0.
-                while True:
-                    richness[1] = 10.**power
-                    log_likelihood[1] = self.logLikelihood(distance_modulus, richness[1], grid_search=True)[0]
-                    power += 1.
-                    if numpy.fabs(log_likelihood[1]) > 1.e-1:
-                        break
-                richness[2] = 10. * richness[1]
-                log_likelihood[2], p, f = self.logLikelihood(distance_modulus, richness[2], grid_search=True)
-                
-                # First search for maximum likelihood richness
-                found_maximum = False
-                while not found_maximum:
-                    parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
-                    if parabola.vertex_x < 0.:
-                            found_maximum = True
-                    else:
-                        richness = numpy.append(richness, parabola.vertex_x)
-                        log_likelihood = numpy.append(log_likelihood,
-                                                      self.logLikelihood(distance_modulus,
-                                                                         richness[-1], grid_search=True)[0])    
-                        if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
-                            found_maximum = True 
-
-                # Use parabolic shape to begin filling in likelihoods at high richness values
-                parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
-                for delta in [1., 3., 10., 30.]:
-                    richness = numpy.append(richness, parabola.profileUpperLimit(delta))
-                    log_likelihood = numpy.append(log_likelihood,
-                                                  self.logLikelihood(distance_modulus,
-                                                                     richness[-1], grid_search=True)[0])
-                
-                # Continue to large enough richness values to ensure that richness upper limit can be computed
-                found_upper_limit = False
-                while not found_upper_limit:
-                    if (numpy.min(log_likelihood) / 2.) > -30.:
-                        richness = numpy.append(richness, 2. * numpy.max(richness))
-                        log_likelihood = numpy.append(log_likelihood,
-                                                      self.logLikelihood(distance_modulus,
-                                                                         richness[-1], grid_search=True)[0])
-                    else:
-                        found_upper_limit = True
-
-                # Argmax algorithm to find maximum
-                #argmax = numpy.argmax(log_likelihood)
-                #if argmax == 0:
-                #    self.log_likelihood_sparse_array[ii][jj] = 0.
-                #    self.richness_sparse_array[ii][jj] = 0.
-                #else:
-                #    self.log_likelihood_sparse_array[ii][jj] = log_likelihood[argmax]
-                #    self.richness_sparse_array[ii][jj] = richness[argmax]
-
-                parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
-
-                # Vertex algorithm to find maximum
-                self.richness_sparse_array[ii][jj] = parabola.vertex_x
-                if self.richness_sparse_array[ii][jj] > 0.:
-                    self.log_likelihood_sparse_array[ii][jj] = parabola.vertex_y / 2.
-                else:
-                    self.richness_sparse_array[ii][jj] = 0.
-                    self.log_likelihood_sparse_array[ii][jj] = 0.
-
-                #richness_lower = parabola.bayesianUpperLimit(0.159) # 1-sigma low
-                #richness_upper = parabola.bayesianUpperLimit(0.841) # 1-sigma high
-                #print richness_lower, richness_upper
-
-                if self.config.params['likelihood']['full_calculation']:
-                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
-                    self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)    
-                else:
-                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = 0., 0.
-                    self.richness_upper_limit_sparse_array[ii][jj] = 0.
-                #if 2. * self.log_likelihood_sparse_array[ii][jj] < 9.:
-                #    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = 0., 0.
-                #    #self.richness_upper_limit_sparse_array[ii][jj] = 0.
-                #else:
-                #self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
-                #self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
-                self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
-                self.fraction_observable_sparse_array[ii][jj] = f
-                
-                #print 'TS = %.2f richness = %.1f (%.1f -- %.1f, 0.68 CL) richness < %.1f (0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                #                                                                                                     self.richness_sparse_array[ii][jj],
-                #                                                                                                     self.richness_lower_sparse_array[ii][jj],
-                #                                                                                                     self.richness_upper_sparse_array[ii][jj],
-                #                                                                                                     self.richness_upper_limit_sparse_array[ii][jj],
-                #                                                                                                     len(richness))
-                print 'TS = %.2f stellar_mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL) iterations = %i'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                                                                                                  self.stellar_mass_sparse_array[ii][jj],
-                                                                                                                  stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
-                                                                                                                  stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
-                                                                                                                  stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj],
-                                                                                                                  len(richness))
-
-
-                #if self.log_likelihood_sparse_array[ii][jj] == 0.:
-                #    pylab.figure()
-                #    pylab.scatter(richness, log_likelihood, c='b')
-                #    raw_input('WAIT')
-
-                if coords is not None and distance_modulus_index is not None:
-                    p, f = self.logLikelihood(distance_modulus,
-                                              self.richness_sparse_array[ii][jj],
-                                              grid_search=True)[1:3]
-                    return self.richness_sparse_array[ii][jj], self.log_likelihood_sparse_array[ii][jj], self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj], self.richness_upper_limit_sparse_array[ii][jj], richness, log_likelihood, p, f
-                """
+            jj_max = self.log_likelihood_sparse_array[ii].argmax()
+            message = "  (%i/%i) Maximum at (%.3f, %.3f) ... "%(jj_max+1, len_pixels_target, lon[jj_max], lat[jj_max])
+            message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj_max], stellar_mass_conversion * self.richness_sparse_array[ii][jj_max])
+            logger.info( message )
 
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
@@ -556,6 +444,10 @@ class Likelihood:
 
         # Check whether the signal probability for all objects are zero
         # This can occur for finite kernels on the edge of the survey footprint
+        if numpy.isnan(self.u).any():
+            logger.warning("NaN signal probability found")
+            return 0., 0., 0., None
+        
         if not numpy.any(self.u):
             logger.warning("Signal probability is zero for all objects")
             return 0., 0., 0., None
@@ -569,6 +461,7 @@ class Likelihood:
 
         
         found_maximum = False
+        iteration = 0
         while not found_maximum:
             parabola = ugali.utils.parabola.Parabola(richness, 2. * log_likelihood)
             if parabola.vertex_x < 0.:
@@ -578,7 +471,7 @@ class Likelihood:
                 log_likelihood = numpy.append(log_likelihood, self.logLikelihoodSimple(richness[-1]))    
                 if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
                     found_maximum = True
-
+            iteration+=1
         index = numpy.argmax(log_likelihood)
         p = (richness[index] * self.u) / ((richness[index] * self.u) + self.b)
         return log_likelihood[index], richness[index], p, parabola

@@ -6,14 +6,15 @@ import time
 import numpy
 import scipy.signal
 import pyfits
-import pylab
+#import pylab
 
 import ugali.utils.parse_config
 import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.analysis.isochrone
 
-pylab.ion()
+from ugali.utils.logger import logger
+#pylab.ion()
 
 ############################################################
 
@@ -76,7 +77,7 @@ def writeColorLUT2(config,
 
     for index_distance_modulus, distance_modulus in enumerate(distance_modulus_array):
 
-        print '(%i/%i)'%(index_distance_modulus, len(distance_modulus_array))
+        logger.debug('(%i/%i)'%(index_distance_modulus, len(distance_modulus_array)))
 
         columns_array = []
         
@@ -99,9 +100,7 @@ def writeColorLUT2(config,
         
         for index_mag_err_1, mag_err_1 in enumerate(mag_err_array):
             for index_mag_err_2, mag_err_2 in enumerate(mag_err_array):
-                print '  Distance modulus = %.2f mag_err_1 = %.2f mag_err_2 = %.2f'%(distance_modulus,
-                                                                                     mag_err_1,
-                                                                                     mag_err_2)
+                logger.debug('  Distance modulus = %.2f mag_err_1 = %.2f mag_err_2 = %.2f'%(distance_modulus, mag_err_1, mag_err_2))
 
                 mag_1_sigma_step = delta_mag / mag_err_1
                 n = int(numpy.ceil(4. / mag_1_sigma_step))
@@ -141,7 +140,7 @@ def writeColorLUT2(config,
         hdul.append(hdu)
 
         time_end = time.time()
-        print '%.2f s'%(time_end - time_start)
+        logger.debug('%.2f s'%(time_end - time_start))
 
     # Store distance modulus info
     columns_array = [pyfits.Column(name = 'DISTANCE_MODULUS',
@@ -175,7 +174,7 @@ def writeColorLUT2(config,
     hdu.name = 'BINS_MAG_2'
     hdul.append(hdu)
 
-    print 'Writing look-up table to %s'%(outfile)
+    logger.info('Writing look-up table to %s'%(outfile))
     hdul.writeto(outfile, clobber = True)
 
 ############################################################
@@ -243,7 +242,7 @@ def writeColorLUT(config,
 
     for index_distance_modulus, distance_modulus in enumerate(distance_modulus_array):
 
-        print '(%i/%i)'%(index_distance_modulus, len(distance_modulus_array))
+        logger.debug('(%i/%i)'%(index_distance_modulus, len(distance_modulus_array)))
 
         columns_array = []
         
@@ -251,11 +250,11 @@ def writeColorLUT(config,
         
         for index_mag_err_1, mag_err_1 in enumerate(mag_err_array):
             for index_mag_err_2, mag_err_2 in enumerate(mag_err_array):
-                print '  (%i/%i) Distance modulus = %.2f mag_err_1 = %.3f mag_err_2 = %.3f'%(index_mag_err_1 * len(mag_err_array) + index_mag_err_2,
+                logger.debug('  (%i/%i) Distance modulus = %.2f mag_err_1 = %.3f mag_err_2 = %.3f'%(index_mag_err_1 * len(mag_err_array) + index_mag_err_2,
                                                                                              len(mag_err_array)**2,
                                                                                              distance_modulus,
                                                                                              mag_err_1,
-                                                                                             mag_err_2)
+                                                                                             mag_err_2))
                 
                 # Add randoms
                 histo_isochrone_pdf = numpy.histogram2d(distance_modulus + isochrone_mag_1 + randoms_1 * mag_err_1,
@@ -282,7 +281,7 @@ def writeColorLUT(config,
         hdul.append(hdu)
 
         time_end = time.time()
-        print '%.2f s'%(time_end - time_start)
+        logger.debug('%.2f s'%(time_end - time_start))
 
     # Store distance modulus info
     columns_array = [pyfits.Column(name = 'DISTANCE_MODULUS',
@@ -316,7 +315,7 @@ def writeColorLUT(config,
     hdu.name = 'BINS_MAG_2'
     hdul.append(hdu)
 
-    print 'Writing look-up table to %s'%(outfile)
+    logger.info('Writing look-up table to %s'%(outfile))
     hdul.writeto(outfile, clobber = True)
 
 ############################################################
@@ -339,8 +338,8 @@ def readColorLUT(infile, distance_modulus, mag_1, mag_2, mag_err_1, mag_err_2):
 
     distance_modulus_array = reader['DISTANCE_MODULUS'].data.field('DISTANCE_MODULUS')
     if not numpy.any(numpy.fabs(distance_modulus_array - distance_modulus) < 1.e-3):
-        print 'WARNING: distance modulus %.2f not available in file %s'%(distance_modulus, infile)
-        print '         available distance moduli:', distance_modulus_array
+        logger.warning("Distance modulus %.2f not available in file %s"%(distance_modulus, infile))
+        logger.warning('         available distance moduli:'+str(distance_modulus_array))
         return False
 
     distance_modulus_key = '%.2f'%(distance_modulus_array[numpy.argmin(numpy.fabs(distance_modulus_array - distance_modulus))])
@@ -348,7 +347,6 @@ def readColorLUT(infile, distance_modulus, mag_1, mag_2, mag_err_1, mag_err_2):
     bins_mag_err = reader['BINS_MAG_ERR'].data.field('BINS_MAG_ERR') 
     bins_mag_1 = reader['BINS_MAG_1'].data.field('BINS_MAG_1') 
     bins_mag_2 = reader['BINS_MAG_2'].data.field('BINS_MAG_2') 
-
     # Note that magnitude uncertainty is always assigned by rounding up, is this the right thing to do?
     index_mag_err_1 = numpy.clip(numpy.digitize(mag_err_1, bins_mag_err) - 1,
                                  0, len(bins_mag_err) - 2)

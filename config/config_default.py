@@ -39,6 +39,12 @@
          'n_bins': 70}, # 0.1, 0.02
 
  # HEALPix nside choices
+ # 2^0  -> 3518 arcmin,   3438 deg^2, 12e6 arcmin^2
+ # 2^1  -> 1759 arcmin,   859. deg^2, 31e5 arcmin^2
+ # 2^2  -> 879. arcmin,   214. deg^2, 77e4 arcmin^2
+ # 2^3  -> 440. arcmin,   53.7 deg^2, 19e4 arcmin^2
+ # 2^4  -> 220. arcmin,   13.4 deg^2, 48e3 arcmin^2
+ # 2^5  -> 110. arcmin,   3.36 deg^2, 12e3 arcmin^2
  # 2^6  -> 55.0 arcmin,   0.84 deg^2, 3021 arcmin^2
  # 2^7  -> 27.5 arcmin,   0.21 deg^2,  755 arcmin^2
  # 2^8  -> 13.7 arcmin,  0.052 deg^2,  189 arcmin^2
@@ -48,9 +54,11 @@
  # 2^12 -> 0.86 arcmin, 2.0e-4 deg^2, 0.74 arcmin^2
  # 2^13 -> 0.43 arcmin, 5.1e-5 deg^2, 0.18 arcmin^2
 
- 'coords': {'nside_likelihood_segmentation': 2**8, # Size of patches for likelihood analysis
-            'nside_mask_segmentation': 2**6, # Size of patches for mask creation
-            'nside_pixel': 2**12, 
+ 'coords': {
+            'nside_catalog': 2**2, # Size of catalog pixel
+            'nside_mask': 2**6, # Size of patches for mask creation
+            'nside_likelihood': 2**8, # Size of patches for likelihood analysis
+            'nside_pixel': 2**12, # Size of pixel binning for objects
             'roi_radius': 1.25, # Outer radius of annulus used to make empirical background model
             'roi_radius_annulus': 0.5, # Inner radius of annulus used to make empirical background model
             'coordsys': 'gal',

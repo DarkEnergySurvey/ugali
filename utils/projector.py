@@ -175,20 +175,28 @@ def angsep(lon_1, lat_1, lon_2, lat_2):
 
 ############################################################
 
+# ADW: Reduce numpy array operations for speed
 def galToCel(ll, bb):
     """
     Converts Galactic (deg) to Celestial J2000 (deg) coordinates
     """
     bb = numpy.radians(bb)
+    sin_bb = numpy.sin(bb)
+    cos_bb = numpy.cos(bb)
+
     ll = numpy.radians(ll)
     ra_gp = numpy.radians(192.85948)
     de_gp = numpy.radians(27.12825)
     lcp = numpy.radians(122.932)
-    sin_d = (numpy.sin(de_gp) * numpy.sin(bb)) \
-            + (numpy.cos(de_gp) * numpy.cos(bb) * numpy.cos(lcp - ll))
-    ramragp = numpy.arctan2(numpy.cos(bb) * numpy.sin(lcp - ll),
-                            (numpy.cos(de_gp) * numpy.sin(bb)) \
-                            - (numpy.sin(de_gp) * numpy.cos(bb) * numpy.cos(lcp - ll)))
+
+    sin_lcp_ll = numpy.sin(lcp - ll)
+    cos_lcp_ll = numpy.cos(lcp - ll)
+
+    sin_d = (numpy.sin(de_gp) * sin_bb) \
+            + (numpy.cos(de_gp) * cos_bb * cos_lcp_ll)
+    ramragp = numpy.arctan2(cos_bb * sin_lcp_ll,
+                            (numpy.cos(de_gp) * sin_bb) \
+                            - (numpy.sin(de_gp) * cos_bb * cos_lcp_ll))
     dec = numpy.arcsin(sin_d)
     ra = (ramragp + ra_gp + (2. * numpy.pi)) % (2. * numpy.pi)
     return numpy.degrees(ra), numpy.degrees(dec)
@@ -198,18 +206,26 @@ def celToGal(ra, dec):
     Converts Celestial J2000 (deg) to Calactic (deg) coordinates
     """
     dec = numpy.radians(dec)
+    sin_dec = numpy.sin(dec)
+    cos_dec = numpy.cos(dec)
+
     ra = numpy.radians(ra)    
     ra_gp = numpy.radians(192.85948)
     de_gp = numpy.radians(27.12825)
+
+    sin_ra_gp = numpy.sin(ra - ra_gp)
+    cos_ra_gp = numpy.cos(ra - ra_gp)
+
     lcp = numpy.radians(122.932)    
-    sin_b = (numpy.sin(de_gp) * numpy.sin(dec)) \
-            + (numpy.cos(de_gp) * numpy.cos(dec) * numpy.cos(ra - ra_gp))
-    lcpml = numpy.arctan2(numpy.cos(dec) * numpy.sin(ra - ra_gp),
-                          (numpy.cos(de_gp) * numpy.sin(dec)) \
-                          - (numpy.sin(de_gp) * numpy.cos(dec) * numpy.cos(ra-ra_gp)))
+    sin_b = (numpy.sin(de_gp) * sin_dec) \
+            + (numpy.cos(de_gp) * cos_dec * cos_ra_gp)
+    lcpml = numpy.arctan2(cos_dec * sin_ra_gp,
+                          (numpy.cos(de_gp) * sin_dec) \
+                          - (numpy.sin(de_gp) * cos_dec * cos_ra_gp))
     bb = numpy.arcsin(sin_b)
     ll = (lcp - lcpml + (2. * numpy.pi)) % (2. * numpy.pi)
     return numpy.degrees(ll), numpy.degrees(bb)
+
 
 ############################################################
 
@@ -236,13 +252,17 @@ def pixToAng(nside, pix):
     lat = 90. - numpy.degrees(theta)                    
     return lon, lat
 
-def angToPix(nside, lon, lat):
+def angToPix(nside, lon, lat, coord='GAL'):
     """
     Input (lon, lat) in degrees instead of (theta, phi) in radians
     """
     theta = numpy.radians(90. - lat)
     phi = numpy.radians(lon)
     return healpy.ang2pix(nside, theta, phi)
+
+def angToVec(lon, lat):
+    vec = healpy.ang2vec(numpy.radians(90. - lat), numpy.radians(lon))
+    return vec
 
 ############################################################
 

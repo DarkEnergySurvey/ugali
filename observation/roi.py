@@ -30,7 +30,8 @@ class ROI(object):
         self.pixels_interior = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, numpy.radians(self.config.params['coords']['roi_radius_annulus']))
         # Pixels in the outer annulus
         self.pixels_annulus = numpy.setdiff1d(self.pixels, self.pixels_interior)
-        # Boolean arrays for selecting given pixels
+        # Boolean arrays for selecting given pixels 
+        # (Careful, this works because pixels are pre-sorted by query_disc before in1d)
         self.pixel_interior_cut = numpy.in1d(self.pixels, self.pixels_interior)
         self.pixel_annulus_cut  = ~self.pixel_interior_cut
 
@@ -38,10 +39,10 @@ class ROI(object):
         self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
 
         # Pixels within target healpix region
-        self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_likelihood_segmentation'],
+        self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_likelihood'],
                                                                         numpy.radians(90. - self.lat),
                                                                         numpy.radians(self.lon)),
-                                                         self.config.params['coords']['nside_likelihood_segmentation'],
+                                                         self.config.params['coords']['nside_likelihood'],
                                                          self.config.params['coords']['nside_pixel'])
         theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels_target)
         self.centers_lon_target, self.centers_lat_target = numpy.degrees(phi), 90. - numpy.degrees(theta)
@@ -125,5 +126,20 @@ class ROI(object):
                                                             self.centers_lon, 
                                                             self.centers_lat))
 
+    def getCatalogPixels(self):
+        """
+        Return the catalog pixels spanned by this ROI.
+        """
+        filenames = self.config.getFilenames()
+
+        nside_catalog = self.config.params['coords']['nside_catalog']
+        nside_pixel = self.config.params['coords']['nside_pixel']
+        # All possible catalog pixels spanned by the ROI
+        superpix = ugali.utils.skymap.superpixel(self.pixels,nside_pixel,nside_catalog)
+        superpix = numpy.unique(superpix)
+        # Only catalog pixels that exist in catalog files
+        pixels = numpy.intersect1d(superpix, filenames['pix'].compressed())
+        return pixels
+        
 ############################################################
 
