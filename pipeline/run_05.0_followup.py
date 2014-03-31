@@ -5,8 +5,6 @@ import numpy
 import copy
 import subprocess
 
-import ugali.data.pixelize
-import ugali.data.maglims
 import ugali.utils.projector
 import ugali.analysis.farm
 
