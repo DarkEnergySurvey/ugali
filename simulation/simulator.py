@@ -1,4 +1,4 @@
-u"""
+"""
 Documentation.
 """
 
@@ -26,11 +26,11 @@ class Simulator:
         
         self.roi = roi
 
-        self.catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        self.catalog_full = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
         self.mask = ugali.observation.mask.Mask(self.config, roi=self.roi)
         
-        cut = self.mask.restrictCatalogToObservableSpace(self.catalog)
-        self.catalog = self.catalog.applyCut(cut)
+        cut = self.mask.restrictCatalogToObservableSpace(self.catalog_full)
+        self.catalog = self.catalog_full.applyCut(cut)
 
         self.cmd_background = self.mask.backgroundCMD(self.catalog)
 
@@ -124,6 +124,99 @@ class Simulator:
 
         #hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         hdu = self.makeHDU(mag_obs_1[cut], mag_err_1[cut], mag_obs_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
+        catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
+        return catalog
+
+    def background(self,mc_source_id=1):
+        """
+        Create a simulation of the background stellar population.
+        Because some stars have been clipped to generate the CMD,
+        this function tends to slightly underestimate (~1%) the 
+        background as compared to the true catalog.
+
+        """
+        # self.cmd_background = Number of objects / deg^2 / mag^2
+
+
+        ### # Number of objects in the background annulus
+        ### ntotal = (self.cmd_background * self.mask.solid_angle_cmd * self.roi.delta_color * self.roi.delta_mag).sum()
+        ###  
+        ### # Number of objects per square degree
+        ### num_per_deg = self.cmd_background  * self.roi.delta_color * self.roi.delta_mag
+        ###  
+        ### # Number of objects per pixel per bin
+        ### num_per_pix = self.cmd_background * self.roi.area_pixel
+        ###  
+        ### # To simulate at each pixel
+        ### #npix = 1e4
+        ### #numpy.random.poisson(lam=self.cmd_background, size=[npix]+list(self.cmd_background.shape))
+
+        # Simulate over full ROI
+        #area_roi = len(self.roi.pixels) * self.roi.area_pixel
+        roi_radius = self.config.params['coords']['roi_radius']
+        nside_pixel = self.config.params['coords']['nside_pixel']
+        area_roi = numpy.pi*roi_radius**2
+        lambda_per_bin = self.cmd_background * area_roi * self.roi.delta_color * self.roi.delta_mag
+        nstar_per_bin = numpy.round(lambda_per_bin).astype(int) 
+        #nstar_per_bin = numpy.random.poisson(lam=lambda_per_bin)
+        nstar = nstar_per_bin.sum()
+        print "nstar", nstar
+
+        xx,yy = numpy.meshgrid(self.roi.centers_color,self.roi.centers_mag)
+        color = numpy.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
+        color += numpy.random.uniform(-self.roi.delta_color/2.,self.roi.delta_color/2.,size=len(color))
+        mag_1 = numpy.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
+        mag_1 += numpy.random.uniform(-self.roi.delta_mag/2.,self.roi.delta_mag/2.,size=len(color))
+        mag_2 = mag_1 - color
+
+        # Simulate random positions
+        # Careful, may not respect sky projections
+        radius = roi_radius*numpy.sqrt(numpy.random.uniform(size=nstar))
+        theta = 2*numpy.pi*numpy.random.uniform(size=nstar)
+        x = numpy.sqrt(radius)*numpy.cos(theta)
+        y = numpy.sqrt(radius)*numpy.sin(theta)
+        lon,lat = self.roi.projector.imageToSphere(x, y)
+        pix = ugali.utils.projector.angToPix(nside_pixel, lon, lat)
+
+        ### # Simulate position by drawing randomly from subpixels
+        ### nside_pixel = self.config.params['coords']['nside_pixel']
+        ### nside_subpix = 2**18
+        ### print "Generating subpix"
+        ### subpix = ugali.utils.projector.query_disc(nside_subpix, self.roi.vec, self.roi.config.params['coords']['roi_radius']+np.degrees(healpy.max_pixrad(nside_pixel)))
+        ###  
+        ### print "Calculating superpix"
+        ### superpix = ugali.utils.skymap.superpixel(subpix,nside_subpix,nside_pixel)
+        ### subpix = subpix[numpy.in1d(superpix,self.roi.pixels)]
+        ### print "Random subpix"
+        ### pixel = subpix[numpy.random.randint(0,len(subpix),nstar)]
+        ### lon,lat = ugali.utils.projector.pixToAng(nside_subpix,pixel)
+        ### pix = ugali.utils.projector.angToPix(nside_pixel, lon, lat)
+        ### print len(pix)
+
+        #return mag_1,mag_2,lon,lat,pix
+
+        # There is probably a better way to do this step without creating the full HEALPix map
+        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
+        mag_lim_1 = mask[pix]
+        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
+        mag_lim_2 = mask[pix]
+
+        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
+        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+
+        cut = numpy.logical_and(mag_1 < mag_lim_1, mag_2 < mag_lim_2)
+        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        
+        if self.config.params['catalog']['coordsys'].lower() == 'cel' \
+           and self.config.params['coords']['coordsys'].lower() == 'gal':
+            lon, lat = ugali.utils.projector.galToCel(lon, lat)
+        elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
+           and self.config.params['coords']['coordsys'].lower() == 'cel':
+            lon, lat = ugali.utils.projector.celToGal(lon, lat)
+
+        hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
