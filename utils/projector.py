@@ -42,13 +42,18 @@ class SphericalRotator:
         
         self.inverted_rotation_matrix = numpy.linalg.inv(self.rotation_matrix)
 
-    def rotate(self, lon, lat, invert = False):
+    def cartesian(self,lon,lat):
         lon = numpy.radians(lon)
         lat = numpy.radians(lat) 
+        
+        x = numpy.cos(lat) * numpy.cos(lon)
+        y = numpy.cos(lat) * numpy.sin(lon)
+        z =  numpy.sin(lat)
+        return numpy.array([x,y,z])
+        
 
-        vec = numpy.array([numpy.cos(lat) * numpy.cos(lon),
-                           numpy.cos(lat) * numpy.sin(lon),
-                           numpy.sin(lat)])
+    def rotate(self, lon, lat, invert = False):
+        vec = self.cartesian(lon,lat)
 
         if invert:
             vec_prime = numpy.dot(numpy.array(self.inverted_rotation_matrix), vec)
@@ -93,15 +98,21 @@ class Projector:
 
 ############################################################
 
+### ADW: Speed up and fixed some issues for conversion of
+### lon = 180 and lon = 360 (returned by rotator)
 def aitoffSphereToImage(lon, lat):
     """
     Hammer-Aitoff projection (deg).
     """
-    lon = (lon < 180.) * lon + (lon > 180.) * ((lon % 360.) - 360.) # Convert angle to [-180, 180] interval
+    lon = lon - 360.*(lon>180)
     lon = numpy.radians(lon)
     lat = numpy.radians(lat)
-    gamma = (180. / numpy.pi) * numpy.sqrt(2. / (1. + (numpy.cos(lat) * numpy.cos(lon / 2.))))
-    x = 2. * gamma * numpy.cos(lat) * numpy.sin(lon / 2.)
+
+    half_lon = lon/2.
+    cos_lat = numpy.cos(lat)
+     
+    gamma = (180. / numpy.pi) * numpy.sqrt(2. / (1. + (cos_lat * numpy.cos(half_lon))))
+    x = 2. * gamma * cos_lat * numpy.sin(half_lon)
     y = gamma * numpy.sin(lat)
     return x, y
 
@@ -109,13 +120,12 @@ def aitoffImageToSphere(x, y):
     """
     Inverse Hammer-Aitoff projection (deg).
     """
-    x = (x < 180.) * x + (x > 180.) * ((x % 360.) - 360.) # Convert angle to [-180, 180] interval
-    x = numpy.array(x)
-    y = numpy.array(y)
-    z = numpy.sqrt(1. - ((numpy.pi / 180.) * (x / 4.))**2 - ((numpy.pi / 180.) * (y / 2.))**2) # deg
-    lon = 2. * numpy.arctan2((2. * z**2) - 1,
-                             (numpy.pi / 180.) * (z / 2.) * x)
-    lat = numpy.arcsin((numpy.pi / 180.) * y * z)
+    x = x - 360.*(x>180)
+    x = numpy.asarray(numpy.radians(x))
+    y = numpy.asarray(numpy.radians(y))
+    z = numpy.sqrt(1. - (x / 4.)**2 - (y / 2.)**2) # rad
+    lon = 2. * numpy.arctan2((2. * z**2) - 1, (z / 2.) * x)
+    lat = numpy.arcsin( y * z)
     return ((180. - numpy.degrees(lon)) % 360.), numpy.degrees(lat)
 
 ############################################################
@@ -124,7 +134,8 @@ def gnomonicSphereToImage(lon, lat):
     """
     Gnomonic projection (deg).
     """
-    lon = (lon < 180.) * lon + (lon > 180.) * ((lon % 360.) - 360.) # Convert angle to [-180, 180] interval
+    # Convert angle to [-180, 180] interval
+    lon = lon - 360.*(lon>180)
     lon = numpy.radians(lon)
     lat = numpy.radians(lat)
     r_theta = (180. / numpy.pi) / numpy.tan(lat)
@@ -136,9 +147,10 @@ def gnomonicImageToSphere(x, y):
     """
     Inverse gnomonic projection (deg).
     """
-    x = (x < 180.) * x + (x > 180.) * ((x % 360.) - 360.) # Convert angle to [-180, 180] interval
-    x = numpy.array(x)
-    y = numpy.array(y)
+    # Convert angle to [-180, 180] interval
+    x = x - 360.*(x>180)
+    x = numpy.asarray(x)
+    y = numpy.asarray(y)
     lon = numpy.degrees(numpy.arctan2(y, x))
     r_theta = numpy.sqrt(x**2 + y**2)
     lat = numpy.degrees(numpy.arctan(180. / (numpy.pi * r_theta)))
@@ -146,24 +158,7 @@ def gnomonicImageToSphere(x, y):
 
 ############################################################
 
-#def angsep(lon_1, lat_1, lon_2, lat_2):
-#    """
-#    Angular separation (deg) between two sky coordinates.
-#    """
-#    lon_1 = numpy.radians(lon_1)
-#    lat_1 = numpy.radians(lat_1)
-#    lon_2 = numpy.radians(lon_2)
-#    lat_2 = numpy.radians(lat_2)
-#
-#    mu = (numpy.cos(lat_1) * numpy.cos(lon_1) * numpy.cos(lat_2) * numpy.cos(lon_2)) \
-#         + (numpy.cos(lat_1) * numpy.sin(lon_1) * numpy.cos(lat_2) * numpy.sin(lon_2)) \
-#         + (numpy.sin(lat_1) * numpy.sin(lat_2))
-#
-#    mu = numpy.clip(mu, -1., 1.)
-#
-#    return numpy.degrees(numpy.arccos(mu))
-
-def angsep(lon_1, lat_1, lon_2, lat_2):
+def angsep2(lon_1, lat_1, lon_2, lat_2):
     """
     Angular separation (deg) between two sky coordinates.
     """
@@ -172,6 +167,36 @@ def angsep(lon_1, lat_1, lon_2, lat_2):
     val = (v10 * v20) + (v11 * v21) + (v12 * v22)
     val = numpy.clip(val, -1., 1.)
     return numpy.degrees(numpy.arccos(val))
+
+def angsep(lon1,lat1,lon2,lat2):
+    """
+    Angular separation (deg) between two sky coordinates.
+    Borrowed from astropy (www.astropy.org)
+
+    Notes
+    -----
+    The angular separation is calculated using the Vincenty formula [1],
+    which is slighly more complex and computationally expensive than
+    some alternatives, but is stable at at all distances, including the
+    poles and antipodes.
+
+    [1] http://en.wikipedia.org/wiki/Great-circle_distance
+    """
+    lon1,lat1 = numpy.radians([lon1,lat1])
+    lon2,lat2 = numpy.radians([lon2,lat2])
+    
+    sdlon = numpy.sin(lon2 - lon1)
+    cdlon = numpy.cos(lon2 - lon1)
+    slat1 = numpy.sin(lat1)
+    slat2 = numpy.sin(lat2)
+    clat1 = numpy.cos(lat1)
+    clat2 = numpy.cos(lat2)
+
+    num1 = clat2 * sdlon
+    num2 = clat1 * slat2 - slat1 * clat2 * cdlon
+    denominator = slat1 * slat2 + clat1 * clat2 * cdlon
+
+    return numpy.degrees(numpy.arctan2(numpy.hypot(num1,num2), denominator))
 
 ############################################################
 
@@ -226,6 +251,49 @@ def celToGal(ra, dec):
     ll = (lcp - lcpml + (2. * numpy.pi)) % (2. * numpy.pi)
     return numpy.degrees(ll), numpy.degrees(bb)
 
+############################################################
+
+def hms2dec(hms):
+    """
+    Convert longitude from hours,minutes,seconds in string or 3-array
+    format to decimal degrees.
+    """
+    DEGREE = 360.
+    HOUR = 24.
+    MINUTE = 60.
+    SECOND = 3600.
+
+    if isinstance(hms,basestring):
+        hour,minute,second = numpy.array(re.split('[hms]',hms))[:3].astype(float)
+    else:
+        hour,minute,second = hms.T
+
+    decimal = (hour + minute * 1./MINUTE + second * 1./SECOND)*(DEGREE/HOUR)
+    return decimal
+
+def dms2dec(dms):
+    """
+    Convert latitude from degrees,minutes,seconds in string or 3-array
+    format to decimal degrees.
+    """
+    DEGREE = 360.
+    HOUR = 24.
+    MINUTE = 60.
+    SECOND = 3600.
+
+    # Be careful here, degree needs to be a float so that negative zero
+    # can have its signbit set:
+    # http://docs.scipy.org/doc/numpy-1.7.0/reference/c-api.coremath.html#NPY_NZERO
+
+    if isinstance(dms,basestring):
+        degree,minute,second = numpy.array(re.split('[dms]',hms))[:3].astype(float)
+    else:
+        degree,minute,second = dms.T
+
+    sign = numpy.copysign(1.0,degree)
+    decimal = numpy.abs(degree) + minute * 1./MINUTE + second * 1./SECOND
+    decimal *= sign
+    return decimal
 
 ############################################################
 
@@ -275,7 +343,7 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
     vec : float, sequence of 3 elements
       The coordinates of unit vector defining the disk center.
     radius : float
-      The radius (in radians) of the disk
+      The radius (in degrees) of the disk
     inclusive : bool, optional
       If False, return the exact set of pixels whose pixel centers lie 
       within the disk; if True, return all pixels that overlap with the disk,
@@ -290,9 +358,90 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
     """
     try: 
         # New-style call (healpy 1.6.3)
-        return healpy.query_disc(nside, vec, radius, inclusive, fact, nest)
+        return healpy.query_disc(nside, vec, numpy.radians(radius), inclusive, fact, nest)
     except: 
         # Old-style call (healpy 0.10.2)
-        return healpy.query_disc(nside, vec, radius, nest, deg=False)
+        return healpy.query_disc(nside, vec, numpy.radians(radius), nest, deg=False)
                           
     
+def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):
+    """
+    Adapted from Eric Tollerud.
+    Finds matches in one catalog to another.
+ 
+    Parameters
+    lon1 : array-like
+        Longitude of the first catalog (degrees)
+    lat1 : array-like
+        Latitude of the first catalog (shape of array must match `lon1`)
+    lon2 : array-like
+        Longitude of the second catalog
+    lat2 : array-like
+        Latitude of the second catalog (shape of array must match `lon2`)
+    tol : float or None, optional
+        Proximity (degrees) of a match to count as a match.  If None,
+        all nearest neighbors for the first catalog will be returned.
+    nnearest : int, optional
+        The nth neighbor to find.  E.g., 1 for the nearest nearby, 2 for the
+        second nearest neighbor, etc.  Particularly useful if you want to get
+        the nearest *non-self* neighbor of a catalog.  To do this, use:
+        ``spherematch(lon, lat, lon, lat, nnearest=2)``
+ 
+    Returns
+    -------
+    idx1 : int array
+        Indices into the first catalog of the matches. Will never be
+        larger than `lon1`/`lat1`.
+    idx2 : int array
+        Indices into the second catalog of the matches. Will never be
+        larger than `lon2`/`lat2`.
+    ds : float array
+        Distance (in degrees) between the matches
+    """
+    from scipy.spatial import cKDTree
+ 
+    lon1 = numpy.asarray(lon1)
+    lat1 = numpy.asarray(lat1)
+    lon2 = numpy.asarray(lon2)
+    lat2 = numpy.asarray(lat2)
+ 
+    if lon1.shape != lat1.shape:
+        raise ValueError('lon1 and lat1 do not match!')
+    if lon2.shape != lat2.shape:
+        raise ValueError('lon2 and lat2 do not match!')
+
+    rotator = SphericalRotator(0,0)
+
+ 
+    # This is equivalent, but faster than just doing numpy.array([x1, y1, z1]).T
+    x1, y1, z1 = rotator.cartesian(lon1.ravel(),lat1.ravel())
+    coords1 = numpy.empty((x1.size, 3))
+    coords1[:, 0] = x1
+    coords1[:, 1] = y1
+    coords1[:, 2] = z1
+ 
+    x2, y2, z2 = rotator.cartesian(lon2.ravel(),lat2.ravel())
+    coords2 = numpy.empty((x2.size, 3))
+    coords2[:, 0] = x2
+    coords2[:, 1] = y2
+    coords2[:, 2] = z2
+ 
+    tree = cKDTree(coords2)
+    if nnearest == 1:
+        idxs2 = tree.query(coords1)[1]
+    elif nnearest > 1:
+        idxs2 = tree.query(coords1, nnearest)[1][:, -1]
+    else:
+        raise ValueError('invalid nnearest ' + str(nnearest))
+ 
+    ds = angsep(lon1, lat1, lon2[idxs2], lat2[idxs2])
+ 
+    idxs1 = numpy.arange(lon1.size)
+ 
+    if tol is not None:
+        msk = ds < tol
+        idxs1 = idxs1[msk]
+        idxs2 = idxs2[msk]
+        ds = ds[msk]
+ 
+    return idxs1, idxs2, ds
