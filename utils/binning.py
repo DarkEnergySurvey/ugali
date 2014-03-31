@@ -64,6 +64,7 @@ def cloudInCells(x, y, bins, weights=None):
     
     x_bins = numpy.array(bins[0])
     delta_x = x_bins[1] - x_bins[0]
+    # Overflow and underflow bins
     x_bins = numpy.insert(x_bins, 0, x_bins[0] - delta_x)
     x_bins = numpy.append(x_bins, x_bins[-1] + delta_x)
     y_bins = numpy.array(bins[1])
@@ -120,7 +121,7 @@ def cloudInCells(x, y, bins, weights=None):
     new_x_vals.append(x_vals - (0.5 * x_width))
     new_y_vals.append(y_vals - (0.5 * y_width))
     cell_weights.append(bound_weights * lx * ly)
-    
+
     new_x_vals = numpy.concatenate(new_x_vals)
     new_y_vals = numpy.concatenate(new_y_vals)
     cell_weights = numpy.concatenate(cell_weights)
@@ -130,13 +131,14 @@ def cloudInCells(x, y, bins, weights=None):
                                weights = cell_weights)[0]
  
     result = numpy.transpose(result[1: result.shape[0] - 1])[1: result.shape[1] - 1]
-        
+
     return result, x_bins, y_bins
     
 ############################################################
 
 def reverseHistogram(data,bins=None):
-    """                                                                                                    Bins data using numpy.histogram and calculates the
+    """             
+    Bins data using numpy.histogram and calculates the
     reverse indices for the entries like IDL.
     Parameters:
     data  : data to pass to numpy.histogram
