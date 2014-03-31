@@ -136,6 +136,7 @@ class Mask:
 
         if mode == 'cloud-in-cells':
             # Select objects in annulus
+            # ADW: This should be standardized (similar function in likelihood)
             cut_annulus = numpy.in1d(ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'],
                                                                     catalog.lon, catalog.lat),
                                      self.roi.pixels_annulus)
@@ -162,14 +163,28 @@ class Mask:
                                                                self.roi.bins_mag],
                                                               weights=number_density)[0]
 
-            # Account for the objects that spill out of the observable space
+            ## Account for the objects that spill out of the observable space
+            ## But what about the objects that spill out to red colors??
+            #for index_color in range(0, len(self.roi.centers_color)):
+            #    for index_mag in range(0, len(self.roi.centers_mag)):
+            #        if self.solid_angle_cmd[index_mag][index_color] < self.minimum_solid_angle:
+            #            cmd_background[index_mag - 1][index_color] += cmd_background[index_mag][index_color]
+            #            cmd_background[index_mag][index_color] = 0.
+            #            break
+
+            # ADW: This accounts for leakage to faint magnitudes
             # But what about the objects that spill out to red colors??
-            for index_color in range(0, len(self.roi.centers_color)):
-                for index_mag in range(0, len(self.roi.centers_mag)):
-                    if self.solid_angle_cmd[index_mag][index_color] < self.minimum_solid_angle:
-                        cmd_background[index_mag - 1][index_color] += cmd_background[index_mag][index_color]
-                        cmd_background[index_mag][index_color] = 0.
-                        break
+            # Maximum obsevable magnitude index for each color (uses the fact that
+            # numpy.argmin returns first minimum (zero) instance found.
+            # NOTE: More complicated maps may have holes causing problems
+            observable = (self.solid_angle_cmd > self.minimum_solid_angle)
+            index_mag = observable.argmin(axis=0) - 1
+            index_color = numpy.arange(len(self.roi.centers_color))
+            # Add the cumulative leakage back into the last bin of the CMD
+            leakage = (cmd_background * ~observable).sum(axis=0)
+            cmd_background[[index_mag,index_color]] += leakage
+            # Zero out all non-observable bins
+            cmd_background *= observable
 
             # Divide by solid angle and bin size in magnitudes
             # Units are (deg^-2 mag^-2)
@@ -178,9 +193,17 @@ class Mask:
             #cmd_background /= (self.solid_angle_cmd + epsilon) * self.roi.delta_color * self.roi.delta_mag
             #cmd_background *= self.solid_angle_cmd > epsilon
 
-            # Avoid dividing by zero
-            cmd_background[numpy.logical_and(self.solid_angle_cmd > 0.,
-                                             cmd_background == 0.)] = numpy.min(cmd_background[cmd_background > 0.])
+            # Avoid dividing by zero by setting empty bins to the value of the 
+            # minimum filled bin of the CMD. This choice is arbitrary and 
+            # could be replaced by a static minimum, some fraction of the 
+            # CMD maximum, some median clipped minimum, etc. However, should 
+            # be robust against outliers with very small values.
+            min_cmd_background = max(cmd_background[cmd_background > 0.].min(),
+                                     1e-4*cmd_background.max())
+
+            # ADW: Should this be 'observable' instead of 'self.solid_angle_cmd > 0.'
+            #cmd_background[(self.solid_angle_cmd > 0.)&(cmd_background == 0.)] = min_cmd_background
+            cmd_background[observable] = cmd_background[observable].clip(min_cmd_background)
                   
         elif mode == 'bootstrap':
             # Not yet implemented
@@ -214,6 +237,12 @@ class Mask:
         """
 
         # Check that the objects fall in the color-magnitude space of the ROI
+        # ADW: This creates a slope in color-magnitude space near the magnitude limit
+        # i.e., if color=g-r then you can't have an object with g-r=1 and mag_r > mask_r-1
+        # Depending on which is the detection band, this slope will appear at blue
+        # or red colors. When it occurs at blue colors, it effects very few objects.
+        # However, when occuring for red objects it can cut many objects. It is 
+        # unclear that this is being correctly accounted for in the likelihood
         cut_mag = numpy.logical_and(catalog.mag > self.roi.bins_mag[0],
                                     catalog.mag < self.roi.bins_mag[-1])
         cut_color = numpy.logical_and(catalog.color > self.roi.bins_color[0],
@@ -224,8 +253,6 @@ class Mask:
         #    catalog.spatialBin(self.roi)
         catalog.spatialBin(self.roi)
         cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
-        # ADW: This creates a slope in color-magnitude space near the magnitude limit
-        # i.e., if color=g-r then you can't have an object with g-r=1 and mag_r > mask_r-1
         cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
         cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 
