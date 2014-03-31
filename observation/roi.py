@@ -22,12 +22,12 @@ class ROI(object):
 
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
-        vec = healpy.ang2vec(numpy.radians(90. - self.lat), numpy.radians(self.lon))
-        
+        self.vec = vec = ugali.utils.projector.angToVec(self.lon, self.lat)
+
         # Pixels from the entire ROI disk
-        self.pixels = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, numpy.radians(self.config.params['coords']['roi_radius']))
+        self.pixels = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, self.config.params['coords']['roi_radius'])
         # Pixels inside the ROI annulus
-        self.pixels_interior = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, numpy.radians(self.config.params['coords']['roi_radius_annulus']))
+        self.pixels_interior = ugali.utils.projector.query_disc(self.config.params['coords']['nside_pixel'], vec, self.config.params['coords']['roi_radius_annulus'])
         # Pixels in the outer annulus
         self.pixels_annulus = numpy.setdiff1d(self.pixels, self.pixels_interior)
         # Boolean arrays for selecting given pixels 
