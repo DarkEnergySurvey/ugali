@@ -99,8 +99,7 @@ if __name__ == "__main__":
             ii = numpy.abs(distance_modulus_array - distance_modulus).argmin()
 
         vec = angToVec(glon,glat)
-        subpix = ugali.utils.projector.query_disc(nside, vec, numpy.radians(0.1),
-                                                  inclusive=True,fact=32)
+        subpix = ugali.utils.projector.query_disc(nside, vec, 0.1, inclusive=True,fact=32)
         sort_pix_idx = pix.argsort()
         sort_pix = pix[sort_pix_idx]
         sort_subpix_idx = numpy.searchsorted(sort_pix,subpix)

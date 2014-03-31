@@ -4,7 +4,7 @@ import healpy
 import numpy as np
 import pylab as plt
 
-from ugali.data.maglims import inMangle
+from ugali.preprocess.maglims import inMangle
 
 from ugali.utils.projector import pixToAng
 if __name__ == "__main__":
