@@ -63,4 +63,14 @@ def confidenceInterval(n, k, alpha = 0.68):
 
     return e, [low, high]
 
+bayesianInterval = confidenceInterval
+
+
+def binomialInterval(n, k, alpha = 0.68):
+    """
+    Given n tests and k successes, return efficiency and confidence interval.
+    """
+    e = float(k)/n
+    delta_e = 1/float(n) * numpy.sqrt(e * (1 - e) * float(n)) * alpha/0.68
+    return e, [e - delta_e, e + delta_e]
 ############################################################
