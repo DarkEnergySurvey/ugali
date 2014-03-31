@@ -70,6 +70,9 @@ class Likelihood:
         self.isochrone = isochrone
         self.kernel = kernel
 
+        # Calculate the average stellar mass per star in the ischrone once
+        self.stellar_mass_conversion = self.isochrone.stellarMass()
+
         self.delta_mag = 0.03 # 1.e-3 Effective bin size in color-magnitude space
 
         #self.precomputeGridSearch()
@@ -309,8 +312,8 @@ class Likelihood:
         self.stellar_mass_sparse_array         = numpy.zeros([len_distance_modulus, len_pixels_target])
         self.fraction_observable_sparse_array  = numpy.zeros([len_distance_modulus, len_pixels_target])
 
-        # Calculate the average stellar mass per star in the ischrone once
-        stellar_mass_conversion = self.isochrone.stellarMass()
+        ## Calculate the average stellar mass per star in the ischrone once
+        #stellar_mass_conversion = self.isochrone.stellarMass()
         
         # Specific pixel
         if coords is not None and distance_modulus_index is not None:
@@ -361,7 +364,7 @@ class Likelihood:
                     self.observable_fraction_sparse[self.pixel_roi_cut])
 
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], p, parabola = self.maximizeLogLikelihood()
-                self.stellar_mass_sparse_array[ii][jj] = stellar_mass_conversion * self.richness_sparse_array[ii][jj]
+                self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
                 self.fraction_observable_sparse_array[ii][jj] = self.f
                 if self.config.params['likelihood']['full_pdf'] \
                    or (coords is not None and distance_modulus_index is not None):
@@ -383,12 +386,12 @@ class Likelihood:
                     self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
 
                     message += 'TS = %.2f, Stellar Mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(2. * self.log_likelihood_sparse_array[ii][jj],
-                                                                                                           stellar_mass_conversion * self.richness_sparse_array[ii][jj],
-                                                                                                           stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
-                                                                                                           stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
-                                                                                                           stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj])
+                                                                                                           self.stellar_mass_conversion * self.richness_sparse_array[ii][jj],
+                                                                                                           self.stellar_mass_conversion * self.richness_lower_sparse_array[ii][jj],
+                                                                                                           self.stellar_mass_conversion * self.richness_upper_sparse_array[ii][jj],
+                                                                                                           self.stellar_mass_conversion * self.richness_upper_limit_sparse_array[ii][jj])
                 else:
-                    message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj], stellar_mass_conversion * self.richness_sparse_array[ii][jj])
+                    message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj], self.stellar_mass_conversion * self.richness_sparse_array[ii][jj])
                     message += ', Fraction = %.2f'%self.fraction_observable_sparse_array[ii][jj]
                 logger.debug( message )
                 
@@ -405,9 +408,10 @@ class Likelihood:
 
             jj_max = self.log_likelihood_sparse_array[ii].argmax()
             message = "  (%i/%i) Maximum at (%.3f, %.3f) ... "%(jj_max+1, len_pixels_target, lon[jj_max], lat[jj_max])
-            message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj_max], stellar_mass_conversion * self.richness_sparse_array[ii][jj_max])
+            message += 'TS = %.2f, Stellar Mass = %.1f'%(2. * self.log_likelihood_sparse_array[ii][jj_max], self.stellar_mass_conversion * self.richness_sparse_array[ii][jj_max])
             logger.info( message )
 
+    #DEPRICATED?
     def logLikelihood(self, distance_modulus, richness, grid_search=False):
         """
         Return log(likelihood). If grid_search=True, take computational shortcuts.
@@ -428,6 +432,16 @@ class Likelihood:
         log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (f * richness)
         return log_likelihood, p, f
 
+    # DEPRICATED
+    def negativeLogLikelihood(self, richness):
+        """
+        Return log(likelihood) given the richness.
+        """
+        p = (richness * self.u) / ((richness * self.u) + self.b)
+        log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
+        print richness, log_likelihood
+        return -1. * log_likelihood
+
     def logLikelihoodSimple(self, richness):
         """
         Evaluate log(likelihood)
@@ -439,9 +453,6 @@ class Likelihood:
         """
         Maximize the log(likelihood) and return the result.
         """
-        #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
-        #richness, negative_log_likelihood = scipy.optimize.brent(self.negativeLogLikelihood, full_output=True)[0:2]
-
         # Check whether the signal probability for all objects are zero
         # This can occur for finite kernels on the edge of the survey footprint
         if numpy.isnan(self.u).any():
@@ -458,8 +469,8 @@ class Likelihood:
         log_likelihood = numpy.array([0., 
                                       self.logLikelihoodSimple(richness[1]), 
                                       self.logLikelihoodSimple(richness[2])])
-
-        
+         
+         
         found_maximum = False
         iteration = 0
         while not found_maximum:
@@ -472,39 +483,11 @@ class Likelihood:
                 if numpy.fabs(log_likelihood[-1] - numpy.max(log_likelihood[0: -1])) < tolerance:
                     found_maximum = True
             iteration+=1
+         
         index = numpy.argmax(log_likelihood)
         p = (richness[index] * self.u) / ((richness[index] * self.u) + self.b)
         return log_likelihood[index], richness[index], p, parabola
 
-        #while True:
-        #    p = (richness_array[-1] * self.u) / ((richness_array[-1] * self.u) + self.b)
-        #    log_likelihood_array.append(-1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness_array[-1]))
-        #    richness_array.append(numpy.sum(p) / self.f)
-        #    if log_likelihood_array[-1] < 0.:
-        #        return 0., 0., numpy.zeros(len(p))
-        #    if numpy.fabs(log_likelihood_array[-1] - log_likelihood_array[-2]) < tol or len(richness_array) == 500:
-        #        p = (richness_array[-1] * self.u) / ((richness_array[-1] * self.u) + self.b)
-        #        log_likelihood_array.append(-1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness_array[-1]))
-        #        return log_likelihood_array[-1], richness_array[-1], p       
-        #        #break
-
-        #for ii in range(0, len(richness_array)):
-        #    print '%10.2f %10.2f'%(log_likelihood_array[ii], richness_array[ii])
-        #if numpy.max(log_likelihood_array) == 0.:
-        #    return 0., 0., numpy.zeros(len(p))
-        #else:
-        #return log_likelihood_array[-1], richness_array[-1], p
-        #p = (richness * self.u) / ((richness * self.u) + self.b)
-        #return -1. * negative_log_likelihood, richness, p
-
-    def negativeLogLikelihood(self, richness):
-        """
-        Return log(likelihood) given the richness.
-        """
-        p = (richness * self.u) / ((richness * self.u) + self.b)
-        log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
-        print richness, log_likelihood
-        return -1. * log_likelihood
 
     def membershipGridSearch(self, index_distance_modulus = None, index_pixel_target = None):
         """
@@ -536,13 +519,22 @@ class Likelihood:
         """
         Save the likelihood fitting results as a sparse HEALPix map.
         """
-        data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
-                     'RICHNESS': self.richness_sparse_array.transpose(),
-                     'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
-                     'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
-                     'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose(),
-                     'STELLAR_MASS': self.stellar_mass_sparse_array.transpose(),
-                     'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+        # Full data output (too large for survey)
+        if self.config.params['likelihood']['full_pdf']:
+            data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
+                         'RICHNESS': self.richness_sparse_array.transpose(),
+                         'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
+                         'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
+                         'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose(),
+                         #'STELLAR_MASS': self.stellar_mass_sparse_array.transpose(),
+                         'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+        else:
+            data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
+                         'RICHNESS': self.richness_sparse_array.transpose(),
+                         'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+
+        # Stellar Mass can be calculated from STELLAR * RICHNESS
+        header_dict = {'STELLAR': round(self.stellar_mass_conversion,8)}
 
         # In case there is only a single distance modulus
         if len(self.distance_modulus_array) == 1:
@@ -554,7 +546,8 @@ class Likelihood:
                                                  self.config.params['coords']['nside_pixel'],
                                                  outfile,
                                                  distance_modulus_array=self.distance_modulus_array,
-                                                 coordsys='NULL', ordering='NULL')
+                                                 coordsys='NULL', ordering='NULL',
+                                                 header_dict=header_dict)
 
 ############################################################
 
