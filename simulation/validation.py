@@ -55,8 +55,10 @@ def validateSatellite(config, isochrone, kernel, stellar_mass, distance_modulus,
 
         # Simulate
         catalog_satellite = simulator.satellite(isochrone, kernel, stellar_mass, distance_modulus, mc_source_id=1)
-        catalog_bootstrap = catalog_base.bootstrap()
-        catalog_merge = ugali.observation.catalog.mergeCatalogs([catalog_bootstrap, catalog_satellite])
+        #catalog_bootstrap = catalog_base.bootstrap()
+        #catalog_merge = ugali.observation.catalog.mergeCatalogs([catalog_bootstrap, catalog_satellite])
+        catalog_background = simulator.satellite(mc_source_id=1)
+        catalog_merge = ugali.observation.catalog.mergeCatalogs([catalog_background, catalog_satellite])
 
         # Analyze
         likelihood = ugali.analysis.likelihood.Likelihood(config, roi, mask, catalog_merge, isochrone, kernel)
