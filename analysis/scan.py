@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 """
-Class to create and run likelihood analysis.
+Class to create and run an individual likelihood analysis.
 
-Classes
-    Class
+Classes:
+    Scan
 
-Functions
+Functions:
     someFunction
 """
 
