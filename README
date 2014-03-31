@@ -56,7 +56,7 @@ ROI: region of interest
 PDF: probability distribution function
 LUT: look-up table
 
-=== TO DO ===
+=== TODO ===
 
 a, b, c = rank by current importance (a > b)
 1, 2, 3 = rank by difficulty (1 > 2)
@@ -71,23 +71,27 @@ Code:
 * (1c) Compute observable fraction including photometric errors
 * (2c) Check for numerical issues with very small Plummer radii, sampling kernel (ADD WARNING)
 * (1c) Add alternative IMFs
-* (1c) Collector function to find peaks (in 3D)
-* (2c) Save stellar mass instead of richness?
 * (2c) Compute the absolute visual magnitude in addition to bolometric luminosity
 * (1c) Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
 * (3b) Rename PDF in kernels
-* (3b) Switch to new kernel
 * (2a) Config file option for likelihood evaluation radius
 * (3b) Search multiple ROIs in same batch job
-* (3c) Chatter to logger
+* (3c) Pass 'chatter' argument to logger
 * (1b) Investigate large kernel fitting accuracy, what is largest size
 * (3b) FNAL, Midway, SLAC config files
 * (2b) Automated data processing to get mangle masks and catalogs from DESDM
+* (2b) Merge config file with default config
 
 Projects:
 * (2b) SVA1 data products
 * (2b) SDSS isochrones, consider updating DES isochrones
 * (2b) SDSS mask
+
+
+=== DONE ===
+* (1c) Collector function to find peaks (in 3D)
+* (2c) Save stellar mass instead of richness?
+* (3b) Switch to new kernel
 
 
 === TEST ===
