@@ -66,11 +66,18 @@ class Farm:
         an array of target locations in Galactic coordinates.
         File description:
         [NAME] [LON] [LAT] [RADIUS] [COORD]
+        
+        The values of LON and LAT will depend on COORD:
+        COORD = [GAL  | CEL | HPX  ],
+        LON   = [GLON | RA  | NSIDE]
+        LAT   = [GLAT | DEC | PIX  ]
+
         """
-        data = numpy.loadtxt(filename,unpack=True,dtype=str)
+        data = numpy.loadtxt(filename,unpack=True,usecols=range(5),dtype=object)
         # Deal with one-line input files
         if data.ndim == 1: data = numpy.array([data]).T
-        out = data[1:4].astype(float)
+        names = data[0]
+        out   = data[1:4].astype(float)
         lon,lat,radius = out
 
         coord = numpy.array([s.lower() for s in data[4]])
@@ -87,7 +94,7 @@ class Farm:
             out[0][hpx] = glon
             out[1][hpx] = glat
 
-        return out
+        return names,out.T
                
     def command(self):
         """
@@ -172,8 +179,7 @@ class Farm:
             vec = angToVec(glon,glat)
             pixels = numpy.zeros( 0, dtype=int)
             for v,r in zip(vec,radius):
-                pix = ugali.utils.projector.query_disc(self.nside_likelihood,v,numpy.radians(r),
-                                                       inclusive=True,fact=32)
+                pix = ugali.utils.projector.query_disc(self.nside_likelihood,v,r,inclusive=True,fact=32)
                 pixels = numpy.hstack([pixels, pix])
             #pixels = numpy.unique(pixels)
 
@@ -252,7 +258,7 @@ class Farm:
                 # SLAC cluster
                 elif self.config.params['queue']['cluster'] == 'slac':
                     # Need to add an option for which slac queue [short/long/kipac-ibq]
-                    batch = """bsub -q %(queue)s -R \"%(require)s\" -oo %(logfile)s -J %(jobname)s """
+                    batch = """bsub -q %(queue)s -R \"%(require)s\" -oo %(logfile)s -J %(jobname)s -C 0 """
                     check_jobs = 'bjobs -u %s | wc\n'%username
                 # FNAL cluster
                 elif self.config.params['queue']['cluster'] == 'fnal':
@@ -325,6 +331,6 @@ if __name__ == "__main__":
         glon,glat = pixToAng(opts.nside,opts.pix)
         coords = [ (glon,glat,radius) ]
     elif opts.targets:
-        coords = farm.loadTargetCoordinates(opts.targets).T
-        
+        names,coords = farm.loadTargetCoordinates(opts.targets)
+
     x = farm.submit_all(coords=coords,local=opts.local,debug=opts.debug)
