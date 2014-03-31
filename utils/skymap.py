@@ -6,6 +6,8 @@ import sys
 import numpy
 import pyfits
 import healpy
+import re
+import gc
 
 import ugali.utils.projector
 from ugali.utils.logger import logger
@@ -24,7 +26,7 @@ def subpixel(superpix, nside_superpix, nside_subpix):
     Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
     """
     vec = healpy.pix2vec(nside_superpix, superpix)
-    radius = 2. * healpy.nside2resol(nside_superpix)
+    radius = numpy.degrees(2. * healpy.max_pixrad(nside_superpix))
     subpix = ugali.utils.projector.query_disc(nside_subpix, vec, radius)
     pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
     # Might be able to speed up array indexing...
@@ -64,7 +66,8 @@ def allSkyCoordinates(nside):
 
 def writeSparseHealpixMap(pix, data_dict, nside, outfile,
                           distance_modulus_array = None,
-                          coordsys = 'NULL', ordering = 'NULL'):
+                          coordsys = 'NULL', ordering = 'NULL',
+                          header_dict = None):
     """
     Sparse HEALPix maps are used to efficiently store maps of the sky by only
     writing out the pixels that contain data.
@@ -103,6 +106,7 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
     hdu_pix_data.header.update('NSIDE', nside)
     hdu_pix_data.header.update('COORDSYS', coordsys.upper())
     hdu_pix_data.header.update('ORDERING', ordering.upper())
+    hdu_pix_data.header.update(header_dict)
     hdu_pix_data.name = 'PIX_DATA'
     hdul.append(hdu_pix_data)
 
@@ -125,9 +129,11 @@ def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=heal
     Flexibility to handle 
     """
     reader = pyfits.open(infile,memmap=False)
-    pix = reader[extension].data.field('PIX')
-    value = reader[extension].data.field(field)
     nside = reader[extension].header['NSIDE']
+
+    # Trying to fix avoid a memory leak
+    pix = numpy.array(reader[extension].data.field('PIX'),copy=True)
+    value = numpy.array(reader[extension].data.field(field),copy=True)
     reader.close()
     
     if construct_map:
@@ -230,9 +236,11 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
         logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
 
         reader = pyfits.open(infiles[ii])
-        if not numpy.array_equal(reader[distance_modulus_extension].data.field(distance_modulus_field),distance_modulus_array):
+        distance_modulus_array_current = numpy.array(reader[distance_modulus_extension].data.field(distance_modulus_field),copy=True)
+        if not numpy.array_equal(distance_modulus_array_current,distance_modulus_array):
             logger.warning("Distance moduli do not match; skipping...")
             continue
+        reader.close()
 
         pix_array_current = readSparseHealpixMap(infiles[ii], pix_field,
                                                  extension=pix_data_extension, construct_map=False)[0]
@@ -247,6 +255,8 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
             #else:
             #    for jj in range(0, len(distance_modulus_array)):
             #        data_dict[key][jj] = value[jj]
+
+        gc.collect()
 
     pix_master = numpy.concatenate(pix_array)
     n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
