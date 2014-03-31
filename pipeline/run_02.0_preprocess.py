@@ -2,13 +2,13 @@
 import os
 import glob
 
-import ugali.data.pixelize
-import ugali.data.maglims
+import ugali.preprocess.pixelize
+import ugali.preprocess.maglims
 from ugali.utils.parse_config import Config
 
 from ugali.utils.logger import logger
 
-COMPONENTS = ['pixelize','density','maglims']
+COMPONENTS = ['pixelize','density','maglims','simple']
 if __name__ == "__main__":
     from optparse import OptionParser
     usage = "Usage: %prog  [options] input"
@@ -30,14 +30,17 @@ if __name__ == "__main__":
         logger.info("Running 'pixelize'...")
         rawdir = config.params['data']['dirname']
         rawfiles = sorted(glob.glob(os.path.join(rawdir,'*.fits')))
-        x = ugali.data.pixelize.pixelizeCatalog(rawfiles,config)
+        x = ugali.preprocess.pixelize.pixelizeCatalog(rawfiles,config)
     if 'density' in opts.run:
         # Calculate magnitude limits
         logger.info("Running 'density'...")
-        x = ugali.data.pixelize.pixelizeDensity(config,nside=2**9)
+        x = ugali.preprocess.pixelize.pixelizeDensity(config,nside=2**9)
     if 'maglims' in opts.run:
         # Calculate magnitude limits
         logger.info("Running 'maglims'...")
-        maglims = ugali.data.maglims.Maglims(config)
+        maglims = ugali.preprocess.maglims.Maglims(config)
         x = maglims.run()
-        
+    if 'simple' in opts.run:
+        # Calculate simple magnitude limits
+        logger.info("Running 'simple'...")
+        ugali.preprocess.maglims.simple_maglims(config)

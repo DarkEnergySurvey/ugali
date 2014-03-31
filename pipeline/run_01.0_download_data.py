@@ -2,7 +2,7 @@
 import os, sys
 
 from ugali.utils.parse_config import Config
-import ugali.data.database
+import ugali.preprocess.database
 
 if __name__ == "__main__":
     from optparse import OptionParser
