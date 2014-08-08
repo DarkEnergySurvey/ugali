@@ -4,16 +4,21 @@ Basic plotting tools.
 import os
 import collections
 
+import matplotlib
+try:             os.environ['DISPLAY']
+except KeyError: matplotlib.use('Agg')
+
 import numpy
 import pylab
 import healpy
 import pyfits
 from mpl_toolkits.axes_grid1 import AxesGrid    
 
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.observation.roi
 import ugali.observation.catalog
 import ugali.utils.skymap
+import ugali.utils.projector
 
 from ugali.utils.logger import logger
 #pylab.ion()
@@ -152,7 +157,7 @@ class BasePlotter(object):
     def __init__(self,glon,glat,config,radius=1.0):
         self.glon,self.glat = glon,glat
         self.ra,self.dec = ugali.utils.projector.galToCel(self.glon,self.glat)
-        self.config = ugali.utils.parse_config.Config(config)
+        self.config = ugali.utils.config.Config(config)
         self.roi = ugali.observation.roi.ROI(self.config,self.glon,self.glat)
         self.nside = self.config.params['coords']['nside_pixel']
         self.radius = radius
@@ -170,7 +175,9 @@ class BasePlotter(object):
         # Flipping JPEG:
         # https://github.com/matplotlib/matplotlib/issues/101
         im =ax.imshow(im[::-1])
-        try: ax.cax.axis["right"].toggle(ticks=True, ticklabels=False)
+        try:
+            ax.cax.axis["right"].toggle(ticks=False, ticklabels=False)
+            ax.cax.axis["top"].toggle(ticks=False, ticklabels=False)
         except: pass
         ax.annotate("Image",**self.label_kwargs)
         return ax
@@ -190,7 +197,7 @@ class BasePlotter(object):
         pylab.close()
         im = ax.imshow(im,origin='bottom')
         try: ax.cax.colorbar(im)
-        except: pass
+        except: pylab.colorbar(im)
         ax.annotate("Stars",**self.label_kwargs)
 
     def drawMask(self,ax):
@@ -205,7 +212,7 @@ class BasePlotter(object):
         pylab.close()
         im = ax.imshow(im,origin='bottom')
         try: ax.cax.colorbar(im)
-        except: pass
+        except: pylab.colorbar(im)
         ax.annotate("Mask",**self.label_kwargs)
 
     def drawTS(self,ax, filename=None, zidx=0):
@@ -214,13 +221,14 @@ class BasePlotter(object):
             basename = self.config.params['output']['mergefile']
             filename = os.path.join(dirname,basename)
         results=pyfits.open(filename)[1]
+
         pixels,values = results.data['pix'],2*results.data['log_likelihood']
         if values.ndim == 1: values = values.reshape(-1,1)
         ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
         # Sum through all distance_moduli
         #ts_map[pixels] = values.sum(axis=1)
         # Just at maximum slice from object
-        
+
         ts_map[pixels] = values[:,zidx]
 
         im = healpy.gnomview(ts_map,**self.gnom_kwargs)
@@ -228,16 +236,31 @@ class BasePlotter(object):
         pylab.close()
         im = ax.imshow(im,origin='bottom')
         try: ax.cax.colorbar(im)
-        except: pass
+        except: pylab.colorbar(im)
         ax.annotate("TS",**self.label_kwargs)
 
-    def drawCMD(self, ax):
+    def drawCMD(self, ax, radius=None, zidx=None):
         import ugali.analysis.isochrone
+
+        if zidx is not None:
+            dirname = self.config.params['output']['savedir_results']
+            basename = self.config.params['output']['mergefile']
+            filename = os.path.join(dirname,basename)
+            logger.debug("Opening %s..."%filename)
+            f = pyfits.open(filename)
+            distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
+
+            for ii, name in enumerate(self.config.params['isochrone']['infiles']):
+                print ii, name
+                isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+                mag = isochrone.mag + distance_modulus
+                ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
         
         # Stellar Catalog
-        catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
         sep = ugali.utils.projector.angsep(self.glon, self.glat, catalog.lon, catalog.lat)
-        cut = (sep < self.radius)
+        radius = self.radius if radius is None else radius
+        cut = (sep < radius)
         catalog_cmd = catalog.applyCut(cut)
         ax.scatter(catalog_cmd.color, catalog_cmd.mag,color='b')
         ax.set_xlim(self.roi.bins_color[0],self.roi.bins_color[-1])
@@ -245,14 +268,55 @@ class BasePlotter(object):
         ax.set_xlabel('Color (mag)')
         ax.set_ylabel('Magnitude (mag)')
 
-        for ii, name in enumerate(self.config.params['isochrone']['infiles']):
-            isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
-            ax.scatter(isochrone.color,isochrone.mag, color='r')
-
-        try: ax.cax.colorbar(im)
+        try:    ax.cax.colorbar(im)
         except: pass
         ax.annotate("Stars",**self.label_kwargs)
 
+
+    def drawMembership(self, ax, radius=None, zidx=0, mc_source_id=1):
+        import ugali.analysis.scan
+
+        dirname = self.config.params['output']['savedir_results']
+        basename = self.config.params['output']['mergefile']
+        filename = os.path.join(dirname,basename)
+        logger.debug("Opening %s..."%filename)
+        f = pyfits.open(filename)
+        distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
+
+        for ii, name in enumerate(self.config.params['isochrone']['infiles']):
+            print ii, name
+            isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+            mag = isochrone.mag + distance_modulus
+            ax.scatter(isochrone.color,mag, color='0.5', s=800, zorder=0)
+            #ax.plot(isochrone.color,mag, lw=20, color='0.5', zorder=0)
+
+
+        pix = ugali.utils.projector.angToPix(self.nside, self.glon, self.glat)
+        likelihood_pix = ugali.utils.skymap.superpixel(pix,self.nside,self.config.params['coords']['nside_likelihood'])
+        config = self.config
+        scan = ugali.analysis.scan.Scan(self.config,likelihood_pix)
+        likelihood = scan.likelihood
+        distance_modulus_array = [self.config.params['likelihood']['distance_modulus_array'][zidx]]
+        likelihood.precomputeGridSearch(distance_modulus_array)
+        likelihood.gridSearch()
+        p = likelihood.membershipGridSearch()
+
+        sep = ugali.utils.projector.angsep(self.glon, self.glat, likelihood.catalog.lon, likelihood.catalog.lat)
+        radius = self.radius if radius is None else radius
+        cut = (sep < radius)
+        catalog = likelihood.catalog.applyCut(cut)
+        p = p[cut]
+
+        cut_mc_source_id = (catalog.mc_source_id == mc_source_id)
+        ax.scatter(catalog.color[cut_mc_source_id], catalog.mag[cut_mc_source_id], c='gray', s=100, edgecolors='none')
+        sc = ax.scatter(catalog.color, catalog.mag, c=p, edgecolors='none')
+
+        ax.set_xlim(likelihood.roi.bins_color[0], likelihood.roi.bins_color[-1])
+        ax.set_ylim(likelihood.roi.bins_mag[-1], likelihood.roi.bins_mag[0])
+        ax.set_xlabel('Color (mag)')
+        ax.set_ylabel('Magnitude (mag)')
+        try: ax.cax.colorbar(sc)
+        except: pylab.colorbar(sc)
 
     def plotDistance(self):
         dirname = self.config.params['output']['savedir_results']
@@ -300,10 +364,28 @@ class BasePlotter(object):
             fig.add_axes(ax.cax)
         return fig,axes
 
-    def plot(self):
+
+    def plot3(self):
+        fig = pylab.figure(figsize=(8,4))
+        axes = AxesGrid(fig, 111,nrows_ncols = (1, 3),axes_pad=0.1,
+                        cbar_mode='each',cbar_pad=0,cbar_size='5%',
+                        cbar_location='top',share_all=True)
+        for ax in axes:
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+
+        self.drawImage(axes[0])
+        self.drawTS(axes[1])
+        #self.drawStellarDensity(axes[1])
+        self.drawMask(axes[2])
+        return fig,axes
+
+
+    def plot4(self):
         fig = pylab.figure()
         axes = AxesGrid(fig, 111,nrows_ncols = (2, 2),axes_pad=0.25,
-                        cbar_mode='each',cbar_pad=0,cbar_size='5%',share_all=True)
+                        cbar_mode='each',cbar_pad=0,cbar_size='5%',
+                        share_all=True)
         for ax in axes:
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
@@ -313,6 +395,8 @@ class BasePlotter(object):
         self.drawMask(axes[2])
         self.drawTS(axes[3])
         return fig,axes
+
+    plot = plot3
 
 
 class ObjectPlotter(BasePlotter):
@@ -327,3 +411,11 @@ class ObjectPlotter(BasePlotter):
     def drawTS(self,ax, filename=None, zidx=None):
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawTS(ax,filename,zidx)
+
+    def drawCMD(self,ax, radius=None, zidx=None):
+        if zidx is None: zidx = self.zidx
+        super(ObjectPlotter,self).drawCMD(ax,radius,zidx)
+
+    def drawMembership(self, ax, radius=None, zidx=None, mc_source_id=1):
+        if zidx is None: zidx = self.zidx
+        super(ObjectPlotter,self).drawMembership(ax,radius,zidx,mc_source_id)

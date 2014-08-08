@@ -8,7 +8,8 @@ import numpy
 import numpy.ma.mrecords
 import healpy
 
-import ugali.utils.parse_config # To recognize own type
+from ugali.utils.logger import logger
+import ugali.utils.config # To recognize own type
 
 ############################################################
 
@@ -30,7 +31,7 @@ class Config(object):
             reader.close()
         elif type(input) is dict:
             self.params = input
-        elif type(input) is ugali.utils.parse_config.Config:
+        elif type(input) is ugali.utils.config.Config:
             self.params = input.params
         else:
             self.params = {}
@@ -50,7 +51,7 @@ class Config(object):
         """
         if type(merge) is dict:
             params = self._mergeParams(merge)
-        elif type(merge) is ugali.utils.parse_config.Config:
+        elif type(merge) is ugali.utils.config.Config:
             params = self._mergeParams(merge.params)
         elif merge is None:
             params = self.params

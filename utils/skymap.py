@@ -10,27 +10,28 @@ import re
 import gc
 
 import ugali.utils.projector
+from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
 from ugali.utils.logger import logger
 
-############################################################
-
-def superpixel(subpix, nside_subpix, nside_superpix):
-    """
-    Return the indices of the super-pixels which contain each of the sub-pixels.
-    """
-    theta, phi =  healpy.pix2ang(nside_subpix, subpix)
-    return healpy.ang2pix(nside_superpix, theta, phi)
-
-def subpixel(superpix, nside_superpix, nside_subpix):
-    """
-    Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
-    """
-    vec = healpy.pix2vec(nside_superpix, superpix)
-    radius = numpy.degrees(2. * healpy.max_pixrad(nside_superpix))
-    subpix = ugali.utils.projector.query_disc(nside_subpix, vec, radius)
-    pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
-    # Might be able to speed up array indexing...
-    return subpix[pix_for_subpix == superpix]
+### ############################################################
+###  
+### def superpixel(subpix, nside_subpix, nside_superpix):
+###     """
+###     Return the indices of the super-pixels which contain each of the sub-pixels.
+###     """
+###     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
+###     return healpy.ang2pix(nside_superpix, theta, phi)
+###  
+### def subpixel(superpix, nside_superpix, nside_subpix):
+###     """
+###     Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
+###     """
+###     vec = healpy.pix2vec(nside_superpix, superpix)
+###     radius = numpy.degrees(2. * healpy.max_pixrad(nside_superpix))
+###     subpix = query_disc(nside_subpix, vec, radius)
+###     pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
+###     # Might be able to speed up array indexing...
+###     return subpix[pix_for_subpix == superpix]
 
 ############################################################
 
@@ -85,6 +86,7 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
     columns_array = [pyfits.Column(name = 'PIX',
                                    format = 'K',
                                    array = pix)]
+
     for key in data_dict.keys():
         if data_dict[key].shape[0] != len(pix):
             logger.warning('First dimension of column %s (%i) does not match number of pixels (%i).'%(key,
@@ -276,6 +278,30 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
     else:
         return data_dict
 
+
+############################################################
+
+def mergeLikelihoodFiles(infiles, lkhdfile, roifile):
+    mergeSparseHealpixMaps(infiles,lkhdfile)
+
+    ext='PIX_DATA'
+    keys=['NINSIDE','NANNULUS']
+    nside = pyfits.open(infiles[0])[ext].header['LKDNSIDE']
+
+    pix_array = []
+    data_dict = dict([(k,[]) for k in keys])
+    for ii in range(0, len(infiles)):
+        logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
+        reader = pyfits.open(infiles[ii])
+        pix_array.append(reader[ext].header['LKDPIX'])
+        for key in data_dict.keys():
+            data_dict[key].append(reader[ext].header[key])
+        
+    pix_array = numpy.array(pix_array)
+    for key in data_dict.keys():
+        data_dict[key] = numpy.array(data_dict[key])
+    writeSparseHealpixMap(pix_array, data_dict, nside, roifile)
+
 ############################################################
 
 def randomPositions(input, nside_pix, n=1):
@@ -292,7 +318,7 @@ def randomPositions(input, nside_pix, n=1):
     input = numpy.array(input)
     if len(input.shape) == 1:
         subpix = numpy.nonzero(input)[0] # All the valid pixels in the mask at the NSIDE for the input mask
-        lon, lat = ugali.utils.projector.pixToAng(healpy.npix2nside(len(input)), subpix)
+        lon, lat = pix2ang(healpy.npix2nside(len(input)), subpix)
     elif len(input.shape) == 2:
         lon, lat = input[0], input[1] # All catalog object positions
     else:
