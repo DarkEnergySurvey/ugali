@@ -5,7 +5,7 @@ Tool to generate a population of simulated satellite properties.
 import numpy
 import pylab
 
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.utils.projector
 import ugali.utils.skymap
 import ugali.analysis.kernel
@@ -30,7 +30,7 @@ def satellitePopulation(config, n,
     """
     
     if type(config) == str:
-        config = ugali.utils.parse_config.Config(config)
+        config = ugali.utils.config.Config(config)
 
     if mode == 'mask':
         mask_1 = ugali.utils.skymap.readSparseHealpixMap(config.params['mask']['infile_1'], 'MAGLIM')

@@ -11,7 +11,7 @@ import pylab
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.observation.roi
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.utils.projector
 
 pylab.ion()
@@ -22,7 +22,7 @@ class Simulator:
 
     def __init__(self, config, roi):
 
-        self.config = ugali.utils.parse_config.Config(config)
+        self.config = ugali.utils.config.Config(config)
         
         self.roi = roi
 
