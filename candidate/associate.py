@@ -80,6 +80,8 @@ class SourceCatalog(object):
                    ('glat',float)]
         self.data = numpy.recarray(0,dtype=columns)
         self._load(filename)
+        if np.isnan([self.data['glon'],self.data['glat']]).any():
+            raise ValueError("Incompatible values")
  
     def __getitem__(self, key):
         """ 
@@ -116,15 +118,17 @@ class SourceCatalog(object):
 class McConnachie12(SourceCatalog):
     """
     Catalog of nearby dwarf spheroidal galaxies. 
- 
     http://arxiv.org/abs/1204.1562
+
+    https://www.astrosci.ca/users/alan/Nearby_Dwarfs_Database_files/NearbyGalaxies.dat
+
     """
  
     def _load(self,filename):
         if filename is None: 
-            filename = os.path.join(self.DATADIR,"NearbyGalaxies.dat")
+            filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
  
-        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float])
+        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=34)
  
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])
@@ -140,8 +144,8 @@ class McConnachie12(SourceCatalog):
 class Rykoff14(SourceCatalog):
     """
     Catalog of red-sequence galaxy clusters.
-
     http://arxiv.org/abs/1303.3562
+
     """
 
     def _load(self, filename):
@@ -170,9 +174,9 @@ class Harris96(SourceCatalog):
     """
     def _load(self,filename):
         if filename is None: 
-            filename = os.path.join(self.DATADIR,"mwgc.dat")
+            filename = os.path.join(self.DATADIR,"VII_202/mwgc.dat")
             
-        raw = numpy.genfromtxt(filename,delimiter=[12,12,3,3,6,5,3,6],dtype=2*['S12']+6*[float])
+        raw = numpy.genfromtxt(filename,delimiter=[12,12,3,3,6,5,3,6],dtype=2*['S12']+6*[float],skip_header=72,skip_footer=363)
 
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])
@@ -201,6 +205,10 @@ class Corwen04(SourceCatalog):
         else:
             raw = numpy.genfromtxt(filename,**kwargs)
 
+        # Some entries are missing...
+        raw['f4'] = numpy.where(numpy.isnan(raw['f4']),0,raw['f4'])
+        raw['f7'] = numpy.where(numpy.isnan(raw['f7']),0,raw['f7'])
+
         self.data.resize(len(raw))
         names = numpy.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
         self.data['name'] = numpy.char.mod(names,raw['f1'])
@@ -213,31 +221,31 @@ class Corwen04(SourceCatalog):
         glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
-class Steinicke10(SourceCatalog):
-    """
-    Another modern compilation of the New General Catalogue
-    (people still don't agree on the composition of NGC...)
-    """
-    def _load(self,filename):
-        if filename is None: 
-            filename = os.path.join(self.DATADIR,"NI2013.csv")
-
-        raw = numpy.genfromtxt(filename,delimiter=',',usecols=[5,6]+range(13,20),dtype=['S1',int]+3*[float]+['S1']+3*[float])
-
-        self.data.resize(len(raw))
-        names = numpy.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
-        self.data['name'] = numpy.char.mod(names,raw['f1'])
-
-        sign = numpy.where(raw['f5'] == '-',-1,1)
-        ra = raw[['f2','f3','f4']].view(float).reshape(len(raw),-1)
-        dec = raw[['f6','f7','f8']].view(float).reshape(len(raw),-1)
-        dec[:,0] = numpy.copysign(dec[:,0], sign)
-
-        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
-        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
-
-        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
-        self.data['glon'],self.data['glat'] = glon,glat
+#class Steinicke10(SourceCatalog):
+#    """
+#    Another modern compilation of the New General Catalogue
+#    (people still don't agree on the composition of NGC...)
+#    """
+#    def _load(self,filename):
+#        if filename is None: 
+#            filename = os.path.join(self.DATADIR,"NI2013.csv")
+# 
+#        raw = numpy.genfromtxt(filename,delimiter=',',usecols=[5,6]+range(13,20),dtype=['S1',int]+3*[float]+['S1']+3*[float])
+# 
+#        self.data.resize(len(raw))
+#        names = numpy.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
+#        self.data['name'] = numpy.char.mod(names,raw['f1'])
+# 
+#        sign = numpy.where(raw['f5'] == '-',-1,1)
+#        ra = raw[['f2','f3','f4']].view(float).reshape(len(raw),-1)
+#        dec = raw[['f6','f7','f8']].view(float).reshape(len(raw),-1)
+#        dec[:,0] = numpy.copysign(dec[:,0], sign)
+# 
+#        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
+#        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
+# 
+#        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
+#        self.data['glon'],self.data['glat'] = glon,glat
 
 class Nilson73(SourceCatalog):
     """

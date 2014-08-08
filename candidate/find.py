@@ -9,7 +9,7 @@ import subprocess
 import os
 
 import ugali.utils.skymap
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.association.sources 
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 
 
     configfile= 'config_dr10_gal.py'
-    config = ugali.utils.parse_config.Config(configfile)
+    config = ugali.utils.config.Config(configfile)
 
 
     

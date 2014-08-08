@@ -10,7 +10,7 @@ import subprocess
 import os
 
 import ugali.utils.skymap
-import ugali.utils.parse_config
+import ugali.utils.config
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
 from ugali.utils.projector import pixToAng,galToCel
@@ -40,6 +40,8 @@ class CandidateSearch(object):
         self.labelfile = os.path.join(dirname,basename)
         basename=self.config.params['output']['objectfile']
         self.objectfile = os.path.join(dirname,basename)
+        basename=self.config.params['output']['roifile']
+        self.roifile = os.path.join(dirname,basename)
         
     def _load(self):
         f = pyfits.open(self.filename)
@@ -89,7 +91,9 @@ class CandidateSearch(object):
         kwargs=dict(pixels=self.pixels,values=self.values,nside=self.nside, 
                     zvalues=self.distances, rev=self.rev, good=self.good)
 
-        self.objects = CandidateSearch.findObjects(**kwargs)
+        #self.objects = CandidateSearch.findObjects(**kwargs)
+        self.objects = self.findObjects(**kwargs)
+        self.roiInfo(self.objects)
         return self.objects
 
     def writeObjects(self,filename=None):
@@ -177,6 +181,8 @@ class CandidateSearch(object):
                                   ('GLON_BARY','f4'),
                                   ('GLAT_BARY','f4'),
                                   ('ZVAL_BARY','f4'),
+                                  ('NANNULUS','i4'),
+                                  ('NINTERIOR','i4'),
                                   ('CUT','i2'),])
         objs['CUT'][:] = 0
      
@@ -227,6 +233,16 @@ class CandidateSearch(object):
             objs[i]['ZVAL_BARY'] = zval_bary
      
         return objs
+
+    def roiInfo(self, objects):
+        ninterior = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NINSIDE')
+        nannulus = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NANNULUS')
+        nside = healpy.npix2nside(len(nannulus))
+        for obj in objects:
+            glon,glat = obj['GLON_MAX'],obj['GLAT_MAX']
+            pix = ugali.utils.projector.angToPix(nside,glon,glat)
+            obj['NANNULUS'] = int(nannulus[pix])
+            obj['NINTERIOR'] = int(ninterior[pix])
 
 if __name__ == "__main__":
     from optparse import OptionParser
