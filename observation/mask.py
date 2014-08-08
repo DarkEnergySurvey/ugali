@@ -16,10 +16,10 @@ import healpy
 import ugali.observation.roi
 import ugali.utils.plotting
 import ugali.utils.binning
-import ugali.utils.projector
 import ugali.utils.skymap
-from ugali.utils.logger import logger
 
+from ugali.utils.logger import logger
+from ugali.utils.healpix import ang2pix
 ############################################################
 
 class Mask:
@@ -137,8 +137,8 @@ class Mask:
         if mode == 'cloud-in-cells':
             # Select objects in annulus
             # ADW: This should be standardized (similar function in likelihood)
-            cut_annulus = numpy.in1d(ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'],
-                                                                    catalog.lon, catalog.lat),
+            cut_annulus = numpy.in1d(ang2pix(self.config.params['coords']['nside_pixel'],
+                                             catalog.lon, catalog.lat),
                                      self.roi.pixels_annulus)
             color = catalog.color[cut_annulus]
             mag = catalog.mag[cut_annulus]

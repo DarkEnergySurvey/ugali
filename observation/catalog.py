@@ -10,9 +10,10 @@ import copy
 
 import ugali.utils.projector
 import ugali.utils.plotting
-import ugali.utils.parse_config
+import ugali.utils.config
 
-from ugali.utils.skymap import superpixel
+from ugali.utils.projector import gal2cel,cel2gal
+from ugali.utils.healpix import ang2pix,superpixel
 from ugali.utils.logger import logger
 ############################################################
 
@@ -80,13 +81,25 @@ class Catalog:
         """
         Return indices of ROI pixels corresponding to object locations.
         """
-        pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], self.lon, self.lat)
+        # ADW: Not safe to set index = -1 (since it will access last entry); -np.inf would be better
 
-        # Involves overhead of creating a full HEALPix map
-        map_roi = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
-        map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels) - 1, len(roi.pixels))
-        self.pixel_roi_index = map_roi[pix]
-        self.pixel_roi_index = self.pixel_roi_index.astype(int)
+        self.pixel = ang2pix(self.config.params['coords']['nside_pixel'],self.lon,self.lat)
+        self.pixel_roi_index = roi.indexROI(self.lon,self.lat)
+
+        ### # ROI pixels should be pre-sorted, otherwise...
+        ### index = numpy.searchsorted(roi.pixels,self.pixel)
+        ### # Find objects that are outside the roi
+        ### index[numpy.take(roi.pixels,index,mode='clip')!=self.pixel] = -1
+        ### self.pixel_roi_index = index
+
+        ## Involves overhead of creating a full HEALPix map
+        #map_roi = -1 * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        #map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels)-1, len(roi.pixels))
+        #self.pixel_roi_index = (map_roi[self.pixel]).astype(int)
+        # 
+        #map_roi[:] = -1
+        #map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels_interior)-1, len(roi.pixels_interior))
+        #self.pixel_interior_index = (map_roi[self.pixel]).astype(int)
 
         if numpy.any(self.pixel_roi_index < 0):
             logger.warning("Objects found that are not contained within ROI")
