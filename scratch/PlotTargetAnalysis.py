@@ -11,7 +11,7 @@ import copy
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.plotting
-import ugali.utils.parse_config
+import ugali.utils.config
 
 TITLES = dict(
 bootes_I          = "Bootes I"         , 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     distance_modulus_array = f[2].data['DISTANCE_MODULUS']
 
     configfile= args[1]
-    config = ugali.utils.parse_config.Config(configfile)
+    config = ugali.utils.config.Config(configfile)
     filenames = config.getFilenames()
     masks = filenames['mask_1'].compressed()
     maglim_map =  ugali.utils.skymap.readSparseHealpixMaps(masks,'MAGLIM')

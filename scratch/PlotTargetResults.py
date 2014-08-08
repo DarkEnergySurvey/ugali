@@ -9,7 +9,7 @@ import pyfits
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.plotting
-import ugali.utils.parse_config
+import ugali.utils.config
 
 TITLES = dict(
 bootes_I          = "Bootes I"         , 
