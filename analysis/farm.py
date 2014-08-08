@@ -29,12 +29,12 @@ import ugali.analysis.likelihood
 import ugali.analysis.scan
 import ugali.observation.catalog
 import ugali.observation.mask
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.utils.skymap
 
-from ugali.utils.projector import galToCel,celToGal,pixToAng,angToPix,angToVec
-from ugali.utils.skymap import subpixel, superpixel
-
+from ugali.utils.projector import gal2cel,cel2gal
+from ugali.utils.healpix import subpixel,superpixel,query_disc
+from ugali.utils.healpix import pix2ang,ang2pix,ang2vec
 
 from ugali.utils.logger import logger
 
@@ -45,7 +45,7 @@ class Farm:
     def __init__(self, configfile):
         self.configfile = configfile
         self.configfile_queue = configfile
-        self.config = ugali.utils.parse_config.Config(self.configfile)
+        self.config = ugali.utils.config.Config(self.configfile)
         self._setup()
 
     def _setup(self):
@@ -86,11 +86,11 @@ class Farm:
         hpx = (coord=='hpx')
 
         if cel.any():
-            glon,glat = celToGal(lon[cel],lat[cel])
+            glon,glat = cel2gal(lon[cel],lat[cel])
             out[0][cel] = glon
             out[1][cel] = glat
         if hpx.any():
-            glon,glat = pixToAng(lat[hpx],lon[hpx])
+            glon,glat = pix2ang(lat[hpx],lon[hpx])
             out[0][hpx] = glon
             out[1][hpx] = glat
 
@@ -176,10 +176,10 @@ class Farm:
                 glon,glat,radius = coords.T
             else:
                 raise Exception("Unrecognized coords shape:"+str(coords.shape))
-            vec = angToVec(glon,glat)
+            vec = ang2vec(glon,glat)
             pixels = numpy.zeros( 0, dtype=int)
             for v,r in zip(vec,radius):
-                pix = ugali.utils.projector.query_disc(self.nside_likelihood,v,r,inclusive=True,fact=32)
+                pix = query_disc(self.nside_likelihood,v,r,inclusive=True,fact=32)
                 pixels = numpy.hstack([pixels, pix])
             #pixels = numpy.unique(pixels)
 
@@ -196,11 +196,11 @@ class Farm:
         self.config.writeConfig(configfile)
 
         pixels = pixels[inside]
-        lon,lat = pixToAng(self.nside_likelihood,pixels)
+        lon,lat = pix2ang(self.nside_likelihood,pixels)
         for ii,pix in enumerate(pixels):
             logger.info('=== Submit Likelihood ===')
             logger.info('  (%i/%i) pixel=%i nside=%i; (glon, glat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, lon[ii], lat[ii] ))
-
+            #if ii >= 1000: break
             self.submit(pix,local=local,debug=debug,configfile=configfile)
 
     def submit(self, pixels, local=True, debug=False, configfile=None):
@@ -220,7 +220,7 @@ class Farm:
                 configfile = '%s/config_queue.py'%(outdir)
                 self.config.writeConfig(configfile)
                 
-        lon,lat = pixToAng(self.nside_likelihood,pixels)
+        lon,lat = pix2ang(self.nside_likelihood,pixels)
         n_query_points = healpy.nside2npix(self.nside_pixel)/healpy.nside2npix(self.nside_likelihood)
 
         for ii,pix in enumerate(pixels):
@@ -300,7 +300,7 @@ if __name__ == "__main__":
                       help="DEC of target")
     parser.add_option('-p','--pix',default=None,type='int',
                       help="HEALPix pixel of target (Galactic coordinates)")
-    parser.add_option('-n','--nside',default=None,type='int',
+    parser.add_option('-n','--nside',default=2**8,type='int',
                       help="HEALPix nside of target pixel")
     parser.add_option('--radius',default=0,type='float',
                       help="Radius surrounding specified coordinates")
@@ -323,13 +323,13 @@ if __name__ == "__main__":
     coords = None
     if opts.glon is not None and opts.glat is not None:
         glon = opts.glon; glat = opts.glat
-        coords = [ (glon,glat,radius) ]
+        coords = [ (glon,glat,opts.radius) ]
     elif opts.ra is not None and opts.dec is not None:
-        glon,glat = celToGal(opts.ra,opts.dec)
-        coords = [ (glon,glat,radius) ]
+        glon,glat = cel2gal(opts.ra,opts.dec)
+        coords = [ (glon,glat,opts.radius) ]
     elif opts.pix is not None and opts.nside is not None:
-        glon,glat = pixToAng(opts.nside,opts.pix)
-        coords = [ (glon,glat,radius) ]
+        glon,glat = pix2ang(opts.nside,opts.pix)
+        coords = [ (glon,glat,opts.radius) ]
     elif opts.targets:
         names,coords = farm.loadTargetCoordinates(opts.targets)
 

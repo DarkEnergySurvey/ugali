@@ -343,29 +343,47 @@ class Isochrone:
 
     def observableFraction(self, mask, distance_modulus, mass_min=0.1):
         """
-        Compute observable fraction of stars with masses greater than mass_min in each mask pixel
+        Compute observable fraction of stars with masses greater than mass_min in each 
+        pixel in the interior region of the mask.
+
+        # ADW: Could this be faster / more readable?
+        # ADW: Could add an argument to specify the pixels over which to compute
         """
-        mass_init_array, mass_pdf_array, mass_act_array, mag_1_array, mag_2_array = self.sample(mass_min=mass_min,
-                                                                                                full_data_range=False)
+        mass_init_array,mass_pdf_array,mass_act_array,mag_1_array,mag_2_array = self.sample(mass_min=mass_min,full_data_range=False)
+                                                                                                
         if self.config.params['catalog']['band_1_detection']:
             mag = mag_1_array
         else:
             mag = mag_2_array
         color = mag_1_array - mag_2_array
 
-        observable_fraction = numpy.zeros(len(mask.roi.pixels))
+        # ADW: Only calculate observable fraction over interior pixels...
+        pixels = mask.roi.pixels_interior
+        mag_1_mask = mask.mask_1.mask_roi_sparse[mask.roi.pixel_interior_cut]
+        mag_2_mask = mask.mask_2.mask_roi_sparse[mask.roi.pixel_interior_cut]
 
-        for ii in range(0, len(mask.roi.pixels)):
-            mag_1_mask = mask.mask_1.mask_roi_sparse[ii]
-            mag_2_mask = mask.mask_2.mask_roi_sparse[ii]
-            observable_fraction[ii] = numpy.sum(mass_pdf_array \
-                                                * (mag_1_array + distance_modulus < mag_1_mask) \
-                                                * (mag_2_array + distance_modulus < mag_2_mask) \
-                                                * (mag + distance_modulus > mask.roi.bins_mag[0]) \
-                                                * (mag + distance_modulus < mask.roi.bins_mag[-1]) \
-                                                * (color > mask.roi.bins_color[0]) \
-                                                * (color < mask.roi.bins_color[-1]))
-        
+        npixels = len(pixels)
+        nsamples = len(mass_pdf_array)
+
+        # Simple 1D cuts on mag and color. size = nsamples
+        mag_cut = (mag + distance_modulus > mask.roi.bins_mag[0]) \
+                  & (mag + distance_modulus < mask.roi.bins_mag[-1])
+        color_cut = (color > mask.roi.bins_color[0]) \
+                    & (color < mask.roi.bins_color[-1])
+        # Pre-apply these cuts to the mass_pdf_array to save time
+        mass_pdf_cut = mass_pdf_array*(mag_cut&color_cut)
+
+        # 2D on pixels and mags. Want to see if mag+mod > mask_mag for each pixel in the mask
+        # Need to create 2d array storing the output of the cut for each sample at each pixel
+        mag_1_repeat = numpy.repeat(mag_1_array,npixels).reshape(nsamples,npixels)
+        mag_2_repeat = numpy.repeat(mag_2_array,npixels).reshape(nsamples,npixels)        
+        mask_cut_repeat = (mag_1_repeat+distance_modulus < mag_1_mask) \
+                          & (mag_2_repeat+distance_modulus < mag_2_mask)
+
+        # To apply this cut to the mass_pdf_array, need to make this array 2d
+        mass_pdf_repeat = numpy.repeat(mass_pdf_cut,npixels).reshape(nsamples,npixels)
+
+        observable_fraction = (mass_pdf_repeat*mask_cut_repeat).sum(axis=0)
         return observable_fraction
 
     def normalizeWithMask(self, mask, distance_modulus, mass_steps=1000, mass_min=0.1, kernel=None, plot=False):
@@ -500,10 +518,10 @@ class CompositeIsochrone:
         mag_1_array = []
         mag_2_array = []
 
-        for ii in range(0, len(self.isochrones)):
-            mass_init_array_single, mass_pdf_array_single,  mass_act_array_single, mag_1_array_single, mag_2_array_single = self.isochrones[ii].sample(mass_steps=mass_steps, mass_min=mass_min, full_data_range=full_data_range)
+        for weight,isochrone in zip(self.weights,self.isochrones):
+            mass_init_array_single, mass_pdf_array_single,  mass_act_array_single, mag_1_array_single, mag_2_array_single = isochrone.sample(mass_steps=mass_steps, mass_min=mass_min, full_data_range=full_data_range)
             mass_init_array.append(mass_init_array_single)
-            mass_pdf_array.append(self.weights[ii] * mass_pdf_array_single)
+            mass_pdf_array.append(weight * mass_pdf_array_single)
             mass_act_array.append(mass_act_array_single)
             mag_1_array.append(mag_1_array_single)
             mag_2_array.append(mag_2_array_single)
@@ -520,28 +538,29 @@ class CompositeIsochrone:
         """
         Compute stellar mass (M_Sol) for composite stellar population. Average per star.
         """
-        sum = 0.
-        for ii in range(0, len(self.isochrones)):
-            sum += self.weights[ii] * self.isochrones[ii].stellarMass()
-        return sum
+        total = 0.
+        for weight,isochrone in zip(self.weights,self.isochrones):
+            total += weight * isochrone.stellarMass()
+        return total
 
     def stellarLuminosity(self):
         """
         Compute the stellar luminosity (L_Sol) for composite stellar population. Average per star.
         """
-        sum = 0.
-        for ii in range(0, len(self.isochrones)):
-            sum += self.weights[ii] * self.isochrones[ii].stellarLuminosity()
-        return sum
+        total = 0.
+        for weight,isochrone in zip(self.weights,self.isochrones):
+            total += weight * isochrone.stellarLuminosity()
+        return total
 
     def observableFraction(self, mask, distance_modulus):
         """
-
+        Calculated observable fraction for all isochrones.
         """
-        value = numpy.zeros(len(mask.roi.pixels))
-        for ii in range(0, len(self.isochrones)):
-            value += self.weights[ii] * self.isochrones[ii].observableFraction(mask, distance_modulus)
-        return value
+        total = []
+        for weight,isochrone in zip(self.weights,self.isochrones):
+            total.append(weight*isochrone.observableFraction(mask, distance_modulus))
+
+        return numpy.sum(total,axis=0)
 
     def simulate(self, stellar_mass, distance_modulus=0.):
         """

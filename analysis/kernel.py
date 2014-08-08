@@ -47,8 +47,11 @@ class RadialKernel(object):
         self._setup(*args)
         self.setCenter(lon,lat)
 
+    def __call__(self, radius):
+        return self.pdf(radius)
+
     def _setup(self, *args):
-        self.params = args
+        self.params = list(args)
         self.norm = 1.0
         self.norm /= self.integrate()
 
@@ -57,8 +60,10 @@ class RadialKernel(object):
         self.lat = lat
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
-    def __call__(self, radius):
-        return self.pdf(radius)
+    def setExtension(self, extension):
+        args = self.params
+        args[0] = extension
+        self._setup(*args)
 
     @abstractmethod
     def extension(self):

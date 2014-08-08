@@ -1,5 +1,5 @@
 """
-Classes to evaluate the likelihood. 
+Likelihood evaluation.
 
 Classes
     Likelihood
@@ -29,6 +29,9 @@ class Likelihood:
     def __init__(self, config, roi, mask, catalog_full, isochrone, kernel):
         """
         Object to efficiently search over a grid of ROI positions.
+
+        ADW: This should probably be renamed GridSearch or something like that
+        since we would like a pure access to the likelihood itself.
         """
 
         self.config = config
@@ -49,16 +52,17 @@ class Likelihood:
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog")
         cut_interior = numpy.in1d(ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
+        #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
         self.catalog_interior.project(self.roi.projector)
         self.catalog_interior.spatialBin(self.roi)
 
-        # ADW: Temporary hack for backcompatibility (we may not want this to be a config parameter)
-        if 'interior_roi' not in config.params['likelihood'].keys():
-            config.params['likelihood']['interior_roi'] = False
+        # ADW: Temporary hack for back compatibility (we may not want this to be a config parameter)
+        if 'interior_roi' not in self.config.params['likelihood'].keys():
+            self.config.params['likelihood']['interior_roi'] = False
 
         # Set the default catalog
-        if config.params['likelihood']['interior_roi']:
+        if self.config.params['likelihood']['interior_roi']:
             logger.info("Using interior ROI for likelihood calculation")
             self.catalog = self.catalog_interior
             self.pixel_roi_cut = self.roi.pixel_interior_cut
@@ -237,8 +241,11 @@ class Likelihood:
                     if self.roi.pixels_target[jj] != pix_coords:
                         continue
 
-                self.kernel.lon = self.roi.centers_lon_target[jj]
-                self.kernel.lat = self.roi.centers_lat_target[jj]
+
+                # ADW: So that projector is re-calculated
+                #self.kernel.lon = self.roi.centers_lon_target[jj]
+                #self.kernel.lat = self.roi.centers_lat_target[jj]
+                self.kernel.setCenter(self.roi.centers_lon_target[jj],self.roi.centers_lat_target[jj])
 
                 print '    (%i/%i) Candidate at (%.3f, %.3f) ... '%(jj, len(self.roi.pixels_target),
                                                                     self.kernel.lon, self.kernel.lat),
@@ -328,8 +335,8 @@ class Likelihood:
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
-            if coords is not None and distance_modulus_index is not None:
-                if ii != distance_modulus_index: continue
+            if distance_modulus_index is not None and ii!=distance_modulus_index:
+                continue
             
             logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len_distance_modulus, distance_modulus))
             self.u_color = self.u_color_array[ii]
@@ -337,9 +344,8 @@ class Likelihood:
 
             for jj in range(0, len_pixels_target):
                 # Specific pixel
-                if coords is not None and distance_modulus_index is not None:
-                    if self.roi.pixels_target[jj] != pix_coords:
-                        continue
+                if coords is not None and self.roi.pixels_target[jj]!=pix_coords: 
+                    continue
 
                 self.kernel.lon = lon[jj]
                 self.kernel.lat = lat[jj]
@@ -436,6 +442,8 @@ class Likelihood:
     def negativeLogLikelihood(self, richness):
         """
         Return log(likelihood) given the richness.
+
+        # DEPRICATED
         """
         p = (richness * self.u) / ((richness * self.u) + self.b)
         log_likelihood = -1. * numpy.sum(numpy.log(1. - p)) - (self.f * richness)
@@ -534,7 +542,16 @@ class Likelihood:
                          'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
 
         # Stellar Mass can be calculated from STELLAR * RICHNESS
-        header_dict = {'STELLAR': round(self.stellar_mass_conversion,8)}
+        header_dict = {
+            'STELLAR' : round(self.stellar_mass_conversion,8),
+            'LKDNSIDE': self.config.params['coords']['nside_likelihood'],
+            'LKDPIX'  : ugali.utils.projector.angToPix(self.config.params['coords']['nside_likelihood'],
+                                                       self.roi.lon,self.roi.lat),
+            'NROI'    : self.roi.inROI(self.catalog_roi.lon,self.catalog_roi.lat).sum(), 
+            'NANNULUS': self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum(), 
+            'NINSIDE' : self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat).sum(), 
+            'NTARGET' : self.roi.inTarget(self.catalog_roi.lon,self.catalog_roi.lat).sum(), 
+        }
 
         # In case there is only a single distance modulus
         if len(self.distance_modulus_array) == 1:

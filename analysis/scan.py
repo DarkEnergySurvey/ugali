@@ -24,16 +24,14 @@ from os.path import join
 
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
-import ugali.analysis.likelihood
+import ugali.analysis.grid
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.simulation.simulator
-import ugali.utils.parse_config
-import ugali.utils.skymap
+import ugali.utils.config
 
 from ugali.utils.logger import logger
 from ugali.utils.skymap import superpixel, subpixel
-
 
 ############################################################
 
@@ -42,7 +40,7 @@ class Scan:
     The base of a likelihood analysis scan.
     """
     def __init__(self, config, pix):
-        self.config = ugali.utils.parse_config.Config(config)
+        self.config = ugali.utils.config.Config(config)
         self.pix = pix
         self._setup()
 
@@ -70,9 +68,10 @@ class Scan:
         self.catalog = self.createCatalog()
         self.mask = self.createMask()
 
-        self.likelihood = ugali.analysis.likelihood.Likelihood(self.config, self.roi, 
-                                                               self.mask, self.catalog, 
-                                                               self.isochrone, self.kernel)
+        self.grid = ugali.analysis.grid.GridSearch(self.config, self.roi, 
+                                                   self.mask,self.catalog, 
+                                                   self.isochrone, self.kernel)
+        self.loglike = self.grid.loglike
 
     def createKernel(self):
         name = self.config.params['kernel']['type'].lower()
@@ -107,14 +106,14 @@ class Scan:
 
     def run(self, coords=None, debug=False):
         """
-        Run the likelihood analysis
+        Run the likelihood grid search
         """
-        self.likelihood.precomputeGridSearch(self.config.params['likelihood']['distance_modulus_array'])
-        self.likelihood.gridSearch(coords=coords)
-        return self.likelihood
+        self.grid.precompute()
+        self.grid.search()
+        return self.grid
         
     def write(self, outfile):
-        self.likelihood.write(outfile)
+        self.grid.write(outfile)
     
 if __name__ == "__main__":
     from optparse import OptionParser
