@@ -1,22 +1,22 @@
 #!/usr/bin/env python
 import os, sys
 
-from ugali.utils.parse_config import Config
+from ugali.utils.config import Config
 import ugali.preprocess.database
 
+COMPONENTS = []
 if __name__ == "__main__":
-    from optparse import OptionParser
-    usage = "Usage: %prog  [options] config.py"
-    description = "Download catalog data."
-    parser = OptionParser(usage=usage,description=description)
-    (opts, args) = parser.parse_args()
+    import argparse
+    description = "Pipeline script for database querying."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('config',help='Configuration file.')
+    parser.add_argument('-v','--verbose',action='store_true',
+                        help='Output verbosity')
+    parser.add_argument('-r','--run', default=[],
+                        action='append',choices=COMPONENTS,
+                        help="Choose analysis component to run")
+    opts = parser.parse_args()
 
-    if len(args) == 0:
-        parser.print_help()
-        sys.exit(1)
-
-    configfile = args[0]
-    config = Config(configfile)
-
+    config = Config(opts.config)
     db = databaseFactory(config)
     db.run()

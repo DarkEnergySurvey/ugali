@@ -8,35 +8,30 @@ import subprocess
 import ugali.utils.projector
 import ugali.analysis.farm
 
-from ugali.utils.parse_config import Config
+from ugali.utils.config import Config
 from ugali.utils.projector import celToGal
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 
 COMPONENTS = []
 if __name__ == "__main__":
-    from optparse import OptionParser
-    usage = "Usage: %prog  [options] input"
-    description = "python script"
-    parser = OptionParser(usage=usage,description=description)
-    parser.add_option('-t','--targets', default=None)
-    parser.add_option('-r','--run', default=[],
-                      action='append',choices=COMPONENTS,
-                      help="Choose analysis component to run")
-    parser.add_option('-v','--verbose', action='store_true')
-    parser.add_option('--debug', action='store_true')
-    parser.add_option('--local', action='store_true')
-    (opts, args) = parser.parse_args()
+    import argparse
+    description = "Pipeline script for targetted followup"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('config',help='Configuration file.')
+    parser.add_argument('-t','--targets', default=None, required=True)
+    parser.add_argument('-v','--verbose',action='store_true',
+                        help='Output verbosity')
+    parser.add_argument('-r','--run', default=[],
+                        action='append',choices=COMPONENTS,
+                        help="Choose analysis component to run")
+    parser.add_arguments('--debug', action='store_true')
+    parser.add_arguments('--local', action='store_true')
+    opts = parser.parse_args()
+
+    config = Config(opts.config)
     if not opts.run: opts.run = COMPONENTS
     if opts.verbose: logger.setLevel(logger.DEBUG)
-
-    if not opts.targets: 
-        logger.error("Targets must be specified")
-        parser.print_help()
-        raise Exception()
-
-    configfile = args[0]
-    config = Config(configfile)
 
     targets = numpy.genfromtxt(opts.targets,dtype=None)
     if not targets.shape: targets = targets.reshape(-1)
