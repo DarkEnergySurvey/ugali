@@ -77,22 +77,23 @@ Code:
 * (2a) Config file option for likelihood evaluation radius
 * (3b) Search multiple ROIs in same batch job
 * (3c) Pass 'chatter' argument to logger
-* (1b) Investigate large kernel fitting accuracy, what is largest size
+* (1b) Investigate large kernel fitting accuracy, what is largest size?
 * (3b) FNAL, Midway, SLAC config files
 * (2b) Automated data processing to get mangle masks and catalogs from DESDM
 * (2b) Merge config file with default config
+* (3b) Distinguish between 'debug' (output verbosity) and 'dryrun' (don't do anything)
+* (2b) Subclass the pipeline scripts (at least the argument parsers)
 
 Projects:
 * (2b) SVA1 data products
-* (2b) SDSS isochrones, consider updating DES isochrones
-* (2b) SDSS mask
-
+* (2b) Consider updating DES isochrones
 
 === DONE ===
 * (1c) Collector function to find peaks (in 3D)
 * (2c) Save stellar mass instead of richness?
 * (3b) Switch to new kernel
-
+* (2b) SDSS mask
+* (2b) SDSS isochrones
 
 === TEST ===
 
