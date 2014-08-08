@@ -286,13 +286,13 @@ class SDSSDatabase(Database):
 
 class DESDatabase(Database):
     ####################################
-    ### !!! NOT FULLY IMPLEMENTED !!!###
+    ###### !!! NOT IMPLEMENTED !!! #####
     ####################################
 
     def __init__(self,pixfile,release='SVA1'):
         super(DESDatabase,self).__init__()
         self.release = release.lower()
-        self.basename = "sdss_%s_photometry"%self.release
+        self.basename = "des_%s_photometry"%self.release
         self.load_pixels(pixfile)
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):

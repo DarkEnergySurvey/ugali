@@ -22,7 +22,7 @@ from ugali.utils.projector import celToGal, galToCel
 from ugali.utils.projector import angToPix, pixToAng
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
-from ugali.utils.parse_config import Config
+from ugali.utils.config import Config
 
 # http://www.adsabs.harvard.edu/abs/2002AJ....123..485S
 # Determination of magnitude limits is rather complicated.

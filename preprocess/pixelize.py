@@ -17,7 +17,7 @@ from ugali.utils.projector import celToGal, galToCel
 from ugali.utils.projector import angToPix, pixToAng
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
-from ugali.utils.parse_config import Config
+from ugali.utils.config import Config
 
 def pixelizeCatalog(infiles, config):
     """
