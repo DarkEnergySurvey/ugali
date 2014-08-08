@@ -14,7 +14,7 @@ import pylab
 import healpy
 
 import ugali.analysis.farm
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.utils.plotting
 import ugali.utils.projector
 import ugali.utils.skymap
@@ -63,7 +63,7 @@ class Collector:
         print 'Data covers %.2f deg^2'%(len(self.pixels) * self.area_pixel)
 
         if config is not None:
-            self.config = ugali.utils.parse_config.Config(config)
+            self.config = ugali.utils.config.Config(config)
             # Determine richness to stellar mass conversion from isochrone
             isochrones = []
             for ii, name in enumerate(self.config.params['isochrone']['infiles']):

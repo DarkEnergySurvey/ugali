@@ -8,7 +8,7 @@ import scipy.signal
 import pyfits
 #import pylab
 
-import ugali.utils.parse_config
+import ugali.utils.config
 import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.analysis.isochrone
@@ -31,7 +31,7 @@ def writeColorLUT2(config,
     """
 
     if type(config) == str:
-        config = ugali.utils.parse_config.Config(config)
+        config = ugali.utils.config.Config(config)
     if outfile is None:
         outfile = config.params['likelihood']['color_lut_infile']
     if isochrone is None:
@@ -192,7 +192,7 @@ def writeColorLUT(config,
     """
 
     if type(config) == str:
-        config = ugali.utils.parse_config.Config(config)
+        config = ugali.utils.config.Config(config)
     if outfile is None:
         outfile = config.params['likelihood']['color_lut_infile']
     if isochrone is None:
