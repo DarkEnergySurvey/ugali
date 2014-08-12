@@ -315,66 +315,8 @@ def distanceModulusToDistance(distance_modulus):
     return 10**((0.2 * numpy.array(distance_modulus)) - 2.)
 
 modulus2dist = distanceModulusToDistance
-
-### ############################################################
-###  
-### def pixToAng(nside, pix):
-###     """
-###     Return (lon, lat) in degrees instead of (theta, phi) in radians
-###     """
-###     theta, phi =  healpy.pix2ang(nside, pix)
-###     lon = numpy.degrees(phi)
-###     lat = 90. - numpy.degrees(theta)                    
-###     return lon, lat
-###  
-### pix2ang = pixToAng
-###  
-### def angToPix(nside, lon, lat, coord='GAL'):
-###     """
-###     Input (lon, lat) in degrees instead of (theta, phi) in radians
-###     """
-###     theta = numpy.radians(90. - lat)
-###     phi = numpy.radians(lon)
-###     return healpy.ang2pix(nside, theta, phi)
-###  
-### ang2pix = angToPix
-###  
-### def angToVec(lon, lat):
-###     vec = healpy.ang2vec(numpy.radians(90. - lat), numpy.radians(lon))
-###     return vec
-###  
-### ang2vec = angToVec
-### ############################################################
-###  
-### def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
-###     """
-###     Wrapper around healpy.query_disc to deal with old healpy implementation.
-###  
-###     nside : int
-###       The nside of the Healpix map.
-###     vec : float, sequence of 3 elements
-###       The coordinates of unit vector defining the disk center.
-###     radius : float
-###       The radius (in degrees) of the disk
-###     inclusive : bool, optional
-###       If False, return the exact set of pixels whose pixel centers lie 
-###       within the disk; if True, return all pixels that overlap with the disk,
-###       and maybe a few more. Default: False
-###     fact : int, optional
-###       Only used when inclusive=True. The overlapping test will be done at
-###       the resolution fact*nside. For NESTED ordering, fact must be a power of 2,
-###       else it can be any positive integer. Default: 4.
-###     nest: bool, optional
-###       if True, assume NESTED pixel ordering, otherwise, RING pixel ordering
-###  
-###     """
-###     try: 
-###         # New-style call (healpy 1.6.3)
-###         return healpy.query_disc(nside, vec, numpy.radians(radius), inclusive, fact, nest)
-###     except: 
-###         # Old-style call (healpy 0.10.2)
-###         return healpy.query_disc(nside, vec, numpy.radians(radius), nest, deg=False)
                           
+############################################################
     
 def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):
     """

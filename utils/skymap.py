@@ -13,26 +13,6 @@ import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
 from ugali.utils.logger import logger
 
-### ############################################################
-###  
-### def superpixel(subpix, nside_subpix, nside_superpix):
-###     """
-###     Return the indices of the super-pixels which contain each of the sub-pixels.
-###     """
-###     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
-###     return healpy.ang2pix(nside_superpix, theta, phi)
-###  
-### def subpixel(superpix, nside_superpix, nside_subpix):
-###     """
-###     Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
-###     """
-###     vec = healpy.pix2vec(nside_superpix, superpix)
-###     radius = numpy.degrees(2. * healpy.max_pixrad(nside_superpix))
-###     subpix = query_disc(nside_subpix, vec, radius)
-###     pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
-###     # Might be able to speed up array indexing...
-###     return subpix[pix_for_subpix == superpix]
-
 ############################################################
 
 def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
