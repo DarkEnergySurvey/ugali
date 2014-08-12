@@ -12,15 +12,10 @@ Functions:
 
 import os
 import sys
+
 import numpy
-import subprocess
-import time
-import getpass
-
+import numpy as np
 import pyfits
-import healpy
-
-from os.path import join
 
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
@@ -31,7 +26,7 @@ import ugali.simulation.simulator
 import ugali.utils.config
 
 from ugali.utils.logger import logger
-from ugali.utils.skymap import superpixel, subpixel
+from ugali.utils.healpix import superpixel, subpixel, pix2ang
 
 ############################################################
 
@@ -54,8 +49,7 @@ class Scan:
         # ADW: Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
 
-        theta, phi =  healpy.pix2ang(self.nside_likelihood, self.pix)
-        self.lon, self.lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
+        self.lon, self.lat = pix2ang(self.nside_likelihood, self.pix)
 
         self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
         # All possible catalog pixels spanned by the ROI
@@ -131,5 +125,5 @@ if __name__ == "__main__":
     outfile = args[2]
     scan = Scan(config,pix)
     if not opts.debug:
-        scan.run()
+        result = scan.run()
         scan.write(outfile)

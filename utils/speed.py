@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import time
 
-def speedtest(func, *args):
+def speedtest(func, *args, **kwargs):
     """ Test the speed of a function. """
     n = 100
     start = time.time()
-    for i in range(n): func(*args)
+    for i in range(n): func(*args,**kwargs)
     end = time.time()
     return (end-start)/n
 

@@ -44,8 +44,7 @@ import ugali.utils.shell
 class Farm:
     def __init__(self, configfile):
         self.configfile = configfile
-        self.configfile_queue = configfile
-        self.config = ugali.utils.config.Config(self.configfile)
+        self.config = ugali.utils.config.Config(configfile)
         self._setup()
 
     def _setup(self):
@@ -193,7 +192,7 @@ class Farm:
         # Only write the configfile once
         outdir = ugali.utils.shell.mkdir(self.config.params['output']['savedir_likelihood'])
         configfile = '%s/config_queue.py'%(outdir)
-        self.config.writeConfig(configfile)
+        self.config.write(configfile)
 
         pixels = pixels[inside]
         lon,lat = pix2ang(self.nside_likelihood,pixels)
@@ -218,7 +217,7 @@ class Farm:
                 configfile = self.configfile
             else:
                 configfile = '%s/config_queue.py'%(outdir)
-                self.config.writeConfig(configfile)
+                self.config.write(configfile)
                 
         lon,lat = pix2ang(self.nside_likelihood,pixels)
         n_query_points = healpy.nside2npix(self.nside_pixel)/healpy.nside2npix(self.nside_likelihood)
@@ -286,39 +285,40 @@ class Farm:
                 #break
 
 if __name__ == "__main__":
-    from optparse import OptionParser
-    usage = "Usage: %prog  [options] config"
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+
     description = "Script housing the setup and execution of the likelihood scan."
-    parser = OptionParser(usage=usage,description=description)
-    parser.add_option('-l','--glon',default=None,type='float',
+    parser = ArgumentParser(description=description,
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('config',metavar='config.py',help='Configuration file.')
+    parser.add_argument('-l','--glon',default=None,type=float,
                       help='Galactic longitude of target')
-    parser.add_option('-b','--glat',default=None,type='float',
+    parser.add_argument('-b','--glat',default=None,type=float,
                       help='Galactic latitude of target')
-    parser.add_option('-r','--ra',default=None,type='float',
+    parser.add_argument('--ra',default=None,type=float,
                       help="RA of target")
-    parser.add_option('-d','--dec',default=None,type='float',
+    parser.add_argument('--dec',default=None,type=float,
                       help="DEC of target")
-    parser.add_option('-p','--pix',default=None,type='int',
-                      help="HEALPix pixel of target (Galactic coordinates)")
-    parser.add_option('-n','--nside',default=2**8,type='int',
+    parser.add_argument('--nside',default=2**8,type=int,
                       help="HEALPix nside of target pixel")
-    parser.add_option('--radius',default=0,type='float',
+    parser.add_argument('--pix',default=None,type=int,
+                      help="HEALPix pixel of target (Galactic coordinates)")
+    parser.add_argument('--radius',default=0,type=float,
                       help="Radius surrounding specified coordinates")
-    parser.add_option('-t','--targets',default=None,type='str',
+    parser.add_argument('-t','--targets',default=None,
                       help="List of target coordinates")
-    parser.add_option('--local',action='store_true',
+    parser.add_argument('--local',action='store_true',
                       help="Run locally")
-    parser.add_option('--debug',action='store_true',
+    parser.add_argument('--debug',action='store_true',
                       help="Setup, but don't run")
-    (opts, args) = parser.parse_args()
+    opts = parser.parse_args()
 
     if opts.glon is not None and (opts.ra is not None or opts.pix is not None):
         logger.error("Only one coordinate type allowed")
         parser.print_help()
         sys.exit(1)
 
-    config = args[0]
-    farm = Farm(config)
+    farm = Farm(opts.config)
 
     coords = None
     if opts.glon is not None and opts.glat is not None:

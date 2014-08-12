@@ -12,9 +12,37 @@ from ugali.utils.projector import modulus2dist,dist2modulus
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
 
+class Parmater(object):
+    def __init__(self, value, bounds=None, **kwargs):
+        self.value = value
+        self.bounds = None
+        self.set_bounds(bounds)
+
+    def __call__(self):
+        return self.value
+
+    def set_bounds(self, bounds):
+        if bounds is None: return
+        else: self.bounds = bounds
+
+    def set_value(self, value):
+        if self.bounds is None:
+            pass
+        elif not (self.bounds[0]<=value<=self.bounds[1]):
+            message="Value outside bounds: %.2g [%.2g,%.2g]"%(value,self.bounds[0],bounds[1])
+            raise ValueError(message)
+        self.value = value
+
+    def set(self, value, bounds=None):
+        self.set_bounds(bounds)
+        self.set_value(value)
+        
 class LogLikelihood(object):
 
     def __init__(self, config, roi, mask, catalog, isochrone=None, kernel=None):
+        self.params = ['isochrone','kernel','richness','lon','lat',
+                       'distance_modulus','extension']
+
         self.do_color = True
         self.do_spatial = True
         self.do_fraction = True
@@ -94,11 +122,9 @@ class LogLikelihood(object):
         return self.isochrone.stellarMass()
 
     def set_params(self,**kwargs):
-        params=['isochrone','kernel','richness','lon','lat',
-                'distance_modulus','extension']
         for k in kwargs.keys():
-            if k not in params:
-                raise KeyError("Parameter %s not found.")
+            if k not in self.params:
+                raise KeyError("Parameter %s not found."%k)
 
         self.set_isochrone(kwargs.get('isochrone'))
         self.set_kernel(kwargs.get('kernel'))
@@ -115,8 +141,14 @@ class LogLikelihood(object):
         if self.do_fraction: self.set_observable_fraction(observable_fraction)
         if self.do_color:    self.set_signal_color(u_color)
         if self.do_spatial:  self.set_signal_spatial(u_spatial)
-        if self.do_color or self.do_spatial:
-            self.u = self.u_spatial * self.u_color
+
+        # Combined object-by-object signal probability
+        self.u = self.u_spatial * self.u_color
+
+        # Observable fraction requires update if isochrone changed
+        # Fraction calculated over interior region
+        self.f = self.roi.area_pixel * \
+                 (self.surface_intensity_sparse*self.observable_fraction).sum()
 
         self.do_color = False
         self.do_spatial = False
@@ -134,10 +166,10 @@ class LogLikelihood(object):
         if (lon is None) and (lat is None): return
         if lon is not None: self.lon = lon
         if lat is not None: self.lat = lat
-        theta = numpy.radians(90. - self.lat)
-        phi = numpy.radians(self.lon)
         nside = self.config.params['coords']['nside_pixel']
-        pixel = healpy.ang2pix(nside, theta, phi)
+        pixel = ang2pix(nside,lon,lat)
+        if pixel not in self.roi.pixels_target:
+            raise ValueError("Coordinate outside target area.")
         self.pixel = pixel
         self.do_spatial=True
 
@@ -156,7 +188,7 @@ class LogLikelihood(object):
         # Should add equality check (needs kernel.__equ__) 
         if kernel is None: return
         self.kernel = kernel
-        self.do_color=True
+        #self.do_color=True
         self.do_spatial=True
 
     def set_isochrone(self,isochrone):
@@ -164,7 +196,6 @@ class LogLikelihood(object):
         if isochrone is None: return
         self.isochrone = isochrone
         self.do_color=True
-        self.do_spatial=True
         self.do_fraction=True
 
     def set_signal_color(self,u_color=None,**kwargs):
@@ -211,7 +242,6 @@ class LogLikelihood(object):
         """
         Compute signal color probability (u_color) for each catalog object on the fly.
         """
-        
         # Isochrone will be binned in next step, so can sample many points efficiently
         isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.isochrone.sample(mass_steps=mass_steps)
 
@@ -221,6 +251,8 @@ class LogLikelihood(object):
         bins_mag_2 = numpy.arange(distance_modulus + numpy.min(isochrone_mag_2) - (0.5 * self.delta_mag),
                                   distance_modulus + numpy.max(isochrone_mag_2) + (0.5 * self.delta_mag),
                                   self.delta_mag)        
+
+
         histo_isochrone_pdf = numpy.histogram2d(distance_modulus + isochrone_mag_1,
                                                 distance_modulus + isochrone_mag_2,
                                                 bins=[bins_mag_1, bins_mag_2],
@@ -243,18 +275,23 @@ class LogLikelihood(object):
         n_isochrone_bins = len(index_mag_1)
         ones = numpy.ones([n_catalog, n_isochrone_bins])
 
+        mag_1_reshape = self.catalog.mag_1.reshape([n_catalog, 1])
+        mag_err_1_reshape = self.catalog.mag_err_1.reshape([n_catalog, 1])
+        mag_2_reshape = self.catalog.mag_2.reshape([n_catalog, 1])
+        mag_err_2_reshape = self.catalog.mag_err_2.reshape([n_catalog, 1])
+
         # Calculate distance between each catalog object and isochrone bin
         # Assume normally distributed photometry uncertainties
-        delta_mag_1_hi = (self.catalog.mag_1.reshape([n_catalog, 1]) * ones) - (bins_mag_1[index_mag_1] * ones)
-        arg_mag_1_hi = delta_mag_1_hi / (self.catalog.mag_err_1.reshape([n_catalog, 1]) * ones)
-        delta_mag_1_lo = (self.catalog.mag_1.reshape([n_catalog, 1]) * ones) - (bins_mag_1[index_mag_1 + 1] * ones)
-        arg_mag_1_lo = delta_mag_1_lo / (self.catalog.mag_err_1.reshape([n_catalog, 1]) * ones)
+        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
+        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
+        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
+        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
         #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
 
-        delta_mag_2_hi = (self.catalog.mag_2.reshape([n_catalog, 1]) * ones) - (bins_mag_2[index_mag_2] * ones)
-        arg_mag_2_hi = delta_mag_2_hi / (self.catalog.mag_err_2.reshape([n_catalog, 1]) * ones)
-        delta_mag_2_lo = (self.catalog.mag_2.reshape([n_catalog, 1]) * ones) - (bins_mag_2[index_mag_2 + 1] * ones)
-        arg_mag_2_lo = delta_mag_2_lo / (self.catalog.mag_err_2.reshape([n_catalog, 1]) * ones)
+        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
+        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
+        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
+        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
         #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
 
         # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
@@ -292,17 +329,11 @@ class LogLikelihood(object):
         self.angsep_object = self.angsep_sparse[pixel_roi_index] # deg
 
         # Surface intensity calculated over region covered by angsep
-        surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
-        surface_intensity_object = surface_intensity_sparse[pixel_roi_index]
+        self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+        self.surface_intensity_object = self.surface_intensity_sparse[pixel_roi_index]
         
         # Spatial component of signal probability
-        u_spatial = self.roi.area_pixel * surface_intensity_object
-        
-        # Observable fraction requires update if isochrone changed
-        # Fraction calculated over interior region
-        self.f = self.roi.area_pixel*numpy.sum(
-            surface_intensity_sparse*self.observable_fraction)
-
+        u_spatial = self.roi.area_pixel * self.surface_intensity_object
         return u_spatial
 
     ################################################################################

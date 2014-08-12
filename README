@@ -5,11 +5,8 @@ classes and functions used to search for ultra-faint satellite
 galaxies of the Milky Way using the stellar object samples 
 derived from optical photometric surveys.
 
-Keith Bechtol
-bechtol@kicp.uchicago.edu
-
-Alex Drlica-Wagner
-kadrlica@fnal.gov
+Keith Bechtol      <bechtol@kicp.uchicago.edu>
+Alex Drlica-Wagner <kadrlica@fnal.gov>
 
 === USAGE EXAMPLES ===
 
@@ -27,10 +24,16 @@ scipy
 pyfits - http://www.stsci.edu/institute/software_hardware/pyfits
 healpy - https://github.com/healpy/healpy
 
+yaml - http://pyyaml.org/
+
 Mangle:
 Not a strict dependency. Used to interface with masks produced by
 the Dark Energy Survey Data Mangement group. Download and documentation 
 available at http://space.mit.edu/~molly/mangle/
+
+*** Coming soon
+astropy - 
+emcee - 
 
 Isochrones:
 Currently set up to use isochrones in the format produced by Leo Girardi's (Padova)
@@ -55,6 +58,7 @@ CMD: color-magnitude diagram
 ROI: region of interest
 PDF: probability distribution function
 LUT: look-up table
+LKHD: likelihood
 
 === TODO ===
 
@@ -83,6 +87,7 @@ Code:
 * (2b) Merge config file with default config
 * (3b) Distinguish between 'debug' (output verbosity) and 'dryrun' (don't do anything)
 * (2b) Subclass the pipeline scripts (at least the argument parsers)
+* (2b) Switch to astropy for coordinate conversion, etc.
 
 Projects:
 * (2b) SVA1 data products
@@ -94,6 +99,7 @@ Projects:
 * (3b) Switch to new kernel
 * (2b) SDSS mask
 * (2b) SDSS isochrones
+* (2b) Have config read yaml files
 
 === TEST ===
 

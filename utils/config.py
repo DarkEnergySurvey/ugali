@@ -1,5 +1,7 @@
 """
 Class for storing and updating config dictionaries.
+
+ADW: Can't we get rid of the 'params' member and just subclass dict?
 """
 import os
 import pprint
@@ -11,81 +13,66 @@ import healpy
 from ugali.utils.logger import logger
 import ugali.utils.config # To recognize own type
 
-############################################################
+try: import yaml
+except ImportError: logger.warning("YAML not found")
 
-class Config(object):
+class Config(dict):
     """
-    Documentation.
+    Configuration object
     """
 
-    def __init__(self, input = None):
+    def __init__(self, input, default=None):
         """
-        Initialize the Config object with a variety of possible input formats.
+        Initialize a configuration object from a filename or a dictionary.
+        Provides functionality to merge with a default configuration.
 
-        INPUTS:
-            input[None]: can be a filename, parameter dictionary, or another Config object
+        Parameters:
+          input:   Either filename or dictionary
+          default: Default configuration to merge
+        
+        Returns:
+          config
         """
-        if type(input) is str:
-            reader = open(input)
-            self.params = eval(''.join(reader.readlines()))
-            reader.close()
-        elif type(input) is dict:
-            self.params = input
-        elif type(input) is ugali.utils.config.Config:
-            self.params = input.params
-        else:
-            self.params = {}
+        self.update(self._load(default))
+        self.update(self._load(input))
+
+        # For back-compatibility...
+        self.params = self
 
         # Possible filenames from this config (masked by existence)
         self.filenames = self.getFilenames()
 
-    def merge(self, merge, overwrite = False):
-        """
-        Update parameters from a second param dictionary or Config object.
-
-        INPUTS
-            merge: a second param dictionary or Config object
-            overwrite[False]: overwrite the parameter dictionary
-        RETURNS
-            merged parameter dictionary
-        """
-        if type(merge) is dict:
-            params = self._mergeParams(merge)
-        elif type(merge) is ugali.utils.config.Config:
-            params = self._mergeParams(merge.params)
-        elif merge is None:
-            params = self.params
+    def _load(self, input):
+        if isinstance(input, basestring):
+            ext = os.path.splitext(input)[1]
+            if ext == '.py':
+                reader = open(input)
+                params = eval(''.join(reader.readlines()))
+                reader.close()
+            elif ext == '.yaml':
+                params = yaml.load(open(input))
+            else:
+                raise Exception('Unrecognized config format: %s'%ext)
+        elif isinstance(input, dict):
+            params = input
+        elif input is None:
+            params = {}
         else:
-            print 'WARNING: did not recognize %s'%(type(merge))
-            params = self.params
-
-        if overwrite:
-            self.params = params
+            raise Exception('Unrecognized input')
 
         return params
-    
-    def writeConfig(self, config_outfile):
-        writer = open(config_outfile, 'w')
-        writer.write(pprint.pformat(self.params))
+
+    def write(self, outfile):
+        ext = os.path.splitext(outfile)[1]
+        writer = open(outfile, 'w')
+        if ext == '.py':
+            writer.write(pprint.pformat(self.params))
+        elif ext == '.yaml':
+            writer.write(yaml.dump(self.params))
+        else:
+            writer.close()
+            raise Exception('Unrecognized config format: %s'%ext)
         writer.close()
-
-    def show(self):
-        print pprint.pformat(self.params)
-
-    def _mergeParams(self, params_update):
-        """
-        Helper function to merge parameters from two dictionaries.
-        """
-        params_merge = copy.copy(self.params)
-        
-        for section in params_update.keys():
-            if section not in params_merge.keys():
-                params_merge[section] = {}
-                if type(params_update[section]) is dict:
-                    for key in params_update[section].keys():
-                        params_merge[section][key] = params_update[section][key]
-                        
-        return params_merge
 
     def getFilenames(self,pixels=None):
         """
@@ -117,6 +104,8 @@ class Config(object):
         else:
             pixels = numpy.arange(healpy.nside2npix(nside_catalog))   
 
+        npix = len(pixels)
+
         catalog_dir = self.params['catalog']['dirname']
         catalog_base = self.params['catalog']['basename']
          
@@ -124,10 +113,10 @@ class Config(object):
         mask_base_1 = self.params['mask']['basename_1']
         mask_base_2 = self.params['mask']['basename_2']
          
-        data = numpy.ma.empty(len(pixels), dtype=[('pix', int),('catalog', object), 
-                                                       ('mask_1', object),('mask_2', object)])
-        mask = numpy.ma.empty(len(pixels), dtype=[('pix', bool),('catalog', bool), 
-                                                       ('mask_1', bool),('mask_2', bool)])
+        data = numpy.ma.empty(npix,dtype=[('pix',int), ('catalog',object), 
+                                          ('mask_1',object), ('mask_2',object)])
+        mask = numpy.ma.empty(npix,dtype=[('pix',bool), ('catalog',bool), 
+                                          ('mask_1',bool), ('mask_2',bool)])
         for ii,pix in enumerate(pixels):
             if pix is None:
                 catalog = os.path.join(catalog_dir,catalog_base)

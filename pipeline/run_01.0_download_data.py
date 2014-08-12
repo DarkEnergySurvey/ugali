@@ -1,9 +1,20 @@
 #!/usr/bin/env python
-import os, sys
+from ugali.analysis.pipeline import Pipeline
+from ugali.preprocess.database import databaseFactory
 
-from ugali.utils.config import Config
-import ugali.preprocess.database
+description="Download data from database."
+components = []
 
+def run(self):
+    db = databaseFactory(self.config)
+    db.run()
+
+Pipeline.run = run
+pipeline = Pipeline(description,components)
+pipeline.parse_args()
+pipeline.execute()
+
+"""
 COMPONENTS = []
 if __name__ == "__main__":
     import argparse
@@ -20,3 +31,4 @@ if __name__ == "__main__":
     config = Config(opts.config)
     db = databaseFactory(config)
     db.run()
+"""

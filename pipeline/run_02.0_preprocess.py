@@ -4,10 +4,40 @@ import glob
 
 import ugali.preprocess.pixelize
 import ugali.preprocess.maglims
-from ugali.utils.config import Config
 
 from ugali.utils.logger import logger
 
+components = ['pixelize','density','maglims','simple']
+description="Pipeline script for data pre-processing."
+
+def run(self):
+    if 'pixelize' in self.opts.run:
+        # Pixelize the raw catalog data
+        logger.info("Running 'pixelize'...")
+        rawdir = config.params['data']['dirname']
+        rawfiles = sorted(glob.glob(os.path.join(rawdir,'*.fits')))
+        x = ugali.preprocess.pixelize.pixelizeCatalog(rawfiles,config)
+    if 'density' in self.opts.run:
+        # Calculate magnitude limits
+        logger.info("Running 'density'...")
+        x = ugali.preprocess.pixelize.pixelizeDensity(config,nside=2**9)
+    if 'maglims' in self.opts.run:
+        # Calculate magnitude limits
+        logger.info("Running 'maglims'...")
+        maglims = ugali.preprocess.maglims.Maglims(config)
+        x = maglims.run()
+    if 'simple' in self.opts.run:
+        # Calculate simple magnitude limits
+        logger.info("Running 'simple'...")
+        ugali.preprocess.maglims.simple_maglims(config)
+
+Pipeline.run = run
+pipeline = Pipeline(description,components)
+pipeline.parse_args()
+pipeline.execute()
+
+
+"""
 COMPONENTS = ['pixelize','density','maglims','simple']
 if __name__ == "__main__":
     import argparse
@@ -44,3 +74,4 @@ if __name__ == "__main__":
         # Calculate simple magnitude limits
         logger.info("Running 'simple'...")
         ugali.preprocess.maglims.simple_maglims(config)
+"""
