@@ -4,45 +4,142 @@ import numpy as np
 import healpy
 import healpy as hp
 import scipy.stats
+from collections import OrderedDict as odict
 
 import ugali.utils.binning
 import ugali.utils.parabola
 
-from ugali.utils.projector import modulus2dist,dist2modulus
+from ugali.utils.projector import modulus2dist,dist2modulus,angsep
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
 
-class Parmater(object):
-    def __init__(self, value, bounds=None, **kwargs):
-        self.value = value
-        self.bounds = None
-        self.set_bounds(bounds)
 
-    def __call__(self):
-        return self.value
+class Parameter(object):
+    """
+    Parameter class for storing value and bounds.
+
+    Adapted from MutableNum from https://gist.github.com/jheiv/6656349
+    """
+    __value__ = None
+    __bounds__ = None
+    def __init__(self, value, bounds=None): self.set(value,bounds)
+
+    # Comparison Methods
+    def __eq__(self, x):        return self.__value__ == x
+    def __ne__(self, x):        return self.__value__ != x
+    def __lt__(self, x):        return self.__value__ <  x
+    def __gt__(self, x):        return self.__value__ >  x
+    def __le__(self, x):        return self.__value__ <= x
+    def __ge__(self, x):        return self.__value__ >= x
+    def __cmp__(self, x):       return 0 if self.__value__ == x else 1 if self.__value__ > 0 else -1
+    # Unary Ops
+    def __pos__(self):          return +self.__value__
+    def __neg__(self):          return -self.__value__
+    def __abs__(self):          return abs(self.__value__)
+    # Bitwise Unary Ops
+    def __invert__(self):       return ~self.__value__
+    # Arithmetic Binary Ops
+    def __add__(self, x):       return self.__value__ + x
+    def __sub__(self, x):       return self.__value__ - x
+    def __mul__(self, x):       return self.__value__ * x
+    def __div__(self, x):       return self.__value__ / x
+    def __mod__(self, x):       return self.__value__ % x
+    def __pow__(self, x):       return self.__value__ ** x
+    def __floordiv__(self, x):  return self.__value__ // x
+    def __divmod__(self, x):    return divmod(self.__value__, x)
+    def __truediv__(self, x):   return self.__value__.__truediv__(x)
+    # Reflected Arithmetic Binary Ops
+    def __radd__(self, x):      return x + self.__value__
+    def __rsub__(self, x):      return x - self.__value__
+    def __rmul__(self, x):      return x * self.__value__
+    def __rdiv__(self, x):      return x / self.__value__
+    def __rmod__(self, x):      return x % self.__value__
+    def __rpow__(self, x):      return x ** self.__value__
+    def __rfloordiv__(self, x): return x // self.__value__
+    def __rdivmod__(self, x):   return divmod(x, self.__value__)
+    def __rtruediv__(self, x):  return x.__truediv__(self.__value__)
+    # Bitwise Binary Ops
+    def __and__(self, x):       return self.__value__ & x
+    def __or__(self, x):        return self.__value__ | x
+    def __xor__(self, x):       return self.__value__ ^ x
+    def __lshift__(self, x):    return self.__value__ << x
+    def __rshift__(self, x):    return self.__value__ >> x
+    # Reflected Bitwise Binary Ops
+    def __rand__(self, x):      return x & self.__value__
+    def __ror__(self, x):       return x | self.__value__
+    def __rxor__(self, x):      return x ^ self.__value__
+    def __rlshift__(self, x):   return x << self.__value__
+    def __rrshift__(self, x):   return x >> self.__value__
+    # Compound Assignment
+    def __iadd__(self, x):      self.set(self + x); return self
+    def __isub__(self, x):      self.set(self - x); return self
+    def __imul__(self, x):      self.set(self * x); return self
+    def __idiv__(self, x):      self.set(self / x); return self
+    def __imod__(self, x):      self.set(self % x); return self
+    def __ipow__(self, x):      self.set(self **x); return self
+    # Casts
+    def __nonzero__(self):      return self.__value__ != 0
+    def __int__(self):          return self.__value__.__int__()    
+    def __float__(self):        return self.__value__.__float__()  
+    def __long__(self):         return self.__value__.__long__()   
+    # Conversions
+    def __oct__(self):          return self.__value__.__oct__()    
+    def __hex__(self):          return self.__value__.__hex__()    
+    def __str__(self):          return self.__value__.__str__()    
+    # Random Ops
+    def __index__(self):        return self.__value__.__index__()  
+    def __trunc__(self):        return self.__value__.__trunc__()  
+    def __coerce__(self, x):    return self.__value__.__coerce__(x)
+    # Represenation
+    def __repr__(self):         return "%s(%s)" % (self.__class__.__name__, self.__value__)
+    # Return the type of the inner value
+    def innertype(self):        return type(self.__value__)
+
+    @property
+    def bounds(self):
+        return self.__bounds__
+
+    @property
+    def value(self):
+        return self.__value__
 
     def set_bounds(self, bounds):
         if bounds is None: return
-        else: self.bounds = bounds
+        else: self.__bounds__ = bounds
+
+    def check_bounds(self, value):
+        if self.__bounds__ is None:
+            return
+        if not (self.__bounds__[0] <= value <= self.__bounds__[1]):
+            msg="Value outside bounds: %.2g [%.2g,%.2g]"
+            msg=msg%(value,self.__bounds__[0],self.__bounds__[1])
+            raise ValueError(msg)
 
     def set_value(self, value):
-        if self.bounds is None:
-            pass
-        elif not (self.bounds[0]<=value<=self.bounds[1]):
-            message="Value outside bounds: %.2g [%.2g,%.2g]"%(value,self.bounds[0],bounds[1])
-            raise ValueError(message)
-        self.value = value
+        self.check_bounds(value)
+        if   isinstance(value, (int, long, float)): self.__value__ = value
+        elif isinstance(value, self.__class__): self.__value__ = value.__value__
+        else: raise TypeError("Numeric type required")
 
     def set(self, value, bounds=None):
         self.set_bounds(bounds)
         self.set_value(value)
+
+class Prior(object):
+    def __init__(self):
+        pass
         
 class LogLikelihood(object):
+    # Default parameters of the likelihood model
+    params = odict([
+        ('richness',         Parameter(0.0, [0.0,np.inf])),
+        ('lon',              Parameter(0.0, [0.0,360.])),
+        ('lat',              Parameter(0.0, [-90.,90.])),
+        ('distance_modulus', Parameter(0.0, [0.0,25.])),
+        ('extension',        Parameter(0.0, [0.0,5.0])),
+        ])
 
     def __init__(self, config, roi, mask, catalog, isochrone=None, kernel=None):
-        self.params = ['isochrone','kernel','richness','lon','lat',
-                       'distance_modulus','extension']
-
         self.do_color = True
         self.do_spatial = True
         self.do_fraction = True
@@ -51,9 +148,9 @@ class LogLikelihood(object):
         self.roi = roi
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
-        self.set_params(isochrone=isochrone,kernel=kernel)
-        #self.isochrone = self.set_isochrone(isochrone)
-        #self.kernel = self.set_kernel(kernel)
+        #self.set_params(isochrone=isochrone,kernel=kernel)
+        self.set_isochrone(isochrone)
+        self.set_kernel(kernel)
 
         self.catalog_full = catalog
         self.clip_catalog()
@@ -62,13 +159,35 @@ class LogLikelihood(object):
         # ADW: Should probably be in config file
         self.delta_mag = 0.03 # 1.e-3 
 
-        self.precompute()
+        self.calc_background()
 
     def __call__(self):
         # self.p is the signal probability for each object
         self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
+        # self.f * self.richness is the total model predicted counts
         return -1. * numpy.sum(numpy.log(1. - self.p)) - (self.f * self.richness)
+        
+    def __setattr__(self, name, value):
+        if name in self.params:
+            self.params[name].set_value(value)
+        else:
+            return object.__setattr__(self, name, value)
+        
+    def __getattr__(self,name):
+        # __getattr__ first tries the usual places first.
+        # The call to object.__getattribute__ at the end is just for
+        # the AttributeError message
+        if name in self.params:
+            return self.params[name]
+        else:
+            return object.__getattribute__(self,name)
 
+    @property
+    def pixel(self):
+        nside = self.config.params['coords']['nside_pixel']
+        pixel = ang2pix(nside,float(self.lon),float(self.lat))
+        return pixel
+    
     def value(self,**kwargs):
         """
         Evaluate the log-likelihood at the given input parameter values
@@ -77,57 +196,18 @@ class LogLikelihood(object):
         self.sync_params()
         return self()
 
-    def clip_catalog(self):
-        # ROI-specific catalog
-        logger.debug("Clipping full catalog...")
-        cut_observable = self.mask.restrictCatalogToObservableSpace(self.catalog_full)
-
-        # All objects within disk ROI
-        logger.debug("Creating roi catalog...")
-        self.catalog_roi = self.catalog_full.applyCut(cut_observable)
-        self.catalog_roi.project(self.roi.projector)
-        self.catalog_roi.spatialBin(self.roi)
-
-        # All objects interior to the background annulus
-        logger.debug("Creating interior catalog...")
-        cut_interior = numpy.in1d(ang2pix(self.config.params['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
-        #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
-        self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
-        self.catalog_interior.project(self.roi.projector)
-        self.catalog_interior.spatialBin(self.roi)
-
-        # Set the default catalog
-        logger.info("Using interior ROI for likelihood calculation")
-        self.catalog = self.catalog_interior
-        #self.pixel_roi_cut = self.roi.pixel_interior_cut
-
-    def precompute(self):
-        logger.info('Calculating angular separation ...')
-        #self.roi.precomputeAngsep()
-        self.angsep = self.calc_angsep()
-
-        #ADW: At some point we may want to make the background level and
-        # fittable parameter.
-        logger.info('Calculating background CMD ...')
-        self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
-
-        # Background density (deg^-2 mag^-2) and background probability for each object
-        logger.info('Calculating background probabilities ...')
-        b_density = ugali.utils.binning.take2D(self.cmd_background,
-                                               self.catalog.color, self.catalog.mag,
-                                               self.roi.bins_color, self.roi.bins_mag)
-        self.b = b_density * self.roi.area_pixel * self.delta_mag**2
-
-    def stellar_mass(self):
-        return self.isochrone.stellarMass()
+    ################################################################################
+    # Methods for setting model parameters
+    ################################################################################
 
     def set_params(self,**kwargs):
         for k in kwargs.keys():
             if k not in self.params:
                 raise KeyError("Parameter %s not found."%k)
 
-        self.set_isochrone(kwargs.get('isochrone'))
-        self.set_kernel(kwargs.get('kernel'))
+        # ADW: At some point, maybe...
+        #self.set_isochrone(kwargs.get('isochrone'))
+        #self.set_kernel(kwargs.get('kernel'))
 
         self.set_richness(kwargs.get('richness'))
 
@@ -138,6 +218,9 @@ class LogLikelihood(object):
         self.set_extension(kwargs.get('extension'))
 
     def sync_params(self,u_color=None,u_spatial=None,observable_fraction=None):
+        # The sync_params step updates internal quantities based on
+        # newly set parameters. The goal is to only update required quantities
+        # to keep computational time low.
         if self.do_fraction: self.set_observable_fraction(observable_fraction)
         if self.do_color:    self.set_signal_color(u_color)
         if self.do_spatial:  self.set_signal_spatial(u_spatial)
@@ -154,10 +237,6 @@ class LogLikelihood(object):
         self.do_spatial = False
         self.do_fraction = False
 
-    ################################################################################
-    # Methods for setting model parameters
-    ################################################################################
-
     def set_richness(self,richness):
         if richness is None: return
         self.richness = richness
@@ -165,12 +244,13 @@ class LogLikelihood(object):
     def set_coords(self,lon,lat):
         if (lon is None) and (lat is None): return
         if lon is not None: self.lon = lon
-        if lat is not None: self.lat = lat
-        nside = self.config.params['coords']['nside_pixel']
-        pixel = ang2pix(nside,lon,lat)
-        if pixel not in self.roi.pixels_target:
-            raise ValueError("Coordinate outside target area.")
-        self.pixel = pixel
+        if lat is not None: self.lat = lat 
+
+        if self.pixel not in self.roi.pixels_interior:
+            # ADW: Raising this exception is not strictly necessary, 
+            # but at least a warning should be printed if target outside of region.
+            raise ValueError("Coordinate outside interior ROI.")
+
         self.do_spatial=True
 
     def set_distance_modulus(self,distance_modulus):
@@ -180,7 +260,7 @@ class LogLikelihood(object):
         self.do_fraction=True
 
     def set_extension(self,extension):
-        if extension is None or extension==kernel.extension(): return
+        if extension is None: return
         self.kernel.setExtension(extension)
         self.do_spatial=True
 
@@ -188,7 +268,6 @@ class LogLikelihood(object):
         # Should add equality check (needs kernel.__equ__) 
         if kernel is None: return
         self.kernel = kernel
-        #self.do_color=True
         self.do_spatial=True
 
     def set_isochrone(self,isochrone):
@@ -221,21 +300,55 @@ class LogLikelihood(object):
     # Methods for calculating observation quantities
     ################################################################################
 
-    def calc_angsep(self):
-        """
-        Calculate the angular separation between each pixel in the target region
-        and each pixel in the interior region (where the likelihood is calculated).
-        """
-        nside = self.config.params['coords']['nside_pixel']
-        target_lon,target_lat = pix2ang(nside,self.roi.pixels_target)
-        interior_lon,interior_lat = pix2ang(nside,self.roi.pixels_interior)
-        angsep = []
-        for ii in range(0, len(self.roi.pixels_target)):
-            angsep.append(ugali.utils.projector.angsep(target_lon[ii],target_lat[ii],
-                                                       interior_lon,interior_lat))
-        return angsep
+    def clip_catalog(self):
+        # ROI-specific catalog
+        logger.debug("Clipping full catalog...")
+        cut_observable = self.mask.restrictCatalogToObservableSpace(self.catalog_full)
+
+        # All objects within disk ROI
+        logger.debug("Creating roi catalog...")
+        self.catalog_roi = self.catalog_full.applyCut(cut_observable)
+        self.catalog_roi.project(self.roi.projector)
+        self.catalog_roi.spatialBin(self.roi)
+
+        # All objects interior to the background annulus
+        logger.debug("Creating interior catalog...")
+        cut_interior = numpy.in1d(ang2pix(self.config.params['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
+        #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
+        self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
+        self.catalog_interior.project(self.roi.projector)
+        self.catalog_interior.spatialBin(self.roi)
+
+        # Set the default catalog
+        logger.info("Using interior ROI for likelihood calculation")
+        self.catalog = self.catalog_interior
+        #self.pixel_roi_cut = self.roi.pixel_interior_cut
+
+    def stellar_mass(self):
+        return self.isochrone.stellarMass()
+
+
+    def calc_background(self):
+        #logger.info('Calculating angular separation ...')
+        #self.roi.precomputeAngsep()
+        #self.angsep = self.calc_angsep()
+
+        #ADW: At some point we may want to make the background level and
+        # fittable parameter.
+        logger.info('Calculating background CMD ...')
+        self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
+
+        # Background density (deg^-2 mag^-2) and background probability for each object
+        logger.info('Calculating background probabilities ...')
+        b_density = ugali.utils.binning.take2D(self.cmd_background,
+                                               self.catalog.color, self.catalog.mag,
+                                               self.roi.bins_color, self.roi.bins_mag)
+        self.b = b_density * self.roi.area_pixel * self.delta_mag**2
 
     def calc_observable_fraction(self,distance_modulus):
+        """
+        Calculated observable fraction within each pixel of the target region.
+        """
         return self.isochrone.observableFraction(self.mask,distance_modulus)
 
     def calc_signal_color(self, distance_modulus, mass_steps=10000):
@@ -315,22 +428,16 @@ class LogLikelihood(object):
         return u_color
 
     def calc_signal_spatial(self):
-        jj = np.where(self.roi.pixels_target==self.pixel)[0][0]
+        self.kernel.setCenter(self.lon, self.lat)
 
-        #self.kernel.lon = self._lon
-        #self.kernel.lat = self._lat
-        self.kernel.setCenter(self.roi.centers_lon_target[jj],self.roi.centers_lat_target[jj])
-
-        # Mapping from object locations to pixels within roi
-        pixel_roi_index = self.roi.indexInterior(self.catalog.lon,self.catalog.lat)
-
-        # Calculated over interior region
-        self.angsep_sparse = self.angsep[jj] # deg
-        self.angsep_object = self.angsep_sparse[pixel_roi_index] # deg
-
-        # Surface intensity calculated over region covered by angsep
+        # At the pixel level over the ROI
+        pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
+        self.angsep_sparse = angsep(float(self.lon),float(self.lat),pix_lon,pix_lat)
         self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
-        self.surface_intensity_object = self.surface_intensity_sparse[pixel_roi_index]
+
+        # On the object-by-object level
+        self.angsep_object = angsep(float(self.lon),float(self.lat),self.catalog.lon,self.catalog.lat)
+        self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
         
         # Spatial component of signal probability
         u_spatial = self.roi.area_pixel * self.surface_intensity_object

@@ -3,11 +3,12 @@ Tools for making maps of the sky with healpix.
 """
 
 import sys
-import numpy
-import pyfits
-import healpy
 import re
 import gc
+
+import numpy
+import healpy
+import pyfits
 
 import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
@@ -20,9 +21,7 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
     Return the set of HEALPix pixels that cover the given coordinates at resolution nside.
     Optionally return the set of subpixels within those pixels at resolution nside_subpix
     """
-    theta = numpy.radians(90. - lat)
-    phi = numpy.radians(lon)
-    pix = numpy.unique(healpy.ang2pix(nside_pix, theta, phi))
+    pix = numpy.unique(ang2pix)
     if nside_subpix is None:
         return pix
     else:
@@ -38,9 +37,7 @@ def allSkyCoordinates(nside):
     """
     Generate a set of coordinates at the centers of pixels of resolutions nside across the full sky. 
     """
-    theta, phi =  healpy.pix2ang(nside, range(0, healpy.nside2npix(nside)))
-    lon = numpy.degrees(phi)
-    lat = 90. - numpy.degrees(theta)                    
+    lon,lat = pix2ang(nside, np.arange(0, healpy.nside2npix(nside)))
     return lon, lat
 
 ############################################################

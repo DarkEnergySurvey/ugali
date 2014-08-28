@@ -30,13 +30,13 @@ from ugali.utils.healpix import superpixel, subpixel, pix2ang
 
 ############################################################
 
-class Scan:
+class Scan(object):
     """
     The base of a likelihood analysis scan.
     """
-    def __init__(self, config, pix):
+    def __init__(self, config, coords):
         self.config = ugali.utils.config.Config(config)
-        self.pix = pix
+        self.lon,self.lat = coords
         self._setup()
 
     def _setup(self):
@@ -48,8 +48,6 @@ class Scan:
         self.filenames = self.config.getFilenames()
         # ADW: Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
-
-        self.lon, self.lat = pix2ang(self.nside_likelihood, self.pix)
 
         self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
         # All possible catalog pixels spanned by the ROI
@@ -110,20 +108,18 @@ class Scan:
         self.grid.write(outfile)
     
 if __name__ == "__main__":
-    from optparse import OptionParser
-    usage = "Usage: %prog  [options] config pix outfile"
-    description = "Script housing the setup and execution of the likelihood scan."
-    parser = OptionParser(usage=usage,description=description)
-    parser.add_option('-d','--debug',action='store_true',
-                      help="Setup, but don't run")
-    parser.add_option('-v','--verbose',action='store_true')
-    (opts, args) = parser.parse_args()
-    if opts.verbose: logger.setLevel(logger.DEBUG)
-    else:            logger.setLevel(logger.INFO)
-    config = args[0]
-    pix = int(args[1])
-    outfile = args[2]
-    scan = Scan(config,pix)
+    import ugali.utils.parser
+    description = "Script for executing the likelihood scan."
+    parser = ugali.utils.parser.Parser(description=description)
+    parser.add_config()
+    parser.add_argument('outfile',metavar='outfile.fits',help='Output fits file.')
+    parser.add_debug()
+    parser.add_verbose()
+    parser.add_coords(required=True)
+    opts = parser.parse_args()
+
+
+    scan = Scan(opts.config,opts.coords)
     if not opts.debug:
         result = scan.run()
-        scan.write(outfile)
+        scan.write(opts.outfile)

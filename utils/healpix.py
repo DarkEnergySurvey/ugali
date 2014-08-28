@@ -5,7 +5,6 @@ toolkit for working with healpix
 import numpy
 import healpy
 
-
 ############################################################
 
 def superpixel(subpix, nside_subpix, nside_superpix):
@@ -50,7 +49,9 @@ def angToPix(nside, lon, lat, coord='GAL'):
 ang2pix = angToPix
 
 def angToVec(lon, lat):
-    vec = healpy.ang2vec(numpy.radians(90. - lat), numpy.radians(lon))
+    theta = numpy.radians(90. - lat)
+    phi = numpy.radians(lon)
+    vec = healpy.ang2vec(theta, phi)
     return vec
 
 ang2vec = angToVec

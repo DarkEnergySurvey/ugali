@@ -2,7 +2,7 @@
 Likelihood evaluation.
 
 Classes
-    Likelihood
+    GridSearch
 
 Functions
     someFunction
@@ -104,7 +104,7 @@ class GridSearch:
         if coords is not None:
             pix_coords = ang2pix(coords)
 
-        lon, lat = self.roi.centers_lon_target, self.roi.centers_lat_target
+        lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
             
         logger.info('Begin loop over distance moduli in likelihood fitting ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
@@ -204,11 +204,12 @@ class GridSearch:
         else:
             pass
 
+        # ADW: This needs to be updated with loglike calls
         distance_modulus = self.distance_modulus_array[index_distance_modulus]
         richness = self.richness_sparse_array[index_distance_modulus][index_pixel_target]
 
-        self.kernel.lon = self.roi.centers_lon_target[index_pixel_target]
-        self.kernel.lat = self.roi.centers_lat_target[index_pixel_target]
+        self.kernel.lon = self.roi.pixels_target.lon[index_pixel_target]
+        self.kernel.lat = self.roi.pixels_target.lat[index_pixel_target]
 
         self.angsep_sparse = self.roi.angsep[index_pixel_target] # deg
         self.angsep_object = self.angsep_sparse[self.catalog.pixel_roi_index] # deg

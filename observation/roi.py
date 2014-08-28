@@ -12,6 +12,7 @@ The ROI is divided into 3 regions:
 """
 
 import numpy
+import numpy as np
 import healpy
 
 import ugali.utils.binning
@@ -22,6 +23,41 @@ import ugali.utils.skymap
 from ugali.utils.healpix import query_disc, ang2pix, pix2ang, ang2vec
 
 ############################################################
+
+# ADW: Should really write some "PixelSet" object that contains the pixels for each region...
+
+class PixelRegion(np.ndarray):
+
+    def __new__(cls, nside, pixels):
+        # Input array is an already formed ndarray instance
+        # We first cast to be our class type
+        obj = np.asarray(pixels).view(cls)
+        # add the new attribute to the created instance
+        obj._nside = nside
+        obj._pix = pixels
+        obj._lon,obj._lat = pix2ang(nside,pixels)
+        # Finally, we must return the newly created object:
+        return obj
+
+    def __array_finalize__(self, obj):
+        # see InfoArray.__array_finalize__ for comments
+        if obj is None: return
+
+    @property
+    def lon(self):
+        return self._lon
+
+    @property
+    def lat(self):
+        return self._lat
+
+    @property
+    def nside(self):
+        return self._nside
+
+    @property
+    def pix(self):
+        return self._pix
 
 class ROI(object):
 
@@ -34,35 +70,41 @@ class ROI(object):
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
         self.vec = vec = ang2vec(self.lon, self.lat)
+        self.pix = ang2pix(self.config['coords']['nside_likelihood'],self.lon,self.lat)
 
         # Pixels from the entire ROI disk
-        self.pixels = query_disc(self.config.params['coords']['nside_pixel'], vec, self.config.params['coords']['roi_radius'])
-        # Pixels inside the ROI annulus
-        self.pixels_interior = query_disc(self.config.params['coords']['nside_pixel'], vec, self.config.params['coords']['roi_radius_annulus'])
+        pix = query_disc(self.config['coords']['nside_pixel'], vec, 
+                         self.config['coords']['roi_radius'])
+        self.pixels = PixelRegion(self.config['coords']['nside_pixel'],pix)
+
+        # Pixels in the interior region
+        pix = query_disc(self.config['coords']['nside_pixel'], vec, 
+                         self.config['coords']['roi_radius_interior'])
+        self.pixels_interior = PixelRegion(self.config['coords']['nside_pixel'],pix)
 
         # Pixels in the outer annulus
-        self.pixels_annulus = numpy.setdiff1d(self.pixels, self.pixels_interior)
+        pix = query_disc(self.config['coords']['nside_pixel'], vec, 
+                         self.config['coords']['roi_radius_annulus'])
+        pix = numpy.setdiff1d(self.pixels, pix)
+        self.pixels_annulus = PixelRegion(self.config['coords']['nside_pixel'],pix)
+
+        # Pixels within target healpix region
+        pix = ugali.utils.skymap.subpixel(self.pix,self.config['coords']['nside_likelihood'],
+                                          self.config['coords']['nside_pixel'])
+        self.pixels_target = PixelRegion(self.config['coords']['nside_pixel'],pix)
 
         # Boolean arrays for selecting given pixels 
         # (Careful, this works because pixels are pre-sorted by query_disc before in1d)
         self.pixel_interior_cut = numpy.in1d(self.pixels, self.pixels_interior)
-        self.pixel_annulus_cut  = ~self.pixel_interior_cut
 
-        self.centers_lon, self.centers_lat = pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
-        #theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels)
-        #self.centers_lon, self.centers_lat = numpy.degrees(phi), 90. - numpy.degrees(theta)
+        # ADW: Updated for more general ROI shapes
+        #self.pixel_annulus_cut  = ~self.pixel_interior_cut
+        self.pixel_annulus_cut  = numpy.in1d(self.pixels, self.pixels_annulus)
 
-        # Pixels within target healpix region
-        # ADW: Use projecter.ang2pix
-        self.pixels_target = ugali.utils.skymap.subpixel(healpy.ang2pix(self.config.params['coords']['nside_likelihood'],
-                                                                        numpy.radians(90. - self.lat),
-                                                                        numpy.radians(self.lon)),
-                                                         self.config.params['coords']['nside_likelihood'],
-                                                         self.config.params['coords']['nside_pixel'])
-
-        self.centers_lon_target, self.centers_lat_target = pix2ang(self.config.params['coords']['nside_pixel'], self.pixels_target)
-        #theta, phi = healpy.pix2ang(self.config.params['coords']['nside_pixel'], self.pixels_target)
-        #self.centers_lon_target, self.centers_lat_target = numpy.degrees(phi), 90. - numpy.degrees(theta)
+        # # These should be unnecessary now
+        # self.centers_lon, self.centers_lat = self.pixels.lon, self.pixels.lat
+        # self.centers_lon_interior,self.centers_lat_interior = self.pixels_interior.lon,self.pixels_interior.lat
+        # self.centers_lon_target, self.centers_lat_target = self.pixels_target.lon, self.pixels_target.lat
 
         self.area_pixel = healpy.nside2pixarea(self.config.params['coords']['nside_pixel'], degrees=True) # deg^2
                                      
@@ -132,19 +174,7 @@ class ROI(object):
                                               self.lon, self.lat,
                                               self.config.params['coords']['roi_radius'])
 
-    def precomputeAngsep(self):
-        """
-        Precompute the angular separations to each pixel in ROI for each target pixel
-        """
-        self.angsep = []
-        self.angsep_interior = []
-        for ii in range(0, len(self.pixels_target)):
-            self.angsep.append(ugali.utils.projector.angsep(self.centers_lon_target[ii],
-                                                            self.centers_lat_target[ii],
-                                                            self.centers_lon, 
-                                                            self.centers_lat))
-            self.angsep_interior.append(self.angsep[-1][self.pixel_interior_cut])
-
+    # ADW: Maybe these should be associated with the PixelRegion objects
     def inPixels(self,lon,lat,pixels):
         """ Function for testing if coordintes in set of ROI pixels. """
         nside = self.config.params['coords']['nside_pixel']

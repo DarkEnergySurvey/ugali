@@ -17,7 +17,7 @@ import ugali.utils.plotting
 from ugali.utils.logger import logger
 ############################################################
 
-class Isochrone:
+class Isochrone(object):
 
     def __init__(self, config, infile, infile_format='padova'):
         """
@@ -113,6 +113,7 @@ class Isochrone:
         Reads an isochrone file in the Padova (Marigo 2008) format and determines
         the age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and creates arrays with
         the initial stellar mass and corresponding magnitudes for each step along the isochrone.
+        http://stev.oapd.inaf.it/cgi-bin/cmd
         """
         mass_init_field = self.config.params['isochrone']['mass_init_field']
         mass_act_field = self.config.params['isochrone']['mass_act_field']
@@ -347,7 +348,6 @@ class Isochrone:
         pixel in the interior region of the mask.
 
         # ADW: Could this be faster / more readable?
-        # ADW: Could add an argument to specify the pixels over which to compute
         """
         mass_init_array,mass_pdf_array,mass_act_array,mag_1_array,mag_2_array = self.sample(mass_min=mass_min,full_data_range=False)
                                                                                                 
@@ -494,12 +494,12 @@ class Isochrone:
 
 ############################################################
 
-class CompositeIsochrone:
+class CompositeIsochrone(object):
 
     def __init__(self, isochrones, weights):
-
         self.isochrones = isochrones
         self.weights = weights
+        self.config = self.isochrones[0].config
 
         if len(self.isochrones) != len(self.weights):
             sys.exit('ERROR: size of isochrone array and weight array must be equal')

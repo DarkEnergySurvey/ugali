@@ -56,11 +56,13 @@ class RadialKernel(object):
         self.norm /= self.integrate()
 
     def setCenter(self, lon, lat):
-        self.lon = lon
-        self.lat = lat
+        self.lon = float(lon)
+        self.lat = float(lat)
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
     def setExtension(self, extension):
+        if extension < 0: 
+            raise ValueError("Extension must be positive.")
         args = self.params
         args[0] = extension
         self._setup(*args)

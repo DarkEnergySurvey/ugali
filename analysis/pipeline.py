@@ -4,6 +4,7 @@ Base functionality for pipeline script instances
 """
 import argparse
 
+from ugali.utils.parser import Parser
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 
@@ -20,27 +21,22 @@ class Pipeline(object):
         self._setup_parser()
 
     def _setup_parser(self):
-        self.parser = argparse.ArgumentParser(description=self.description,
-                                              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        self.parser.add_argument('config',metavar='config.py',help='Configuration file.')
-        self.parser.add_argument('-d','--dryrun',action='store_true',
-                            help="NOT IMPLEMENTED.")
-        self.parser.add_argument('-q','--queue',
-                            help="NOT IMPLEMENTED.")
+        self.parser = Parser(description=self.description)
+        self.parser.add_config()
+        self.parser.add_debug()
+        self.parser.add_queue()
         self.parser.add_argument('-r','--run', default=[],
-                            action='append',choices=self.components,
-                            help="Analysis component(s) to run.")
-        self.parser.add_argument('-v','--verbose',action='store_true',
-                            help='Output verbosity.')
+                                 action='append',choices=self.components,
+                                 help="Analysis component(s) to run.")
+        self.parser.add_verbose()
 
     def parse_args(self):
         self.opts = self.parser.parse_args()
-
-        self.config = Config(self.opts.config)        
         if not self.opts.run: 
             self.opts.run = self.components
-        if self.opts.verbose: 
-            logger.setLevel(logger.DEBUG)
+
+        self.config = Config(self.opts.config)        
+            
 
     def run(self):
         logger.warning("Doing nothing...")

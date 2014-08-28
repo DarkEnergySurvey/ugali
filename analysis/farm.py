@@ -31,6 +31,7 @@ import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.utils.config
 import ugali.utils.skymap
+import ugali.utils.batch
 
 from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import subpixel,superpixel,query_disc
@@ -39,7 +40,7 @@ from ugali.utils.healpix import pix2ang,ang2pix,ang2vec
 from ugali.utils.logger import logger
 
 import ugali.utils.shell
-
+from ugali.utils.shell import mkdir
 
 class Farm:
     def __init__(self, configfile):
@@ -57,7 +58,7 @@ class Farm:
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
         self.catalog_pixels = self.filenames['pix'].compressed()
 
-    # ADW: This should be moved to a "target" module
+    # ADW: This should be moved to a "target" or utility module
     @staticmethod
     def loadTargetCoordinates(filename):
         """
@@ -95,12 +96,13 @@ class Farm:
 
         return names,out.T
                
-    def command(self):
+    def command(self, outfile, configfile, pix):
         """
         Placeholder for a function to generate the command for running
         the likelihood scan.
         """
-        pass
+        cmd = '%s %s %s --hpx %i %i'%(self.config['queue']['script'], configfile, outfile, self.nside_likelihood, pix)
+        return cmd
 
     def queue(self):
         """
@@ -109,6 +111,7 @@ class Farm:
         """
         pass
 
+    # ADW: Should probably be in a utility
     def footprint(self, nside=None):
         """
         UNTESTED.
@@ -124,6 +127,7 @@ class Farm:
         map = self.inFootprint(pix)
         return map 
 
+    # ADW: Should probably be in a utility
     def inFootprint(self, pixels, nside=None):
         """
         Open each valid filename for the set of pixels and determine the set 
@@ -190,17 +194,12 @@ class Farm:
             return
 
         # Only write the configfile once
-        outdir = ugali.utils.shell.mkdir(self.config.params['output']['savedir_likelihood'])
+        outdir = mkdir(self.config.params['output']['savedir_likelihood'])
         configfile = '%s/config_queue.py'%(outdir)
         self.config.write(configfile)
 
         pixels = pixels[inside]
-        lon,lat = pix2ang(self.nside_likelihood,pixels)
-        for ii,pix in enumerate(pixels):
-            logger.info('=== Submit Likelihood ===')
-            logger.info('  (%i/%i) pixel=%i nside=%i; (glon, glat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, lon[ii], lat[ii] ))
-            #if ii >= 1000: break
-            self.submit(pix,local=local,debug=debug,configfile=configfile)
+        self.submit(pixels,local=local,debug=debug,configfile=configfile)
 
     def submit(self, pixels, local=True, debug=False, configfile=None):
         """
@@ -208,7 +207,22 @@ class Farm:
         """
         if numpy.isscalar(pixels): pixels = numpy.array([pixels])
 
-        outdir = ugali.utils.shell.mkdir(self.config.params['output']['savedir_likelihood'])
+        outdir = mkdir(self.config['output']['savedir_likelihood'])
+        logdir = mkdir(join(outdir,'log'))
+        subdir = mkdir(join(outdir,'sub'))
+
+        # Need to develop some way to take command line arguments...
+        if local or self.config['queue']['cluster']=='local':
+            batch = ugali.utils.batch.Local()
+        elif self.config['queue']['cluster']=='midway':
+            batch = ugali.utils.batch.Midway()
+        elif self.config['queue']['cluster']=='slac':
+            # Need to add an option for which slac queue [short/long/kipac-ibq]
+            batch = ugali.utils.batch.LSF()
+        elif self.config['queue']['cluster']=='fnal':
+            # Need to learn how to use condor first...
+            batch = ugali.utils.batch.Condor()
+            raise Exception("FNAL cluster not implemented")
 
         # Save the current configuation settings; avoid writing 
         # file multiple times if configfile passed as argument.
@@ -220,117 +234,86 @@ class Farm:
                 self.config.write(configfile)
                 
         lon,lat = pix2ang(self.nside_likelihood,pixels)
-        n_query_points = healpy.nside2npix(self.nside_pixel)/healpy.nside2npix(self.nside_likelihood)
-
+        commands = []
+        chunk = self.config['queue']['chunk']
+        istart = 0
+        logger.info('=== Submit Likelihood ===')
         for ii,pix in enumerate(pixels):
-            #logger.info('  (%i/%i) pixel %i nside %i; %i query points; %s (lon, lat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, n_query_points, self.config.params['coords']['coordsys'],lon[ii], lat[ii]))
+            logger.info('  (%i/%i) pixel=%i nside=%i; (lon, lat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, lon[ii], lat[ii] ))
 
             # Create outfile name
-            outfile = '%s/likelihood_%010i_nside_pix_%i_nside_subpix_%i_%s.fits'%(outdir,pix,self.nside_likelihood,self.nside_pixel,self.config.params['coords']['coordsys'].lower())
+            outbase = 'likelihood_%08i_%s.fits'%(pix,self.config['coords']['coordsys'].lower())
+            outfile = join(outdir, outbase)
+            jobname = self.config['queue']['jobname']
 
-            # Submission command
-            # This should be able to submit multiple pixels...
-            command = '%s %s %i %s'%(self.config.params['queue']['script'], configfile, pix, outfile)
             # Check if outfile exists
             if os.path.exists(outfile) and not local:
                 logger.info('  %s already exists. Skipping ...'%(outfile))
                 continue
-                
-            if local or self.config.params['queue']['cluster'] == 'local':
-                #scan = ugali.analysis.scan.Scan(self.configfile,pix[ii])
-                #likelihood = scan.run(outfile,debug=debug)
-                #return likelihood
-                logger.info(command)
-                subprocess.call(command,shell=True)
 
+            # Submission command
+            # This should be able to submit multiple pixels...
+            cmd = self.command(outfile,configfile,pix)
+
+            commands.append([ii,cmd])
+            
+            if local or chunk == 0:
+                # Not chunking
+                command = cmd
+                logfile = join(logdir,os.path.splitext(outbase)[0]+'.log')
+            elif (len(commands)%chunk==0) or (len(pixels)==ii+1):
+                # End of chunk, create submit script
+                istart, iend = commands[0][0], commands[-1][0]
+                info = 'echo -e "\n### %s ###";\n'
+                subfile = join(subdir,'submit_%08i_%08i.sh'%(istart,iend))
+                logfile = join(logdir,'submit_%08i_%08i.log'%(istart,iend))
+                script = open(subfile,'w')
+                script.write(info%('Pixels %i to %i'%(istart,ii)))
+                for i,c in commands: 
+                    script.write(info%('Pixel %i (%.3f, %.3f)'%(i,lon[i],lat[i])))
+                    script.write('%s;\n'%c)
+                script.close()
+                commands = []; istart = ii+1
+                command = "sh %s"%subfile
             else:
-                # Submit to queue
-                logfile = '%s/%s_%i.log'%(self.config.params['output']['logdir_likelihood'], self.config.params['queue']['jobname'], pix)
-                logdir = ugali.utils.shell.mkdir(os.path.dirname(logfile))
-                username = getpass.getuser()
- 
-                # Midway cluster
-                if self.config.params['queue']['cluster'] == 'midway':
-                    #batch = 'sbatch --account=kicp --partition=kicp-ht --output=%s --job-name=%s --mem=10000 '%(logfile, self.config.params['queue']['jobname'])
-                    batch = """sbatch --account=kicp --partition=kicp-ht --output=%(logfile)s --job-name=%(jobname)s --mem=10000 """
-                    check_jobs = 'squeue -u %s | wc\n'%username
-                # SLAC cluster
-                elif self.config.params['queue']['cluster'] == 'slac':
-                    # Need to add an option for which slac queue [short/long/kipac-ibq]
-                    batch = """bsub -q %(queue)s -R \"%(require)s\" -oo %(logfile)s -J %(jobname)s -C 0 """
-                    check_jobs = 'bjobs -u %s | wc\n'%username
-                # FNAL cluster
-                elif self.config.params['queue']['cluster'] == 'fnal':
-                    # Need to learn how to use condor first...
-                    raise Exception("FNAL cluster not implemented")
- 
-                batch = batch % dict(self.config.params['queue'],logfile=logfile)
-                sleep = "; sleep 0.5"
-                command_queue = batch + command + sleep
-                logger.info(command_queue)
-                    
-                if not os.path.exists(self.config.params['output']['logdir_likelihood']):
-                    logdir = os.mkdir(self.config.params['output']['logdir_likelihood'])
- 
-                while True:
-                    n_submitted = int(subprocess.Popen(check_jobs, shell=True, 
-                                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].split()[0]) - 1
-                    if n_submitted < self.config.params['queue']['max_jobs']:
-                        break
-                    else:
-                        logger.info('%i jobs already in queue, waiting ...'%(n_submitted))
-                        time.sleep(15)
- 
-                subprocess.call(command_queue,shell=True)
-                #break
+                # Not end of chunk
+                continue
+
+            while True:
+                njobs = batch.njobs()
+                if njobs < self.config.params['queue']['max_jobs']:
+                    break
+                else:
+                    logger.info('%i jobs already in queue, waiting ...'%(njobs))
+                    time.sleep(15)
+
+            opts = self.config['queue'].get('opts',{})
+            job = batch.submit(command,jobname,logfile,**opts)
+            logger.info("  "+job)
+            time.sleep(0.5)
+
 
 if __name__ == "__main__":
-    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-
-    description = "Script housing the setup and execution of the likelihood scan."
-    parser = ArgumentParser(description=description,
-                            formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('config',metavar='config.py',help='Configuration file.')
-    parser.add_argument('-l','--glon',default=None,type=float,
-                      help='Galactic longitude of target')
-    parser.add_argument('-b','--glat',default=None,type=float,
-                      help='Galactic latitude of target')
-    parser.add_argument('--ra',default=None,type=float,
-                      help="RA of target")
-    parser.add_argument('--dec',default=None,type=float,
-                      help="DEC of target")
-    parser.add_argument('--nside',default=2**8,type=int,
-                      help="HEALPix nside of target pixel")
-    parser.add_argument('--pix',default=None,type=int,
-                      help="HEALPix pixel of target (Galactic coordinates)")
+    import ugali.utils.parser
+    description = "Script for dispatching the likelihood scan to the queue."
+    parser = ugali.utils.parser.Parser(description=description)
+    parser.add_config()
+    parser.add_debug()
+    parser.add_queue()
+    parser.add_verbose()
+    parser.add_coords(required=True)
     parser.add_argument('--radius',default=0,type=float,
                       help="Radius surrounding specified coordinates")
     parser.add_argument('-t','--targets',default=None,
                       help="List of target coordinates")
-    parser.add_argument('--local',action='store_true',
-                      help="Run locally")
-    parser.add_argument('--debug',action='store_true',
-                      help="Setup, but don't run")
     opts = parser.parse_args()
 
-    if opts.glon is not None and (opts.ra is not None or opts.pix is not None):
-        logger.error("Only one coordinate type allowed")
-        parser.print_help()
-        sys.exit(1)
+    if opts.targets:
+        names,coords = farm.loadTargetCoordinates(opts.targets)
+    else:
+        coords = [ (opts.coords[0],opts.coords[1],opts.radius) ]
+
+    local = (opts.queue=='local')
 
     farm = Farm(opts.config)
-
-    coords = None
-    if opts.glon is not None and opts.glat is not None:
-        glon = opts.glon; glat = opts.glat
-        coords = [ (glon,glat,opts.radius) ]
-    elif opts.ra is not None and opts.dec is not None:
-        glon,glat = cel2gal(opts.ra,opts.dec)
-        coords = [ (glon,glat,opts.radius) ]
-    elif opts.pix is not None and opts.nside is not None:
-        glon,glat = pix2ang(opts.nside,opts.pix)
-        coords = [ (glon,glat,opts.radius) ]
-    elif opts.targets:
-        names,coords = farm.loadTargetCoordinates(opts.targets)
-
-    x = farm.submit_all(coords=coords,local=opts.local,debug=opts.debug)
+    x = farm.submit_all(coords=coords,local=local,debug=opts.debug)
