@@ -21,6 +21,8 @@ QUEUES = odict([
 ])
 
 def batchFactory(queue,**kwargs):
+    if queue is None: queue = 'local'
+
     name = queue.lower()
     if name in list(chain(*QUEUES.values())):
         kwargs.setdefault('q',name)

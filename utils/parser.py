@@ -46,8 +46,9 @@ class Parser(argparse.ArgumentParser):
                           help="Setup, but do not run",**kwargs)
 
     def add_queue(self,**kwargs):
-        self.add_argument('-q','--queue',default='local',
+        self.add_argument('-q','--queue',
                           help="Batch queue for execution.",**kwargs)
+                          
 
     def add_config(self,**kwargs):
         self.add_argument('config',metavar='config.yaml',

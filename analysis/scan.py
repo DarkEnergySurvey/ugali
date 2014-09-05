@@ -1,32 +1,36 @@
 #!/usr/bin/env python
-
 """
 Class to create and run an individual likelihood analysis.
 
 Classes:
     Scan
+    GridSearch
 
-Functions:
-    someFunction
 """
 
 import os
 import sys
+from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
 import pyfits
+import healpy
 
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
-import ugali.analysis.grid
+import ugali.analysis.color_lut
+import ugali.analysis.loglike
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.simulation.simulator
-import ugali.utils.config
+import ugali.utils.parabola
+import ugali.utils.skymap
 
+from ugali.utils.config import Config
 from ugali.utils.logger import logger
-from ugali.utils.healpix import superpixel, subpixel, pix2ang
+from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
+
 
 ############################################################
 
@@ -35,16 +39,16 @@ class Scan(object):
     The base of a likelihood analysis scan.
     """
     def __init__(self, config, coords):
-        self.config = ugali.utils.config.Config(config)
+        self.config = Config(config)
         # Should only be one coordinate
         if len(coords)!=1: raise Exception('Must specify one coordinate.')
         self.lon,self.lat,radius = coords[0]
         self._setup()
 
     def _setup(self):
-        self.nside_catalog    = self.config.params['coords']['nside_catalog']
-        self.nside_likelihood = self.config.params['coords']['nside_likelihood']
-        self.nside_pixel      = self.config.params['coords']['nside_pixel']
+        self.nside_catalog    = self.config['coords']['nside_catalog']
+        self.nside_likelihood = self.config['coords']['nside_likelihood']
+        self.nside_pixel      = self.config['coords']['nside_pixel']
 
         # All possible filenames
         self.filenames = self.config.getFilenames()
@@ -62,22 +66,21 @@ class Scan(object):
         self.catalog = self.createCatalog()
         self.mask = self.createMask()
 
-        self.grid = ugali.analysis.grid.GridSearch(self.config, self.roi, 
-                                                   self.mask,self.catalog, 
-                                                   self.isochrone, self.kernel)
+        self.grid = GridSearch(self.config, self.roi, self.mask,self.catalog, 
+                               self.isochrone, self.kernel)
         self.loglike = self.grid.loglike
 
     def createKernel(self):
-        name = self.config.params['kernel']['type'].lower()
-        params = self.config.params['kernel']['params']
+        name = self.config['kernel']['type'].lower()
+        params = self.config['kernel']['params']
         kernel = ugali.analysis.kernel.kernelFactory(name,self.lon,self.lat,*params)
         return kernel
 
     def createIsochrone(self):
         isochrones = []
-        for ii, name in enumerate(self.config.params['isochrone']['infiles']):
+        for ii, name in enumerate(self.config['isochrone']['infiles']):
             isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, name))
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config.params['isochrone']['weights'])
+        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config['isochrone']['weights'])
         return isochrone
 
     def createCatalog(self):
@@ -108,6 +111,225 @@ class Scan(object):
         
     def write(self, outfile):
         self.grid.write(outfile)
+
+
+############################################################
+
+class GridSearch:
+
+    def __init__(self, config, roi, mask, catalog, isochrone, kernel):
+        """
+        Object to efficiently search over a grid of ROI positions.
+
+        ADW: This should probably be renamed GridSearch or something like that
+        since we would like a pure access to the likelihood itself.
+        """
+
+        self.config = config
+        self.roi = roi
+        self.mask = mask # Currently assuming that input mask is ROI-specific
+
+        logger.info("Creating log-likelihood...")
+        self.loglike=ugali.analysis.loglike.LogLikelihood(config,roi,
+                                                          mask,catalog,
+                                                          isochrone,kernel)
+
+        self.stellar_mass_conversion = self.loglike.stellar_mass()
+
+    def precompute(self, distance_modulus_array=None):
+        """
+        Precompute u_background and u_color for each star in catalog.
+        Precompute observable fraction in each ROI pixel.
+        # Precompute still operates over the full ROI, not just the likelihood region
+        """
+        if distance_modulus_array is not None:
+            self.distance_modulus_array = distance_modulus_array
+        else:
+            self.distance_modulus_array = self.config['likelihood']['distance_modulus_array']
+
+        # Observable fraction for each pixel
+        self.u_color_array = [[]] * len(self.distance_modulus_array)
+        self.observable_fraction_sparse_array = [[]] * len(self.distance_modulus_array)
+
+        logger.info('Loop over distance moduli in precompute step ...')
+        for ii, distance_modulus in enumerate(self.distance_modulus_array):
+            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len(self.distance_modulus_array), distance_modulus))
+
+            self.u_color_array[ii] = False
+            if self.config['likelihood']['color_lut_infile'] is not None:
+                logger.info('  Precomputing signal color from %s'%(self.config['likelihood']['color_lut_infile']))
+                self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config['likelihood']['color_lut_infile'],
+                                                                               distance_modulus,
+                                                                               self.loglike.catalog.mag_1,
+                                                                               self.loglike.catalog.mag_2,
+                                                                               self.loglike.catalog.mag_err_1,
+                                                                               self.loglike.catalog.mag_err_2)
+            if not numpy.any(self.u_color_array[ii]):
+                logger.info('  Precomputing signal color on the fly...')
+                self.u_color_array[ii] = self.loglike.calc_signal_color(distance_modulus) 
+            
+            # Calculate over all pixels in ROI
+            self.observable_fraction_sparse_array[ii] = self.loglike.calc_observable_fraction(distance_modulus)
+            
+        self.u_color_array = numpy.array(self.u_color_array)
+
+                
+    def search(self, coords=None, distance_modulus_index=None, tolerance=1.e-2):
+        """
+        Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
+        """
+        nmoduli = len(self.distance_modulus_array)
+        npixels    = len(self.roi.pixels_target)
+        self.log_likelihood_sparse_array       = numpy.zeros([nmoduli, npixels])
+        self.richness_sparse_array             = numpy.zeros([nmoduli, npixels])
+        self.richness_lower_sparse_array       = numpy.zeros([nmoduli, npixels])
+        self.richness_upper_sparse_array       = numpy.zeros([nmoduli, npixels])
+        self.richness_upper_limit_sparse_array = numpy.zeros([nmoduli, npixels])
+        self.stellar_mass_sparse_array         = numpy.zeros([nmoduli, npixels])
+        self.fraction_observable_sparse_array  = numpy.zeros([nmoduli, npixels])
+
+        # Specific pixel
+        if coords is not None:
+            pix_coords = ang2pix(coords)
+
+        lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
+            
+        logger.info('Begin loop over distance moduli in likelihood fitting ...')
+        for ii, distance_modulus in enumerate(self.distance_modulus_array):
+
+            # Specific pixel
+            if distance_modulus_index is not None:
+                if ii != distance_modulus_index: continue
+            
+            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, nmoduli, distance_modulus))
+
+            for jj in range(0, npixels):
+                # Specific pixel
+                if coords is not None:
+                    if self.roi.pixels_target[jj] != pix_coords:
+                        continue
+
+                self.loglike.set_params(lon=lon[jj],lat=lat[jj],distance_modulus=distance_modulus)
+                self.loglike.sync_params(u_color=self.u_color_array[ii],
+                                         observable_fraction=self.observable_fraction_sparse_array[ii])
+                                         
+                args = (
+                    jj+1, npixels, 
+                    self.loglike.kernel.lon, self.loglike.kernel.lat
+                )
+                message = """    (%i/%i) Candidate at (%.3f, %.3f) ... """%(args)
+
+                self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
+                self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
+                self.fraction_observable_sparse_array[ii][jj] = self.loglike.f
+                if self.config['likelihood']['full_pdf'] \
+                   or (coords is not None and distance_modulus_index is not None):
+
+                    n_pdf_points = 100
+                    richness_range = parabola.profileUpperLimit(delta=25.) - self.richness_sparse_array[ii][jj]
+                    richness = numpy.linspace(max(0., self.richness_sparse_array[ii][jj] - richness_range),
+                                              self.richness_sparse_array[ii][jj] + richness_range,
+                                              n_pdf_points)
+                    if richness[0] > 0.:
+                        richness = numpy.insert(richness, 0, 0.)
+                        n_pdf_points += 1
+                    
+                    log_likelihood = numpy.zeros(n_pdf_points)
+                    for kk in range(0, n_pdf_points):
+                        log_likelihood[kk] = self.loglike.value(richness=richness[kk])
+                    parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
+                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
+                    self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
+
+                    args = (
+                        2. * self.log_likelihood_sparse_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_sparse_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_lower_sparse_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_upper_sparse_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_upper_limit_sparse_array[ii][jj]
+                    )
+                    message += 'TS = %.2f, Stellar Mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
+                else:
+                    args = (
+                        2. * self.log_likelihood_sparse_array[ii][jj], 
+                        self.stellar_mass_conversion * self.richness_sparse_array[ii][jj],
+                        self.fraction_observable_sparse_array[ii][jj]
+                    )
+                    message += 'TS = %.2f, Stellar Mass = %.1f, Fraction = %.2g'%(args)
+                logger.debug( message )
+                
+                if coords is not None and distance_modulus_index is not None:
+                    results = [self.richness_sparse_array[ii][jj],
+                               self.log_likelihood_sparse_array[ii][jj],
+                               self.richness_lower_sparse_array[ii][jj],
+                               self.richness_upper_sparse_array[ii][jj],
+                               self.richness_upper_limit_sparse_array[ii][jj],
+                               richness, log_likelihood, self.loglike.p, self.loglike.f]
+                    return results
+
+            jj_max = self.log_likelihood_sparse_array[ii].argmax()
+            args = (
+                jj_max+1, npixels, lon[jj_max], lat[jj_max],
+                2. * self.log_likelihood_sparse_array[ii][jj_max], 
+                self.stellar_mass_conversion * self.richness_sparse_array[ii][jj_max]
+            )
+            message = "  (%i/%i) Maximum at (%.3f, %.3f) ... TS = %.2f, Stellar Mass = %.1f"%(args)
+            logger.info( message )
+ 
+    def mle(self):
+        a = self.log_likelihood_sparse_array
+        j,k = np.unravel_index(a.argmax(),a.shape)
+        mle = odict()
+        mle['richness'] = self.richness_sparse_array[j][k]
+        mle['lon'] = self.roi.pixels_target.lon[k]
+        mle['lat'] = self.roi.pixels_target.lat[k]
+        mle['distance_modulus'] = self.distance_modulus_array[j]
+        mle['extension'] = float(self.loglike.kernel.extension())
+        return mle
+
+    def write(self, outfile):
+        """
+        Save the likelihood fitting results as a sparse HEALPix map.
+        """
+        # Full data output (too large for survey)
+        if self.config['likelihood']['full_pdf']:
+            data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
+                         'RICHNESS':       self.richness_sparse_array.transpose(),
+                         'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),
+                         'RICHNESS_UPPER': self.richness_upper_sparse_array.transpose(),
+                         'RICHNESS_LIMIT': self.richness_upper_limit_sparse_array.transpose(),
+                         #'STELLAR_MASS': self.stellar_mass_sparse_array.transpose(),
+                         'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+        else:
+            data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
+                         'RICHNESS': self.richness_sparse_array.transpose(),
+                         'FRACTION_OBSERVABLE': self.fraction_observable_sparse_array.transpose()}
+
+        # Stellar Mass can be calculated from STELLAR * RICHNESS
+        header_dict = {
+            'STELLAR' : round(self.stellar_mass_conversion,8),
+            'LKDNSIDE': self.config['coords']['nside_likelihood'],
+            'LKDPIX'  : ang2pix(self.config['coords']['nside_likelihood'],self.roi.lon,self.roi.lat),
+            'NROI'    : self.roi.inROI(self.loglike.catalog_roi.lon,self.loglike.catalog_roi.lat).sum(), 
+            'NANNULUS': self.roi.inAnnulus(self.loglike.catalog_roi.lon,self.loglike.catalog_roi.lat).sum(), 
+            'NINSIDE' : self.roi.inInterior(self.loglike.catalog_roi.lon,self.loglike.catalog_roi.lat).sum(), 
+            'NTARGET' : self.roi.inTarget(self.loglike.catalog_roi.lon,self.loglike.catalog_roi.lat).sum(), 
+        }
+
+        # In case there is only a single distance modulus
+        if len(self.distance_modulus_array) == 1:
+            for key in data_dict:
+                data_dict[key] = data_dict[key].flatten()
+
+        ugali.utils.skymap.writeSparseHealpixMap(self.roi.pixels_target,
+                                                 data_dict,
+                                                 self.config['coords']['nside_pixel'],
+                                                 outfile,
+                                                 distance_modulus_array=self.distance_modulus_array,
+                                                 coordsys='NULL', ordering='NULL',
+                                                 header_dict=header_dict)
+
+############################################################
     
 if __name__ == "__main__":
     import ugali.utils.parser

@@ -217,9 +217,11 @@ class BasePlotter(object):
 
     def drawTS(self,ax, filename=None, zidx=0):
         if not filename:
-            dirname = self.config.params['output']['savedir_results']
-            basename = self.config.params['output']['mergefile']
-            filename = os.path.join(dirname,basename)
+            #dirname = self.config.params['output2']['searchdir']
+            #basename = self.config.params['output2']['mergefile']
+            #filename = os.path.join(dirname,basename)
+            filename = self.config.mergefile
+
         results=pyfits.open(filename)[1]
 
         pixels,values = results.data['pix'],2*results.data['log_likelihood']
@@ -243,9 +245,10 @@ class BasePlotter(object):
         import ugali.analysis.isochrone
 
         if zidx is not None:
-            dirname = self.config.params['output']['savedir_results']
-            basename = self.config.params['output']['mergefile']
-            filename = os.path.join(dirname,basename)
+            #dirname = self.config.params['output2']['searchdir']
+            #basename = self.config.params['output2']['mergefile']
+            #filename = os.path.join(dirname,basename)
+            filename = self.config.mergefile
             logger.debug("Opening %s..."%filename)
             f = pyfits.open(filename)
             distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
@@ -276,9 +279,10 @@ class BasePlotter(object):
     def drawMembership(self, ax, radius=None, zidx=0, mc_source_id=1):
         import ugali.analysis.scan
 
-        dirname = self.config.params['output']['savedir_results']
-        basename = self.config.params['output']['mergefile']
-        filename = os.path.join(dirname,basename)
+        #dirname = self.config.params['output2']['searchdir']
+        #basename = self.config.params['output2']['mergefile']
+        #filename = os.path.join(dirname,basename)
+        filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
         distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
@@ -319,10 +323,10 @@ class BasePlotter(object):
         except: pylab.colorbar(sc)
 
     def plotDistance(self):
-        dirname = self.config.params['output']['savedir_results']
-        basename = self.config.params['output']['mergefile']
-        filename = os.path.join(dirname,basename)
-
+        #dirname = self.config.params['output2']['searchdir']
+        #basename = self.config.params['output2']['mergefile']
+        #filename = os.path.join(dirname,basename)
+        filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
         pixels,values = f[1].data['pix'],2*f[1].data['log_likelihood']

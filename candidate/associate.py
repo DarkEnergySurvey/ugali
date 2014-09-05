@@ -276,40 +276,6 @@ class Nilson73(SourceCatalog):
         glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
-#def associate_sources(config, outfile=None):
-#    dirname = config.params['output']['savedir_results']
-#    infile = join(dirname,config.params['output']['objectfile'])
-#    f = pyfits.open(infile)
-#    objects = f[1].data
-# 
-#    tol = config.params['associate']['radius']
-#    columns = []
-# 
-#    for i,names in enumerate(config.params['associate']['catalogs']):
-#        i += 1
-#        catalog = SourceCatalog()
-#        for name in names:
-#            catalog += catalogFactory(name)
-# 
-#        # String length (should be greater than longest name)
-#        length = len(max(catalog['name'],key=len)) + 1
-#        dtype = 'S%i'%length; fitstype='%iA'%length
-# 
-#        assoc = np.empty(len(objects),dtype=dtype)
-#        assoc.fill('')
-#        idx1,idx2,dist = catalog.match(objects['GLON_MAX'],objects['GLAT_MAX'],tol=tol)
-#        assoc[idx1] = catalog['name'][idx2].astype(dtype)
-#        columns.append(pyfits.Column(name='ASSOC%i'%i,format=fitstype,array=assoc))
-#        columns.append(pyfits.Column(name='ANGSEP%i'%i,format='E',array=dist))
-# 
-# 
-#    hdu = pyfits.new_table(objects.columns + pyfits.ColDefs(columns))
-#    
-#    if outfile is None:
-#        outfile = join(dirname,config.params['output']['assocfile'])
-#        
-#    hdu.writeto(outfile,clobber=True)
-#    return catalog,objects
 
 if __name__ == "__main__":
     import argparse

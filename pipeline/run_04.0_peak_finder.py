@@ -3,10 +3,11 @@ import os
 from os.path import exists, join
 
 from ugali.analysis.pipeline import Pipeline
-from ugali.candidate.search import CandidateSearch
+from ugali.analysis.search import CandidateSearch
 import ugali.candidate.associate
 
 from ugali.utils.logger import logger
+from ugali.utils.shell import mkdir
 
 description="Perform object finding and association."
 components = ['label','objects','associate','candidates']
@@ -47,7 +48,6 @@ def run(self):
             search.loadAssociations()
             search.writeCandidates()
         
-            
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parse_args()

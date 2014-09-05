@@ -1,9 +1,8 @@
 """
 Class for storing and updating config dictionaries.
-
-ADW: Can't we get rid of the 'params' member and just subclass dict?
 """
 import os
+from os.path import join, exists
 import pprint
 import copy
 import numpy
@@ -41,6 +40,7 @@ class Config(dict):
 
         # Possible filenames from this config (masked by existence)
         self.filenames = self.getFilenames()
+        self._makeFilenames()
 
     def _load(self, input):
         if isinstance(input, basestring):
@@ -63,13 +63,28 @@ class Config(dict):
 
         return params
 
+    def _makeFilenames(self):
+        likedir=self['output']['likedir']
+        self.likefile  = join(likedir,self['output']['likefile'])
+        self.mergefile = join(likedir,self['output']['mergefile'])
+        self.roifile   = join(likedir,self['output']['roifile'])
+
+        searchdir=self['output']['searchdir']
+        self.labelfile  = join(searchdir,self['output']['labelfile'])
+        self.objectfile = join(searchdir,self['output']['objectfile'])
+        self.assocfile  = join(searchdir,self['output']['assocfile'])
+        self.candfile   = join(searchdir,self['output']['candfile'])
+
+        mcmcdir=self['output']['mcmcdir']
+        self.mcmcfile   = join(mcmcdir,self['output']['mcmcfile'])
+
     def write(self, outfile):
         ext = os.path.splitext(outfile)[1]
         writer = open(outfile, 'w')
         if ext == '.py':
-            writer.write(pprint.pformat(self.params))
+            writer.write(pprint.pformat(self))
         elif ext == '.yaml':
-            writer.write(yaml.dump(self.params))
+            writer.write(yaml.dump(self))
         else:
             writer.close()
             raise Exception('Unrecognized config format: %s'%ext)
@@ -96,7 +111,7 @@ class Config(dict):
         # Pixels where all files exist
         f['pix'][~f.mask['pix']]
         """
-        nside_catalog = self.params['coords']['nside_catalog']
+        nside_catalog = self['coords']['nside_catalog']
 
         if nside_catalog is None:
             pixels = [None]
@@ -107,12 +122,12 @@ class Config(dict):
 
         npix = len(pixels)
 
-        catalog_dir = self.params['catalog']['dirname']
-        catalog_base = self.params['catalog']['basename']
+        catalog_dir = self['catalog']['dirname']
+        catalog_base = self['catalog']['basename']
          
-        mask_dir = self.params['mask']['dirname']
-        mask_base_1 = self.params['mask']['basename_1']
-        mask_base_2 = self.params['mask']['basename_2']
+        mask_dir = self['mask']['dirname']
+        mask_base_1 = self['mask']['basename_1']
+        mask_base_2 = self['mask']['basename_2']
          
         data = numpy.ma.empty(npix,dtype=[('pix',int), ('catalog',object), 
                                           ('mask_1',object), ('mask_2',object)])
@@ -139,5 +154,6 @@ class Config(dict):
         #return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
         return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
 
+    getCatalogFiles = getFilenames
 
 ############################################################

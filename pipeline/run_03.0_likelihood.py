@@ -10,7 +10,7 @@ from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 
 description="Run the likelihood search."
-components = ['likelihood','merge','targets']
+components = ['likelihood','merge']
 
 def run(self):
     if 'likelihood' in self.opts.run:
@@ -19,16 +19,16 @@ def run(self):
         farm.submit_all(coords=self.opts.coords,queue=self.opts.queue,debug=self.opts.debug)
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
-        filenames = "%s/likelihood*.fits"%self.config['output']['savedir_likelihood']
+        filenames = self.config.likefile.split('_%')[0]+'_*'
         infiles = sorted(glob.glob(filenames))
-        outdir = mkdir(self.config['output']['savedir_results'])
-        mergefile = join(outdir,self.config['output']['mergefile'])
-        roifile = join(outdir,self.config['output']['roifile'])
+        mergefile = self.config.mergefile
+        roifile = self.config.roifile
         if (exists(mergefile) or exists(roifile)) and not self.opts.force:
             logger.info("  Found %s; skipping..."%mergefile)
             logger.info("  Found %s; skipping..."%roifile)
         else:
             ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
+            outdir = mkdir(self.config['output']['searchdir'])
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

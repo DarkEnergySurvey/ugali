@@ -146,7 +146,7 @@ class Farm:
             return
 
         # Only write the configfile once
-        outdir = mkdir(self.config['output']['savedir_likelihood'])
+        outdir = mkdir(self.config['output']['likedir'])
         configfile = '%s/config_queue.py'%(outdir)
         self.config.write(configfile)
 
@@ -165,7 +165,7 @@ class Farm:
 
         if numpy.isscalar(pixels): pixels = numpy.array([pixels])
 
-        outdir = mkdir(self.config['output']['savedir_likelihood'])
+        outdir = mkdir(self.config['output']['likedir'])
         logdir = mkdir(join(outdir,'log'))
         subdir = mkdir(join(outdir,'sub'))
 
@@ -187,8 +187,10 @@ class Farm:
             logger.info('  (%i/%i) pixel=%i nside=%i; (lon, lat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, lon[ii], lat[ii] ))
 
             # Create outfile name
-            outbase = 'likelihood_%08i_%s.fits'%(pix,self.config['coords']['coordsys'].lower())
-            outfile = join(outdir, outbase)
+            outfile = self.config.likefile%(pix,self.config['coords']['coordsys'].lower())
+            #outbase = 'likelihood_%08i_%s.fits'%(pix,self.config['coords']['coordsys'].lower())
+            #outfile = join(outdir, outbase)
+            outbase = os.path.basename(outfile)
             jobname = self.config['batch']['jobname']
 
             # Check if outfile exists
