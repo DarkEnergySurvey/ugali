@@ -262,7 +262,7 @@ def mergeLikelihoodFiles(infiles, lkhdfile, roifile):
     mergeSparseHealpixMaps(infiles,lkhdfile)
 
     ext='PIX_DATA'
-    keys=['NINSIDE','NANNULUS']
+    keys=['STELLAR','NINSIDE','NANNULUS']
     nside = pyfits.open(infiles[0])[ext].header['LKDNSIDE']
 
     pix_array = []

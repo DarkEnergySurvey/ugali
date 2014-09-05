@@ -8,7 +8,9 @@ from numpy.lib.recfunctions import stack_arrays
 
 import ugali.utils.skymap
 import ugali.utils.projector
+from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
+from ugali.utils.healpix import ang2pix
 
 #class Catalog(numpy.recarray):
 # 
@@ -110,7 +112,7 @@ class SourceCatalog(object):
  
     def match(self,lon,lat,coord='gal',tol=0.1,nnearest=1):
         if coord.lower == 'cel':
-            glon, glat = ugali.utils.projector.celToGal(lon,lat)
+            glon, glat = cel2gal(lon,lat)
         else:
             glon,glat = lon, lat
         return ugali.utils.projector.match(glon,glat,self['glon'],self['glat'],tol,nnearest)
@@ -138,7 +140,7 @@ class McConnachie12(SourceCatalog):
         self.data['ra'] = ugali.utils.projector.hms2dec(ra)
         self.data['dec'] = ugali.utils.projector.dms2dec(dec)
         
-        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
 class Rykoff14(SourceCatalog):
@@ -158,7 +160,7 @@ class Rykoff14(SourceCatalog):
         self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['MEM_MATCH_ID'])
         self.data['ra'] = raw['ra']
         self.data['dec'] = raw['dec']
-        glon,glat = ugali.utils.projector.celToGal(raw['ra'],raw['dec'])
+        glon,glat = cel2gal(raw['ra'],raw['dec'])
         self.data['glon'],self.data['glat'] = glon, glat
 
 class Harris96(SourceCatalog):
@@ -187,7 +189,7 @@ class Harris96(SourceCatalog):
         self.data['ra'] = ugali.utils.projector.hms2dec(ra)
         self.data['dec'] = ugali.utils.projector.dms2dec(dec)
 
-        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
 class Corwen04(SourceCatalog):
@@ -218,7 +220,7 @@ class Corwen04(SourceCatalog):
         self.data['ra'] = ugali.utils.projector.hms2dec(ra)
         self.data['dec'] = ugali.utils.projector.dms2dec(dec)
 
-        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
 #class Steinicke10(SourceCatalog):
@@ -271,42 +273,43 @@ class Nilson73(SourceCatalog):
         self.data['ra'] = ra2000
         self.data['dec'] = dec2000
 
-        glon,glat = ugali.utils.projector.celToGal(self.data['ra'],self.data['dec'])
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
-def associate_sources(config):
-
-    dirname = config.params['output']['savedir_results']
-    infile = join(dirname,config.params['output']['objectfile'])
-    f = pyfits.open(infile)
-    objects = f[1].data
-
-    tol = config.params['associate']['radius']
-    columns = []
-
-    for i,names in enumerate(config.params['associate']['catalogs']):
-        i += 1
-        catalog = SourceCatalog()
-        for name in names:
-            catalog += catalogFactory(name)
-
-        # String length (should be greater than longest name)
-        length = len(max(catalog['name'],key=len)) + 1
-        dtype = 'S%i'%length; fitstype='%iA'%length
-
-        assoc = np.empty(len(objects),dtype=dtype)
-        assoc.fill('')
-        idx1,idx2,dist = catalog.match(objects['GLON_MAX'],objects['GLAT_MAX'],tol=tol)
-        assoc[idx1] = catalog['name'][idx2].astype(dtype)
-        columns.append(pyfits.Column(name='ASSOC%i'%i,format=fitstype,array=assoc))
-        columns.append(pyfits.Column(name='ANGSEP%i'%i,format='E',array=dist))
-
-
-    hdu = pyfits.new_table(objects.columns + pyfits.ColDefs(columns))
-    
-    outfile = join(dirname,config.params['output']['assocfile'])
-    hdu.writeto(outfile,clobber=True)
-    return catalog,objects
+#def associate_sources(config, outfile=None):
+#    dirname = config.params['output']['savedir_results']
+#    infile = join(dirname,config.params['output']['objectfile'])
+#    f = pyfits.open(infile)
+#    objects = f[1].data
+# 
+#    tol = config.params['associate']['radius']
+#    columns = []
+# 
+#    for i,names in enumerate(config.params['associate']['catalogs']):
+#        i += 1
+#        catalog = SourceCatalog()
+#        for name in names:
+#            catalog += catalogFactory(name)
+# 
+#        # String length (should be greater than longest name)
+#        length = len(max(catalog['name'],key=len)) + 1
+#        dtype = 'S%i'%length; fitstype='%iA'%length
+# 
+#        assoc = np.empty(len(objects),dtype=dtype)
+#        assoc.fill('')
+#        idx1,idx2,dist = catalog.match(objects['GLON_MAX'],objects['GLAT_MAX'],tol=tol)
+#        assoc[idx1] = catalog['name'][idx2].astype(dtype)
+#        columns.append(pyfits.Column(name='ASSOC%i'%i,format=fitstype,array=assoc))
+#        columns.append(pyfits.Column(name='ANGSEP%i'%i,format='E',array=dist))
+# 
+# 
+#    hdu = pyfits.new_table(objects.columns + pyfits.ColDefs(columns))
+#    
+#    if outfile is None:
+#        outfile = join(dirname,config.params['output']['assocfile'])
+#        
+#    hdu.writeto(outfile,clobber=True)
+#    return catalog,objects
 
 if __name__ == "__main__":
     import argparse

@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 
 """
-Run MCMC follow up on target parameters.
+Run MCMC follow-up on target parameters.
 """
 
 import os
 import sys
+from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
+import scipy.stats
 
 import pyfits
 import healpy
 import emcee
+import yaml
 
 import ugali.analysis.scan
 import ugali.utils.config
@@ -88,45 +89,30 @@ class MCMC(object):
         self.nsamples = self.config['mcmc']['nsamples'] 
         self.nthreads = self.config['mcmc']['nthreads'] 
 
+    def get_mle(self):
+        return self.grid.mle()
 
-    def get_mle(self, params):
-        # Maximum likelihood from scan
-        a = self.grid.log_likelihood_sparse_array
-        j,k = np.unravel_index(a.argmax(),a.shape)
+    def get_std(self):
+        mle = self.get_mle()
 
-        ret = []
-        for i,p in enumerate(params):
-            if p == 'richness':
-                ret += [self.grid.richness_sparse_array[j][k]]
-            if p == 'lon':
-                ret += [self.roi.pixels_target.lon[k]]
-            if p == 'lat':
-                ret += [self.roi.pixels_target.lat[k]]
-            if p == 'distance_modulus':
-                ret += [self.grid.distance_modulus_array[j]]
-            if p == 'extension':
-                ret += [self.loglike.kernel.extension()]
-                        
-        return np.array(ret)
+        std = odict([
+            ('richness',0.1*mle['richness']), # delta_r = 10% of max richness 
+            ('lon',0.01),                     # delta_l = 0.01 deg            
+            ('lat',0.01),                     # delta_b = 0.01 deg            
+            ('distance_modulus',0.1),         # delta_mu = 0.1                
+            ('extension',0.01),               # delta_ext = 0.01 deg
+        ])
+        return std
 
     def get_ball(self, params, size=1):
-        mle = self.get_mle(params)
+        mle = self.get_mle() 
+        std = self.get_std()
+                                             
+        p0 = np.array([mle[k] for k in params])
+        s0 = np.array([std[k] for k in params])
 
-        std = []
-        for i,p in enumerate(params):
-            if p == 'richness':
-                std += [0.1*mle[i]] # delta_r = 10% of max richness
-            if p == 'lon':
-                std += [0.01]       # delta_l = 0.01 deg
-            if p == 'lat':
-                std += [0.01]       # delta_b = 0.01 deg
-            if p == 'distance_modulus':
-                std += [0.1]        # delta_mu = 0.1 
-            if p == 'extension':
-                std += [0.01]       # delta_ext = 0.01 deg
+        return emcee.utils.sample_ball(p0,s0,size)
 
-        return emcee.utils.sample_ball(mle,std,size)
-        
     def lnlike(self, theta):
         kwargs = dict(zip(self.params,theta))
         try:
@@ -141,18 +127,67 @@ class MCMC(object):
         return 0
 
     def run(self, params):
+        logger.info("Setting inital values...")
+
+        # Initailize the likelihood to maximal value
+        mle =self.grid.mle()
+        self.loglike.set_params(**mle)
+        self.loglike.sync_params()
+
         self.params = params
  
-        ball = self.get_ball(params,size=self.nwalkers)
         nwalkers = self.nwalkers
         nsamples = self.nsamples
         nthreads = self.nthreads
-
         ndim = len(params)
         
+        logger.info("Running MCMC chain...")
         p0 = self.get_ball(params,nwalkers)
         self.sampler = emcee.EnsembleSampler(nwalkers,ndim,lnprob,threads=nthreads)
         self.sampler.run_mcmc(p0,nsamples)
+
+        # Chain is shape (nwalkers,nsteps,nparams)
+        self.chain = mcmc.sampler.chain
+        # Samples is shape (nwalkers*nsteps,nparams):
+        # chain[walker][step] == samples[walker+nwalkers*step]
+        samples = self.chain.reshape(-1,len(params),order='F')
+        ## Non-optimal conversion...
+        #self.samples = np.core.records.fromrecords(samples,names=self.params)
+        # Faster...
+        self.samples = np.core.records.fromarrays(samples.T,names=self.params)
+
+    def estimate(self,param,burn=None,sigma=5.0):
+        if param not in self.loglike.params.keys():
+            raise Exception('Unrecognized parameter: %s'%param)
+
+        if param not in self.params: 
+            mle = self.get_mle()
+            return [mle[param],0]
+
+        if burn is None: burn = self.config['mcmc']['nburn']
+        burn *= self.nwalkers
+        clip = scipy.stats.sigmaclip(self.samples[param][burn:],sigma,sigma)
+        mu,sigma = scipy.stats.norm.fit(clip[0])
+        return [float(mu), float(sigma)]
+
+    def estimate_params(self,burn=None,sigma=5.0):
+        mle = self.get_mle()
+        out = odict()
+        for param in mle.keys():
+            out[param] = self.estimate(param,burn,sigma)
+        return out
+
+    def save_samples(self,filename):
+        np.save(filename,self.samples)
+
+    def load_samples(self,filename):
+        self.samples = np.load(filename)
+
+    def save_results(self,filename):
+        output = self.estimate_params()
+        out = open(filename,'w')
+        out.write(yaml.dump(dict(output)))
+        out.close()
 
 if __name__ == "__main__":
     import ugali.utils.parser
@@ -162,18 +197,17 @@ if __name__ == "__main__":
     parser.add_debug()
     parser.add_verbose()
     parser.add_coords(required=True)
+    parser.add_argument('outfile',default=None,help="Output file name")
+                        
     opts = parser.parse_args()
-
-    #test = Test(opts.config,opts.coords)
-    #test.run()
 
     mcmc = MCMC(opts.config,opts.coords)
 
     niter = 0
     def lnprob(theta):
         global niter
-        if (logger.level==logger.DEBUG) and (niter%100==0):
-            logger.debug("%i function calls ..."%niter)
+        if (niter%100==0):
+            logger.info("%i function calls ..."%niter)
         niter+=1
         lp = mcmc.lnprior(theta)
         if not np.isfinite(lp):
@@ -182,15 +216,24 @@ if __name__ == "__main__":
             return lp + mcmc.lnlike(theta)
 
     mcmc.lnprob = lnprob
-    #params = ['lon','lat','extension']
-    params = ['richness','lon','lat','extension']
+
+    params = mcmc.config['mcmc']['params']
     mcmc.run(params)
 
-    chain = mcmc.sampler.chain
-    samples = chain.reshape((-1, len(params)))
-    np.save('mcmc_l%.1f_b%.1f.npy'%(mcmc.roi.lon,mcmc.roi.lat),samples)
+    mcmc.save_samples(opts.outfile)
+    resfile = opts.outfile.replace('.npy','.dat')
+    mcmc.save_results(resfile)
 
-    import triangle
-    fig = triangle.corner(samples[50*mcmc.nwalkers:], labels=params)
-    fig.savefig('mcmc_l%.1f_b%.1f.png'%(mcmc.roi.lon,mcmc.roi.lat))
+    memfile = opts.outfile.replace('.npy','.fits')
+    est = mcmc.estimate_params()
+    kwargs = {k:v[0] for k,v in est.items()}
+    mcmc.loglike.set_params(**kwargs)
+    mcmc.loglike.sync_params()
+    mcmc.loglike.write_membership(memfile)
 
+    #import matplotlib
+    #matplotlib.use('Agg')
+    #
+    #import triangle
+    #fig = triangle.corner(samples[50*mcmc.nwalkers:], labels=params)
+    #fig.savefig('mcmc_l%.1f_b%.1f.png'%(mcmc.roi.lon,mcmc.roi.lat))

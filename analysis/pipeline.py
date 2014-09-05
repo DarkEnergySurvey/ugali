@@ -4,6 +4,8 @@ Base functionality for pipeline script instances
 """
 import argparse
 
+import ugali.utils.batch
+
 from ugali.utils.parser import Parser
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
@@ -24,6 +26,7 @@ class Pipeline(object):
         self.parser = Parser(description=self.description)
         self.parser.add_config()
         self.parser.add_debug()
+        self.parser.add_force()
         self.parser.add_queue()
         self.parser.add_argument('-r','--run', default=[],
                                  action='append',choices=self.components,
@@ -36,7 +39,7 @@ class Pipeline(object):
             self.opts.run = self.components
 
         self.config = Config(self.opts.config)        
-            
+        self.batch = ugali.utils.batch.batchFactory(self.opts.queue)
 
     def run(self):
         logger.warning("Doing nothing...")

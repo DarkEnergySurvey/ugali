@@ -9,7 +9,6 @@ import healpy
 import copy
 
 import ugali.utils.projector
-import ugali.utils.plotting
 import ugali.utils.config
 
 from ugali.utils.projector import gal2cel,cel2gal
@@ -31,7 +30,7 @@ class Catalog:
             roi[None] : Region of Interest to load catalog data for
             data[None]: pyfits table data (fitsrec) object.
         """
-        #self.params = config.merge(config_merge) # Maybe you would want to update parameters??
+        #self = config.merge(config_merge) # Maybe you would want to update parameters??
         self.config = config
 
         if data is None:
@@ -54,11 +53,11 @@ class Catalog:
         if seed is not None: numpy.random.seed(seed)
         data = copy.deepcopy(self.data)
         idx = numpy.random.randint(0,len(data),len(data))
-        data[self.config.params['catalog']['mag_1_field']][:] = self.mag_1[idx]
-        data[self.config.params['catalog']['mag_err_1_field']][:] = self.mag_err_1[idx]
-        data[self.config.params['catalog']['mag_2_field']][:] = self.mag_2[idx]
-        data[self.config.params['catalog']['mag_err_2_field']][:] = self.mag_err_2[idx]
-        data[self.config.params['catalog']['mc_source_id_field']][:] |= mc_bit
+        data[self.config['catalog']['mag_1_field']][:] = self.mag_1[idx]
+        data[self.config['catalog']['mag_err_1_field']][:] = self.mag_err_1[idx]
+        data[self.config['catalog']['mag_2_field']][:] = self.mag_2[idx]
+        data[self.config['catalog']['mag_err_2_field']][:] = self.mag_err_2[idx]
+        data[self.config['catalog']['mc_source_id_field']][:] |= mc_bit
         return Catalog(self.config, data=data)
 
     def project(self, projector = None):
@@ -67,8 +66,8 @@ class Catalog:
         """
         if projector is None:
             try:
-                self.projector = ugali.utils.projector.Projector(self.config.params['coords']['reference'][0],
-                                                                 self.config.params['coords']['reference'][1])
+                self.projector = ugali.utils.projector.Projector(self.config['coords']['reference'][0],
+                                                                 self.config['coords']['reference'][1])
             except KeyError:
                 logger.warning('Projection reference point is median (lon, lat) of catalog objects')
                 self.projector = ugali.utils.projector.Projector(numpy.median(self.lon), numpy.median(self.lat))
@@ -83,7 +82,7 @@ class Catalog:
         """
         # ADW: Not safe to set index = -1 (since it will access last entry); -np.inf would be better
 
-        self.pixel = ang2pix(self.config.params['coords']['nside_pixel'],self.lon,self.lat)
+        self.pixel = ang2pix(self.config['coords']['nside_pixel'],self.lon,self.lat)
         self.pixel_roi_index = roi.indexROI(self.lon,self.lat)
 
         ### # ROI pixels should be pre-sorted, otherwise...
@@ -93,7 +92,7 @@ class Catalog:
         ### self.pixel_roi_index = index
 
         ## Involves overhead of creating a full HEALPix map
-        #map_roi = -1 * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        #map_roi = -1 * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
         #map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels)-1, len(roi.pixels))
         #self.pixel_roi_index = (map_roi[self.pixel]).astype(int)
         # 
@@ -116,6 +115,8 @@ class Catalog:
         """
         Show the color-magnitude diagram for catalog objects as scatter plot or two-dimensional histogram.
         """
+        import ugali.utils.plotting
+
         if mode == 'scatter':
             ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',
                                                        self.color, self.mag)
@@ -131,6 +132,8 @@ class Catalog:
         """
         Show map of catalog objects in image (projected) coordinates.
         """
+        import ugali.utils.plotting
+
         if mode == 'scatter':
             ugali.utils.plotting.twoDimensionalScatter('test', r'$\Delta$x', '$\Delta$y',
                                                        self.x, self.y, color=self.color)
@@ -177,36 +180,37 @@ class Catalog:
         """
         Helper funtion to define pertinent variables from catalog data.
         """
-        self.lon = self.data.field(self.config.params['catalog']['lon_field'])
-        self.lat = self.data.field(self.config.params['catalog']['lat_field'])
+        self.objid = self.data.field(self.config['catalog']['objid_field'])
+        self.lon = self.data.field(self.config['catalog']['lon_field'])
+        self.lat = self.data.field(self.config['catalog']['lat_field'])
 
-        if self.config.params['catalog']['coordsys'].lower() == 'cel' \
-           and self.config.params['coords']['coordsys'].lower() == 'gal':
+        if self.config['catalog']['coordsys'].lower() == 'cel' \
+           and self.config['coords']['coordsys'].lower() == 'gal':
             logger.info('Converting catalog objects from CELESTIAL to GALACTIC cboordinates')
             self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
-        elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
-           and self.config.params['coords']['coordsys'].lower() == 'cel':
+        elif self.config['catalog']['coordsys'].lower() == 'gal' \
+           and self.config['coords']['coordsys'].lower() == 'cel':
             logger.info('Converting catalog objects from GALACTIC to CELESTIAL coordinates')
             self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
 
-        self.mag_1 = self.data.field(self.config.params['catalog']['mag_1_field'])
-        self.mag_err_1 = self.data.field(self.config.params['catalog']['mag_err_1_field'])
-        self.mag_2 = self.data.field(self.config.params['catalog']['mag_2_field'])
-        self.mag_err_2 = self.data.field(self.config.params['catalog']['mag_err_2_field'])
+        self.mag_1 = self.data.field(self.config['catalog']['mag_1_field'])
+        self.mag_err_1 = self.data.field(self.config['catalog']['mag_err_1_field'])
+        self.mag_2 = self.data.field(self.config['catalog']['mag_2_field'])
+        self.mag_err_2 = self.data.field(self.config['catalog']['mag_err_2_field'])
 
-        if self.config.params['catalog']['mc_source_id_field'] is not None:
-            if self.config.params['catalog']['mc_source_id_field'] in self.data.names:
-                self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
+        if self.config['catalog']['mc_source_id_field'] is not None:
+            if self.config['catalog']['mc_source_id_field'] in self.data.names:
+                self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
                 logger.info('Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0)))
             else:
-                columns_array = [pyfits.Column(name = self.config.params['catalog']['mc_source_id_field'],
+                columns_array = [pyfits.Column(name = self.config['catalog']['mc_source_id_field'],
                                                format = 'I',
                                                array = numpy.zeros(len(self.data)))]
                 hdu = pyfits.new_table(columns_array)
                 self.data = pyfits.new_table(pyfits.new_table(self.data).columns + hdu.columns).data
-                self.mc_source_id = self.data.field(self.config.params['catalog']['mc_source_id_field'])
+                self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
 
-        if self.config.params['catalog']['band_1_detection']:
+        if self.config['catalog']['band_1_detection']:
             self.mag = self.mag_1
             self.mag_err = self.mag_err_1
         else:

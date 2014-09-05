@@ -94,6 +94,7 @@ Code:
 Projects:
 * (2b) SVA1 data products
 * (2b) Consider updating DES isochrones
+* (2b) Separate calculations from plotting
 
 === DONE ===
 * (1c) Collector function to find peaks (in 3D)

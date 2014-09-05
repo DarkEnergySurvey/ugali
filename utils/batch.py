@@ -2,19 +2,53 @@
 import subprocess, subprocess as sub
 import getpass
 from collections import OrderedDict as odict
+from itertools import chain
 
 from ugali.utils.logger import logger
 
+CLUSTERS = odict([
+    ('local',['local']),
+    ('lsf',['lsf','slac','kipac']),
+    ('slurm',['slurm','midway','kicp']),
+    ('condor',['condor','fnal']),
+])
+
+QUEUES = odict([
+    ('local',[]),
+    ('lsf',['express','short','medium','long','xlong','xxl','kipac-ibq']),
+    ('slurm',[]),
+    ('condor',['vanilla','universe']),
+])
+
+def batchFactory(queue,**kwargs):
+    name = queue.lower()
+    if name in list(chain(*QUEUES.values())):
+        kwargs.setdefault('q',name)
+
+    if name in CLUSTERS['local']+QUEUES['local']:
+        batch = Local(**kwargs)
+    elif name in CLUSTERS['lsf']+QUEUES['lsf']:
+        batch = LSF(**kwargs)
+    elif name in CLUSTERS['slurm']+QUEUES['slurm']:
+        batch = Slurm(**kwargs)
+    elif name in CLUSTERS['condor']+QUEUES['condor']:
+        # Need to learn how to use condor first...
+        batch = Condor(**kwargs)
+        raise Exception("FNAL cluster not implemented")
+    else:
+        raise TypeError('Unexpected queue name: %s'%name)
+
+    return batch
+
 class Batch(object):
+    # Default options for batch submission
+    default_opts = odict([])
+    # Map between generic and batch specific names
+    map_opts = odict([])
 
     def __init__(self, **kwargs):
         self.username = getpass.getuser()
-
-        # Default options for batch submission
-        self.default_opts = odict([])
-        # Map between generic and batch specific names
-        self.opts_map = odict([])
-
+        self.default_opts.update(**kwargs)
         self.submit_cmd = "submit %(opts)s %(command)s"
         self.jobs_cmd = "jobs"
 
@@ -36,10 +70,10 @@ class Batch(object):
         return sub.call(command,shell=True)
 
     def remap_options(self,opts):
-        for k in self.opts_map.keys():
+        for k in self.map_opts.keys():
             v = opts.pop(k,None)
             if v is not None:
-                opts[self.opts_map[k]] = v
+                opts[self.map_opts[k]] = v
 
     def batch(self, command, jobname=None, logfile=None, **opts):
         if jobname: opts.update(jobname=jobname)
@@ -54,12 +88,8 @@ class Batch(object):
         return cmd
 
 class Local(Batch):
-    def __init__(self):
-        super(Local,self).__init__()
-
-        self.default_opts = odict([])
-        self.opts_map = odict([])
-
+    def __init__(self,**kwargs):
+        super(Local,self).__init__(**kwargs)
         self.jobs_cmd = "echo 0"
         self.submit_cmd = "%(command)s %(opts)s"
 
@@ -68,19 +98,19 @@ class Local(Batch):
         return ''
 
 class LSF(Batch):
-    def __init__(self):
-        super(LSF,self).__init__()
+    default_opts = odict([
+        ('R','"scratch > 1 && rhel60"'),
+        ('C', 0),
+        ('q', 'long'),
+    ])
 
-        self.default_opts = odict([
-            ('R','"scratch > 1 && rhel60"'),
-            ('C', 0),
-            ('q', 'long'),
-        ])
+    map_opts = odict([
+        ('jobname','J'),
+        ('logfile','oo')
+    ])
 
-        self.opts_map = odict([
-            ('jobname','J'),
-            ('logfile','oo')
-        ])
+    def __init__(self,**kwargs):
+        super(LSF,self).__init__(**kwargs)
 
         self.jobs_cmd = "bjobs -u %s"%self.username
         self.submit_cmd = "bsub %(opts)s %(command)s"
@@ -90,15 +120,17 @@ class LSF(Batch):
         options.update(opts)
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
-class Midway(Batch):
-    def __init__(self):
-        super(Midway,self).__init__()
-        logger.warning('Midway cluster is untested')
-        self.default_opts = odict([
-            ('account','kicp'),
-            ('partition','kicp-ht'),
-            ('mem',10000)
-        ])
+class Slurm(Batch):
+    default_opts = odict([
+        ('account','kicp'),
+        ('partition','kicp-ht'),
+        ('mem',10000)
+    ])
+
+    def __init__(self, **kwargs):
+        super(Slurm,self).__init__(**kwargs)
+        logger.warning('Slurm cluster is untested')
+
         self.jobs_cmd = "squeue -u %s"%self.username
         self.submit_cmd = "sbatch %(opts)s %(command)s"
 
@@ -108,7 +140,13 @@ class Midway(Batch):
         return ''.join('--%s %s '%(k,v) for k,v in options.items())
 
 class Condor(Batch):
+    default_opts = odict()
+    map_opts = odict()
+
     def __init__(self):
+        super(Condor,self).__init__(**kwargs)
+        logger.warning('Condor cluster is untested')
+        
         self.jobs_cmd = 'condor_q -u %s'%self.username
         self.submit_cmd = "csub %(opts)s %(command)s"
 

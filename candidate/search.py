@@ -1,20 +1,29 @@
 #!/usr/bin/env python
+"""
+@author: Alex Drlica-Wagner <kadrlica@fnal.gov>
+"""
+
+import os
+import copy
+import subprocess
+from collections import OrderedDict as odict
+
 import healpy
 import pyfits
 import numpy as np
 import numpy
-import pylab as plt
+import numpy.lib.recfunctions as recfuncs
 import scipy.ndimage as ndimage
-import copy
-import subprocess
-import os
+
+import ugali.candidate.associate
 
 import ugali.utils.skymap
 import ugali.utils.config
+import ugali.utils.shell
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
-from ugali.utils.projector import pixToAng,galToCel
-from ugali.utils.projector import Projector
+from ugali.utils.projector import Projector, gal2cel, dec2hms, dec2dms, mod2dist
+from ugali.utils.healpix import pix2ang, ang2pix
 
 class CandidateSearch(object):
     """
@@ -23,34 +32,54 @@ class CandidateSearch(object):
     def __init__(self, config, filename=None):
         self.config = config
         if filename is None:
-            dirname = config.params['output']['savedir_results']
-            basename = config.params['output']['mergefile']
+            dirname = config['output']['savedir_results']
+            basename = config['output']['mergefile']
             filename = os.path.join(dirname,basename)
         self.filename = filename
         self._load()
         self._config()
 
     def _config(self):
-        self.nside = self.config.params['coords']['nside_pixel']
-        self.threshold = self.config.params['search']['threshold'] # = 10
-        self.xsize = self.config.params['search']['xsize'] # = 10000
-        self.minpix = self.config.params['search']['minpix'] # = 1
-        dirname=self.config.params['output']['savedir_results']
-        basename=self.config.params['output']['labelfile']
+        self.nside = self.config['coords']['nside_pixel']
+        self.threshold = self.config['search']['obj_threshold'] # = 10
+        self.xsize = self.config['search']['xsize'] # = 10000
+        self.minpix = self.config['search']['minpix'] # = 1
+        dirname=self.config['output']['savedir_results']
+        basename=self.config['output']['labelfile']
         self.labelfile = os.path.join(dirname,basename)
-        basename=self.config.params['output']['objectfile']
+        basename=self.config['output']['objectfile']
         self.objectfile = os.path.join(dirname,basename)
-        basename=self.config.params['output']['roifile']
+        basename=self.config['output']['roifile']
         self.roifile = os.path.join(dirname,basename)
-        
-    def _load(self):
-        f = pyfits.open(self.filename)
-        self.pixels = f[1].data['pix']
-        self.values = 2*f[1].data['log_likelihood']
-        self.distances = f[2].data['DISTANCE_MODULUS']
+        basename=self.config['output']['assocfile']
+        self.assocfile = os.path.join(dirname,basename)
+        basename=self.config['output']['candfile']
+        self.candfile = os.path.join(dirname,basename)
 
-    def createLabels(self):
-        logger.debug("Creating labels...")
+    def loadLikelihood(self):
+        f = pyfits.open(self.filename)
+        self.pixels = f[1].data['PIX']
+        self.values = 2*f[1].data['LOG_LIKELIHOOD']
+        self.distances = f[2].data['DISTANCE_MODULUS']
+        self.richness = f[1].data['RICHNESS']
+
+    _load = loadLikelihood
+
+    def createLabels2D(self):
+        """ 2D labeling at zmax """
+        logger.debug("Creating 2D labels...")
+        self.zmax = np.argmax(self.values,axis=1)
+        self.vmax = self.values[np.arange(len(self.pixels),dtype=int),self.zmax]
+
+        kwargs=dict(pixels=self.pixels,values=self.vmax,nside=self.nside,
+                    threshold=self.threshold,xsize=self.xsize)
+        labels,nlabels = CandidateSearch.labelHealpix(**kwargs)
+        self.nlabels = nlabels
+        self.labels = np.repeat(labels,len(self.distances)).reshape(len(labels),len(self.distances))
+        return self.labels, self.nlabels
+
+    def createLabels3D(self):
+        logger.debug("Creating 3D labels...")
         kwargs=dict(pixels=self.pixels,values=self.values,nside=self.nside,
                     threshold=self.threshold,xsize=self.xsize)
         self.labels,self.nlabels = CandidateSearch.labelHealpix(**kwargs)
@@ -68,12 +97,12 @@ class CandidateSearch(object):
     def loadLabels(self,filename=None):
         if filename is None: filename = self.labelfile
         f = pyfits.open(filename)
-        if not (self.pixels == f[1].data['pix']).all(): 
+        if not (self.pixels == f[1].data['PIX']).all(): 
             raise Exception("...")
         if not (self.distances == f[2].data['DISTANCE_MODULUS']).all():
             raise Exception("...")            
 
-        self.labels = f[1].data['label'].astype(int)
+        self.labels = f[1].data['LABEL'].astype(int)
         self.nlabels = self.labels.max()
         if self.nlabels != (len(np.unique(self.labels)) - 1):
             raise Exception("Incorrect number of labels found.")
@@ -90,10 +119,9 @@ class CandidateSearch(object):
 
         kwargs=dict(pixels=self.pixels,values=self.values,nside=self.nside, 
                     zvalues=self.distances, rev=self.rev, good=self.good)
+        objects = self.findObjects(**kwargs)
+        self.objects = self.finalizeObjects(objects)
 
-        #self.objects = CandidateSearch.findObjects(**kwargs)
-        self.objects = self.findObjects(**kwargs)
-        self.roiInfo(self.objects)
         return self.objects
 
     def writeObjects(self,filename=None):
@@ -131,20 +159,33 @@ class CandidateSearch(object):
         if values.ndim < 2: iterate = [values]
         else:               iterate = values.T
         for i,value in enumerate(iterate):
+            logger.debug("Labeling slice %i...")
             searchim = numpy.zeros(xx.shape,dtype=bool)
             select = (value > threshold)
             yidx = ij[0][select]; xidx = ij[1][select]
             searchim[yidx,xidx] |= True
             searchims.append( searchim )
-     
-        # Do the labeling
         searchims = numpy.array(searchims)
+
+        # Full binary structure
         s = ndimage.generate_binary_structure(searchims.ndim,searchims.ndim)
-        labels,nlabels = ndimage.label(searchims,structure=s)
      
+        ### # Dilate in the z-direction
+        logger.info("Dilating image...")
+        searchims = ndimage.binary_dilation(searchims,s,1)
+        
+        # Do the labeling
+        logger.info("Labeling image...")
+        labels,nlabels = ndimage.label(searchims,structure=s)
+
         # Convert back to healpix
         pix_labels = labels[:,ij[0],ij[1]].T
+        pix_labels = pix_labels.reshape(values.shape)
+        #print pix_labels.shape
+        #print values.shape
+        #print (values > threshold).shape
         pix_labels *= (values > threshold) # re-trim
+        #print pix_labels.shape
         return pix_labels, nlabels
 
     @staticmethod
@@ -168,21 +209,19 @@ class CandidateSearch(object):
         objs = numpy.recarray((ngood,),
                            dtype=[('LABEL','i4'),
                                   ('NPIX','i4'),
-                                  ('VALUE_MAX','f4'),
+                                  ('VAL_MAX','f4'),
                                   ('IDX_MAX','i4'),
                                   ('ZIDX_MAX','i4'),
                                   ('PIX_MAX','i4'),
-                                  ('GLON_MAX','f4'),
-                                  ('GLAT_MAX','f4'),
-                                  ('ZVAL_MAX','f4'),
-                                  ('GLON_CENT','f4'),
-                                  ('GLAT_CENT','f4'),
-                                  ('ZVAL_CENT','f4'),
-                                  ('GLON_BARY','f4'),
-                                  ('GLAT_BARY','f4'),
-                                  ('ZVAL_BARY','f4'),
-                                  ('NANNULUS','i4'),
-                                  ('NINTERIOR','i4'),
+                                  ('X_MAX','f4'),
+                                  ('Y_MAX','f4'),
+                                  ('Z_MAX','f4'),
+                                  ('X_CENT','f4'),
+                                  ('Y_CENT','f4'),
+                                  ('Z_CENT','f4'),
+                                  ('X_BARY','f4'),
+                                  ('Y_BARY','f4'),
+                                  ('Z_BARY','f4'),
                                   ('CUT','i2'),])
         objs['CUT'][:] = 0
      
@@ -197,7 +236,7 @@ class CandidateSearch(object):
             zidx = indices % ncol  # This is the distance index
      
             pix = pixels[idx] # This is the healpix pixel
-            glon,glat = pixToAng(nside, pix)
+            xval,yval = pix2ang(nside, pix)
             zval = zvalues[zidx]
             
             objs[i]['LABEL'] = good[i]
@@ -207,42 +246,176 @@ class CandidateSearch(object):
      
             island = values[idx,zidx]
             idxmax = island.argmax()
-            glon_max,glat_max,zval_max = glon[idxmax],glat[idxmax],zval[idxmax]
+            xval_max,yval_max,zval_max = xval[idxmax],yval[idxmax],zval[idxmax]
      
-            objs[i]['VALUE_MAX'] = island[idxmax]
+            objs[i]['VAL_MAX'] = island[idxmax]
             objs[i]['IDX_MAX']  = idx[idxmax]
             objs[i]['ZIDX_MAX']  = zidx[idxmax]
             objs[i]['PIX_MAX']   = pix[idxmax]
-            objs[i]['GLON_MAX']  = glon_max
-            objs[i]['GLAT_MAX']  = glat_max
-            objs[i]['ZVAL_MAX']  = zval_max
-     
-            proj = Projector(glon_max,glat_max)
-            xpix,ypix = proj.sphereToImage(glon,glat)
-            
+            objs[i]['X_MAX']  = xval_max
+            objs[i]['Y_MAX']  = yval_max
+            objs[i]['Z_MAX']  = zval_max
+
+            proj = Projector(xval_max,yval_max)
+            xpix,ypix = proj.sphereToImage(xval,yval)
+
+            # Projected centroid
             x_cent,y_cent,zval_cent = numpy.average([xpix,ypix,zval],axis=1)
-            glon_cent, glat_cent = proj.imageToSphere(x_cent,y_cent)
-            objs[i]['GLON_CENT'] = glon_cent
-            objs[i]['GLAT_CENT'] = glat_cent
-            objs[i]['ZVAL_CENT'] = zval_cent
-     
-            x_bary,y_bary,zval_bary = numpy.average([xpix,ypix,zval],weights=[island,island,island],axis=1)
-            glon_bary, glat_bary = proj.imageToSphere(x_bary, y_bary)
-            objs[i]['GLON_BARY'] = glon_bary
-            objs[i]['GLAT_BARY'] = glat_bary
-            objs[i]['ZVAL_BARY'] = zval_bary
+            xval_cent, yval_cent = proj.imageToSphere(x_cent,y_cent)
+            objs[i]['X_CENT'] = xval_cent
+            objs[i]['Y_CENT'] = yval_cent
+            objs[i]['Z_CENT'] = zval_cent
+
+            # Projected barycenter
+            weights=[island,island,island]
+            x_bary,y_bary,zval_bary = numpy.average([xpix,ypix,zval],weights=weights,axis=1)
+            xval_bary,yval_bary = proj.imageToSphere(x_bary, y_bary)
+            objs[i]['X_BARY'] = xval_bary
+            objs[i]['Y_BARY'] = yval_bary
+            objs[i]['Z_BARY'] = zval_bary
      
         return objs
 
-    def roiInfo(self, objects):
+    def finalizeObjects(self, objects):
+        objs = numpy.recarray(len(objects),
+                              dtype=[('NAME','S24'),
+                                     ('TS','f4'),
+                                     ('GLON','f4'),
+                                     ('GLAT','f4'),
+                                     ('RA','f4'),
+                                     ('DEC','f4'),
+                                     ('MODULUS','f4'),
+                                     ('DISTANCE','f4'),
+                                     ('RICHNESS','f4'),
+                                     ('MASS','f4'),
+                                     ('NANNULUS','i4'),
+                                     ('NINTERIOR','i4'),
+                                     ])
+        
+        objs['TS'] = self.values[objects['IDX_MAX'],objects['ZIDX_MAX']]
+
+        glon,glat = objects['X_MAX'],objects['Y_MAX']
+        objs['GLON'],objs['GLAT'] = glon,glat
+        
+        ra,dec    = gal2cel(glon,glat)
+        objs['RA'],objs['DEC'] = ra,dec
+
+        modulus = objects['Z_MAX']
+        objs['MODULUS'] = modulus
+        objs['DISTANCE'] = mod2dist(modulus)
+
         ninterior = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NINSIDE')
         nannulus = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NANNULUS')
+        stellar = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'STELLAR')
+
         nside = healpy.npix2nside(len(nannulus))
-        for obj in objects:
-            glon,glat = obj['GLON_MAX'],obj['GLAT_MAX']
-            pix = ugali.utils.projector.angToPix(nside,glon,glat)
-            obj['NANNULUS'] = int(nannulus[pix])
-            obj['NINTERIOR'] = int(ninterior[pix])
+        pix = ang2pix(nside,glon,glat)
+
+        richness = self.richness[objects['IDX_MAX'],objects['ZIDX_MAX']]
+        objs['RICHNESS'] = richness
+        objs['MASS'] = richness * stellar[pix]
+
+        objs['NANNULUS']  = nannulus[pix].astype(int)
+        objs['NINTERIOR'] = ninterior[pix].astype(int)
+
+        # Default name formatting
+        # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
+        fmt = "UGALI J%(hour)02i%(hmin)02.1f%(deg)+03i%(dmin)02i"
+        for obj,_ra,_dec in zip(objs,ra,dec):
+            hms = dec2hms(_ra); dms = dec2dms(_dec)
+            params = dict(hour=hms[0],hmin=hms[1]+hms[2]/60.,
+                          deg=dms[0],dmin=dms[1]+dms[2]/60.)
+            obj['NAME'] = fmt%params
+
+        out = recfuncs.merge_arrays([objs,objects],usemask=False,asrecarray=True,flatten=True)
+        # This is safer than viewing as FITS_rec
+        return pyfits.new_table(out).data
+
+    def loadLabels(self,filename=None):
+        if filename is None: filename = self.labelfile
+        f = pyfits.open(filename)
+        if not (self.pixels == f[1].data['PIX']).all(): 
+            raise Exception("...")
+        if not (self.distances == f[2].data['DISTANCE_MODULUS']).all():
+            raise Exception("...")            
+
+        self.labels = f[1].data['LABEL'].astype(int)
+        self.nlabels = self.labels.max()
+        if self.nlabels != (len(np.unique(self.labels)) - 1):
+            raise Exception("Incorrect number of labels found.")
+        return self.labels, self.nlabels
+
+    def loadObjects(self,filename=None):
+        if filename is None: filename = self.objectfile
+        f = pyfits.open(filename)
+        self.objects = f[1].data
+
+    def loadAssociations(self,filename=None):
+        if filename is None: filename = self.assocfile
+        f = pyfits.open(filename)
+        self.assocs = f[1].data
+
+    def createAssociations(self):
+        objects = self.objects
+
+        tol = self.config['search']['proximity']
+        columns = []
+     
+        names = np.empty(len(objects),dtype=object)
+        names.fill('')
+        for i,refs in enumerate(self.config['search']['catalogs']):
+            i += 1
+            catalog = ugali.candidate.associate.SourceCatalog()
+            for ref in refs:
+                catalog += ugali.candidate.associate.catalogFactory(ref)
+     
+            # String length (should be greater than longest name)
+            length = len(max(catalog['name'],key=len)) + 1
+            dtype = 'S%i'%length; fitstype='%iA'%length
+     
+            assoc = np.empty(len(objects),dtype=dtype)
+            assoc.fill('')
+            idx1,idx2,dist = catalog.match(objects['GLON'],objects['GLAT'],tol=tol)
+            assoc[idx1] = catalog['name'][idx2].astype(dtype)
+            columns.append(pyfits.Column(name='ASSOC%i'%i,format=fitstype,array=assoc))
+            columns.append(pyfits.Column(name='ANGSEP%i'%i,format='E',array=dist))
+
+            if length > objects['NAME'].itemsize:
+                logger.warning("Association name may not fit.")
+            names = np.where(names=='',assoc,names)
+        names = names.astype(objects['NAME'].dtype)
+        objects['NAME'][:] = np.where(names=='',objects['NAME'],names)
+
+        self.assocs = pyfits.new_table(objects.columns+pyfits.ColDefs(columns)).data
+
+    def writeAssociations(self,filename=None):
+        if filename is None: filename = self.assocfile
+        hdu = pyfits.new_table(self.assocs)
+        logger.info("Writing %s..."%filename)
+        hdu.writeto(filename,clobber=True)
+
+    def writeCandidates(self,filename=None):
+        if filename is None: filename = self.candfile
+
+        threshold = self.config['search']['cand_threshold']
+        select  = (self.assocs['CUT']==0)
+        select &= (self.assocs['TS']>threshold)
+        #select &= (self.assocs['ASSOC2']=='')
+
+        self.candidates = self.assocs[select]
+        # ADW: View this as a recarray or writes the original assocation
+        # Why? I don't know, and I'm slightly terrified.
+        hdu = pyfits.new_table(self.candidates.view(np.recarray))
+        logger.info("Writing %s..."%filename)
+        hdu.writeto(filename,clobber=True)
+
+        # Dump to txt file 
+        if ugali.utils.shell.which('fdump'):
+            txtfile = filename.replace('.fits','.txt')
+            columns = ['NAME','TS','GLON','GLAT','DISTANCE','MASS']
+            cmd = 'fdump %(infile)s %(outfile)s columns="%(columns)s" rows="-" prhead="no" showcol="yes" clobber="yes" pagewidth="256" fldsep=" " showrow="no"'%(dict(infile=filename,outfile=txtfile,columns=','.join(columns)))
+            print cmd
+            subprocess.call(cmd,shell=True)
 
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -250,5 +423,3 @@ if __name__ == "__main__":
     description = "python script"
     parser = OptionParser(usage=usage,description=description)
     (opts, args) = parser.parse_args()
-
-    

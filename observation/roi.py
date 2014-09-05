@@ -17,7 +17,6 @@ import healpy
 
 import ugali.utils.binning
 import ugali.utils.projector
-import ugali.utils.plotting
 import ugali.utils.skymap
 
 from ugali.utils.healpix import query_disc, ang2pix, pix2ang, ang2vec
@@ -154,6 +153,8 @@ class ROI(object):
         """
         Plot the ROI
         """
+        import ugali.utils.plotting
+
         map_roi = numpy.array(healpy.UNSEEN \
                               * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel'])))
         

@@ -44,6 +44,7 @@ class Config(dict):
 
     def _load(self, input):
         if isinstance(input, basestring):
+            self.filename = input
             ext = os.path.splitext(input)[1]
             if ext == '.py':
                 reader = open(input)

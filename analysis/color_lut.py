@@ -9,7 +9,6 @@ import pyfits
 #import pylab
 
 import ugali.utils.config
-import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.analysis.isochrone
 
@@ -29,6 +28,7 @@ def writeColorLUT2(config,
     and an array of magnitude uncertainties which set the bin edges of those dimensions (zero implicity included).
     Finally there is an outfile name.
     """
+    if plot: import ugali.utils.plotting
 
     if type(config) == str:
         config = ugali.utils.config.Config(config)
@@ -190,7 +190,7 @@ def writeColorLUT(config,
     and an array of magnitude uncertainties which set the bin edges of those dimensions (zero implicity included).
     Finally there is an outfile name.
     """
-
+    if plot: import ugali.utils.plotting
     if type(config) == str:
         config = ugali.utils.config.Config(config)
     if outfile is None:

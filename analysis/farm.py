@@ -3,11 +3,8 @@
 """
 Class to farm out analysis tasks.
 
-Classes
-    Mask
-
-Functions
-    someFunction
+@author: Keith Bechtol <>
+@author: Alex Drlica-Wagner <>
 """
 
 import os
@@ -49,67 +46,22 @@ class Farm:
         self._setup()
 
     def _setup(self):
-        self.nside_catalog    = self.config.params['coords']['nside_catalog']
-        self.nside_likelihood = self.config.params['coords']['nside_likelihood']
-        self.nside_pixel      = self.config.params['coords']['nside_pixel']
+        self.nside_catalog    = self.config['coords']['nside_catalog']
+        self.nside_likelihood = self.config['coords']['nside_likelihood']
+        self.nside_pixel      = self.config['coords']['nside_pixel']
 
         self.filenames = self.config.getFilenames()
         # Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
         self.catalog_pixels = self.filenames['pix'].compressed()
 
-    # ADW: This should be moved to a "target" or utility module
-    @staticmethod
-    def loadTargetCoordinates(filename):
-        """
-        Load a text file with target coordinates. Returns
-        an array of target locations in Galactic coordinates.
-        File description:
-        [NAME] [LON] [LAT] [RADIUS] [COORD]
-        
-        The values of LON and LAT will depend on COORD:
-        COORD = [GAL  | CEL | HPX  ],
-        LON   = [GLON | RA  | NSIDE]
-        LAT   = [GLAT | DEC | PIX  ]
-
-        """
-        data = numpy.loadtxt(filename,unpack=True,usecols=range(5),dtype=object)
-        # Deal with one-line input files
-        if data.ndim == 1: data = numpy.array([data]).T
-        names = data[0]
-        out   = data[1:4].astype(float)
-        lon,lat,radius = out
-
-        coord = numpy.array([s.lower() for s in data[4]])
-        gal = (coord=='gal')
-        cel = (coord=='cel')
-        hpx = (coord=='hpx')
-
-        if cel.any():
-            glon,glat = cel2gal(lon[cel],lat[cel])
-            out[0][cel] = glon
-            out[1][cel] = glat
-        if hpx.any():
-            glon,glat = pix2ang(lat[hpx],lon[hpx])
-            out[0][hpx] = glon
-            out[1][hpx] = glat
-
-        return names,out.T
-               
     def command(self, outfile, configfile, pix):
         """
         Placeholder for a function to generate the command for running
         the likelihood scan.
         """
-        cmd = '%s %s %s --hpx %i %i'%(self.config['queue']['script'], configfile, outfile, self.nside_likelihood, pix)
+        cmd = '%s %s %s --hpx %i %i'%(self.config['batch']['script'], configfile, outfile, self.nside_likelihood, pix)
         return cmd
-
-    def queue(self):
-        """
-        Placeholder for a function that will interface with the various
-        batch systems (i.e., lsf, condor, etc.)
-        """
-        pass
 
     # ADW: Should probably be in a utility
     def footprint(self, nside=None):
@@ -154,7 +106,7 @@ class Farm:
             
         return inside
         
-    def submit_all(self, coords=None, local=False, debug=False):
+    def submit_all(self, coords=None, queue=None, debug=False):
         """
         Submit likelihood analyses on a set of coordinates. If
         coords == None, submit all coordinates in the footprint.
@@ -163,7 +115,7 @@ class Farm:
         coords : Array of target locations in Galactic coordinates. 
                  [Can optionally contain search radii about the specified coordinates.]
                  [ (GLON, GLAT, [RADIUS]) ]
-        local  : Run locally
+        queue  : Overwrite submit queue.
         debug  : Don't run.
         """
         if coords is None:
@@ -194,35 +146,28 @@ class Farm:
             return
 
         # Only write the configfile once
-        outdir = mkdir(self.config.params['output']['savedir_likelihood'])
+        outdir = mkdir(self.config['output']['savedir_likelihood'])
         configfile = '%s/config_queue.py'%(outdir)
         self.config.write(configfile)
 
         pixels = pixels[inside]
-        self.submit(pixels,local=local,debug=debug,configfile=configfile)
+        self.submit(pixels,queue=queue,debug=debug,configfile=configfile)
 
-    def submit(self, pixels, local=True, debug=False, configfile=None):
+    def submit(self, pixels, queue=None, debug=False, configfile=None):
         """
         Submit the likelihood job for the given pixel(s).
         """
+        queue = self.config['batch']['cluster'] if queue is None else queue
+        local = (queue == 'local')
+
+        # Need to develop some way to take command line arguments...
+        self.batch = ugali.utils.batch.batchFactory(queue,**self.config['batch']['opts'])
+
         if numpy.isscalar(pixels): pixels = numpy.array([pixels])
 
         outdir = mkdir(self.config['output']['savedir_likelihood'])
         logdir = mkdir(join(outdir,'log'))
         subdir = mkdir(join(outdir,'sub'))
-
-        # Need to develop some way to take command line arguments...
-        if local or self.config['queue']['cluster']=='local':
-            batch = ugali.utils.batch.Local()
-        elif self.config['queue']['cluster']=='midway':
-            batch = ugali.utils.batch.Midway()
-        elif self.config['queue']['cluster']=='slac':
-            # Need to add an option for which slac queue [short/long/kipac-ibq]
-            batch = ugali.utils.batch.LSF()
-        elif self.config['queue']['cluster']=='fnal':
-            # Need to learn how to use condor first...
-            batch = ugali.utils.batch.Condor()
-            raise Exception("FNAL cluster not implemented")
 
         # Save the current configuation settings; avoid writing 
         # file multiple times if configfile passed as argument.
@@ -235,7 +180,7 @@ class Farm:
                 
         lon,lat = pix2ang(self.nside_likelihood,pixels)
         commands = []
-        chunk = self.config['queue']['chunk']
+        chunk = self.config['batch']['chunk']
         istart = 0
         logger.info('=== Submit Likelihood ===')
         for ii,pix in enumerate(pixels):
@@ -244,7 +189,7 @@ class Farm:
             # Create outfile name
             outbase = 'likelihood_%08i_%s.fits'%(pix,self.config['coords']['coordsys'].lower())
             outfile = join(outdir, outbase)
-            jobname = self.config['queue']['jobname']
+            jobname = self.config['batch']['jobname']
 
             # Check if outfile exists
             if os.path.exists(outfile) and not local:
@@ -280,15 +225,14 @@ class Farm:
                 continue
 
             while True:
-                njobs = batch.njobs()
-                if njobs < self.config.params['queue']['max_jobs']:
+                njobs = self.batch.njobs()
+                if njobs < self.config['batch']['max_jobs']:
                     break
                 else:
                     logger.info('%i jobs already in queue, waiting ...'%(njobs))
                     time.sleep(15)
 
-            opts = self.config['queue'].get('opts',{})
-            job = batch.submit(command,jobname,logfile,**opts)
+            job = self.batch.submit(command,jobname,logfile)
             logger.info("  "+job)
             time.sleep(0.5)
 
@@ -301,19 +245,8 @@ if __name__ == "__main__":
     parser.add_debug()
     parser.add_queue()
     parser.add_verbose()
-    parser.add_coords(required=True)
-    parser.add_argument('--radius',default=0,type=float,
-                      help="Radius surrounding specified coordinates")
-    parser.add_argument('-t','--targets',default=None,
-                      help="List of target coordinates")
+    parser.add_coords(required=True,radius=True,targets=True)
     opts = parser.parse_args()
 
-    if opts.targets:
-        names,coords = farm.loadTargetCoordinates(opts.targets)
-    else:
-        coords = [ (opts.coords[0],opts.coords[1],opts.radius) ]
-
-    local = (opts.queue=='local')
-
     farm = Farm(opts.config)
-    x = farm.submit_all(coords=coords,local=local,debug=opts.debug)
+    x = farm.submit_all(coords=opts.coords,queue=opts.queue,debug=opts.debug)

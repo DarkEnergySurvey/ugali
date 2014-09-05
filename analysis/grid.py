@@ -9,15 +9,18 @@ Functions
 """
 
 import time
+from collections import OrderedDict as odict
+
 import numpy
+import numpy as np
 import scipy.stats
 import scipy.optimize
-import pylab
 import healpy
 
-import ugali.utils.binning
+#import ugali.utils.binning
 import ugali.utils.parabola
 import ugali.utils.skymap
+
 import ugali.analysis.color_lut
 import ugali.analysis.loglike
 
@@ -70,10 +73,10 @@ class GridSearch:
                 logger.info('  Precomputing signal color from %s'%(self.config.params['likelihood']['color_lut_infile']))
                 self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config.params['likelihood']['color_lut_infile'],
                                                                                distance_modulus,
-                                                                               self.catalog.mag_1,
-                                                                               self.catalog.mag_2,
-                                                                               self.catalog.mag_err_1,
-                                                                               self.catalog.mag_err_2)
+                                                                               self.loglike.catalog.mag_1,
+                                                                               self.loglike.catalog.mag_2,
+                                                                               self.loglike.catalog.mag_err_1,
+                                                                               self.loglike.catalog.mag_err_2)
             if not numpy.any(self.u_color_array[ii]):
                 logger.info('  Precomputing signal color on the fly...')
                 self.u_color_array[ii] = self.loglike.calc_signal_color(distance_modulus) 
@@ -216,6 +219,17 @@ class GridSearch:
             
         log_likelihood, p, f = self.logLikelihood(distance_modulus, richness, grid_search=True)
         return p
+
+    def mle(self):
+        a = self.log_likelihood_sparse_array
+        j,k = np.unravel_index(a.argmax(),a.shape)
+        mle = odict()
+        mle['richness'] = self.richness_sparse_array[j][k]
+        mle['lon'] = self.roi.pixels_target.lon[k]
+        mle['lat'] = self.roi.pixels_target.lat[k]
+        mle['distance_modulus'] = self.distance_modulus_array[j]
+        mle['extension'] = float(self.loglike.kernel.extension())
+        return mle
 
     def write(self, outfile):
         """

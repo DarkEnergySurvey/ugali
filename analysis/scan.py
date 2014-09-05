@@ -36,7 +36,9 @@ class Scan(object):
     """
     def __init__(self, config, coords):
         self.config = ugali.utils.config.Config(config)
-        self.lon,self.lat = coords
+        # Should only be one coordinate
+        if len(coords)!=1: raise Exception('Must specify one coordinate.')
+        self.lon,self.lat,radius = coords[0]
         self._setup()
 
     def _setup(self):
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument('outfile',metavar='outfile.fits',help='Output fits file.')
     parser.add_debug()
     parser.add_verbose()
-    parser.add_coords(required=True)
+    parser.add_coords(required=True,radius=False)
     opts = parser.parse_args()
 
 

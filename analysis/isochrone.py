@@ -12,7 +12,6 @@ import pylab
 
 import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
-import ugali.utils.plotting
 
 from ugali.utils.logger import logger
 ############################################################
@@ -58,6 +57,8 @@ class Isochrone(object):
         """
         Show the color-magnitude diagram of isochrone points in absolute magnitudes.
         """
+        import ugali.utils.plotting
+
         ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',
                                                    self.color, self.mag)
         y_min, y_max = pylab.axis()[2], pylab.axis()[3]
@@ -416,6 +417,8 @@ class Isochrone(object):
                                                                    * (mag_2_array + distance_modulus < mag_2_mask))
 
         if plot:
+            import ugali.utils.plotting
+
             plot_title = 'Fraction of Stars (>%.2f M_{Sol}) Observable within Pixel'%(mass_min)
             ugali.utils.plotting.twoDimensionalHistogram(plot_title,
                                                          'x (deg)', 'y (deg)',
@@ -428,6 +431,7 @@ class Isochrone(object):
         if kernel is not None:
             normalization_kernel = scipy.signal.convolve(normalization, kernel.kernel, mode='same')
             if plot:
+                import ugali.utils.plotting
                 plot_title = 'Fraction of Stars (>%.2f M_{Sol}) Observable within Kernel'%(mass_min)
                 ugali.utils.plotting.twoDimensionalHistogram(plot_title,
                                                              'x (deg)', 'y (deg)',
@@ -457,6 +461,7 @@ class Isochrone(object):
         mag_1_array = mag_1_interpolation(mass_center_array) #+ distance_modulus
         mag_2_array = mag_2_interpolation(mass_center_array) #+ distance_modulus
         
+        import ugali.utils.plotting
         ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',
                                                    mag_1_array - mag_2_array, mag_1_array)
 

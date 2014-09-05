@@ -1,145 +1,33 @@
 #!/usr/bin/env python
+from collections import OrderedDict as odict
+
 import numpy
 import numpy as np
+import scipy.stats
+
 import healpy
 import healpy as hp
-import scipy.stats
-from collections import OrderedDict as odict
+import pyfits
 
 import ugali.utils.binning
 import ugali.utils.parabola
 
-from ugali.utils.projector import modulus2dist,dist2modulus,angsep
+from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
+from ugali.utils.params import Parameter
 
-
-class Parameter(object):
-    """
-    Parameter class for storing value and bounds.
-
-    Adapted from MutableNum from https://gist.github.com/jheiv/6656349
-    """
-    __value__ = None
-    __bounds__ = None
-    def __init__(self, value, bounds=None): self.set(value,bounds)
-
-    # Comparison Methods
-    def __eq__(self, x):        return self.__value__ == x
-    def __ne__(self, x):        return self.__value__ != x
-    def __lt__(self, x):        return self.__value__ <  x
-    def __gt__(self, x):        return self.__value__ >  x
-    def __le__(self, x):        return self.__value__ <= x
-    def __ge__(self, x):        return self.__value__ >= x
-    def __cmp__(self, x):       return 0 if self.__value__ == x else 1 if self.__value__ > 0 else -1
-    # Unary Ops
-    def __pos__(self):          return +self.__value__
-    def __neg__(self):          return -self.__value__
-    def __abs__(self):          return abs(self.__value__)
-    # Bitwise Unary Ops
-    def __invert__(self):       return ~self.__value__
-    # Arithmetic Binary Ops
-    def __add__(self, x):       return self.__value__ + x
-    def __sub__(self, x):       return self.__value__ - x
-    def __mul__(self, x):       return self.__value__ * x
-    def __div__(self, x):       return self.__value__ / x
-    def __mod__(self, x):       return self.__value__ % x
-    def __pow__(self, x):       return self.__value__ ** x
-    def __floordiv__(self, x):  return self.__value__ // x
-    def __divmod__(self, x):    return divmod(self.__value__, x)
-    def __truediv__(self, x):   return self.__value__.__truediv__(x)
-    # Reflected Arithmetic Binary Ops
-    def __radd__(self, x):      return x + self.__value__
-    def __rsub__(self, x):      return x - self.__value__
-    def __rmul__(self, x):      return x * self.__value__
-    def __rdiv__(self, x):      return x / self.__value__
-    def __rmod__(self, x):      return x % self.__value__
-    def __rpow__(self, x):      return x ** self.__value__
-    def __rfloordiv__(self, x): return x // self.__value__
-    def __rdivmod__(self, x):   return divmod(x, self.__value__)
-    def __rtruediv__(self, x):  return x.__truediv__(self.__value__)
-    # Bitwise Binary Ops
-    def __and__(self, x):       return self.__value__ & x
-    def __or__(self, x):        return self.__value__ | x
-    def __xor__(self, x):       return self.__value__ ^ x
-    def __lshift__(self, x):    return self.__value__ << x
-    def __rshift__(self, x):    return self.__value__ >> x
-    # Reflected Bitwise Binary Ops
-    def __rand__(self, x):      return x & self.__value__
-    def __ror__(self, x):       return x | self.__value__
-    def __rxor__(self, x):      return x ^ self.__value__
-    def __rlshift__(self, x):   return x << self.__value__
-    def __rrshift__(self, x):   return x >> self.__value__
-    # Compound Assignment
-    def __iadd__(self, x):      self.set(self + x); return self
-    def __isub__(self, x):      self.set(self - x); return self
-    def __imul__(self, x):      self.set(self * x); return self
-    def __idiv__(self, x):      self.set(self / x); return self
-    def __imod__(self, x):      self.set(self % x); return self
-    def __ipow__(self, x):      self.set(self **x); return self
-    # Casts
-    def __nonzero__(self):      return self.__value__ != 0
-    def __int__(self):          return self.__value__.__int__()    
-    def __float__(self):        return self.__value__.__float__()  
-    def __long__(self):         return self.__value__.__long__()   
-    # Conversions
-    def __oct__(self):          return self.__value__.__oct__()    
-    def __hex__(self):          return self.__value__.__hex__()    
-    def __str__(self):          return self.__value__.__str__()    
-    # Random Ops
-    def __index__(self):        return self.__value__.__index__()  
-    def __trunc__(self):        return self.__value__.__trunc__()  
-    def __coerce__(self, x):    return self.__value__.__coerce__(x)
-    # Represenation
-    def __repr__(self):         return "%s(%s)" % (self.__class__.__name__, self.__value__)
-    # Return the type of the inner value
-    def innertype(self):        return type(self.__value__)
-
-    @property
-    def bounds(self):
-        return self.__bounds__
-
-    @property
-    def value(self):
-        return self.__value__
-
-    def set_bounds(self, bounds):
-        if bounds is None: return
-        else: self.__bounds__ = bounds
-
-    def check_bounds(self, value):
-        if self.__bounds__ is None:
-            return
-        if not (self.__bounds__[0] <= value <= self.__bounds__[1]):
-            msg="Value outside bounds: %.2g [%.2g,%.2g]"
-            msg=msg%(value,self.__bounds__[0],self.__bounds__[1])
-            raise ValueError(msg)
-
-    def set_value(self, value):
-        self.check_bounds(value)
-        if   isinstance(value, (int, long, float)): self.__value__ = value
-        elif isinstance(value, self.__class__): self.__value__ = value.__value__
-        else: raise TypeError("Numeric type required")
-
-    def set(self, value, bounds=None):
-        self.set_bounds(bounds)
-        self.set_value(value)
-
-class Prior(object):
-    def __init__(self):
-        pass
-        
 class LogLikelihood(object):
     # Default parameters of the likelihood model
     params = odict([
         ('richness',         Parameter(0.0, [0.0,np.inf])),
         ('lon',              Parameter(0.0, [0.0,360.])),
         ('lat',              Parameter(0.0, [-90.,90.])),
-        ('distance_modulus', Parameter(0.0, [0.0,25.])),
-        ('extension',        Parameter(0.0, [0.0,5.0])),
+        ('distance_modulus', Parameter(17.0, [10.0,25.])),
+        ('extension',        Parameter(0.1, [0.01,5.0])),
         ])
 
-    def __init__(self, config, roi, mask, catalog, isochrone=None, kernel=None):
+    def __init__(self, config, roi, mask, catalog, isochrone, kernel):
         self.do_color = True
         self.do_spatial = True
         self.do_fraction = True
@@ -162,24 +50,26 @@ class LogLikelihood(object):
         self.calc_background()
 
     def __call__(self):
-        # self.p is the signal probability for each object
-        self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
-        # self.f * self.richness is the total model predicted counts
+        # The signal probability for each object
+        #self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
+        # The total model predicted counts
         return -1. * numpy.sum(numpy.log(1. - self.p)) - (self.f * self.richness)
         
     def __setattr__(self, name, value):
+        # Call 'set_value' on parameters
+        # __setattr__ tries the usual places first.
         if name in self.params:
             self.params[name].set_value(value)
         else:
             return object.__setattr__(self, name, value)
         
     def __getattr__(self,name):
-        # __getattr__ first tries the usual places first.
-        # The call to object.__getattribute__ at the end is just for
-        # the AttributeError message
+        # Return 'value' of parameters
+        # __getattr__ tries the usual places first.
         if name in self.params:
-            return self.params[name]
+            return self.params[name].value
         else:
+            # Raises AttributeError
             return object.__getattribute__(self,name)
 
     @property
@@ -187,7 +77,21 @@ class LogLikelihood(object):
         nside = self.config.params['coords']['nside_pixel']
         pixel = ang2pix(nside,float(self.lon),float(self.lat))
         return pixel
-    
+
+    # Protect the basic elements of the likelihood
+    @property
+    def u(self):
+        return self._u
+    @property
+    def b(self):
+        return self._b
+    @property
+    def p(self):
+        return self._p
+    @property
+    def f(self):
+        return self._f
+        
     def value(self,**kwargs):
         """
         Evaluate the log-likelihood at the given input parameter values
@@ -226,12 +130,15 @@ class LogLikelihood(object):
         if self.do_spatial:  self.set_signal_spatial(u_spatial)
 
         # Combined object-by-object signal probability
-        self.u = self.u_spatial * self.u_color
+        self._u = self.u_spatial * self.u_color
 
         # Observable fraction requires update if isochrone changed
         # Fraction calculated over interior region
-        self.f = self.roi.area_pixel * \
+        self._f = self.roi.area_pixel * \
                  (self.surface_intensity_sparse*self.observable_fraction).sum()
+
+        # The signal probability for each object
+        self._p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
 
         self.do_color = False
         self.do_spatial = False
@@ -261,7 +168,8 @@ class LogLikelihood(object):
 
     def set_extension(self,extension):
         if extension is None: return
-        self.kernel.setExtension(extension)
+        self.extension = extension
+        self.kernel.setExtension(self.extension)
         self.do_spatial=True
 
     def set_kernel(self,kernel):
@@ -343,7 +251,7 @@ class LogLikelihood(object):
         b_density = ugali.utils.binning.take2D(self.cmd_background,
                                                self.catalog.color, self.catalog.mag,
                                                self.roi.bins_color, self.roi.bins_mag)
-        self.b = b_density * self.roi.area_pixel * self.delta_mag**2
+        self._b = b_density * self.roi.area_pixel * self.delta_mag**2
 
     def calc_observable_fraction(self,distance_modulus):
         """
@@ -432,11 +340,11 @@ class LogLikelihood(object):
 
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-        self.angsep_sparse = angsep(float(self.lon),float(self.lat),pix_lon,pix_lat)
+        self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
         self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
 
         # On the object-by-object level
-        self.angsep_object = angsep(float(self.lon),float(self.lat),self.catalog.lon,self.catalog.lat)
+        self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
         self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
         
         # Spatial component of signal probability
@@ -455,11 +363,11 @@ class LogLikelihood(object):
         # This can occur for finite kernels on the edge of the survey footprint
         if numpy.isnan(self.u).any():
             logger.warning("NaN signal probability found")
-            return 0., 0., 0., None
+            return 0., 0., None
         
         if not numpy.any(self.u):
             logger.warning("Signal probability is zero for all objects")
-            return 0., 0., 0., None
+            return 0., 0., None
 
         # Richness corresponding to 0, 1, and 10 observable stars
         richness = np.array([0., 1./self.f, 10./self.f])
@@ -487,6 +395,27 @@ class LogLikelihood(object):
             
         index = numpy.argmax(loglike)
         return loglike[index], richness[index], parabola
+
+    def write_membership(self,filename):
+        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        
+        name_objid = self.config['catalog']['objid_field']
+        name_mag_1 = self.config['catalog']['mag_1_field']
+        name_mag_2 = self.config['catalog']['mag_2_field']
+
+        columns = [
+            pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
+            pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
+            pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
+            pyfits.Column(name='RA',format='D',array=ra),
+            pyfits.Column(name='DEC',format='D',array=dec),
+            pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
+            pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
+            pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
+            pyfits.Column(name='PROB',format='E',array=self.p),
+        ]
+        hdu = pyfits.new_table(columns)
+        hdu.writeto(filename,clobber=True)
 
 if __name__ == "__main__":
     import argparse

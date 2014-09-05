@@ -7,7 +7,6 @@ import scipy.signal
 import scipy.integrate
 from abc import abstractmethod
 
-import ugali.utils.plotting
 import ugali.utils.projector
 
 def kernelFactory(kernel_type,*args):
@@ -61,7 +60,7 @@ class RadialKernel(object):
         self.projector = ugali.utils.projector.Projector(self.lon, self.lat)
 
     def setExtension(self, extension):
-        if extension < 0: 
+        if extension <= 0: 
             raise ValueError("Extension must be positive.")
         args = self.params
         args[0] = extension

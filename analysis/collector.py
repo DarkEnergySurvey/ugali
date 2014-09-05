@@ -15,11 +15,11 @@ import healpy
 
 import ugali.analysis.farm
 import ugali.utils.config
-import ugali.utils.plotting
 import ugali.utils.projector
 import ugali.utils.skymap
+import ugali.utils.plotting
 
-pylab.ion()
+#pylab.ion()
 
 ############################################################
 

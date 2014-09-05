@@ -1,65 +1,54 @@
 #!/usr/bin/env python
+import os
+from os.path import exists, join
 
 from ugali.analysis.pipeline import Pipeline
-
 from ugali.candidate.search import CandidateSearch
 import ugali.candidate.associate
 
 from ugali.utils.logger import logger
 
-description="Perform object association."
-components = ['label','objects','associate']
+description="Perform object finding and association."
+components = ['label','objects','associate','candidates']
 
 def run(self):
     search = CandidateSearch(self.config)
+    self.search = search
 
     if 'label' in self.opts.run:
         logger.info("Running 'label'...")
-        search.createLabels()
-        search.writeLabels()
+        if exists(search.labelfile) and not self.opts.force:
+            logger.info("  Found %s; skipping..."%search.labelfile)
+        else:
+            #search.createLabels3D()
+            search.createLabels2D()
+            search.writeLabels()
     if 'objects' in self.opts.run:
         logger.info("Running 'objects'...")
-        search.loadLabels()
-        search.createObjects()
-        search.writeObjects()
+        if exists(search.objectfile) and not self.opts.force:
+            logger.info("  Found %s; skipping..."%search.labelfile)
+        else:
+            search.loadLabels()
+            search.createObjects()
+            search.writeObjects()
     if 'associate' in self.opts.run:
         logger.info("Running 'associate'...")
-        ugali.candidate.associate.associate_sources(config)
-
+        if exists(search.assocfile) and not self.opts.force:
+            logger.info("  Found %s; skipping..."%search.assocfile)
+        else:
+            search.loadObjects()
+            search.createAssociations()
+            search.writeAssociations()
+    if 'candidates' in self.opts.run:
+        logger.info("Running 'candidates'...")
+        if exists(search.candfile) and not self.opts.force:
+            logger.info("  Found %s; skipping..."%search.candfile)
+        else:
+            search.loadAssociations()
+            search.writeCandidates()
+        
+            
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parse_args()
 pipeline.execute()
-
-"""    
-if __name__ == "__main__":
-    import argparse
-    description = "Pipeline script for object association."
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('config',help='Configuration file.')
-    parser.add_argument('-v','--verbose',action='store_true',
-                        help='Output verbosity')
-    parser.add_argument('-r','--run', default=[],
-                        action='append',choices=COMPONENTS,
-                        help="Choose analysis component to run")
-    opts = parser.parse_args()
-
-    config = Config(opts.config)
-    if not opts.run: opts.run = COMPONENTS
-    if opts.verbose: logger.setLevel(logger.DEBUG)
-
-    search = CandidateSearch(config)
-
-    if 'label' in opts.run:
-        logger.info("Running 'label'...")
-        search.createLabels()
-        search.writeLabels()
-    if 'objects' in opts.run:
-        logger.info("Running 'objects'...")
-        search.loadLabels()
-        search.createObjects()
-        search.writeObjects()
-    if 'associate' in opts.run:
-        logger.info("Running 'associate'...")
-        x,o = ugali.candidate.associate.associate_sources(config)
-"""

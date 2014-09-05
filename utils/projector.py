@@ -5,6 +5,7 @@ Based on Calabretta & Greisen 2002, A&A, 357, 1077-1122
 """
 
 import numpy
+import numpy as np
 import healpy
 
 ############################################################
@@ -256,10 +257,58 @@ def celToGal(ra, dec):
 cel2gal = celToGal
 ############################################################
 
+def dec2hms(dec):
+    """
+    ADW: This should really be replaced by astropy
+    """
+    DEGREE = 360.
+    HOUR = 24.
+    MINUTE = 60.
+    SECOND = 3600.
+    
+    if isinstance(dec,basestring):
+        dec = float(dec)
+
+    fhour = dec*(HOUR/DEGREE)
+    hour = int(fhour)
+
+    fminute = (fhour - hour)*MINUTE
+    minute = int(fminute)
+    
+    second = (fminute - minute)*MINUTE
+    return (hour, minute, second)
+
+def dec2dms(dec):
+    """
+    ADW: This should really be replaced by astropy
+    """
+    DEGREE = 360.
+    HOUR = 24.
+    MINUTE = 60.
+    SECOND = 3600.
+    
+    if isinstance(dec,basestring):
+        dec = float(dec)
+
+    sign = numpy.copysign(1.0,dec)
+
+    fdeg = np.abs(dec)
+    deg = int(fdeg)
+    
+    fminute = (fdeg - deg)*MINUTE
+    minute = int(fminute)
+    
+    second = (fminute - minute)*MINUTE
+
+    deg = int(deg * sign)
+    return (deg, minute, second)
+
 def hms2dec(hms):
     """
     Convert longitude from hours,minutes,seconds in string or 3-array
     format to decimal degrees.
+
+    ADW: This really should be replaced by astropy
     """
     DEGREE = 360.
     HOUR = 24.
@@ -306,7 +355,7 @@ def distanceToDistanceModulus(distance):
     """
     return 5. * (numpy.log10(numpy.array(distance) * 1.e3) - 1.)
 
-dist2modulus = distanceToDistanceModulus
+dist2mod = distanceToDistanceModulus
 
 def distanceModulusToDistance(distance_modulus):
     """
@@ -314,8 +363,8 @@ def distanceModulusToDistance(distance_modulus):
     """
     return 10**((0.2 * numpy.array(distance_modulus)) - 2.)
 
-modulus2dist = distanceModulusToDistance
-                          
+mod2dist = distanceModulusToDistance
+
 ############################################################
     
 def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):

@@ -13,10 +13,11 @@ import numpy
 import scipy.signal
 import healpy
 
-import ugali.observation.roi
-import ugali.utils.plotting
+#import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.utils.skymap
+
+import ugali.observation.roi
 
 from ugali.utils.logger import logger
 from ugali.utils.healpix import ang2pix
@@ -27,7 +28,6 @@ class Mask:
     Contains maps of completeness depth in magnitudes for multiple observing bands, and associated products.
     """
     def __init__(self, config, roi):
-
         self.config = config
         self.roi = roi
         filenames = self.config.getFilenames()
@@ -115,6 +115,8 @@ class Mask:
         """
         Solid angle within the mask as a function of color and magnitude.
         """
+        import ugali.utils.plotting        
+
         ugali.utils.plotting.twoDimensionalHistogram('mask', 'color', 'magnitude',
                                                      self.solid_angle_cmd,
                                                      self.roi.bins_color,
@@ -133,7 +135,6 @@ class Mask:
         OUTPUTS:
             background
         """
-
         if mode == 'cloud-in-cells':
             # Select objects in annulus
             # ADW: This should be standardized (similar function in likelihood)
@@ -213,16 +214,16 @@ class Mask:
             catalog.mag_1 + (catalog.mag_1_err * numpy.random.normal(0, 1., len(catalog.mag_1)))
             catalog.mag_2 + (catalog.mag_2_err * numpy.random.normal(0, 1., len(catalog.mag_2)))
 
-        if plot:
-            ugali.utils.plotting.twoDimensionalHistogram(r'CMD Background (deg$^{-2}$ mag$^{-2}$)',
-                                                         'color (mag)', 'magnitude (mag)',
-                                                         cmd_background,
-                                                         self.roi.bins_color,
-                                                         self.roi.bins_mag,
-                                                         lim_x = [self.roi.bins_color[0],
-                                                                  self.roi.bins_color[-1]],
-                                                         lim_y = [self.roi.bins_mag[-1],
-                                                                  self.roi.bins_mag[0]])
+        #if plot:
+        #    ugali.utils.plotting.twoDimensionalHistogram(r'CMD Background (deg$^{-2}$ mag$^{-2}$)',
+        #                                                 'color (mag)', 'magnitude (mag)',
+        #                                                 cmd_background,
+        #                                                 self.roi.bins_color,
+        #                                                 self.roi.bins_mag,
+        #                                                 lim_x = [self.roi.bins_color[0],
+        #                                                          self.roi.bins_color[-1]],
+        #                                                 lim_y = [self.roi.bins_mag[-1],
+        #                                                          self.roi.bins_mag[0]])
 
         return cmd_background
         
@@ -298,6 +299,8 @@ class MaskBand:
         """
         Plot the magnitude depth.
         """
+        import ugali.utils.plotting
+
         mask = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
         mask[self.roi.pixels] = self.mask_roi_sparse
         mask[mask == 0.] = healpy.UNSEEN
