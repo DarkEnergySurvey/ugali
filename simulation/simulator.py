@@ -6,15 +6,12 @@ import numpy
 import scipy.interpolate
 import pyfits
 import healpy
-import pylab
 
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.observation.roi
 import ugali.utils.config
 import ugali.utils.projector
-
-pylab.ion()
 
 ############################################################
 
@@ -84,25 +81,25 @@ class Simulator:
         self.photo_err_2 = scipy.interpolate.interp1d(mag_2_thresh_medians, mag_err_2_medians,
                                                       bounds_error=False, fill_value=mag_err_2_medians[-1])
 
-        if plot:
-            pylab.figure()
-            pylab.scatter(mag_1_thresh, self.catalog.mag_err_1, c='blue')
-            x = numpy.linspace(0., 10., 1.e4)        
-            #pylab.scatter(mag_1_thresh_medians, mag_err_1_medians, c='red')
-            pylab.plot(x, self.photo_err_1(x), c='red')
+        ### if plot:
+        ###     pylab.figure()
+        ###     pylab.scatter(mag_1_thresh, self.catalog.mag_err_1, c='blue')
+        ###     x = numpy.linspace(0., 10., 1.e4)        
+        ###     #pylab.scatter(mag_1_thresh_medians, mag_err_1_medians, c='red')
+        ###     pylab.plot(x, self.photo_err_1(x), c='red')
 
     def satellite(self, isochrone, kernel, stellar_mass, distance_modulus, mc_source_id=1):
         """
         Create a simulated satellite. Returns a catalog object.
         """
         mag_1, mag_2, lon, lat = satellite(isochrone, kernel, stellar_mass, distance_modulus)
-        pix = ugali.utils.projector.angToPix(self.config.params['coords']['nside_pixel'], lon, lat)
+        pix = ugali.utils.projector.angToPix(self.config['coords']['nside_pixel'], lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config.params['coords']['nside_pixel']))
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
@@ -115,19 +112,12 @@ class Simulator:
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         mc_source_id = mc_source_id * numpy.ones(len(mag_1))
         
-        if self.config.params['catalog']['coordsys'].lower() == 'cel' \
-           and self.config.params['coords']['coordsys'].lower() == 'gal':
-            lon, lat = ugali.utils.projector.galToCel(lon, lat)
-        elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
-           and self.config.params['coords']['coordsys'].lower() == 'cel':
-            lon, lat = ugali.utils.projector.celToGal(lon, lat)
-
         #hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         hdu = self.makeHDU(mag_obs_1[cut], mag_err_1[cut], mag_obs_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
-    def background(self,mc_source_id=1):
+    def background(self,mc_source_id=2):
         """
         Create a simulation of the background stellar population.
         Because some stars have been clipped to generate the CMD,
@@ -153,8 +143,8 @@ class Simulator:
 
         # Simulate over full ROI
         #area_roi = len(self.roi.pixels) * self.roi.area_pixel
-        roi_radius = self.config.params['coords']['roi_radius']
-        nside_pixel = self.config.params['coords']['nside_pixel']
+        roi_radius = self.config['coords']['roi_radius']
+        nside_pixel = self.config['coords']['nside_pixel']
         area_roi = numpy.pi*roi_radius**2
         lambda_per_bin = self.cmd_background * area_roi * self.roi.delta_color * self.roi.delta_mag
         nstar_per_bin = numpy.round(lambda_per_bin).astype(int) 
@@ -179,10 +169,10 @@ class Simulator:
         pix = ugali.utils.projector.angToPix(nside_pixel, lon, lat)
 
         ### # Simulate position by drawing randomly from subpixels
-        ### nside_pixel = self.config.params['coords']['nside_pixel']
+        ### nside_pixel = self.config['coords']['nside_pixel']
         ### nside_subpix = 2**18
         ### print "Generating subpix"
-        ### subpix = ugali.utils.projector.query_disc(nside_subpix, self.roi.vec, self.roi.config.params['coords']['roi_radius']+np.degrees(healpy.max_pixrad(nside_pixel)))
+        ### subpix = ugali.utils.projector.query_disc(nside_subpix, self.roi.vec, self.roi.config['coords']['roi_radius']+np.degrees(healpy.max_pixrad(nside_pixel)))
         ###  
         ### print "Calculating superpix"
         ### superpix = ugali.utils.skymap.superpixel(subpix,nside_subpix,nside_pixel)
@@ -209,44 +199,42 @@ class Simulator:
         cut = numpy.logical_and(mag_1 < mag_lim_1, mag_2 < mag_lim_2)
         mc_source_id = mc_source_id * numpy.ones(len(mag_1))
         
-        if self.config.params['catalog']['coordsys'].lower() == 'cel' \
-           and self.config.params['coords']['coordsys'].lower() == 'gal':
-            lon, lat = ugali.utils.projector.galToCel(lon, lat)
-        elif self.config.params['catalog']['coordsys'].lower() == 'gal' \
-           and self.config.params['coords']['coordsys'].lower() == 'cel':
-            lon, lat = ugali.utils.projector.celToGal(lon, lat)
-
         hdu = self.makeHDU(mag_1[cut], mag_err_1[cut], mag_2[cut], mag_err_2[cut], lon[cut], lat[cut], mc_source_id[cut])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
     def makeHDU(self, mag_1, mag_err_1, mag_2, mag_err_2, lon, lat, mc_source_id):
         """
-        Create a pyfits header object based on input data.
+        Create a catalog fits file object based on input data.
         """
-        columns_array = []
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['lon_field'],
-                                           format = 'D',
-                                           array = lon))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['lat_field'],
-                                           format = 'D',
-                                           array = lat))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['mag_1_field'],
-                                           format = 'E',
-                                           array = mag_1))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['mag_err_1_field'],
-                                           format = 'E',
-                                           array = mag_err_1))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['mag_2_field'],
-                                           format = 'E',
-                                           array = mag_2))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['mag_err_2_field'],
-                                           format = 'E',
-                                           array = mag_err_2))
-        columns_array.append(pyfits.Column(name = self.config.params['catalog']['mc_source_id_field'],
-                                           format = 'I',
-                                           array = mc_source_id))
-        hdu = pyfits.new_table(columns_array)
+
+        if self.config['catalog']['coordsys'].lower() == 'cel' \
+           and self.config['coords']['coordsys'].lower() == 'gal':
+            lon, lat = ugali.utils.projector.galToCel(lon, lat)
+        elif self.config['catalog']['coordsys'].lower() == 'gal' \
+           and self.config['coords']['coordsys'].lower() == 'cel':
+            lon, lat = ugali.utils.projector.celToGal(lon, lat)
+
+        columns = [
+            pyfits.Column(name=self.config['catalog']['objid_field'],
+                          format = 'D',array = np.arange(len(lon))),
+            pyfits.Column(name=self.config['catalog']['lon_field'],
+                          format = 'D',array = lon),
+            pyfits.Column(name = self.config['catalog']['lat_field'],          
+                          format = 'D',array = lat), 
+            pyfits.Column(name = self.config['catalog']['mag_1_field'],        
+                          format = 'E',array = mag_1),
+            pyfits.Column(name = self.config['catalog']['mag_err_1_field'],    
+                          format = 'E',array = mag_err_1),
+            pyfits.Column(name = self.config['catalog']['mag_2_field'],        
+                          format = 'E',array = mag_2),
+            pyfits.Column(name = self.config['catalog']['mag_err_2_field'],    
+                          format = 'E',array = mag_err_2),
+            pyfits.Column(name = self.config['catalog']['mc_source_id_field'], 
+                          format = 'I',array = mc_source_id),
+        ]
+
+        hdu = pyfits.new_table(columns)
         return hdu
 
     def write(self, outfile):

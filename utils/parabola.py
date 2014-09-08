@@ -1,13 +1,12 @@
 """
 Class to construct parabolas from 3 points.
+
+ADW: Need to move all of the plotting stuff
 """
 
 import numpy
 import scipy.stats
 import scipy.interpolate
-import pylab
-
-pylab.ion()
 
 ############################################################
 
@@ -120,9 +119,9 @@ class Parabola:
 
             print a, b, c
             
-            pylab.figure()
-            pylab.scatter(self.x, self.y)
-            raw_input('WAIT')
+            #pylab.figure()
+            #pylab.scatter(self.x, self.y)
+            #raw_input('WAIT')
             return 0.
 
         
@@ -165,16 +164,16 @@ class Parabola:
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
-        if plot:            
-            pylab.figure()
-            pylab.plot(x, f(x))
-            pylab.scatter(self.x, self.y, c='red')
-            
-            pylab.figure()
-            pylab.plot(x, pdf)
-            
-            pylab.figure()
-            pylab.plot(cdf, x)
+        #if plot:            
+        #    pylab.figure()
+        #    pylab.plot(x, f(x))
+        #    pylab.scatter(self.x, self.y, c='red')
+        #    
+        #    pylab.figure()
+        #    pylab.plot(x, pdf)
+        #    
+        #    pylab.figure()
+        #    pylab.plot(cdf, x)
         
         return cdf_reflect(alpha)
 
@@ -199,18 +198,18 @@ class Parabola:
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
-        if plot:
-            pylab.figure()
-            pylab.scatter(self.x, self.y)
-
-            pylab.figure()
-            pylab.plot(x, f(x))
-            
-            pylab.figure()
-            pylab.plot(x, y)
-            
-            pylab.figure()
-            pylab.plot(cdf, x)
+        #if plot:
+        #    pylab.figure()
+        #    pylab.scatter(self.x, self.y)
+        # 
+        #    pylab.figure()
+        #    pylab.plot(x, f(x))
+        #    
+        #    pylab.figure()
+        #    pylab.plot(x, y)
+        #    
+        #    pylab.figure()
+        #    pylab.plot(cdf, x)
         
         return cdf_reflect(alpha)
 
@@ -249,18 +248,18 @@ class Parabola:
         sorted_pdf_index_max = numpy.argmin((cdf - alpha)**2)
         x_select = x[sorted_pdf_indices[0: sorted_pdf_index_max]]
 
-        if plot:
-            cdf = numpy.cumsum(pdf)
-            cdf /= cdf[-1]
-            print cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
-                  - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])]
-            
-            pylab.figure()
-            pylab.plot(x, f(x))
-            pylab.scatter(self.x, self.y, c='red')
-            
-            pylab.figure()
-            pylab.plot(x, pdf)
+        #if plot:
+        #    cdf = numpy.cumsum(pdf)
+        #    cdf /= cdf[-1]
+        #    print cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
+        #          - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])]
+        #    
+        #    pylab.figure()
+        #    pylab.plot(x, f(x))
+        #    pylab.scatter(self.x, self.y, c='red')
+        #    
+        #    pylab.figure()
+        #    pylab.plot(x, pdf)
             
         return numpy.min(x_select), numpy.max(x_select) 
 

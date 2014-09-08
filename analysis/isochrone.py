@@ -8,7 +8,6 @@ import sys
 import numpy
 import scipy.interpolate
 import scipy.stats
-import pylab
 
 import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
@@ -57,6 +56,7 @@ class Isochrone(object):
         """
         Show the color-magnitude diagram of isochrone points in absolute magnitudes.
         """
+        import pylab
         import ugali.utils.plotting
 
         ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',

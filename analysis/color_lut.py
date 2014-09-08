@@ -6,14 +6,12 @@ import time
 import numpy
 import scipy.signal
 import pyfits
-#import pylab
 
 import ugali.utils.config
 import ugali.utils.binning
 import ugali.analysis.isochrone
 
 from ugali.utils.logger import logger
-#pylab.ion()
 
 ############################################################
 

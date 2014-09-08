@@ -42,6 +42,9 @@ class Config(dict):
         self.filenames = self.getFilenames()
         self._makeFilenames()
 
+    def __str__(self):
+        return yaml.dump(self)
+
     def _load(self, input):
         if isinstance(input, basestring):
             self.filename = input

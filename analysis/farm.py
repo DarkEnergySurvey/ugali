@@ -3,27 +3,23 @@
 """
 Class to farm out analysis tasks.
 
-@author: Keith Bechtol <>
-@author: Alex Drlica-Wagner <>
+@author: Keith Bechtol      <bechtol@kicp.uchicago.edu>
+@author: Alex Drlica-Wagner <kadrlica@fnal.gov>
 """
 
 import os
+from os.path import join, exists
 import sys
-import numpy
-import healpy
 import subprocess
 import time
-import getpass
 import glob
 
-from os.path import join, exists
+import numpy
+import healpy
 
-import numpy.ma.mrecords
-
+import ugali.analysis.scan
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
-import ugali.analysis.likelihood
-import ugali.analysis.scan
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.utils.config
@@ -33,13 +29,11 @@ import ugali.utils.batch
 from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import subpixel,superpixel,query_disc
 from ugali.utils.healpix import pix2ang,ang2pix,ang2vec
-
 from ugali.utils.logger import logger
-
-import ugali.utils.shell
 from ugali.utils.shell import mkdir
 
 class Farm:
+
     def __init__(self, configfile):
         self.configfile = configfile
         self.config = ugali.utils.config.Config(configfile)
@@ -60,7 +54,10 @@ class Farm:
         Placeholder for a function to generate the command for running
         the likelihood scan.
         """
-        cmd = '%s %s %s --hpx %i %i'%(self.config['batch']['script'], configfile, outfile, self.nside_likelihood, pix)
+        params = dict(script=self.config['batch']['script'],
+                      config=configfile, outfile=outfile, 
+                      nside=self.nside_likelihood, pix=pix)
+        cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i'%params
         return cmd
 
     # ADW: Should probably be in a utility
@@ -113,13 +110,11 @@ class Farm:
 
         Inputs:
         coords : Array of target locations in Galactic coordinates. 
-                 [Can optionally contain search radii about the specified coordinates.]
-                 [ (GLON, GLAT, [RADIUS]) ]
         queue  : Overwrite submit queue.
         debug  : Don't run.
         """
         if coords is None:
-            pixels = numpy.arange( healpy.nside2npix(self.nside_likelihood) )
+            pixels = numpy.arange(healpy.nside2npix(self.nside_likelihood))
         else:
             coords = numpy.asarray(coords)
             if coords.ndim == 1:
@@ -232,7 +227,7 @@ class Farm:
                     break
                 else:
                     logger.info('%i jobs already in queue, waiting ...'%(njobs))
-                    time.sleep(15)
+                    time.sleep(5*chunk)
 
             job = self.batch.submit(command,jobname,logfile)
             logger.info("  "+job)

@@ -4,7 +4,6 @@ Classes which manage object catalogs live here.
 
 import numpy
 import pyfits
-import pylab
 import healpy
 import copy
 
@@ -115,6 +114,7 @@ class Catalog:
         """
         Show the color-magnitude diagram for catalog objects as scatter plot or two-dimensional histogram.
         """
+        import pylab
         import ugali.utils.plotting
 
         if mode == 'scatter':

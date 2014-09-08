@@ -23,8 +23,10 @@ class LogLikelihood(object):
         ('richness',         Parameter(0.0, [0.0,np.inf])),
         ('lon',              Parameter(0.0, [0.0,360.])),
         ('lat',              Parameter(0.0, [-90.,90.])),
-        ('distance_modulus', Parameter(17.0, [10.0,25.])),
+        ('distance_modulus', Parameter(17.0,[10.0,25.])),
         ('extension',        Parameter(0.1, [0.01,5.0])),
+        ('ellipticity',      Parameter(0.0, [0.0,1.0])),
+        ('position_angle',   Parameter(0.0, [0.0,90.0])),
         ])
 
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):

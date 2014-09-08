@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 import os
 from os.path import join
-import glob
 import numpy
-import copy
-import subprocess
+import numpy as np
 
-from ugali.analysis.scan import Scan
 from ugali.analysis.mcmc import MCMC
 from ugali.analysis.pipeline import Pipeline
 
@@ -14,30 +11,50 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
 description="Perform targeted followup."
-components = ['mcmc']
+components = ['mcmc','plot']
 
 def run(self):
-    if self.opts.coords:
+    if self.opts.coords is not None:
         coords = self.opts.coords
+        names = vars(self.opts).get('names',len(coords)*[''])
     else:
         #dirname = self.config['output2']['searchdir']
         #filename = os.path.join(dirname,self.config['output2']['candfile'])
         names,coords = self.parser.parse_targets(self.config.candfile)
     labels=[n.lower().replace(' ','_').replace('(','').replace(')','') for n in names]
 
+    outdir=mkdir(self.config['output']['mcmcdir'])
+    logdir=mkdir(join(outdir,'log'))
+
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
-        outdir=mkdir(self.config['output']['mcmcdir'])
-        logdir=mkdir(join(outdir,'log'))
         for name,label,coord in zip(names,labels,coords):
             glon,glat,radius = coord
             print name,'(%.4f,%.4f)'%(glon,glat)
-            logfile=join(logdir,'%s_mcmc.log'%label)
-            outfile=join(outdir,'%s_mcmc.npy'%label)
+            outfile=join(outdir,self.config['output']['mcmcfile']%label)
+            logfile=outfile.replace('.fits','.log')
             jobname=label
             cmd='ugali/analysis/mcmc.py %s --gal %.4f %.4f %s'%(self.opts.config,glon,glat,outfile)
             nthreads = self.config['mcmc']['nthreads']
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
+
+    if 'plot' in self.opts.run:
+        logger.info("Running 'plot'...")
+        import matplotlib; matplotlib.use('Agg')
+        import triangle
+
+        for name,label,coord in zip(names,labels,coords):
+            filename = join(outdir,self.config['output']['mcmcfile']%label)
+            infile = filename.replace('.fits','.npy')
+            outfile = filename.replace('.fits','.png')
+            nburn = self.config['mcmc']['nburn']
+            nwalkers = self.config['mcmc']['nwalkers']
+            params = self.config['mcmc']['params']
+            samples = np.load(infile)[nburn*nwalkers:]
+            fig = triangle.corner(samples.view((float,len(params))), labels=params)
+            fig.suptitle(name)
+            logger.info("  Writing %s..."%outfile)
+            fig.savefig(outfile)
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

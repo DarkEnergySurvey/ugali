@@ -23,7 +23,6 @@ import ugali.analysis.color_lut
 import ugali.analysis.loglike
 import ugali.observation.catalog
 import ugali.observation.mask
-import ugali.simulation.simulator
 import ugali.utils.parabola
 import ugali.utils.skymap
 
@@ -284,7 +283,9 @@ class GridSearch:
         mle['lon'] = self.roi.pixels_target.lon[k]
         mle['lat'] = self.roi.pixels_target.lat[k]
         mle['distance_modulus'] = self.distance_modulus_array[j]
-        mle['extension'] = float(self.loglike.kernel.extension())
+        mle['extension'] = float(self.loglike.extension)
+        mle['ellipticity'] = float(self.loglike.ellipticity)
+        mle['position_angle'] = float(self.loglike.position_angle)
         return mle
 
     def write(self, outfile):

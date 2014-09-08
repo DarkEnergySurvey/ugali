@@ -21,7 +21,7 @@ import ugali.analysis.scan
 import ugali.utils.config
 
 from ugali.utils.logger import logger
-from ugali.utils.skymap import superpixel, subpixel
+from ugali.utils.projector import mod2dist
 
 
 """
@@ -34,41 +34,6 @@ http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
 Another simple solution is to create a plain method linked to a static method.
 http://stackoverflow.com/questions/21111106/cant-pickle-static-method-multiprocessing-python
 """
-#import copy_reg
-#import types
-# 
-#def _pickle_method(method):
-#    """
-#    Author: Steven Bethard (author of argparse)
-#    http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
-#    """
-#    func_name = method.im_func.__name__
-#    obj = method.im_self
-#    cls = method.im_class
-#    cls_name = ''
-#    if func_name.startswith('__') and not func_name.endswith('__'):
-#        cls_name = cls.__name__.lstrip('_')
-#    if cls_name:
-#        func_name = '_' + cls_name + func_name
-#    return _unpickle_method, (func_name, obj, cls)
-# 
-# 
-#def _unpickle_method(func_name, obj, cls):
-#    """
-#    Author: Steven Bethard
-#    http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
-#    """
-#    for cls in cls.mro():
-#        try:
-#            func = cls.__dict__[func_name]
-#        except KeyError:
-#            pass
-#        else:
-#            break
-#    return func.__get__(obj, cls)
-# 
-#copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
- 
 
 class MCMC(object):
     """
@@ -101,6 +66,8 @@ class MCMC(object):
             ('lat',0.01),                     # delta_b = 0.01 deg            
             ('distance_modulus',0.1),         # delta_mu = 0.1                
             ('extension',0.01),               # delta_ext = 0.01 deg
+            ('ellipticity',0.05),
+            ('position_angle',10.0),
         ])
         return std
 
@@ -177,14 +144,33 @@ class MCMC(object):
             out[param] = self.estimate(param,burn,sigma)
         return out
 
-    def save_samples(self,filename):
+    def write_samples(self,filename):
         np.save(filename,self.samples)
 
     def load_samples(self,filename):
         self.samples = np.load(filename)
 
-    def save_results(self,filename):
-        output = self.estimate_params()
+    def write_results(self,filename):
+        estimate = self.estimate_params()
+        params = {k:v[0] for k,v in estimate.items()}
+        results = dict(estimate)
+
+        mod,mod_err = estimate['distance_modulus']
+        dist = mod2dist(mod)
+        dist_err = (mod2dist(mod+mod_err)-mod2dist(mod-mod_err))/2.
+        results['distance'] = [float(dist),float(dist_err)]
+        rich,rich_err = estimate['richness']
+
+        # Careful, depends on the isochrone...
+        stellar = self.loglike.stellar_mass()
+
+        mass,mass_err = rich*stellar,rich_err*stellar
+        results['mass'] = [float(mass),float(mass_err)]
+
+        output = dict()
+        output['params'] = params
+        output['results'] = results
+
         out = open(filename,'w')
         out.write(yaml.dump(dict(output)))
         out.close()
@@ -219,21 +205,16 @@ if __name__ == "__main__":
 
     params = mcmc.config['mcmc']['params']
     mcmc.run(params)
+    mcmc.write_samples(opts.outfile)
 
-    mcmc.save_samples(opts.outfile)
-    resfile = opts.outfile.replace('.npy','.dat')
-    mcmc.save_results(resfile)
+    estimate = mcmc.estimate_params()
+    kwargs = {k:v[0] for k,v in estimate.items()}
 
-    memfile = opts.outfile.replace('.npy','.fits')
-    est = mcmc.estimate_params()
-    kwargs = {k:v[0] for k,v in est.items()}
     mcmc.loglike.set_params(**kwargs)
     mcmc.loglike.sync_params()
-    mcmc.loglike.write_membership(memfile)
 
-    #import matplotlib
-    #matplotlib.use('Agg')
-    #
-    #import triangle
-    #fig = triangle.corner(samples[50*mcmc.nwalkers:], labels=params)
-    #fig.savefig('mcmc_l%.1f_b%.1f.png'%(mcmc.roi.lon,mcmc.roi.lat))
+    resfile = opts.outfile.replace('.npy','.dat')
+    mcmc.write_results(resfile)
+
+    membfile = opts.outfile.replace('.npy','.fits')
+    mcmc.loglike.write_membership(membfile)
