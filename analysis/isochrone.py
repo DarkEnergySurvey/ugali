@@ -55,6 +55,7 @@ class Isochrone(object):
         # Horizontal branch dispersion
         #self._setHorizontalBranch()
         self.horizontal_branch_dispersion = self.config.params['isochrone']['horizontal_branch_dispersion'] # mag
+        self.horizontal_branch_spacing = self.config.params['isochrone']['horizontal_branch_spacing'] # mag
         self.horizontal_branch_stage = self.config.params['isochrone']['horizontal_branch_stage']
 
     def plotCMD(self):
@@ -251,7 +252,7 @@ class Isochrone(object):
             mass_init_horizontal_branch_max = numpy.max(self.mass_init[self.stage == self.horizontal_branch_stage])
             cut = numpy.logical_and(mass_init_array > mass_init_horizontal_branch_min,
                                     mass_init_array < mass_init_horizontal_branch_max)
-            n = int(2. * self.horizontal_branch_dispersion / 0.1)
+            n = int(2. * self.horizontal_branch_dispersion / self.horizontal_branch_spacing)
             if n % 2 != 1:
                 n += 1
             dispersion_array = numpy.linspace(-1. * self.horizontal_branch_dispersion, self.horizontal_branch_dispersion, n)

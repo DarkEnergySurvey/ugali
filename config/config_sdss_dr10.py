@@ -102,6 +102,7 @@
      'stage_field': 'stage',
      'imf': 'chabrier',
      'horizontal_branch_dispersion': 0.5, # mag
+     'horizontal_branch_spacing': 0.1, # mag
      'horizontal_branch_stage': 'BHeb',
                #'infiles': ['/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.1.dat',
                #            '/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.2.dat',
