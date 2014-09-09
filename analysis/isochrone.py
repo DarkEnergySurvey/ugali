@@ -52,6 +52,11 @@ class Isochrone(object):
         #self.photometric_error_func_1 = ugali.observation.photometric_errors.PhotometricErrors()
         #self.photometric_error_func_2 = ugali.observation.photometric_errors.PhotometricErrors()
 
+        # Horizontal branch dispersion
+        #self._setHorizontalBranch()
+        self.horizontal_branch_dispersion = self.config.params['isochrone']['horizontal_branch_dispersion'] # mag
+        self.horizontal_branch_stage = self.config.params['isochrone']['horizontal_branch_stage']
+
     def plotCMD(self):
         """
         Show the color-magnitude diagram of isochrone points in absolute magnitudes.
@@ -182,6 +187,9 @@ class Isochrone(object):
                 stage.append(parts[index_dict[stage_field]])
             else:
                 stage.append('')
+            if len(stage) > 1:
+                if stage[-1] == '' and stage[-2] != ['']:
+                    stage[-1] = stage[-2]
 
             for key in index_dict.keys():
                 if key in [mass_init_field, mass_act_field, luminosity_field, stage_field]:
@@ -237,6 +245,29 @@ class Isochrone(object):
             mag_1_array = mag_1_interpolation(mass_init_array)
             mag_2_array = mag_2_interpolation(mass_init_array)
             
+        # Horizontal branch dispersion
+        if self.horizontal_branch_dispersion > 1.e-3 and numpy.any(self.stage == self.horizontal_branch_stage):
+            mass_init_horizontal_branch_min = numpy.min(self.mass_init[self.stage == self.horizontal_branch_stage])
+            mass_init_horizontal_branch_max = numpy.max(self.mass_init[self.stage == self.horizontal_branch_stage])
+            cut = numpy.logical_and(mass_init_array > mass_init_horizontal_branch_min,
+                                    mass_init_array < mass_init_horizontal_branch_max)
+            n = int(2. * self.horizontal_branch_dispersion / 0.1)
+            if n % 2 != 1:
+                n += 1
+            dispersion_array = numpy.linspace(-1. * self.horizontal_branch_dispersion, self.horizontal_branch_dispersion, n)
+            print 'before', mass_pdf_array[cut]
+            mass_pdf_array[cut] = mass_pdf_array[cut] / float(n)
+            print 'after', mass_pdf_array[cut]
+            for dispersion in dispersion_array:
+                if dispersion == 0.:
+                    continue
+                print dispersion, numpy.sum(cut), len(mass_init_array)
+                mass_init_array = numpy.append(mass_init_array, mass_init_array[cut]) 
+                mass_pdf_array = numpy.append(mass_pdf_array, mass_pdf_array[cut])
+                mass_act_array = numpy.append(mass_act_array, mass_act_array[cut]) 
+                mag_1_array = numpy.append(mag_1_array, mag_1_array[cut] + dispersion)
+                mag_2_array = numpy.append(mag_2_array, mag_2_array[cut] + dispersion)
+
         #ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',
         #                                           mag_1_array - mag_2_array, mag_1_array)
 
@@ -497,6 +528,39 @@ class Isochrone(object):
                                  [self.irfs.color_bins, self.irfs.mag_bins],
                                  weights = pdf)[0]
 
+    def _setHorizontalBranch(self, horizontal_branch_stage='BHeb', pad=0.5):
+        """
+        Define horizontal branch region of CMD space.
+        """
+        cut = self.stage == horizontal_branch_stage
+        
+        # Check that colors are monotonically increasing
+        if numpy.sum(cut) < 2 or numpy.any(numpy.sort(self.color[cut]) != self.color[cut]):
+            print 'WARNING!'
+
+        self.horizontal_branch_stage_lower_envelope = scipy.interpolate.interp1d(self.color[cut], self.mag[cut] - pad, bounds_error=False, fill_value=0.)
+        self.horizontal_branch_stage_upper_envelope = scipy.interpolate.interp1d(self.color[cut], self.mag[cut] + pad, bounds_error=False, fill_value=0.)
+
+        # Assert uniform density in CMD-space
+        self.horizontal_branch_density = self.imf.integrate(self.mass_init[cut][0], self.mass_init[cut][-1]) / (2. * pad * (self.color[cut][-1] - self.color[cut][0])) # mag^-2
+
+    def horizontalBranch(self, color, mag):
+        """
+        Horizontal branch weight in units of mag^-2 to mirror field density. 
+        """
+        if numpy.isscalar(color):
+            if numpy.logical_and(mag > self.horizontal_branch_stage_lower_envelope(color),
+                                 mag < self.horizontal_branch_stage_upper_envelope(color)):
+                return self.horizontal_branch_density
+            else:
+                return 0.
+            
+        value = numpy.zeros(len(color))
+        cut = numpy.logical_and(mag > self.horizontal_branch_stage_lower_envelope(color),
+                                mag < self.horizontal_branch_stage_upper_envelope(color))
+        value[cut] = self.horizontal_branch_density
+        return value
+
 ############################################################
 
 class CompositeIsochrone(object):
@@ -514,7 +578,7 @@ class CompositeIsochrone(object):
 
     def sample(self, mass_steps=1000, mass_min=0.1, full_data_range=False):
         """
-
+        Documentation here.
         """
         
         mass_init_array = []
@@ -562,8 +626,8 @@ class CompositeIsochrone(object):
         Calculated observable fraction for all isochrones.
         """
         total = []
-        for weight,isochrone in zip(self.weights,self.isochrones):
-            total.append(weight*isochrone.observableFraction(mask, distance_modulus))
+        for weight, isochrone in zip(self.weights, self.isochrones):
+            total.append(weight * isochrone.observableFraction(mask, distance_modulus))
 
         return numpy.sum(total,axis=0)
 
@@ -579,5 +643,14 @@ class CompositeIsochrone(object):
         index = numpy.floor(f(numpy.random.rand(n))).astype(int)
         index = index[index >= 0]
         return mag_1_array[index] + distance_modulus, mag_2_array[index] + distance_modulus
+
+    def horizontalBranch(self, color, mag):
+        """
+        Horizontal branch weight in units of mag^-2 to mirror field density.
+        """
+        value = []
+        for weight, isochrone in zip(self.weights, self.isochrones):
+            value.append(weight * isochrone.horizontalBranch(color, mag))
+        return numpy.sum(value, axis=0)
 
 ############################################################
