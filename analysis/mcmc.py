@@ -19,6 +19,7 @@ import yaml
 
 import ugali.analysis.scan
 import ugali.utils.config
+from ugali.analysis.kernel import kernelFactory
 
 from ugali.utils.logger import logger
 from ugali.utils.projector import mod2dist
@@ -45,14 +46,15 @@ class MCMC(object):
     def __init__(self, config, coords):
         self.scan = ugali.analysis.scan.Scan(config, coords)
         self.config = self.scan.config
-        self.scan.run()
-        self.grid = self.scan.grid
-        self.loglike = self.grid.loglike
-        self.roi = self.loglike.roi
-
         self.nwalkers = self.config['mcmc']['nwalkers']
         self.nsamples = self.config['mcmc']['nsamples'] 
         self.nthreads = self.config['mcmc']['nthreads'] 
+        
+        self.scan.run()
+        self.grid = self.scan.grid
+        self.loglike = self.grid.loglike
+        self.loglike.kernel = kernelFactory(**self.config['mcmc']['kernel'])
+        self.roi = self.loglike.roi
 
     def get_mle(self):
         return self.grid.mle()
@@ -61,13 +63,13 @@ class MCMC(object):
         mle = self.get_mle()
 
         std = odict([
-            ('richness',0.1*mle['richness']), # delta_r = 10% of max richness 
-            ('lon',0.01),                     # delta_l = 0.01 deg            
-            ('lat',0.01),                     # delta_b = 0.01 deg            
-            ('distance_modulus',0.1),         # delta_mu = 0.1                
-            ('extension',0.01),               # delta_ext = 0.01 deg
-            ('ellipticity',0.05),
-            ('position_angle',10.0),
+            ('richness',0.1*mle['richness']), # delta_r (10% of max)
+            ('lon',0.01),                     # delta_l (deg)
+            ('lat',0.01),                     # delta_b (deg)
+            ('distance_modulus',0.1),         # delta_mu                
+            ('extension',0.01),               # delta_ext (deg)
+            ('ellipticity',0.1),              # delta_e 
+            ('position_angle',15.0),          # delta_pa (deg)
         ])
         return std
 

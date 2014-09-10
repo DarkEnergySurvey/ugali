@@ -23,14 +23,14 @@ class Kernel(object):
     _params = odict([
         ('lon',0.0),
         ('lat',0.0),
-        ('proj','car'),
+        ('proj','ait'),
     ])
     _mapping = odict([])
     
-    def __init__(self, lon, lat, **kwargs):
+    def __init__(self, **kwargs):
         self.name = self.__class__.__name__
         params = dict()
-        params.update(lon=lon,lat=lat,**kwargs)
+        params.update(**kwargs)
         for param,value in params.items():
             # Raise AttributeError if attribute not found
             self.__getattr__(param) 
@@ -65,22 +65,22 @@ class Kernel(object):
 
     def setp(self,param,value):
         self._params[param] = value
+        self._cache(param)
+        
+    def _cache(self, param=None):
+        # Cache any computationally intensive properties
+        # The 'param' argument can be used to decide what
+        # caching is done.
+        pass
 
     @abstractmethod
     def _kernel(self, r):
         # unnormalized, untruncated kernel
         pass
 
-    @property
-    def projector(self):
-        #return Projector(self.lon, self.lat, proj_type='tan')
-        if self.proj is None:
-            return None
-        else:
-            return Projector(self.lon, self.lat, self.proj)
-
     def _pdf(self, radius):
-        return np.where(radius<=self.edge,self._kernel(radius),0.)
+        # unnormalized, truncated kernel
+        return np.where(radius<=self.edge, self._kernel(radius), 0.)
 
     @abstractmethod
     def pdf(self, lon, lat):
@@ -91,6 +91,13 @@ class Kernel(object):
     def norm(self):
         # Numerically integrate the pdf
         return 1./self.integrate()
+
+    @property
+    def projector(self):
+        if self.proj is None or self.proj.lower() == 'none':
+            return None
+        else:
+            return Projector(self.lon, self.lat, self.proj)
 
     def integrate(self, rmin=0, rmax=numpy.inf):
         """
@@ -186,6 +193,14 @@ class EllipticalKernel(Kernel):
     simulate = sample_lonlat
     sample = sample_lonlat
 
+    # Back-compatibility
+    def setExtension(self,extension):
+        self.extension = extension
+
+    def setCenter(self,lon,lat):
+        self.lon = lon
+        self.lat = lat
+
 class EllipticalDisk(EllipticalKernel):
     """
     Simple uniform disk kernel for testing.
@@ -280,7 +295,15 @@ class EllipticalPlummer(EllipticalKernel):
  
     def _kernel(self, radius):
         return 1./(numpy.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
- 
+
+    def _cache(self, param=None):
+        if param in ['lon','lat']: return
+        self._norm = 1./self.integrate()
+
+    @property
+    def norm(self):
+        return self._norm
+
     @property
     def u_t(self):
         # Truncation factor
@@ -310,6 +333,14 @@ class EllipticalKing(EllipticalKernel):
  
     def _kernel(self, radius):
         return ((1./np.sqrt(1.+(radius/self.r_c)**2))-(1./np.sqrt(1.+(self.r_t/self.r_c)**2)))**2
+
+    def _cache(self, param=None):
+        if param in ['lon','lat']: return
+        self._norm = 1./self.integrate()
+
+    @property
+    def norm(self):
+        return self._norm
  
     @property
     def c(self):
@@ -337,34 +368,28 @@ class RadialKernel(EllipticalKernel):
         super(RadialKernel,self).setp(param,value)
  
     def pdf(self, lon, lat):
-        if self.proj is None:
+        if self.projector is None:
             radius = angsep(self.lon,self.lat,lon,lat)
             return self.norm*self._pdf(radius)
         else:
             return super(RadialKernel,self).pdf(lon,lat)
+
+    # Back-compatibility
+    def surfaceIntensity(self,radius):
+        return self.norm*self._pdf(radius)
         
-
-class RadialDisk(RadialKernel,EllipticalDisk):
-    pass
-
-class RadialExponential(RadialKernel,EllipticalExponential):
-    pass
-
-class RadialGaussian(RadialKernel,EllipticalGaussian):
-    pass
-
-class RadialPlummer(RadialKernel,EllipticalPlummer):
-    pass
-
-class RadialKing(RadialKernel,EllipticalKing):
-    pass
- 
 # For fast access...
-Disk = RadialDisk
-Gaussian = RadialGaussian
+class RadialDisk(RadialKernel,EllipticalDisk): pass
+class RadialExponential(RadialKernel,EllipticalExponential): pass
+class RadialGaussian(RadialKernel,EllipticalGaussian): pass
+class RadialPlummer(RadialKernel,EllipticalPlummer): pass
+class RadialKing(RadialKernel,EllipticalKing): pass
+ 
+Disk        = RadialDisk
+Gaussian    = RadialGaussian
 Exponential = RadialExponential
-Plummer = RadialPlummer
-King = RadialKing
+Plummer     = RadialPlummer
+King        = RadialKing
 
 def kernelFactory(name, **kwargs):
     """

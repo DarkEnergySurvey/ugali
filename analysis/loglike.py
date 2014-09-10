@@ -23,16 +23,21 @@ class LogLikelihood(object):
         ('richness',         Parameter(0.0, [0.0,np.inf])),
         ('lon',              Parameter(0.0, [0.0,360.])),
         ('lat',              Parameter(0.0, [-90.,90.])),
-        ('distance_modulus', Parameter(17.0,[10.0,25.])),
         ('extension',        Parameter(0.1, [0.01,5.0])),
         ('ellipticity',      Parameter(0.0, [0.0,1.0])),
-        ('position_angle',   Parameter(0.0, [0.0,90.0])),
+        ('position_angle',   Parameter(0.0, [0.0,180.0])),
+        ('distance_modulus', Parameter(17.0,[10.0,25.])),
         ])
 
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):
-        self.do_color = True
-        self.do_spatial = True
-        self.do_fraction = True
+        self.sync = odict([
+            ('color',True),
+            ('fraction',True),
+            ('spatial',True),
+        ])
+        #self.do_color = True
+        #self.do_spatial = True
+        #self.do_fraction = True
 
         self.config = config
         self.roi = roi
@@ -73,6 +78,9 @@ class LogLikelihood(object):
         else:
             # Raises AttributeError
             return object.__getattribute__(self,name)
+
+    def _cache(self,param):
+        pass
 
     @property
     def pixel(self):
@@ -122,14 +130,20 @@ class LogLikelihood(object):
 
         self.set_distance_modulus(kwargs.get('distance_modulus'))
         self.set_extension(kwargs.get('extension'))
+        self.set_ellipticity(kwargs.get('ellipticity'))
+        self.set_position_angle(kwargs.get('position_angle'))
 
     def sync_params(self,u_color=None,u_spatial=None,observable_fraction=None):
         # The sync_params step updates internal quantities based on
         # newly set parameters. The goal is to only update required quantities
         # to keep computational time low.
-        if self.do_fraction: self.set_observable_fraction(observable_fraction)
-        if self.do_color:    self.set_signal_color(u_color)
-        if self.do_spatial:  self.set_signal_spatial(u_spatial)
+        #if self.do_fraction: self.set_observable_fraction(observable_fraction)
+        #if self.do_color:    self.set_signal_color(u_color)
+        #if self.do_spatial:  self.set_signal_spatial(u_spatial)
+
+        if self.sync['fraction']: self.set_observable_fraction(observable_fraction)
+        if self.sync['color']:    self.set_signal_color(u_color)
+        if self.sync['spatial']:  self.set_signal_spatial(u_spatial)
 
         # Combined object-by-object signal probability
         self._u = self.u_spatial * self.u_color
@@ -142,9 +156,10 @@ class LogLikelihood(object):
         # The signal probability for each object
         self._p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
 
-        self.do_color = False
-        self.do_spatial = False
-        self.do_fraction = False
+        for k in self.sync.keys(): self.sync[k]=False 
+        #self.do_color = False
+        #self.do_spatial = False
+        #self.do_fraction = False
 
     def set_richness(self,richness):
         if richness is None: return
@@ -154,38 +169,60 @@ class LogLikelihood(object):
         if (lon is None) and (lat is None): return
         if lon is not None: self.lon = lon
         if lat is not None: self.lat = lat 
-
+        self.kernel.setCenter(self.lon,self.lat)
         if self.pixel not in self.roi.pixels_interior:
             # ADW: Raising this exception is not strictly necessary, 
             # but at least a warning should be printed if target outside of region.
             raise ValueError("Coordinate outside interior ROI.")
 
-        self.do_spatial=True
+        self.sync['spatial']=True
+        #self.do_spatial=True
 
     def set_distance_modulus(self,distance_modulus):
         if distance_modulus is None: return
         self.distance_modulus = distance_modulus
-        self.do_color=True
-        self.do_fraction=True
+        self.sync['color']=True
+        self.sync['fraction']=True
+        #self.do_color=True
+        #self.do_fraction=True
 
     def set_extension(self,extension):
         if extension is None: return
         self.extension = extension
-        self.kernel.setExtension(self.extension)
-        self.do_spatial=True
+        self.kernel.extension = self.extension
+        self.sync['spatial']=True
+        #self.do_spatial=True
 
+    def set_ellipticity(self,ellipticity):
+        if ellipticity is None: return
+        self.ellipticity = ellipticity
+        self.kernel.ellipticity = self.ellipticity
+        self.sync['spatial']=True
+        #self.do_spatial=True
+
+    def set_position_angle(self,position_angle):
+        if position_angle is None: return
+        self.position_angle = position_angle
+        self.kernel.position_angle = self.position_angle
+        self.sync['spatial']=True
+        #self.do_spatial=True
+
+        
     def set_kernel(self,kernel):
         # Should add equality check (needs kernel.__equ__) 
         if kernel is None: return
         self.kernel = kernel
-        self.do_spatial=True
+        self.sync['spatial']=True
+        #self.do_spatial=True
 
     def set_isochrone(self,isochrone):
         # Should add equality check (needs isochrone.__equ__) 
         if isochrone is None: return
         self.isochrone = isochrone
-        self.do_color=True
-        self.do_fraction=True
+        self.sync['color']=True
+        self.sync['fraction']=True
+        #self.do_color=True
+        #self.do_fraction=True
 
     def set_signal_color(self,u_color=None,**kwargs):
         if u_color is None:
@@ -236,7 +273,6 @@ class LogLikelihood(object):
 
     def stellar_mass(self):
         return self.isochrone.stellarMass()
-
 
     def calc_background(self):
         #logger.info('Calculating angular separation ...')
@@ -338,16 +374,18 @@ class LogLikelihood(object):
         return u_color
 
     def calc_signal_spatial(self):
-        self.kernel.setCenter(self.lon, self.lat)
+        #self.kernel.setCenter(self.lon, self.lat)
 
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-        self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
-        self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+        #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
+        #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+        self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
 
         # On the object-by-object level
-        self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
-        self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
+        #self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
+        #self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
+        self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,self.catalog.lat)
         
         # Spatial component of signal probability
         u_spatial = self.roi.area_pixel * self.surface_intensity_object

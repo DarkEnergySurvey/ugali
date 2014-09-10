@@ -54,9 +54,9 @@ class Isochrone(object):
 
         # Horizontal branch dispersion
         #self._setHorizontalBranch()
-        self.horizontal_branch_dispersion = self.config.params['isochrone']['horizontal_branch_dispersion'] # mag
-        self.horizontal_branch_spacing = self.config.params['isochrone']['horizontal_branch_spacing'] # mag
-        self.horizontal_branch_stage = self.config.params['isochrone']['horizontal_branch_stage']
+        self.horizontal_branch_dispersion = self.config['isochrone']['horizontal_branch_dispersion'] # mag
+        self.horizontal_branch_spacing = self.config['isochrone']['horizontal_branch_spacing'] # mag
+        self.horizontal_branch_stage = self.config['isochrone']['horizontal_branch_stage']
 
     def plotCMD(self):
         """
@@ -248,6 +248,7 @@ class Isochrone(object):
             
         # Horizontal branch dispersion
         if self.horizontal_branch_dispersion > 1.e-3 and numpy.any(self.stage == self.horizontal_branch_stage):
+            logger.info("Performing dispersion of horizontal branch...")
             mass_init_horizontal_branch_min = numpy.min(self.mass_init[self.stage == self.horizontal_branch_stage])
             mass_init_horizontal_branch_max = numpy.max(self.mass_init[self.stage == self.horizontal_branch_stage])
             cut = numpy.logical_and(mass_init_array > mass_init_horizontal_branch_min,
@@ -256,9 +257,9 @@ class Isochrone(object):
             if n % 2 != 1:
                 n += 1
             dispersion_array = numpy.linspace(-1. * self.horizontal_branch_dispersion, self.horizontal_branch_dispersion, n)
-            print 'before', mass_pdf_array[cut]
+            #print 'before', mass_pdf_array[cut]
             mass_pdf_array[cut] = mass_pdf_array[cut] / float(n)
-            print 'after', mass_pdf_array[cut]
+            #print 'after', mass_pdf_array[cut]
             for dispersion in dispersion_array:
                 if dispersion == 0.:
                     continue
@@ -537,7 +538,7 @@ class Isochrone(object):
         
         # Check that colors are monotonically increasing
         if numpy.sum(cut) < 2 or numpy.any(numpy.sort(self.color[cut]) != self.color[cut]):
-            print 'WARNING!'
+            logger.warning('Colors are not monotonically increasing.')
 
         self.horizontal_branch_stage_lower_envelope = scipy.interpolate.interp1d(self.color[cut], self.mag[cut] - pad, bounds_error=False, fill_value=0.)
         self.horizontal_branch_stage_upper_envelope = scipy.interpolate.interp1d(self.color[cut], self.mag[cut] + pad, bounds_error=False, fill_value=0.)

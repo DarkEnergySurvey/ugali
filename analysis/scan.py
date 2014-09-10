@@ -70,9 +70,18 @@ class Scan(object):
         self.loglike = self.grid.loglike
 
     def createKernel(self):
-        name = self.config['kernel']['type'].lower()
-        params = self.config['kernel']['params']
-        kernel = ugali.analysis.kernel.kernelFactory(name,self.lon,self.lat,*params)
+        params = self.config['scan']['kernel']
+        params.setdefault('lon',self.lon)
+        params.setdefault('lat',self.lat)
+        kernel = ugali.analysis.kernel.kernelFactory(**params)
+        #name = self.config['kernel']['type']
+        #params = self.config['kernel']['params']
+        #try: 
+        #    kernel = ugali.analysis.kernel.kernelFactory(name,lon=self.lon,lat=self.lat,**params)
+        #except:
+        #    import ugali.analysis.old_kernel
+        #    kernel = ugali.analysis.old_kernel.kernelFactory(name,self.lon,self.lat,*params)
+
         return kernel
 
     def createIsochrone(self):

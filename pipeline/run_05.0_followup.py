@@ -44,13 +44,14 @@ def run(self):
         import triangle
 
         for name,label,coord in zip(names,labels,coords):
-            filename = join(outdir,self.config['output']['mcmcfile']%label)
-            infile = filename.replace('.fits','.npy')
-            outfile = filename.replace('.fits','.png')
+            infile = join(outdir,self.config['output']['mcmcfile']%label)
+            outfile = infile.replace('.npy','.png')
             nburn = self.config['mcmc']['nburn']
             nwalkers = self.config['mcmc']['nwalkers']
             params = self.config['mcmc']['params']
             samples = np.load(infile)[nburn*nwalkers:]
+            if len(params) != len(samples.dtype):
+                raise Exception("Samples shape does not match number of params")
             fig = triangle.corner(samples.view((float,len(params))), labels=params)
             fig.suptitle(name)
             logger.info("  Writing %s..."%outfile)
