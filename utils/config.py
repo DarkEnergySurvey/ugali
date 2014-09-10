@@ -40,7 +40,10 @@ class Config(dict):
 
         # Possible filenames from this config (masked by existence)
         self.filenames = self.getFilenames()
-        self._makeFilenames()
+        try:
+            self._makeFilenames()
+        except:
+            logger.warning("Filenames could not be created for Config object")
 
     def __str__(self):
         return yaml.dump(self)
