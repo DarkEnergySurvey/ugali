@@ -9,7 +9,9 @@ try:             os.environ['DISPLAY']
 except KeyError: matplotlib.use('Agg')
 
 import numpy
+import numpy as np
 import pylab
+import pylab as plt
 import healpy
 import pyfits
 from mpl_toolkits.axes_grid1 import AxesGrid    
@@ -342,7 +344,9 @@ class BasePlotter(object):
         ncols = ndim // nrows + (ndim%nrows > 0)
 
         fig = pylab.figure()
-        axes  = AxesGrid(fig, 111, nrows_ncols = (nrows, ncols),axes_pad=0,label_mode='1', cbar_mode='single',cbar_pad=0,cbar_size='5%',share_all=True,add_all=False)
+        axes  = AxesGrid(fig, 111, nrows_ncols = (nrows, ncols),axes_pad=0,
+                         label_mode='1', cbar_mode='single',cbar_pad=0,cbar_size='5%',
+                         share_all=True,add_all=False)
 
         images = []
         for i,val in enumerate(values.T):
@@ -423,3 +427,103 @@ class ObjectPlotter(BasePlotter):
     def drawMembership(self, ax, radius=None, zidx=None, mc_source_id=1):
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawMembership(ax,radius,zidx,mc_source_id)
+
+###################################################
+
+
+def draw_slices(ax, hist, **kwargs):
+    """ Draw horizontal and vertical slices through histogram """
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    from matplotlib.ticker import MaxNLocator
+    kwargs.setdefault('ls','-')
+
+    data = hist
+    npix = np.array(data.shape)
+    xlim,ylim = plt.array(zip([0,0],npix-1))
+
+    # Slices
+    vslice = data.sum(axis=0)
+    hslice = data.sum(axis=1)
+    # Bin centers
+    xbin = np.linspace(xlim[0],xlim[1],len(vslice))+0.5 
+    ybin = np.linspace(ylim[0],ylim[1],len(hslice))+0.5
+    divider = make_axes_locatable(ax)
+
+    #gh2 = pywcsgrid2.GridHelperSimple(wcs=self.header, axis_nums=[2, 1])
+    hax = divider.append_axes("right", size=1.2, pad=0.05,sharey=ax)
+                              #axes_class=axes_divider.LocatableAxes)
+    hax.axis["left"].toggle(label=False, ticklabels=False)
+    #hax.plot(hslice, plt.arange(*ylim)+0.5,'-') # Bin center
+    hax.plot(hslice, ybin, **kwargs) # Bin center
+    hax.xaxis.set_major_locator(MaxNLocator(4,prune='both'))
+
+    #gh1 = pywcsgrid2.GridHelperSimple(wcs=self.header, axis_nums=[0, 2])
+    vax = divider.append_axes("top", size=1.2, pad=0.05, sharex=ax)
+                              #axes_class=axes_divider.LocatableAxes)
+    vax.axis["bottom"].toggle(label=False, ticklabels=False)
+    vax.plot(xbin, vslice, **kwargs) 
+    vax.xaxis.set_major_locator(MaxNLocator(4,prune='lower'))
+
+    return hax, vax
+
+def plotKernel(kernel):
+    fig = plt.figure()
+    axes = AxesGrid(fig, 111, nrows_ncols = (1,1),
+                    cbar_mode='none',cbar_pad=0,cbar_size='5%',
+                    cbar_location='top', share_all=True)
+    drawKernel(axes[0],kernel)
+
+def drawKernel(ax, kernel):
+    ext = kernel.extension
+    theta = kernel.theta
+    lon, lat = kernel.lon, kernel.lat
+    xmin,xmax = -5*ext,5*ext
+    ymin,ymax = -5*ext,5*ext,
+    x = np.linspace(xmin,xmax,100)+kernel.lon
+    y = np.linspace(ymin,ymax,100)+kernel.lat
+
+    xx,yy = np.meshgrid(x,y)
+    zz = kernel.pdf(xx,yy)
+    im = ax.imshow(zz)#,extent=[xmin,xmax,ymin,ymax])
+    hax,vax = draw_slices(ax,zz,color='k')
+
+    mc_lon,mc_lat = kernel.sample(1e5)
+    hist,xedges,yedges = np.histogram2d(mc_lon,mc_lat,bins=[len(x),len(y)],
+                                        range=[[x.min(),x.max()],[y.min(),y.max()]])
+    xbins,ybins = np.arange(hist.shape[0])+0.5,np.arange(hist.shape[1])+0.5
+
+    vzz = zz.sum(axis=0)
+    hzz = zz.sum(axis=1)
+    vmc = hist.sum(axis=0)
+    hmc = hist.sum(axis=1)
+
+    vscale = vzz.max()/vmc.max()
+    hscale = hzz.max()/hmc.max()
+
+    kwargs = dict(marker='.',ls='',color='r')
+    hax.errorbar(hmc*hscale, ybins, xerr=np.sqrt(hmc)*hscale,**kwargs)
+    vax.errorbar(xbins, vmc*vscale,yerr=np.sqrt(vmc)*vscale,**kwargs) 
+
+    ax.set_ylim(0,len(y))
+    ax.set_xlim(0,len(x))
+
+    #try: ax.cax.colorbar(im)
+    #except: pylab.colorbar(im)
+
+    #a0 = np.array([0.,0.])
+    #a1 =kernel.a*np.array([np.sin(np.deg2rad(theta)),-np.cos(np.deg2rad(theta))])
+    #ax.plot([a0[0],a1[0]],[a0[1],a1[1]],'-ob')
+    # 
+    #b0 = np.array([0.,0.])
+    #b1 =kernel.b*np.array([np.cos(np.radians(theta)),np.sin(np.radians(theta))])
+    #ax.plot([b0[0],b1[0]],[b0[1],b1[1]],'-or')    
+
+    label_kwargs = dict(xy=(0.05,0.05),xycoords='axes fraction', xytext=(0, 0), 
+                        textcoords='offset points',ha='left', va='bottom',size=10,
+                        bbox={'boxstyle':"round",'fc':'1'}, zorder=10)
+    norm = zz.sum() * (x[1]-x[0])**2
+    ax.annotate("Sum = %.2f"%norm,**label_kwargs)
+        
+    #ax.set_xlabel(r'$\Delta$ LON (deg)')
+    #ax.set_ylabel(r'$\Delta$ LAT (deg)')
+

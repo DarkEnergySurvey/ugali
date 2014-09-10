@@ -2,6 +2,7 @@
 Class for converting between sphere to image coordinates using map projections.
 
 Based on Calabretta & Greisen 2002, A&A, 357, 1077-1122
+http://adsabs.harvard.edu/abs/2002A%26A...395.1077C
 """
 
 import numpy
@@ -31,15 +32,22 @@ class SphericalRotator:
             theta = numpy.radians(lat_ref)
             psi = numpy.radians(90.) # psi = 90 corresponds to (0, 0) psi = -90 corresponds to (180, 0)
         
-        self.rotation_matrix = numpy.matrix([[numpy.cos(psi) * numpy.cos(phi) - numpy.cos(theta) * numpy.sin(phi) * numpy.sin(psi),
-                                              numpy.cos(psi) * numpy.sin(phi) + numpy.cos(theta) * numpy.cos(phi) * numpy.sin(psi),
-                                              numpy.sin(psi) * numpy.sin(theta)],
-                                             [-numpy.sin(psi) * numpy.cos(phi) - numpy.cos(theta) * numpy.sin(phi) * numpy.cos(psi),
-                                              -numpy.sin(psi) * numpy.sin(phi) + numpy.cos(theta) * numpy.cos(phi) * numpy.cos(psi),
-                                              numpy.cos(psi)*numpy.sin(theta)],
-                                             [numpy.sin(theta) * numpy.sin(phi),
-                                              -numpy.sin(theta) * numpy.cos(phi),
-                                              numpy.cos(theta)]])
+
+        cos_psi,sin_psi = numpy.cos(psi),numpy.sin(psi)
+        cos_phi,sin_phi = numpy.cos(phi),numpy.sin(phi)
+        cos_theta,sin_theta = numpy.cos(theta),numpy.sin(theta)
+
+        self.rotation_matrix = numpy.matrix([
+            [cos_psi * cos_phi - cos_theta * sin_phi * sin_psi,
+             cos_psi * sin_phi + cos_theta * cos_phi * sin_psi,
+             sin_psi * sin_theta],
+            [-sin_psi * cos_phi - cos_theta * sin_phi * cos_psi,
+             -sin_psi * sin_phi + cos_theta * cos_phi * cos_psi,
+             cos_psi * sin_theta],
+            [sin_theta * sin_phi,
+             -sin_theta * cos_phi,
+             cos_theta]
+        ])
         
         self.inverted_rotation_matrix = numpy.linalg.inv(self.rotation_matrix)
 
@@ -53,7 +61,7 @@ class SphericalRotator:
         return numpy.array([x,y,z])
         
 
-    def rotate(self, lon, lat, invert = False):
+    def rotate(self, lon, lat, invert=False):
         vec = self.cartesian(lon,lat)
 
         if invert:
@@ -86,6 +94,17 @@ class Projector:
             self.rotator = SphericalRotator(lon_ref, lat_ref, zenithal=True)
             self.sphere_to_image_func = gnomonicSphereToImage
             self.image_to_sphere_func = gnomonicImageToSphere
+        elif proj_type.lower() == 'car':
+            def rotate(lon,lat,invert=False):
+                if invert:
+                    return lon + np.array([lon_ref]), lat + np.array([lat_ref])
+                else:
+                    return lon - np.array([lon_ref]), lat - np.array([lat_ref])
+            self.rotator = SphericalRotator(lon_ref, lat_ref, zenithal=False)
+            # Monkey patch the rotate function
+            self.rotator.rotate = rotate 
+            self.sphere_to_image_func = cartesianSphereToImage
+            self.image_to_sphere_func = cartesianImageToSphere
         else:
             print 'WARNING: %s not recognized'%(proj_type)
 
@@ -98,6 +117,17 @@ class Projector:
         return self.rotator.rotate(lon_rotated, lat_rotated, invert = True)
 
 ############################################################
+
+# ADW: Unteseted dummy projection.
+def cartesianSphereToImage(lon, lat):
+    lon = lon - 360.*(lon>180)
+    x,y = lon,lat
+    return x,y
+
+def cartesianImageToSphere(x,y):
+    x = x - 360.*(x>180)
+    lon,lat = x,y
+    return lon,lat
 
 ### ADW: Speed up and fixed some issues for conversion of
 ### lon = 180 and lon = 360 (returned by rotator)
