@@ -4,14 +4,16 @@ import numpy as np
 import pylab as plt
 
 from ugali.utils.projector import match
+from ugali.utils.plotting import plotMembership
+from ugali.utils.config import Config
 
 import numpy.lib.recfunctions as recfuncs
 
 specfiles = [
-    'members_CB.dat',
-    'members_CVnII.dat',
-    'members_Herc.dat',
-    'members_booI.dat',
+    #'/u/ki/kadrlica/sdss/spec/members_CB.dat',
+    #'/u/ki/kadrlica/sdss/spec/members_CVnII.dat',
+    #'/u/ki/kadrlica/sdss/spec/members_Herc.dat',
+    '/u/ki/kadrlica/sdss/spec/members_booI.dat',
 ]
 
 photfiles = [
@@ -30,20 +32,28 @@ for f in specfiles:
 
 isMember = np.array(['N' not in x for x in spec['member']])
 
-phot = pyfits.open(photfiles[0])[1].data
-for f in photfiles[1:]:
-    p = pyfits.open(f)[1].data
-    phot = recfuncs.stack_arrays([phot,p],usemask=False,asrecarray=True)
-
-m = match(spec['ra'],spec['dec'],phot['RA'],phot['DEC'],tol=1e-3)
-
-plt.hist(phot['PROB'][m[1]][isMember[m[0]]],bins=25)
-plt.hist(phot['PROB'][m[1]][~isMember[m[0]]],bins=25)
+#phot = pyfits.open(photfiles[0])[1].data
+#for f in photfiles[1:]:
+#    p = pyfits.open(f)[1].data
+#    phot = recfuncs.stack_arrays([phot,p],usemask=False,asrecarray=True)
 
 
-if __name__ == "__main__":
-    import argparse
-    description = "python script"
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('args',nargs=argparse.REMAINDER)
-    opts = parser.parse_args(); args = opts.args
+photfiles = [
+    'bootes_i_hb_0.0.fits',    
+    'bootes_i_hb_0.1.fits',    
+    'bootes_i_hb_0.2.fits',    
+    'bootes_i_hb_0.3.fits',    
+    'bootes_i_hb_0.4.fits',    
+    'bootes_i_hb_0.5.fits',    
+]
+for f in photfiles:
+    phot = pyfits.open(f)[1].data
+    m = match(spec['ra'],spec['dec'],phot['RA'],phot['DEC'],tol=1e-3)
+
+    config = Config('config_dr10_gal.yaml')
+    plotMembership(phot[m[1]][isMember[m[0]]],config, distance_modulus=19.)
+    plt.suptitle(f.replace('.fits',''))
+    plt.savefig(f.replace('.fits','.png'))
+
+#plt.hist(phot['PROB'][m[1]][isMember[m[0]]],bins=25)
+#plt.hist(phot['PROB'][m[1]][~isMember[m[0]]],bins=25)

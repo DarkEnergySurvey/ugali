@@ -14,64 +14,27 @@ import scipy.integrate
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
+from ugali.analysis.model import Model, Parameter
+
 from ugali.utils.logger import logger
 
-class Kernel(object):
+class Kernel(Model):
     """
     Base class for kernels.
     """
     _params = odict([
-        ('lon',0.0),
-        ('lat',0.0),
-        ('proj','ait'),
+        #('richness', Parameter(1.0, [0.0,  np.inf])),
+        ('lon',      Parameter(0.0, [0.0,  360.  ])),
+        ('lat',      Parameter(0.0, [-90., 90.   ])),
     ])
     _mapping = odict([])
     
-    def __init__(self, **kwargs):
-        self.name = self.__class__.__name__
-        params = dict()
-        params.update(**kwargs)
-        for param,value in params.items():
-            # Raise AttributeError if attribute not found
-            self.__getattr__(param) 
-            # Set attribute
-            self.__setattr__(param,value)
+    def __init__(self, proj='ait',**kwargs):
+        self.proj = proj
+        super(Kernel,self).__init__(**kwargs)
  
     def __call__(self, lon, lat):
         return self.pdf(lon, lat)
-
-    def __getattr__(self,name):
-        # Return 'value' of parameters
-        # __getattr__ tries the usual places first.
-        if name in self._mapping:
-            return self.__getattr__(self._mapping[name])
-
-        if name in self._params:
-            return self._params[name]
-        else:
-            # Raises AttributeError
-            return object.__getattribute__(self,name)
-
-    def __setattr__(self, name, value):
-        # Call 'set_value' on parameters
-        # __setattr__ tries the usual places first.
-        if name in self._mapping.keys():
-            return self.__setattr__(self._mapping[name],value)
-        
-        if name in self._params:
-            self.setp(name,value)
-        else:
-            return object.__setattr__(self, name, value)
-
-    def setp(self,param,value):
-        self._params[param] = value
-        self._cache(param)
-        
-    def _cache(self, param=None):
-        # Cache any computationally intensive properties
-        # The 'param' argument can be used to decide what
-        # caching is done.
-        pass
 
     @abstractmethod
     def _kernel(self, r):
@@ -94,7 +57,7 @@ class Kernel(object):
 
     @property
     def projector(self):
-        if self.proj is None or self.proj.lower() == 'none':
+        if self.proj is None or self.proj.lower()=='none':
             return None
         else:
             return Projector(self.lon, self.lat, self.proj)
@@ -111,6 +74,7 @@ class Kernel(object):
         integrand = lambda r: self._pdf(r) * 2*numpy.pi * r
         return scipy.integrate.quad(integrand,rmin,rmax,full_output=True,epsabs=0)[0]
 
+
 class EllipticalKernel(Kernel):
     """
     Base class for elliptical kernels.
@@ -122,9 +86,9 @@ class EllipticalKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',0.5),
-            ('ellipticity',0.0),     # Default 0 for RadialKernel
-            ('position_angle',0.0),  # Default 0 for RadialKernel
+            ('extension',     Parameter(0.5, [0.01,5.0]) ),
+            ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),  # Default 0 for RadialKernel
+            ('position_angle',Parameter(0.0, [0.0, 1.0]) ),  # Default 0 for RadialKernel
         ])
     _mapping = odict([
         ('e','ellipticity'),
@@ -284,7 +248,7 @@ class EllipticalPlummer(EllipticalKernel):
     _params = odict(
         EllipticalKernel._params.items() + 
         [
-            ('truncate',3.0), # Truncation radius
+            ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
         EllipticalKernel._mapping.items() +
@@ -296,9 +260,11 @@ class EllipticalPlummer(EllipticalKernel):
     def _kernel(self, radius):
         return 1./(numpy.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
 
-    def _cache(self, param=None):
-        if param in ['lon','lat']: return
-        self._norm = 1./self.integrate()
+    def _cache(self, name=None):
+        if name in ['extension','ellipticity','truncate']:
+            self._norm = 1./self.integrate()
+        else:
+            return
 
     @property
     def norm(self):
@@ -322,7 +288,7 @@ class EllipticalKing(EllipticalKernel):
     _params = odict(
         EllipticalKernel._params.items() + 
         [
-            ('truncate',3.0), # Truncation radius
+            ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
         EllipticalKernel._mapping.items() +
@@ -334,9 +300,11 @@ class EllipticalKing(EllipticalKernel):
     def _kernel(self, radius):
         return ((1./np.sqrt(1.+(radius/self.r_c)**2))-(1./np.sqrt(1.+(self.r_t/self.r_c)**2)))**2
 
-    def _cache(self, param=None):
-        if param in ['lon','lat']: return
-        self._norm = 1./self.integrate()
+    def _cache(self, name=None):
+        if name in ['extension','ellipticity','truncate']:
+            self._norm = 1./self.integrate()
+        else:
+            return
 
     @property
     def norm(self):
@@ -361,12 +329,11 @@ class RadialKernel(EllipticalKernel):
     """
     _fixed_params = ['ellipticity','position_angle']
 
-    def setp(self,param,value):
-        if param in self._fixed_params:
-            msg = "Fixed parameter cannot be updated: %s"%param
-            raise AttributeError(msg)
-        super(RadialKernel,self).setp(param,value)
- 
+    def __init__(self,**kwargs):
+        self._params['ellipticity'].set(0.0, [0.0,0.0])
+        self._params['position_angle'].set(0.0, [0.0,0.0])
+        super(RadialKernel,self).__init__(**kwargs)
+        
     def pdf(self, lon, lat):
         if self.projector is None:
             radius = angsep(self.lon,self.lat,lon,lat)

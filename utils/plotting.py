@@ -14,13 +14,16 @@ import pylab
 import pylab as plt
 import healpy
 import pyfits
+
 from mpl_toolkits.axes_grid1 import AxesGrid    
+from matplotlib.ticker import MaxNLocator
 
 import ugali.utils.config
 import ugali.observation.roi
 import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
+from ugali.utils.projector import mod2dist
 
 from ugali.utils.logger import logger
 #pylab.ion()
@@ -171,16 +174,18 @@ class BasePlotter(object):
                                  textcoords='offset points',ha='left', va='bottom',size=10,
                                  bbox={'boxstyle':"round",'fc':'1'}, zorder=10)
         
-    def drawImage(self,ax):
+    def drawImage(self,ax,invert=True):
         # Optical Image
         im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
         # Flipping JPEG:
         # https://github.com/matplotlib/matplotlib/issues/101
-        im =ax.imshow(im[::-1])
+        if invert: im =ax.imshow(im[::-1])
+        else:      im =ax.imshow(im)
         try:
             ax.cax.axis["right"].toggle(ticks=False, ticklabels=False)
             ax.cax.axis["top"].toggle(ticks=False, ticklabels=False)
-        except: pass
+        except AttributeError: 
+            pass
         ax.annotate("Image",**self.label_kwargs)
         return ax
 
@@ -302,7 +307,7 @@ class BasePlotter(object):
         config = self.config
         scan = ugali.analysis.scan.Scan(self.config,likelihood_pix)
         likelihood = scan.likelihood
-        distance_modulus_array = [self.config.params['likelihood']['distance_modulus_array'][zidx]]
+        distance_modulus_array = [self.config.params['scan']['distance_modulus_array'][zidx]]
         likelihood.precomputeGridSearch(distance_modulus_array)
         likelihood.gridSearch()
         p = likelihood.membershipGridSearch()
@@ -325,13 +330,10 @@ class BasePlotter(object):
         except: pylab.colorbar(sc)
 
     def plotDistance(self):
-        #dirname = self.config.params['output2']['searchdir']
-        #basename = self.config.params['output2']['mergefile']
-        #filename = os.path.join(dirname,basename)
         filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
-        pixels,values = f[1].data['pix'],2*f[1].data['log_likelihood']
+        pixels,values = f[1].data['pix'],2*f[1].data['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
         distances = f[2].data['DISTANCE_MODULUS']
         if distances.ndim == 1: distances = distances.reshape(-1,1)
@@ -365,7 +367,8 @@ class BasePlotter(object):
             im = ax.imshow(images[i],origin='bottom',vmin=vmin,vmax=vmax)
             ax.cax.colorbar(im)
             
-            ax.annotate(r"$\mu = %g$"%distances[i],**self.label_kwargs)
+            #ax.annotate(r"$\mu = %g$"%distances[i],**self.label_kwargs)
+            ax.annotate(r"$d = %.0f$ kpc"%mod2dist(distances[i]),**self.label_kwargs)
             ax.axis["left"].major_ticklabels.set_visible(False) 
             ax.axis["bottom"].major_ticklabels.set_visible(False) 
             fig.add_axes(ax)
@@ -412,7 +415,7 @@ class ObjectPlotter(BasePlotter):
 
     def __init__(self,obj,config,radius=1.0):
         self.obj = obj
-        glon,glat = self.obj['GLON_MAX'],self.obj['GLAT_MAX']
+        glon,glat = self.obj['GLON'],self.obj['GLAT']
         self.zidx = self.obj['ZIDX_MAX'] 
         super(ObjectPlotter,self).__init__(glon,glat,config,radius)
 
@@ -434,7 +437,6 @@ class ObjectPlotter(BasePlotter):
 def draw_slices(ax, hist, **kwargs):
     """ Draw horizontal and vertical slices through histogram """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
-    from matplotlib.ticker import MaxNLocator
     kwargs.setdefault('ls','-')
 
     data = hist
@@ -527,3 +529,85 @@ def drawKernel(ax, kernel):
     #ax.set_xlabel(r'$\Delta$ LON (deg)')
     #ax.set_ylabel(r'$\Delta$ LAT (deg)')
 
+###################################################
+
+def plotMembership(data, config, distance_modulus=None):
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    if isinstance(data,basestring):
+        data = pyfits.open(data)[1].data
+
+
+    sort = np.argsort(data['PROB'])
+    prob = data['PROB'][sort]
+
+    lon,lat = data['RA'][sort],data['DEC'][sort]
+    color = data['COLOR'][sort]
+
+    # ADW: Sometimes may be mag_1
+    mag = data[config['catalog']['mag_1_field']][sort]
+    mag_err_1 = data[config['catalog']['mag_err_1_field']][sort]
+    mag_err_2 = data[config['catalog']['mag_err_2_field']][sort]
+
+    fig,axes = plt.subplots(1,2,figsize=(10,5))
+
+    proj = ugali.utils.projector.Projector(np.median(lon),np.median(lat))
+    x,y = proj.sphereToImage(lon,lat)
+    sc = axes[0].scatter(x,y,c=prob,vmin=0,vmax=1)
+    axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
+    axes[0].set_xlabel(r'$\Delta$ RA (deg)')
+    axes[0].xaxis.set_major_locator(MaxNLocator(4))
+    axes[0].yaxis.set_major_locator(MaxNLocator(4))
+
+    axes[1].errorbar(color,mag,yerr=mag_err_1,fmt='.',c='k',zorder=0.5)
+    sc = axes[1].scatter(color,mag,c=prob,vmin=0,vmax=1,zorder=10)
+    if distance_modulus is not None:
+        drawIsochrone(axes[1],config,distance_modulus,lw=25,c='0.5')
+        drawIsochrone(axes[1],config,distance_modulus,ls='',marker='.',ms=1,c='k')
+
+    axes[1].set_ylabel(r'$g$')
+    axes[1].set_xlabel(r'$g-r$')
+    axes[1].set_ylim(23,18)
+    axes[1].set_xlim(-0.5,1.0)
+    axes[1].xaxis.set_major_locator(MaxNLocator(4))
+
+
+    divider = make_axes_locatable(axes[1])
+    #ax_cb = divider.new_vertical(size="5%", pad=0.05)
+    ax_cb = divider.new_horizontal(size="7%", pad=0.1)
+    fig.add_axes(ax_cb)
+    plt.colorbar(sc, cax=ax_cb, orientation='vertical')
+    ax_cb.yaxis.tick_right()
+    
+
+def drawIsochrone(ax, config, distance_modulus, **kwargs):
+    from ugali.analysis.scan import Scan
+    kwargs.setdefault('c','0.5')
+    kwargs.setdefault('lw',25)
+    kwargs.setdefault('zorder',0)
+    kwargs.setdefault('ls','-')
+
+    isochrone = Scan.createIsochrone(config)
+    
+    for iso in isochrone.isochrones:
+        logger.debug(iso.infile)
+        mass_init, mass_pdf, mass_act, mag_1, mag_2 = iso.sample(mass_steps=5e4)
+        mag = mag_1 + distance_modulus
+        color = mag_1 - mag_2
+
+        # Find discontinuities in the color magnitude distributions
+        dmag = np.fabs(mag[1:]-mag[:-1])
+        dcolor = np.fabs(color[1:]-color[:-1])
+        idx = np.where( (dmag>1.0) | (dcolor>0.25))[0]
+        # +1 to map from difference array to original array
+        mags = np.split(mag,idx+1)
+        colors = np.split(color,idx+1)
+
+        for i,(c,m) in enumerate(zip(colors,mags)):
+            msg = '%-4i (%g,%g) -- (%g,%g)'%(i,m[0],c[0],m[-1],c[-1])
+            logger.debug(msg)
+            ax.plot(c,m,**kwargs)
+
+    ax.invert_yaxis()
+    ax.set_xlim(-0.5,1.5)
+    ax.set_ylim(23,18)

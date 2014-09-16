@@ -31,18 +31,18 @@ def writeColorLUT2(config,
     if type(config) == str:
         config = ugali.utils.config.Config(config)
     if outfile is None:
-        outfile = config.params['likelihood']['color_lut_infile']
+        outfile = config.params['color_lut']['filename']
     if isochrone is None:
         isochrones = []
         for ii, name in enumerate(config.params['isochrone']['infiles']):
             isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
         isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
     if distance_modulus_array is None:
-        distance_modulus_array = config.params['likelihood']['distance_modulus_array']
+        distance_modulus_array = config.params['color_lut']['distance_modulus_array']
     if delta_mag is None:
-        delta_mag = config.params['likelihood']['color_lut_delta_mag']
+        delta_mag = config.params['color_lut']['delta_mag']
     if mag_err_array is None:
-        mag_err_array = config.params['likelihood']['color_lut_mag_err_array']
+        mag_err_array = config.params['color_lut']['mag_err_array']
 
     mag_buffer = 0.5 # Safety buffer in magnitudes around the color-magnitude space defined by the ROI
     epsilon = 1.e-10
@@ -192,18 +192,18 @@ def writeColorLUT(config,
     if type(config) == str:
         config = ugali.utils.config.Config(config)
     if outfile is None:
-        outfile = config.params['likelihood']['color_lut_infile']
+        outfile = config.params['color_lut']['filename']
     if isochrone is None:
         isochrones = []
         for ii, name in enumerate(config.params['isochrone']['infiles']):
             isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
         isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
     if distance_modulus_array is None:
-        distance_modulus_array = config.params['likelihood']['distance_modulus_array']
+        distance_modulus_array = config.params['color_lut']['distance_modulus_array']
     if delta_mag is None:
-        delta_mag = config.params['likelihood']['color_lut_delta_mag']
+        delta_mag = config.params['color_lut']['delta_mag']
     if mag_err_array is None:
-        mag_err_array = config.params['likelihood']['color_lut_mag_err_array']
+        mag_err_array = config.params['color_lut']['mag_err_array']
 
     mag_buffer = 0.5 # Safety buffer in magnitudes around the color-magnitude space defined by the ROI
     epsilon = 1.e-10

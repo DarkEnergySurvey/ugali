@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 import os
-from os.path import join
+from os.path import join, exists
 import numpy
 import numpy as np
 
 from ugali.analysis.mcmc import MCMC
 from ugali.analysis.pipeline import Pipeline
+from ugali.analysis.scan import Scan
 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
 description="Perform targeted followup."
-components = ['mcmc','plot']
+components = ['mcmc','membership','plot']
 
 def run(self):
     if self.opts.coords is not None:
@@ -37,14 +38,31 @@ def run(self):
             cmd='ugali/analysis/mcmc.py %s --gal %.4f %.4f %s'%(self.opts.config,glon,glat,outfile)
             nthreads = self.config['mcmc']['nthreads']
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
+    if 'membership' in self.opts.run:
+        logger.info("Running 'membership'...")
+        for name,label,coord in zip(names,labels,coords):
+            glon,glat,radius = coord
+            print name,'(%.4f,%.4f)'%(glon,glat)
+            scan = Scan(self.config, [coord])
+            #scan.run()
+            #params = scan.grid.mle()
+            #params['ellipticity'] = None
+            #params['position_angle'] = None
+            params = dict(distance_modulus=19.,extension=0.16,lat=69.63,lon=358.09,richness=51514.)
+            scan.loglike.set_params(**params)
+            scan.loglike.sync_params()
+            outfile=join(outdir,self.config['output']['mcmcfile']%label).replace('.npy','.fits')
+            scan.loglike.write_membership(outfile)
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
+        import ugali.utils.plotting
         import matplotlib; matplotlib.use('Agg')
         import triangle
 
         for name,label,coord in zip(names,labels,coords):
             infile = join(outdir,self.config['output']['mcmcfile']%label)
+            if not exists(infile): continue
             outfile = infile.replace('.npy','.png')
             nburn = self.config['mcmc']['nburn']
             nwalkers = self.config['mcmc']['nwalkers']
@@ -56,7 +74,7 @@ def run(self):
             fig.suptitle(name)
             logger.info("  Writing %s..."%outfile)
             fig.savefig(outfile)
-
+            
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parser.add_coords(radius=True,targets=True)

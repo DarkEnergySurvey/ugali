@@ -5,23 +5,33 @@ NOTE: only absolute magnitudes are used in the Isochrone class
 """
 
 import sys
+import collections
+from collections import OrderedDict as odict
+
 import numpy
 import scipy.interpolate
 import scipy.stats
 
 import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
+from ugali.analysis.model import Model, Parameter
+
 
 from ugali.utils.logger import logger
 ############################################################
 
-class Isochrone(object):
-
-    def __init__(self, config, infile, infile_format='padova'):
+class Isochrone(Model):
+    _params = odict([
+        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
+    ])
+    _mapping = odict([])
+    
+    def __init__(self, config, infile, infile_format='padova', **kwargs):
         """
         Initialize an isochrone instance.
         """
-        
+        super(Isochrone,self).__init__(**kwargs)
+
         self.config = config
         self.infile = infile
         
@@ -55,7 +65,6 @@ class Isochrone(object):
         # Horizontal branch dispersion
         #self._setHorizontalBranch()
         self.horizontal_branch_dispersion = self.config['isochrone']['horizontal_branch_dispersion'] # mag
-        self.horizontal_branch_spacing = self.config['isochrone']['horizontal_branch_spacing'] # mag
         self.horizontal_branch_stage = self.config['isochrone']['horizontal_branch_stage']
 
     def plotCMD(self):
@@ -247,23 +256,31 @@ class Isochrone(object):
             mag_2_array = mag_2_interpolation(mass_init_array)
             
         # Horizontal branch dispersion
-        if self.horizontal_branch_dispersion > 1.e-3 and numpy.any(self.stage == self.horizontal_branch_stage):
-            logger.info("Performing dispersion of horizontal branch...")
-            mass_init_horizontal_branch_min = numpy.min(self.mass_init[self.stage == self.horizontal_branch_stage])
-            mass_init_horizontal_branch_max = numpy.max(self.mass_init[self.stage == self.horizontal_branch_stage])
+        if self.horizontal_branch_dispersion and numpy.any(self.stage==self.horizontal_branch_stage):
+            logger.debug("Performing dispersion of horizontal branch...")
+            mass_init_horizontal_branch_min = self.mass_init[self.stage==self.horizontal_branch_stage].min()
+            mass_init_horizontal_branch_max = self.mass_init[self.stage==self.horizontal_branch_stage].max()
             cut = numpy.logical_and(mass_init_array > mass_init_horizontal_branch_min,
                                     mass_init_array < mass_init_horizontal_branch_max)
-            n = int(2. * self.horizontal_branch_dispersion / self.horizontal_branch_spacing)
-            if n % 2 != 1:
-                n += 1
-            dispersion_array = numpy.linspace(-1. * self.horizontal_branch_dispersion, self.horizontal_branch_dispersion, n)
-            #print 'before', mass_pdf_array[cut]
+
+            if isinstance(self.horizontal_branch_dispersion,collections.Iterable):
+                dispersion_array = self.horizontal_branch_dispersion
+                n = len(dispersion_array)
+            else:
+                dispersion = self.horizontal_branch_dispersion
+                spacing = 0.1
+                n = int(round(2.0*self.horizontal_branch_dispersion/spacing))
+                if n % 2 != 1: n += 1
+                dispersion_array = numpy.linspace(-dispersion, dispersion, n)
+
+            # Reset original values
             mass_pdf_array[cut] = mass_pdf_array[cut] / float(n)
-            #print 'after', mass_pdf_array[cut]
+
+            # Add dispersed values
             for dispersion in dispersion_array:
-                if dispersion == 0.:
-                    continue
-                print dispersion, numpy.sum(cut), len(mass_init_array)
+                if dispersion == 0.: continue
+                msg = '%-6g%-6g%-6g'%(dispersion,cut.sum(),len(mass_init_array))
+                logger.debug(msg)
                 mass_init_array = numpy.append(mass_init_array, mass_init_array[cut]) 
                 mass_pdf_array = numpy.append(mass_pdf_array, mass_pdf_array[cut])
                 mass_act_array = numpy.append(mass_act_array, mass_act_array[cut]) 
@@ -565,9 +582,15 @@ class Isochrone(object):
 
 ############################################################
 
-class CompositeIsochrone(object):
+class CompositeIsochrone(Model):
+    _params = odict([
+        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
+    ])
+    _mapping = odict([])
 
-    def __init__(self, isochrones, weights):
+    def __init__(self, isochrones, weights, **kwargs):
+        super(CompositeIsochrone,self).__init__(**kwargs)
+
         self.isochrones = isochrones
         self.weights = weights
         self.config = self.isochrones[0].config
@@ -577,6 +600,9 @@ class CompositeIsochrone(object):
 
         # Make sure the composite isochrone is properly normalized
         self.weights /= numpy.sum(self.weights)
+
+    def __getitem__(self, key):
+        return self.isochrones[key]
 
     def sample(self, mass_steps=1000, mass_min=0.1, full_data_range=False):
         """

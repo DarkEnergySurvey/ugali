@@ -1,8 +1,117 @@
 #!/usr/bin/env python
+from collections import OrderedDict as odict
+
+"""
+A Model object is just a container for a set of Parameter.
+Implements __getattr__ and __setattr__.
+"""
+
+
+class Model(object):
+    # The _params member is an ordered dictionary
+    # of Parameter objects.
+    _params = odict([])
+    # The _mapping is an alternative name mapping
+    # for the parameters in _params
+    _mapping = odict([])
+
+    def __init__(self,*args,**kwargs):
+        self.name = self.__class__.__name__
+        params = dict()
+        params.update(**kwargs)
+        for param, value in params.items():
+            # Raise AttributeError if attribute not found
+            self.__getattr__(param) 
+            # Set attribute
+            self.__setattr__(param,value)
+
+    def __getattr__(self,name):
+        # Return 'value' of parameters
+        # __getattr__ tries the usual places first.
+        if name in self._mapping:
+            return self.__getattr__(self._mapping[name])
+        if name in self._params:
+            return self._getp(name)
+        else:
+            # Raises AttributeError
+            return object.__getattribute__(self,name)
+
+    def __setattr__(self, name, value):
+        # Call 'set_value' on parameters
+        # __setattr__ tries the usual places first.
+        if name in self._mapping.keys():
+            return self.__setattr__(self._mapping[name],value)
+        if name in self._params:
+            self._setp(name, value)
+        else:
+            return object.__setattr__(self, name, value)
+
+    def __str__(self):
+        ret = "%s:\n"%self.name
+        ret += "  Parameters:"
+        if len(self._params)==0:
+            ret += "\n"
+        else:            
+            width = len(max(self._params.keys(),key=len))
+            for name,value in self._params.items():
+                ret += '\n    {0!s:{width}} : {1!r}'.format(name,value,width=width)
+        return ret
+
+    def _getp(self, name):
+        """ 
+        Get the value of the named parameter.
+
+        Parameters
+        ----------
+        name : string
+            The parameter name.
+
+        Returns
+        -------
+        value : scalar
+            The parameter value.
+        """
+        return self._params[name].value
+
+    def _setp(self, name, value):
+        """ 
+        Set the value of the named parameter.
+
+        Parameters
+        ----------
+        name : string
+            The parameter name.
+
+        Returns
+        -------
+        None
+        """
+        self._params[name].set_value(value)
+        self._cache(name)
+
+    def _cache(self, name=None):
+        """ 
+        Method called in _setp to cache any computationally
+        intensive properties after updating the parameters.
+
+        Parameters
+        ----------
+        name : string
+           The parameter name.
+
+        Returns
+        -------
+        None
+        """
+        pass
+
+    @property
+    def params(self):
+        return self._params
 
 class Parameter(object):
     """
-    Parameter class for storing value and bounds.
+    Parameter class for storing a value and bounds.
 
     Adapted from MutableNum from https://gist.github.com/jheiv/6656349
     """
@@ -77,7 +186,10 @@ class Parameter(object):
     def __trunc__(self):        return self.__value__.__trunc__()  
     def __coerce__(self, x):    return self.__value__.__coerce__(x)
     # Represenation
-    def __repr__(self):         return "%s(%s)" % (self.__class__.__name__, self.__value__)
+    # ADW: This should probably be __str__ not __repr__
+    def __repr__(self):         
+        return "%s(%s, %s)" % (self.__class__.__name__, self.__value__, self.__bounds__)
+
     # Return the type of the inner value
     def innertype(self):        return type(self.__value__)
 

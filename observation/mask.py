@@ -75,6 +75,11 @@ class Mask:
                 n_unmasked_pixels = numpy.sum((self.mask_1.mask_annulus_sparse > mag_1) \
                                               * (self.mask_2.mask_annulus_sparse > mag_2))
                 self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * n_unmasked_pixels
+        if self.solid_angle_cmd.sum() == 0:
+            msg = "Mask contains no solid angle."
+            logger.Error(msg)
+            raise Exception(msg)
+            
 
     def _pruneCMD(self, minimum_solid_angle):
         """
@@ -86,9 +91,12 @@ class Mask:
         """
 
         logger.info('Prunning CMD based on minimum solid angle of %.2f deg^2'%(minimum_solid_angle))
-        
-        self.solid_angle_cmd *= self.solid_angle_cmd > minimum_solid_angle
 
+        self.solid_angle_cmd *= self.solid_angle_cmd > minimum_solid_angle
+        if self.solid_angle_cmd.sum() == 0:
+            msg = "Pruned mask contains no solid angle."
+            logger.Error(msg)
+            raise Exception(msg)
         # Compute which magnitudes the clipping correspond to
         index_mag, index_color = numpy.nonzero(self.solid_angle_cmd)
         mag = self.roi.centers_mag[index_mag]

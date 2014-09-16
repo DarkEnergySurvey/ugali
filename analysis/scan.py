@@ -20,11 +20,11 @@ import healpy
 import ugali.analysis.isochrone
 import ugali.analysis.kernel
 import ugali.analysis.color_lut
-import ugali.analysis.loglike
 import ugali.observation.catalog
 import ugali.observation.mask
 import ugali.utils.parabola
 import ugali.utils.skymap
+from ugali.analysis.loglike  import LogLikelihood 
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
@@ -54,66 +54,74 @@ class Scan(object):
         # ADW: Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
 
-        self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
+        #self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
+        self.roi = self.createROI(self.config,self.lon,self.lat)
         # All possible catalog pixels spanned by the ROI
         catalog_pixels = numpy.unique(superpixel(self.roi.pixels,self.nside_pixel,self.nside_catalog))
         # Only catalog pixels that exist in catalog files
         self.catalog_pixels = numpy.intersect1d(catalog_pixels, self.filenames['pix'].compressed())
 
-        self.kernel = self.createKernel()
-        self.isochrone = self.createIsochrone()
-        self.catalog = self.createCatalog()
-        self.mask = self.createMask()
+        self.kernel = self.createKernel(self.config,self.lon,self.lat)
+        self.isochrone = self.createIsochrone(self.config)
+        self.catalog = self.createCatalog(self.config,self.roi)
+        self.mask = self.createMask(self.config,self.roi)
 
         self.grid = GridSearch(self.config, self.roi, self.mask,self.catalog, 
                                self.isochrone, self.kernel)
-        self.loglike = self.grid.loglike
 
-    def createKernel(self):
-        params = self.config['scan']['kernel']
-        params.setdefault('lon',self.lon)
-        params.setdefault('lat',self.lat)
+    @property
+    def loglike(self):
+        return self.grid.loglike
+
+    @staticmethod
+    def createROI(config,lon,lat):
+        roi = ugali.observation.roi.ROI(config, lon, lat)        
+        return roi
+
+    @staticmethod
+    def createKernel(config,lon=0.0,lat=0.0):
+        params = config['scan']['kernel']
+        params.setdefault('lon',lon)
+        params.setdefault('lat',lat)
         kernel = ugali.analysis.kernel.kernelFactory(**params)
-        #name = self.config['kernel']['type']
-        #params = self.config['kernel']['params']
-        #try: 
-        #    kernel = ugali.analysis.kernel.kernelFactory(name,lon=self.lon,lat=self.lat,**params)
-        #except:
-        #    import ugali.analysis.old_kernel
-        #    kernel = ugali.analysis.old_kernel.kernelFactory(name,self.lon,self.lat,*params)
-
         return kernel
 
-    def createIsochrone(self):
+    @staticmethod
+    def createIsochrone(config):
         isochrones = []
-        for ii, name in enumerate(self.config['isochrone']['infiles']):
-            isochrones.append(ugali.analysis.isochrone.Isochrone(self.config, name))
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, self.config['isochrone']['weights'])
+        for ii, name in enumerate(config['isochrone']['infiles']):
+            isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
+        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config['isochrone']['weights'])
         return isochrone
 
-    def createCatalog(self):
+    @staticmethod
+    def createCatalog(config,roi=None,lon=None,lat=None):
         """
         Find the relevant catalog files for this scan.
         """
-        catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)  
+        if roi is None: roi = Scan.createROI(config,lon,lat)
+        catalog = ugali.observation.catalog.Catalog(config,roi=roi)  
         return catalog
 
-    def simulateCatalog(self):
+    @staticmethod
+    def simulateCatalog(config,roi=None,lon=None,lat=None):
         """
         !!! PLACEHOLDER: Integrate the simulation structure more tightly with
         the analysis structure to avoid any nasty disconnects. !!!
         """
         pass
 
-    def createMask(self):
-        mask = ugali.observation.mask.Mask(self.config, self.roi)
+    @staticmethod
+    def createMask(config,roi=None,lon=None,lat=None):
+        if roi is None: roi = Scan.createROI(config,lon,lat)
+        mask = ugali.observation.mask.Mask(config, roi)
         return mask
 
     def run(self, coords=None, debug=False):
         """
         Run the likelihood grid search
         """
-        self.grid.precompute()
+        #self.grid.precompute()
         self.grid.search()
         return self.grid
         
@@ -138,11 +146,10 @@ class GridSearch:
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
         logger.info("Creating log-likelihood...")
-        self.loglike=ugali.analysis.loglike.LogLikelihood(config,roi,
-                                                          mask,catalog,
-                                                          isochrone,kernel)
+        self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
 
         self.stellar_mass_conversion = self.loglike.stellar_mass()
+        self.distance_modulus_array = self.config['scan']['distance_modulus_array']
 
     def precompute(self, distance_modulus_array=None):
         """
@@ -153,20 +160,20 @@ class GridSearch:
         if distance_modulus_array is not None:
             self.distance_modulus_array = distance_modulus_array
         else:
-            self.distance_modulus_array = self.config['likelihood']['distance_modulus_array']
+            self.distance_modulus_array = self.config['scan']['distance_modulus_array']
 
         # Observable fraction for each pixel
         self.u_color_array = [[]] * len(self.distance_modulus_array)
         self.observable_fraction_sparse_array = [[]] * len(self.distance_modulus_array)
 
-        logger.info('Loop over distance moduli in precompute step ...')
+        logger.info('Looping over distance moduli in precompute ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
-            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, len(self.distance_modulus_array), distance_modulus))
+            logger.info('  (%i/%i) Distance Modulus = %.2f ...'%(ii+1, len(self.distance_modulus_array), distance_modulus))
 
             self.u_color_array[ii] = False
-            if self.config['likelihood']['color_lut_infile'] is not None:
-                logger.info('  Precomputing signal color from %s'%(self.config['likelihood']['color_lut_infile']))
-                self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config['likelihood']['color_lut_infile'],
+            if self.config['scan']['color_lut_infile'] is not None:
+                logger.info('  Precomputing signal color from %s'%(self.config['scan']['color_lut_infile']))
+                self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config['scan']['color_lut_infile'],
                                                                                distance_modulus,
                                                                                self.loglike.catalog.mag_1,
                                                                                self.loglike.catalog.mag_2,
@@ -202,35 +209,37 @@ class GridSearch:
 
         lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
             
-        logger.info('Begin loop over distance moduli in likelihood fitting ...')
+        logger.info('Looping over distance moduli in grid search ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
             if distance_modulus_index is not None:
                 if ii != distance_modulus_index: continue
-            
-            logger.info('  (%i/%i) distance modulus = %.2f ...'%(ii+1, nmoduli, distance_modulus))
+
+            logger.info('  (%-2i/%i) Distance Modulus=%.1f ...'%(ii+1,nmoduli,distance_modulus))
+
+            # Set distance_modulus once to save time
+            self.loglike.set_params(distance_modulus=distance_modulus)
+            #self.loglike.sync_params()
 
             for jj in range(0, npixels):
                 # Specific pixel
                 if coords is not None:
                     if self.roi.pixels_target[jj] != pix_coords:
                         continue
-
-                self.loglike.set_params(lon=lon[jj],lat=lat[jj],distance_modulus=distance_modulus)
-                self.loglike.sync_params(u_color=self.u_color_array[ii],
-                                         observable_fraction=self.observable_fraction_sparse_array[ii])
+                
+                # Set kernel location
+                self.loglike.set_params(lon=lon[jj],lat=lat[jj])
+                # Doesn't re-sync distance_modulus each time
+                self.loglike.sync_params()
                                          
-                args = (
-                    jj+1, npixels, 
-                    self.loglike.kernel.lon, self.loglike.kernel.lat
-                )
-                message = """    (%i/%i) Candidate at (%.3f, %.3f) ... """%(args)
+                args = (jj+1, npixels, self.loglike.lon, self.loglike.lat)
+                message = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '%(args)
 
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
                 self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
                 self.fraction_observable_sparse_array[ii][jj] = self.loglike.f
-                if self.config['likelihood']['full_pdf'] \
+                if self.config['scan']['full_pdf'] \
                    or (coords is not None and distance_modulus_index is not None):
 
                     n_pdf_points = 100
@@ -256,14 +265,14 @@ class GridSearch:
                         self.stellar_mass_conversion*self.richness_upper_sparse_array[ii][jj],
                         self.stellar_mass_conversion*self.richness_upper_limit_sparse_array[ii][jj]
                     )
-                    message += 'TS = %.2f, Stellar Mass = %.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
+                    message += 'TS=%.1f, Stellar Mass=%.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
                 else:
                     args = (
                         2. * self.log_likelihood_sparse_array[ii][jj], 
                         self.stellar_mass_conversion * self.richness_sparse_array[ii][jj],
                         self.fraction_observable_sparse_array[ii][jj]
                     )
-                    message += 'TS = %.2f, Stellar Mass = %.1f, Fraction = %.2g'%(args)
+                    message += 'TS=%.1f, Stellar Mass=%.1f, Fraction=%.2g'%(args)
                 logger.debug( message )
                 
                 if coords is not None and distance_modulus_index is not None:
@@ -281,7 +290,7 @@ class GridSearch:
                 2. * self.log_likelihood_sparse_array[ii][jj_max], 
                 self.stellar_mass_conversion * self.richness_sparse_array[ii][jj_max]
             )
-            message = "  (%i/%i) Maximum at (%.3f, %.3f) ... TS = %.2f, Stellar Mass = %.1f"%(args)
+            message = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
             logger.info( message )
  
     def mle(self):
@@ -302,7 +311,7 @@ class GridSearch:
         Save the likelihood fitting results as a sparse HEALPix map.
         """
         # Full data output (too large for survey)
-        if self.config['likelihood']['full_pdf']:
+        if self.config['scan']['full_pdf']:
             data_dict = {'LOG_LIKELIHOOD': self.log_likelihood_sparse_array.transpose(),
                          'RICHNESS':       self.richness_sparse_array.transpose(),
                          'RICHNESS_LOWER': self.richness_lower_sparse_array.transpose(),

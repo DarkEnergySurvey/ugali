@@ -3,7 +3,7 @@ from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
-import scipy.stats
+from scipy.stats import norm
 
 import healpy
 import healpy as hp
@@ -15,44 +15,47 @@ import ugali.utils.parabola
 from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
-from ugali.utils.params import Parameter
+from ugali.analysis.model import Model,Parameter
+
+class Richness(Model):
+    """
+    Dummy model to hold the richness, which is not
+    directly connected to either the spatial or 
+    color information and doesn't require a sync
+    when updated.
+    """
+    _params = odict([
+        ('richness', Parameter(1.0, [0.0,  np.inf])),
+    ])
 
 class LogLikelihood(object):
-    # Default parameters of the likelihood model
-    params = odict([
-        ('richness',         Parameter(0.0, [0.0,np.inf])),
-        ('lon',              Parameter(0.0, [0.0,360.])),
-        ('lat',              Parameter(0.0, [-90.,90.])),
-        ('extension',        Parameter(0.1, [0.01,5.0])),
-        ('ellipticity',      Parameter(0.0, [0.0,1.0])),
-        ('position_angle',   Parameter(0.0, [0.0,180.0])),
-        ('distance_modulus', Parameter(17.0,[10.0,25.])),
-        ])
+    """
+    Class for calculating the log-likelihood from a set of models.
+    """
+    models = odict([
+        ('richness', Model()),
+        ('color'   , Model()),
+        ('spatial' , Model()),
+    ])
 
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):
-        self.sync = odict([
-            ('color',True),
-            ('fraction',True),
-            ('spatial',True),
-        ])
-        #self.do_color = True
-        #self.do_spatial = True
-        #self.do_fraction = True
+        # Set the various models for the likelihood
+        self.models['richness'] = Richness()
+        self.models['color']    = isochrone
+        self.models['spatial']  = kernel
+
+        # Toggle for tracking which models need to be synched
+        self._sync = odict([(k,True) for k in self.models.keys()])
 
         self.config = config
         self.roi = roi
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
-        #self.set_params(isochrone=isochrone,kernel=kernel)
-        self.set_isochrone(isochrone)
-        self.set_kernel(kernel)
-
         self.catalog_full = catalog
         self.clip_catalog()
 
         # Effective bin size in color-magnitude space
-        # ADW: Should probably be in config file
-        self.delta_mag = 0.03 # 1.e-3 
+        self.delta_mag = self.config['likelihood']['delta_mag']
 
         self.calc_background()
 
@@ -63,24 +66,46 @@ class LogLikelihood(object):
         return -1. * numpy.sum(numpy.log(1. - self.p)) - (self.f * self.richness)
         
     def __setattr__(self, name, value):
-        # Call 'set_value' on parameters
-        # __setattr__ tries the usual places first.
-        if name in self.params:
-            self.params[name].set_value(value)
-        else:
-            return object.__setattr__(self, name, value)
+        for key,model in self.models.items():
+            if name in model.params:
+                self._sync[key] = True
+                return setattr(model, name, value)
+        # Raises AttributeError?
+        return object.__setattr__(self, name, value)
         
-    def __getattr__(self,name):
-        # Return 'value' of parameters
-        # __getattr__ tries the usual places first.
-        if name in self.params:
-            return self.params[name].value
-        else:
-            # Raises AttributeError
-            return object.__getattribute__(self,name)
+    def __getattr__(self, name):
+        for key,model in self.models.items():
+            if name in model.params:
+                return getattr(model, name)
+        # Raises AttributeError
+        return object.__getattribute__(self,name)
 
-    def _cache(self,param):
-        pass
+    def __str__(self):
+        ret = "%s:"%self.__class__.__name__
+        for key,model in self.models.items():
+            ret += "\n %s Model (sync=%s):\n"%(key.capitalize(),self._sync[key])
+            ret += ("  " + str(model))
+        return ret
+
+    ############################################################################
+    # Derived and protected properties
+    ############################################################################
+
+    # Various derived properties
+    @property
+    def kernel(self):
+        return self.models['spatial']
+
+    @property
+    def isochrone(self):
+        return self.models['color']
+
+    @property
+    def params(self):
+        params = odict([])
+        for key,model in self.models.items():
+            params.update(model.params)
+        return params
 
     @property
     def pixel(self):
@@ -110,40 +135,32 @@ class LogLikelihood(object):
         self.sync_params()
         return self()
 
-    ################################################################################
+    ############################################################################
     # Methods for setting model parameters
-    ################################################################################
+    ############################################################################
 
     def set_params(self,**kwargs):
-        for k in kwargs.keys():
-            if k not in self.params:
-                raise KeyError("Parameter %s not found."%k)
+        for key,value in kwargs.items():
+            setattr(self,key,value)
 
-        # ADW: At some point, maybe...
-        #self.set_isochrone(kwargs.get('isochrone'))
-        #self.set_kernel(kwargs.get('kernel'))
-
-        self.set_richness(kwargs.get('richness'))
-
-        if kwargs.get('lon') is not None or kwargs.get('lat') is not None:
-            self.set_coords(kwargs.get('lon'),kwargs.get('lat'))
-
-        self.set_distance_modulus(kwargs.get('distance_modulus'))
-        self.set_extension(kwargs.get('extension'))
-        self.set_ellipticity(kwargs.get('ellipticity'))
-        self.set_position_angle(kwargs.get('position_angle'))
+        if self.pixel not in self.roi.pixels_interior:
+            # ADW: Raising this exception is not strictly necessary, 
+            # but at least a warning should be printed if target outside of region.
+            raise ValueError("Coordinate outside interior ROI.")
 
     def sync_params(self,u_color=None,u_spatial=None,observable_fraction=None):
         # The sync_params step updates internal quantities based on
         # newly set parameters. The goal is to only update required quantities
         # to keep computational time low.
-        #if self.do_fraction: self.set_observable_fraction(observable_fraction)
-        #if self.do_color:    self.set_signal_color(u_color)
-        #if self.do_spatial:  self.set_signal_spatial(u_spatial)
 
-        if self.sync['fraction']: self.set_observable_fraction(observable_fraction)
-        if self.sync['color']:    self.set_signal_color(u_color)
-        if self.sync['spatial']:  self.set_signal_spatial(u_spatial)
+        if self._sync['richness']:
+            # No sync necessary for richness
+            pass
+        if self._sync['color']:
+            self.observable_fraction = self.calc_observable_fraction(self.distance_modulus)
+            self.u_color = self.calc_signal_color(self.distance_modulus)
+        if self._sync['spatial']:
+            self.u_spatial = self.calc_signal_spatial()
 
         # Combined object-by-object signal probability
         self._u = self.u_spatial * self.u_color
@@ -156,96 +173,12 @@ class LogLikelihood(object):
         # The signal probability for each object
         self._p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
 
-        for k in self.sync.keys(): self.sync[k]=False 
-        #self.do_color = False
-        #self.do_spatial = False
-        #self.do_fraction = False
+        # Reset the sync toggle
+        for k in self._sync.keys(): self._sync[k]=False 
 
-    def set_richness(self,richness):
-        if richness is None: return
-        self.richness = richness
-
-    def set_coords(self,lon,lat):
-        if (lon is None) and (lat is None): return
-        if lon is not None: self.lon = lon
-        if lat is not None: self.lat = lat 
-        self.kernel.setCenter(self.lon,self.lat)
-        if self.pixel not in self.roi.pixels_interior:
-            # ADW: Raising this exception is not strictly necessary, 
-            # but at least a warning should be printed if target outside of region.
-            raise ValueError("Coordinate outside interior ROI.")
-
-        self.sync['spatial']=True
-        #self.do_spatial=True
-
-    def set_distance_modulus(self,distance_modulus):
-        if distance_modulus is None: return
-        self.distance_modulus = distance_modulus
-        self.sync['color']=True
-        self.sync['fraction']=True
-        #self.do_color=True
-        #self.do_fraction=True
-
-    def set_extension(self,extension):
-        if extension is None: return
-        self.extension = extension
-        self.kernel.extension = self.extension
-        self.sync['spatial']=True
-        #self.do_spatial=True
-
-    def set_ellipticity(self,ellipticity):
-        if ellipticity is None: return
-        self.ellipticity = ellipticity
-        self.kernel.ellipticity = self.ellipticity
-        self.sync['spatial']=True
-        #self.do_spatial=True
-
-    def set_position_angle(self,position_angle):
-        if position_angle is None: return
-        self.position_angle = position_angle
-        self.kernel.position_angle = self.position_angle
-        self.sync['spatial']=True
-        #self.do_spatial=True
-
-        
-    def set_kernel(self,kernel):
-        # Should add equality check (needs kernel.__equ__) 
-        if kernel is None: return
-        self.kernel = kernel
-        self.sync['spatial']=True
-        #self.do_spatial=True
-
-    def set_isochrone(self,isochrone):
-        # Should add equality check (needs isochrone.__equ__) 
-        if isochrone is None: return
-        self.isochrone = isochrone
-        self.sync['color']=True
-        self.sync['fraction']=True
-        #self.do_color=True
-        #self.do_fraction=True
-
-    def set_signal_color(self,u_color=None,**kwargs):
-        if u_color is None:
-            self.u_color = self.calc_signal_color(self.distance_modulus,**kwargs)
-        else:
-            self.u_color = u_color
-            
-    def set_signal_spatial(self,u_spatial=None,**kwargs):
-        if u_spatial is None: 
-            self.u_spatial = self.calc_signal_spatial(**kwargs)
-        else:
-            self.u_spatial = u_spatial
-
-    def set_observable_fraction(self,observable_fraction=None):
-        if observable_fraction is None:
-            self.observable_fraction = self.calc_observable_fraction(self.distance_modulus)
-        else:
-            self.observable_fraction = observable_fraction
-
-
-    ################################################################################
+    ############################################################################
     # Methods for calculating observation quantities
-    ################################################################################
+    ############################################################################
 
     def clip_catalog(self):
         # ROI-specific catalog
@@ -260,7 +193,7 @@ class LogLikelihood(object):
 
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog...")
-        cut_interior = numpy.in1d(ang2pix(self.config.params['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
+        cut_interior = numpy.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
         #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
         self.catalog_interior.project(self.roi.projector)
@@ -275,10 +208,6 @@ class LogLikelihood(object):
         return self.isochrone.stellarMass()
 
     def calc_background(self):
-        #logger.info('Calculating angular separation ...')
-        #self.roi.precomputeAngsep()
-        #self.angsep = self.calc_angsep()
-
         #ADW: At some point we may want to make the background level and
         # fittable parameter.
         logger.info('Calculating background CMD ...')
@@ -304,35 +233,35 @@ class LogLikelihood(object):
         # Isochrone will be binned in next step, so can sample many points efficiently
         isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.isochrone.sample(mass_steps=mass_steps)
 
-        bins_mag_1 = numpy.arange(distance_modulus + numpy.min(isochrone_mag_1) - (0.5 * self.delta_mag),
-                                  distance_modulus + numpy.max(isochrone_mag_1) + (0.5 * self.delta_mag),
-                                  self.delta_mag)
-        bins_mag_2 = numpy.arange(distance_modulus + numpy.min(isochrone_mag_2) - (0.5 * self.delta_mag),
-                                  distance_modulus + numpy.max(isochrone_mag_2) + (0.5 * self.delta_mag),
-                                  self.delta_mag)        
+        bins_mag_1 = np.arange(distance_modulus+isochrone_mag_1.min() - (0.5*self.delta_mag),
+                               distance_modulus+isochrone_mag_1.max() + (0.5*self.delta_mag),
+                               self.delta_mag)
+        bins_mag_2 = np.arange(distance_modulus+isochrone_mag_2.min() - (0.5*self.delta_mag),
+                               distance_modulus+isochrone_mag_2.max() + (0.5*self.delta_mag),
+                               self.delta_mag)        
 
 
-        histo_isochrone_pdf = numpy.histogram2d(distance_modulus + isochrone_mag_1,
-                                                distance_modulus + isochrone_mag_2,
-                                                bins=[bins_mag_1, bins_mag_2],
-                                                weights=isochrone_mass_pdf)[0]
+        histo_isochrone_pdf = np.histogram2d(distance_modulus + isochrone_mag_1,
+                                             distance_modulus + isochrone_mag_2,
+                                             bins=[bins_mag_1, bins_mag_2],
+                                             weights=isochrone_mass_pdf)[0]
 
         # Keep only isochrone bins that are within the color-magnitude space of the ROI
-        mag_1_mesh, mag_2_mesh = numpy.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
+        mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
         pad = 1. # mag
-        if self.config.params['catalog']['band_1_detection']:
+        if self.config['catalog']['band_1_detection']:
             in_color_magnitude_space = (mag_1_mesh < (self.mask.mag_1_clip + pad)) \
-                                       * (mag_2_mesh > (self.roi.bins_mag[0] - pad))
+                                       *(mag_2_mesh > (self.roi.bins_mag[0] - pad))
         else:
             in_color_magnitude_space = (mag_2_mesh < (self.mask.mag_2_clip + pad)) \
-                                       * (mag_2_mesh > (self.roi.bins_mag[0] - pad))
+                                       *(mag_2_mesh > (self.roi.bins_mag[0] - pad))
         histo_isochrone_pdf *= in_color_magnitude_space
-        index_mag_1, index_mag_2 = numpy.nonzero(histo_isochrone_pdf)
+        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
         isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
 
         n_catalog = len(self.catalog.mag_1)
         n_isochrone_bins = len(index_mag_1)
-        ones = numpy.ones([n_catalog, n_isochrone_bins])
+        ones = np.ones([n_catalog, n_isochrone_bins])
 
         mag_1_reshape = self.catalog.mag_1.reshape([n_catalog, 1])
         mag_err_1_reshape = self.catalog.mag_err_1.reshape([n_catalog, 1])
@@ -355,27 +284,26 @@ class LogLikelihood(object):
 
         # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
         index_nonzero_0, index_nonzero_1 = numpy.nonzero((arg_mag_1_hi > -5.) \
-                                                         * (arg_mag_1_lo < 5.) \
-                                                         * (arg_mag_2_hi > -5.) \
-                                                         * (arg_mag_2_lo < 5.))
-        pdf_mag_1 = numpy.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_2 = numpy.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_1[index_nonzero_0, index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_1_hi[index_nonzero_0,
-                                                                                        index_nonzero_1]) \
-                                                      - scipy.stats.norm.cdf(arg_mag_1_lo[index_nonzero_0,
-                                                                                          index_nonzero_1])
-        pdf_mag_2[index_nonzero_0, index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_2_hi[index_nonzero_0,
-                                                                                        index_nonzero_1]) \
-                                                      - scipy.stats.norm.cdf(arg_mag_2_lo[index_nonzero_0,
-                                                                                          index_nonzero_1])
+                                                         *(arg_mag_1_lo < 5.) \
+                                                         *(arg_mag_2_hi > -5.) \
+                                                         *(arg_mag_2_lo < 5.))
+        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_1[index_nonzero_0,index_nonzero_1] = norm.cdf(arg_mag_1_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - norm.cdf(arg_mag_1_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
+        pdf_mag_2[index_nonzero_0,index_nonzero_1] = norm.cdf(arg_mag_2_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - norm.cdf(arg_mag_2_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
 
-        # Signal color probability is product of PDFs for each object-bin pair summed over isochrone bins
-        u_color = numpy.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
+        # Signal color probability is product of PDFs for each object-bin pair 
+        # summed over isochrone bins
+        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
         return u_color
 
     def calc_signal_spatial(self):
-        #self.kernel.setCenter(self.lon, self.lat)
-
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
         #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
@@ -391,9 +319,9 @@ class LogLikelihood(object):
         u_spatial = self.roi.area_pixel * self.surface_intensity_object
         return u_spatial
 
-    ################################################################################
+    ############################################################################
     # Methods for fitting and working with the likelihood
-    ################################################################################
+    ############################################################################
 
     def fit_richness(self, atol=1.e-3, maxiter=50):
         """
@@ -442,6 +370,8 @@ class LogLikelihood(object):
         name_objid = self.config['catalog']['objid_field']
         name_mag_1 = self.config['catalog']['mag_1_field']
         name_mag_2 = self.config['catalog']['mag_2_field']
+        name_mag_err_1 = self.config['catalog']['mag_err_1_field']
+        name_mag_err_2 = self.config['catalog']['mag_err_2_field']
 
         columns = [
             pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
@@ -450,11 +380,17 @@ class LogLikelihood(object):
             pyfits.Column(name='RA',format='D',array=ra),
             pyfits.Column(name='DEC',format='D',array=dec),
             pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
+            pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
             pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
+            pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
             pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
             pyfits.Column(name='PROB',format='E',array=self.p),
         ]
         hdu = pyfits.new_table(columns)
+        for param,value in self.params.items():
+            # HIERARCH allows header keywords longer than 8 characters
+            name = 'HIERARCH %s'%param.upper()
+            hdu.header.set(name,value.value,param)
         hdu.writeto(filename,clobber=True)
 
 if __name__ == "__main__":

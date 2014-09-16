@@ -169,6 +169,9 @@ class MCMC(object):
         mass,mass_err = rich*stellar,rich_err*stellar
         results['mass'] = [float(mass),float(mass_err)]
 
+        ts = 2*self.loglike.value()
+        results['ts'] = [float(ts),0]
+
         output = dict()
         output['params'] = params
         output['results'] = results
