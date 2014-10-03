@@ -26,7 +26,7 @@ class Config(dict):
         Provides functionality to merge with a default configuration.
 
         Parameters:
-          input:   Either filename or dictionary
+          input:   Either filename or dictionary (deep copied)
           default: Default configuration to merge
         
         Returns:
@@ -39,8 +39,8 @@ class Config(dict):
         self.params = self
 
         # Possible filenames from this config (masked by existence)
-        self.filenames = self.getFilenames()
         try:
+            self.filenames = self.getFilenames()
             self._makeFilenames()
         except:
             logger.warning("Filenames could not be created for Config object")
@@ -61,7 +61,8 @@ class Config(dict):
             else:
                 raise Exception('Unrecognized config format: %s'%ext)
         elif isinstance(input, dict):
-            params = input
+            # This is the copy constructor...
+            params = copy.deepcopy(input)
         elif input is None:
             params = {}
         else:

@@ -19,6 +19,7 @@ import ugali.utils.binning
 import ugali.utils.projector
 import ugali.utils.skymap
 
+from ugali.utils.config import Config
 from ugali.utils.healpix import query_disc, ang2pix, pix2ang, ang2vec
 
 ############################################################
@@ -62,7 +63,7 @@ class ROI(object):
 
     def __init__(self, config, lon, lat):
 
-        self.config = config
+        self.config = Config(config)
         self.lon = lon
         self.lat = lat
 
@@ -105,7 +106,7 @@ class ROI(object):
         # self.centers_lon_interior,self.centers_lat_interior = self.pixels_interior.lon,self.pixels_interior.lat
         # self.centers_lon_target, self.centers_lat_target = self.pixels_target.lon, self.pixels_target.lat
 
-        self.area_pixel = healpy.nside2pixarea(self.config.params['coords']['nside_pixel'], degrees=True) # deg^2
+        self.area_pixel = healpy.nside2pixarea(self.config.params['coords']['nside_pixel'],degrees=True) # deg^2
                                      
         """
         self.centers_x = self._centers(self.bins_x)

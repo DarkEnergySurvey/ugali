@@ -79,28 +79,13 @@ class Catalog:
         """
         Return indices of ROI pixels corresponding to object locations.
         """
-        # ADW: Not safe to set index = -1 (since it will access last entry); -np.inf would be better
-
+        # ADW: Not safe to set index = -1 (since it will access last entry); 
+        # np.inf would be better...
         self.pixel = ang2pix(self.config['coords']['nside_pixel'],self.lon,self.lat)
         self.pixel_roi_index = roi.indexROI(self.lon,self.lat)
 
-        ### # ROI pixels should be pre-sorted, otherwise...
-        ### index = numpy.searchsorted(roi.pixels,self.pixel)
-        ### # Find objects that are outside the roi
-        ### index[numpy.take(roi.pixels,index,mode='clip')!=self.pixel] = -1
-        ### self.pixel_roi_index = index
-
-        ## Involves overhead of creating a full HEALPix map
-        #map_roi = -1 * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
-        #map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels)-1, len(roi.pixels))
-        #self.pixel_roi_index = (map_roi[self.pixel]).astype(int)
-        # 
-        #map_roi[:] = -1
-        #map_roi[roi.pixels] = numpy.linspace(0, len(roi.pixels_interior)-1, len(roi.pixels_interior))
-        #self.pixel_interior_index = (map_roi[self.pixel]).astype(int)
-
         if numpy.any(self.pixel_roi_index < 0):
-            logger.warning("Objects found that are not contained within ROI")
+            logger.warning("Objects found outside ROI")
 
     def write(self, outfile):
         """

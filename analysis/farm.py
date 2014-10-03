@@ -15,20 +15,16 @@ import time
 import glob
 
 import numpy
+import numpy as np
 import healpy
 
-import ugali.analysis.scan
-import ugali.analysis.isochrone
-import ugali.analysis.kernel
-import ugali.observation.catalog
-import ugali.observation.mask
 import ugali.utils.config
 import ugali.utils.skymap
 import ugali.utils.batch
 
 from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import subpixel,superpixel,query_disc
-from ugali.utils.healpix import pix2ang,ang2pix,ang2vec
+from ugali.utils.healpix import pix2ang,ang2vec
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
@@ -45,16 +41,17 @@ class Farm:
         self.nside_pixel      = self.config['coords']['nside_pixel']
 
         self.filenames = self.config.getFilenames()
+        self.skip = "Outfile already exists. Skipping..."
+
         # Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
         self.catalog_pixels = self.filenames['pix'].compressed()
 
     def command(self, outfile, configfile, pix):
         """
-        Placeholder for a function to generate the command for running
-        the likelihood scan.
+        Generate the command for running the likelihood scan.
         """
-        params = dict(script=self.config['batch']['script'],
+        params = dict(script=self.config['scan']['script'],
                       config=configfile, outfile=outfile, 
                       nside=self.nside_likelihood, pix=pix)
         cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i'%params
@@ -72,7 +69,7 @@ class Farm:
             raise Exception('Requested nside=%i is greater than catalog_nside'%nside)
         elif nside < self.nside_pixel:
             raise Exception('Requested nside=%i is less than pixel_nside'%nside)
-        pix = numpy.arange( healpy.nside2npix(nside), dtype=int )
+        pix = numpy.arange(healpy.nside2npix(nside), dtype=int)
         map = self.inFootprint(pix)
         return map 
 
@@ -106,7 +103,7 @@ class Farm:
     def submit_all(self, coords=None, queue=None, debug=False):
         """
         Submit likelihood analyses on a set of coordinates. If
-        coords == None, submit all coordinates in the footprint.
+        coords is `None`, submit all coordinates in the footprint.
 
         Inputs:
         coords : Array of target locations in Galactic coordinates. 
@@ -127,13 +124,13 @@ class Farm:
             else:
                 raise Exception("Unrecognized coords shape:"+str(coords.shape))
             vec = ang2vec(glon,glat)
-            pixels = numpy.zeros( 0, dtype=int)
+            pixels = numpy.zeros(0, dtype=int)
             for v,r in zip(vec,radius):
                 pix = query_disc(self.nside_likelihood,v,r,inclusive=True,fact=32)
                 pixels = numpy.hstack([pixels, pix])
             #pixels = numpy.unique(pixels)
 
-        inside = self.inFootprint(pixels)
+        inside = ugali.utils.skymap.inFootprint(self.config,pixels)
         if inside.sum() != len(pixels):
             logger.warning("Ignoring pixels outside survey footprint:\n"+str(pixels[~inside]))
         if inside.sum() == 0:
@@ -179,60 +176,75 @@ class Farm:
         istart = 0
         logger.info('=== Submit Likelihood ===')
         for ii,pix in enumerate(pixels):
-            logger.info('  (%i/%i) pixel=%i nside=%i; (lon, lat) = (%.3f, %.3f)'%(ii+1, len(pixels), pix, self.nside_likelihood, lon[ii], lat[ii] ))
+            logger.info('  (%i/%i) pixel=%i nside=%i; (lon, lat) = (%.2f, %.2f)'%(ii+1,len(pixels),pix, self.nside_likelihood,lon[ii],lat[ii]))
 
             # Create outfile name
             outfile = self.config.likefile%(pix,self.config['coords']['coordsys'].lower())
-            #outbase = 'likelihood_%08i_%s.fits'%(pix,self.config['coords']['coordsys'].lower())
-            #outfile = join(outdir, outbase)
             outbase = os.path.basename(outfile)
             jobname = self.config['batch']['jobname']
 
-            # Check if outfile exists
-            if os.path.exists(outfile) and not local:
-                logger.info('  %s already exists. Skipping ...'%(outfile))
-                continue
-
             # Submission command
-            # This should be able to submit multiple pixels...
+            sub = not os.path.exists(outfile)
             cmd = self.command(outfile,configfile,pix)
-
-            commands.append([ii,cmd])
+            commands.append([ii,cmd,lon[ii],lat[ii],sub])
             
             if local or chunk == 0:
                 # Not chunking
                 command = cmd
+                submit = sub
                 logfile = join(logdir,os.path.splitext(outbase)[0]+'.log')
-            elif (len(commands)%chunk==0) or (len(pixels)==ii+1):
-                # End of chunk, create submit script
+            elif (len(commands)%chunk==0) or (ii+1 == len(pixels)):
+                # End of chunk, create submission script
+                commands = np.array(commands,dtype=object)
                 istart, iend = commands[0][0], commands[-1][0]
-                info = 'echo -e "\n### %s ###";\n'
                 subfile = join(subdir,'submit_%08i_%08i.sh'%(istart,iend))
                 logfile = join(logdir,'submit_%08i_%08i.log'%(istart,iend))
-                script = open(subfile,'w')
-                script.write(info%('Pixels %i to %i'%(istart,ii)))
-                for i,c in commands: 
-                    script.write(info%('Pixel %i (%.3f, %.3f)'%(i,lon[i],lat[i])))
-                    script.write('%s;\n'%c)
-                script.close()
-                commands = []; istart = ii+1
                 command = "sh %s"%subfile
+
+                submit = np.any(commands[:,-1])
+                if submit: self.write_script(subfile,commands)
             else:
                 # Not end of chunk
                 continue
+            commands=[]
 
-            while True:
-                njobs = self.batch.njobs()
-                if njobs < self.config['batch']['max_jobs']:
-                    break
-                else:
-                    logger.info('%i jobs already in queue, waiting ...'%(njobs))
-                    time.sleep(5*chunk)
+            # Actual job submission
+            if not submit:
+                logger.info(self.skip)
+                continue
+            else:
+                while True:
+                    njobs = self.batch.njobs()
+                    if njobs < self.config['batch']['max_jobs']:
+                        break
+                    else:
+                        logger.info('%i jobs already in queue, waiting...'%(njobs))
+                        time.sleep(5*chunk)
 
-            job = self.batch.submit(command,jobname,logfile)
-            logger.info("  "+job)
-            time.sleep(0.5)
+                job = self.batch.submit(command,jobname,logfile)
+                logger.info("  "+job)
+                time.sleep(0.5)
 
+    def write_script(self, filename, commands):
+        info = 'echo "{0:=^60}";\n'
+        hline = info.format("")
+        newline = 'echo;\n'
+
+        istart, iend = commands[0][0], commands[-1][0]
+        script = open(filename,'w')
+        script.write(hline)
+        script.write(info.format('Submit Pixels %i to %i'%(istart,iend)))
+        script.write(hline)
+        script.write(newline)
+        script.write('status=0;\n')
+        for i,cmd,lon,lat,sub in commands: 
+            script.write(info.format('Pixel %i: (%.2f, %.2f)'%(i,lon,lat)))
+            if sub: script.write('%s; [ $? -ne 0 ] && status=1;\n'%cmd)
+            else:   script.write('echo "%s";\n'%self.skip)
+            script.write(hline)
+            script.write(newline)
+        script.write('exit $status;\n')
+        script.close()
 
 if __name__ == "__main__":
     import ugali.utils.parser

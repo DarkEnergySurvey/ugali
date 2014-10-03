@@ -53,7 +53,8 @@ class MCMC(object):
         self.scan.run()
         self.grid = self.scan.grid
         self.loglike = self.grid.loglike
-        self.loglike.kernel = kernelFactory(**self.config['mcmc']['kernel'])
+        kernel = kernelFactory(**self.config['mcmc']['kernel'])
+        self.loglike.set_model('spatial',kernel)
         self.roi = self.loglike.roi
 
     def get_mle(self):
@@ -123,7 +124,7 @@ class MCMC(object):
         ## Non-optimal conversion...
         #self.samples = np.core.records.fromrecords(samples,names=self.params)
         # Faster...
-        self.samples = np.core.records.fromarrays(samples.T,names=self.params)
+        self.samples = np.rec.fromarrays(samples.T,names=self.params)
 
     def estimate(self,param,burn=None,sigma=5.0):
         if param not in self.loglike.params.keys():

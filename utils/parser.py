@@ -59,6 +59,10 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('-f','--force',action='store_true',
                           help='Force the overwrite of files')
 
+    def add_seed(self,**kwargs):
+        self.add_argument('--seed',default=None,type=int,
+                          help='Random seed.')
+
     def _parse_verbose(self,opts):
         if vars(opts).get('verbose'): 
             logger.setLevel(logger.DEBUG)

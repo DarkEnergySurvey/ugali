@@ -3,8 +3,8 @@
 Class to create and run an individual likelihood analysis.
 
 Classes:
-    Scan
-    GridSearch
+    Scan -- ADW: Doesn't do anything
+    GridSearch -- ADW: Should be renamed to Scan
 
 """
 
@@ -26,6 +26,8 @@ import ugali.utils.parabola
 import ugali.utils.skymap
 from ugali.analysis.loglike  import LogLikelihood 
 
+from ugali.utils.parabola import Parabola
+
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
@@ -36,6 +38,8 @@ from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
 class Scan(object):
     """
     The base of a likelihood analysis scan.
+
+    ADW: This really does nothing now...
     """
     def __init__(self, config, coords):
         self.config = Config(config)
@@ -45,21 +49,21 @@ class Scan(object):
         self._setup()
 
     def _setup(self):
-        self.nside_catalog    = self.config['coords']['nside_catalog']
-        self.nside_likelihood = self.config['coords']['nside_likelihood']
-        self.nside_pixel      = self.config['coords']['nside_pixel']
+        #self.nside_catalog    = self.config['coords']['nside_catalog']
+        #self.nside_likelihood = self.config['coords']['nside_likelihood']
+        #self.nside_pixel      = self.config['coords']['nside_pixel']
 
         # All possible filenames
-        self.filenames = self.config.getFilenames()
+        #self.filenames = self.config.getFilenames()
         # ADW: Might consider storing only the good filenames
         # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
 
         #self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
         self.roi = self.createROI(self.config,self.lon,self.lat)
-        # All possible catalog pixels spanned by the ROI
-        catalog_pixels = numpy.unique(superpixel(self.roi.pixels,self.nside_pixel,self.nside_catalog))
-        # Only catalog pixels that exist in catalog files
-        self.catalog_pixels = numpy.intersect1d(catalog_pixels, self.filenames['pix'].compressed())
+        ### # All possible catalog pixels spanned by the ROI
+        ### catalog_pixels = numpy.unique(superpixel(self.roi.pixels,self.nside_pixel,self.nside_catalog))
+        ### # Only catalog pixels that exist in catalog files
+        ### self.catalog_pixels = numpy.intersect1d(catalog_pixels, self.filenames['pix'].compressed())
 
         self.kernel = self.createKernel(self.config,self.lon,self.lat)
         self.isochrone = self.createIsochrone(self.config)
@@ -75,54 +79,38 @@ class Scan(object):
 
     @staticmethod
     def createROI(config,lon,lat):
-        roi = ugali.observation.roi.ROI(config, lon, lat)        
-        return roi
+        return ugali.analysis.loglike.createROI(config,lon,lat)
 
     @staticmethod
     def createKernel(config,lon=0.0,lat=0.0):
-        params = config['scan']['kernel']
-        params.setdefault('lon',lon)
-        params.setdefault('lat',lat)
-        kernel = ugali.analysis.kernel.kernelFactory(**params)
-        return kernel
+        return ugali.analysis.loglike.createKernel(config,lon,lat)
 
     @staticmethod
     def createIsochrone(config):
-        isochrones = []
-        for ii, name in enumerate(config['isochrone']['infiles']):
-            isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config['isochrone']['weights'])
-        return isochrone
+        return ugali.analysis.loglike.createIsochrone(config)
 
     @staticmethod
     def createCatalog(config,roi=None,lon=None,lat=None):
-        """
-        Find the relevant catalog files for this scan.
-        """
-        if roi is None: roi = Scan.createROI(config,lon,lat)
-        catalog = ugali.observation.catalog.Catalog(config,roi=roi)  
-        return catalog
+        return ugali.analysis.loglike.createCatalog(config,roi,lon,lat)
 
     @staticmethod
     def simulateCatalog(config,roi=None,lon=None,lat=None):
-        """
-        !!! PLACEHOLDER: Integrate the simulation structure more tightly with
-        the analysis structure to avoid any nasty disconnects. !!!
-        """
-        pass
+        return ugali.analysis.loglike.simulateCatalog(config,roi,lon,lat)
 
     @staticmethod
     def createMask(config,roi=None,lon=None,lat=None):
-        if roi is None: roi = Scan.createROI(config,lon,lat)
-        mask = ugali.observation.mask.Mask(config, roi)
-        return mask
+        return ugali.analysis.loglike.createMask(config,roi,lon,lat)
+
+    @staticmethod
+    def createLoglike(config,lon=None,lat=None):
+        return ugali.analysis.loglike.createLoglike(config,roi,lon,lat)
 
     def run(self, coords=None, debug=False):
         """
         Run the likelihood grid search
         """
         #self.grid.precompute()
-        self.grid.search()
+        self.grid.search(coords=coords)
         return self.grid
         
     def write(self, outfile):
@@ -142,14 +130,14 @@ class GridSearch:
         """
 
         self.config = config
-        self.roi = roi
+        self.roi  = roi
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
         logger.info("Creating log-likelihood...")
         self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
 
         self.stellar_mass_conversion = self.loglike.stellar_mass()
-        self.distance_modulus_array = self.config['scan']['distance_modulus_array']
+        self.distance_modulus_array = np.asarray(self.config['scan']['distance_modulus_array'])
 
     def precompute(self, distance_modulus_array=None):
         """
@@ -160,7 +148,7 @@ class GridSearch:
         if distance_modulus_array is not None:
             self.distance_modulus_array = distance_modulus_array
         else:
-            self.distance_modulus_array = self.config['scan']['distance_modulus_array']
+            self.distance_modulus_array = sel
 
         # Observable fraction for each pixel
         self.u_color_array = [[]] * len(self.distance_modulus_array)
@@ -189,9 +177,11 @@ class GridSearch:
         self.u_color_array = numpy.array(self.u_color_array)
 
                 
-    def search(self, coords=None, distance_modulus_index=None, tolerance=1.e-2):
+    def search(self, coords=None, distance_modulus=None, tolerance=1.e-2):
         """
         Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
+        coords: (lon,lat)
+        distance_modulus: scalar
         """
         nmoduli = len(self.distance_modulus_array)
         npixels    = len(self.roi.pixels_target)
@@ -203,9 +193,12 @@ class GridSearch:
         self.stellar_mass_sparse_array         = numpy.zeros([nmoduli, npixels])
         self.fraction_observable_sparse_array  = numpy.zeros([nmoduli, npixels])
 
-        # Specific pixel
+        # Specific pixel/distance_modulus
+        coord_idx, distance_modulus_idx = None, None
         if coords is not None:
-            pix_coords = ang2pix(coords)
+            coord_idx = self.roi.indexTarget(coords[0],coords[1])
+        if distance_modulus is not None:
+            distance_modulus_idx=np.where(self.distance_modulus_array==distance_modulus)[0][0]
 
         lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
             
@@ -213,21 +206,19 @@ class GridSearch:
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
 
             # Specific pixel
-            if distance_modulus_index is not None:
-                if ii != distance_modulus_index: continue
+            if distance_modulus_idx is not None:
+                if ii != distance_modulus_idx: continue
 
             logger.info('  (%-2i/%i) Distance Modulus=%.1f ...'%(ii+1,nmoduli,distance_modulus))
 
             # Set distance_modulus once to save time
             self.loglike.set_params(distance_modulus=distance_modulus)
-            #self.loglike.sync_params()
 
             for jj in range(0, npixels):
                 # Specific pixel
-                if coords is not None:
-                    if self.roi.pixels_target[jj] != pix_coords:
-                        continue
-                
+                if coord_idx is not None:
+                    if jj != coord_idx: continue
+
                 # Set kernel location
                 self.loglike.set_params(lon=lon[jj],lat=lat[jj])
                 # Doesn't re-sync distance_modulus each time
@@ -239,23 +230,23 @@ class GridSearch:
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
                 self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
                 self.fraction_observable_sparse_array[ii][jj] = self.loglike.f
-                if self.config['scan']['full_pdf'] \
-                   or (coords is not None and distance_modulus_index is not None):
-
-                    n_pdf_points = 100
-                    richness_range = parabola.profileUpperLimit(delta=25.) - self.richness_sparse_array[ii][jj]
-                    richness = numpy.linspace(max(0., self.richness_sparse_array[ii][jj] - richness_range),
-                                              self.richness_sparse_array[ii][jj] + richness_range,
-                                              n_pdf_points)
-                    if richness[0] > 0.:
-                        richness = numpy.insert(richness, 0, 0.)
-                        n_pdf_points += 1
+                if self.config['scan']['full_pdf']:
+                    #n_pdf_points = 100
+                    #richness_range = parabola.profileUpperLimit(delta=25.) - self.richness_sparse_array[ii][jj]
+                    #richness = numpy.linspace(max(0., self.richness_sparse_array[ii][jj] - richness_range),
+                    #                          self.richness_sparse_array[ii][jj] + richness_range,
+                    #                          n_pdf_points)
+                    #if richness[0] > 0.:
+                    #    richness = numpy.insert(richness, 0, 0.)
+                    #    n_pdf_points += 1
+                    # 
+                    #log_likelihood = numpy.zeros(n_pdf_points)
+                    #for kk in range(0, n_pdf_points):
+                    #    log_likelihood[kk] = self.loglike.value(richness=richness[kk])
+                    #parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
+                    #self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
+                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = self.loglike.richness_interval(0.6827)
                     
-                    log_likelihood = numpy.zeros(n_pdf_points)
-                    for kk in range(0, n_pdf_points):
-                        log_likelihood[kk] = self.loglike.value(richness=richness[kk])
-                    parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
-                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
                     self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
 
                     args = (
@@ -275,14 +266,14 @@ class GridSearch:
                     message += 'TS=%.1f, Stellar Mass=%.1f, Fraction=%.2g'%(args)
                 logger.debug( message )
                 
-                if coords is not None and distance_modulus_index is not None:
-                    results = [self.richness_sparse_array[ii][jj],
-                               self.log_likelihood_sparse_array[ii][jj],
-                               self.richness_lower_sparse_array[ii][jj],
-                               self.richness_upper_sparse_array[ii][jj],
-                               self.richness_upper_limit_sparse_array[ii][jj],
-                               richness, log_likelihood, self.loglike.p, self.loglike.f]
-                    return results
+                #if coords is not None and distance_modulus is not None:
+                #    results = [self.richness_sparse_array[ii][jj],
+                #               self.log_likelihood_sparse_array[ii][jj],
+                #               self.richness_lower_sparse_array[ii][jj],
+                #               self.richness_upper_sparse_array[ii][jj],
+                #               self.richness_upper_limit_sparse_array[ii][jj],
+                #               richness, log_likelihood, self.loglike.p, self.loglike.f]
+                #    return results
 
             jj_max = self.log_likelihood_sparse_array[ii].argmax()
             args = (
@@ -305,6 +296,41 @@ class GridSearch:
         mle['ellipticity'] = float(self.loglike.ellipticity)
         mle['position_angle'] = float(self.loglike.position_angle)
         return mle
+
+    def err(self):
+        """
+        A few rough symmetric approximations of the fit uncertainty. These
+        values shouldn't be trusted for anything real (use MCMC).
+        """
+        a = self.log_likelihood_sparse_array
+        j,k = np.unravel_index(a.argmax(),a.shape)
+
+        self.loglike.set_params(distance_modulus=self.distance_modulus_array[j],
+                                lon=self.roi.pixels_target.lon[k],
+                                lat=self.roi.pixels_target.lat[k])
+        self.loglike.sync_params()
+
+        err= odict()
+        lo,hi = np.array(self.loglike.richness_interval())
+        #err['richness'] = np.array([lo,hi])
+        err['richness'] = (hi-lo)/2.
+        err['lon'] = np.nan*np.ones(2)
+        err['lat'] = np.nan*np.ones(2)
+        
+        # ADW: This is a rough estimate of the distance uncertainty 
+        # hacked to keep the maximum distance modulus on a grid index
+
+        # This is a hack to get the confidence interval to play nice...
+        parabola = Parabola(np.insert(self.distance_modulus_array,0,0.), 
+                            np.insert(a[:,k],0,0.) )
+        lo,hi = np.array(parabola.confidenceInterval())
+        #err['distance_modulus'] = self.distance_modulus_array[j] + (hi-lo)/2.*np.array([-1.,1.])
+        err['distance_modulus'] = (hi-lo)/2.
+        err['extension'] = np.nan*np.ones(2)
+        err['ellipticity'] = np.nan*np.ones(2)
+        err['position_angle'] = np.nan*np.ones(2)
+        return err
+
 
     def write(self, outfile):
         """

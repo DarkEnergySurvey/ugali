@@ -611,3 +611,85 @@ def drawIsochrone(ax, config, distance_modulus, **kwargs):
     ax.invert_yaxis()
     ax.set_xlim(-0.5,1.5)
     ax.set_ylim(23,18)
+
+def drawChernoff(ax,ts,bands='smooth'):
+    from scipy.stats import chi2
+
+    logger.debug("Drawing %i simulations..."%len(ts))
+    x = plt.linspace(0.1,50,5000)
+    bins = np.linspace(-1e-2,50,501)
+    centers = (bins[1:]+bins[:-1])/2.
+
+    ax.set_xscale('linear')
+    ax.set_yscale('log',nonposy='clip')
+
+    dof = 1
+    patches,labels = [],[]
+    label = r"$\chi^2_{1} / 2$"
+    kwargs = dict(label=label, lw=2, c='k',dashes=(5,2))
+    ax.plot(x,(1-chi2.cdf(x,dof))/2.,**kwargs)
+    #fudge = 1/1.4
+    #ax.plot(x,(1-chi2.cdf(x,dof))/2.*fudge,**kwargs)
+
+    clip_ts = np.where(ts<1e-4, 0, ts)
+    n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step')
+
+    idx = np.argmax(n==0)
+    n = n[1:idx]; b=b[1:idx+1]
+
+    ax.set_xlim([0,np.ceil(ts.max())])
+    ax.set_ylim([10**np.floor(np.log10(n.min())),1])
+
+    # Smoother bands
+    if bands=='smooth':
+        xvals = np.hstack([b[0],((b[1:]+b[:-1])/2.),b[-1]])
+        yvals = np.hstack([n[0],n,n[-1]])
+    elif bands=='sharp':
+        xvals = np.repeat(b,2)[1:-1]
+        yvals = np.repeat(n,2)
+    else:
+        msg = 'Unrecognized band type: %s'%bands
+        raise Exception(msg)
+
+    # Bands...
+    err = np.sqrt(yvals/float(len(ts)))
+    y_hi = np.clip(yvals+err,1e-32,np.inf)
+    y_lo = np.clip(yvals-err,1e-32,np.inf)
+
+    #cut = (y_lo > 0)
+    kwargs = dict(color='r', alpha='0.5', zorder=0.5)
+
+    #ax.fill_between(c[cut], y_lo[cut], y_hi[cut], **kwargs)
+    ax.fill_between(xvals, y_lo, y_hi, **kwargs)
+    ax.add_patch(plt.Rectangle((0,0),0,0, **kwargs)) # Legend
+
+
+def plotChernoff(ts):
+    fig,ax = plt.subplots(1,1)
+    drawChernoff(ax,ts)
+    
+def plotSkymap(lon,lat,**kwargs):
+    fig = plt.figure()
+    ax = plt.subplot(111,projection=projection)
+    drawSkymap(ax,lon,lat,**kwargs)
+
+def drawSkymap(ax,lon,lat,**kwargs):
+    mapping = {
+        'ait':'aitoff',
+        'mol':'mollweide',
+        'lam':'lambert',
+        'ham':'hammer'
+    }
+    kwargs.setdefault('proj','aitoff')
+    kwargs.setdefault('s',2)
+    kwargs.setdefault('marker','.')
+    kwargs.setdefault('c','k')
+
+    proj = kwargs.pop('proj')
+    projection = mapping.get(proj,proj)
+    ax.grid()
+    # Convert from 
+    # [0. < lon < 360] -> [-pi < lon < pi]
+    # [-90 < lat < 90] -> [-pi/2 < lat < pi/2]
+    lon,lat= np.radians([lon-360.*(lon>180),lat])
+    ax.scatter(lon,lat,**kwargs)

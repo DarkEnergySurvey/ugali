@@ -229,7 +229,7 @@ class Parabola:
         return result
         """
 
-    def confidenceInterval(self, alpha, steps=1.e5, plot=False):
+    def confidenceInterval(self, alpha=0.6827, steps=1.e5, plot=False):
         """
         Compute two-sided confidence interval by taking x-values corresponding to the largest PDF-values first.
         """
@@ -237,6 +237,9 @@ class Parabola:
         y_dense -= numpy.max(y_dense) # Numeric stability
         f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
         x = numpy.linspace(0., numpy.max(x_dense), steps)
+        # ADW: Why does this start at 0, which often outside the input range?
+        # Wouldn't starting at xmin be better:
+        #x = numpy.linspace(numpy.min(x_dense), numpy.max(x_dense), steps)
         pdf = numpy.exp(f(x) / 2.)
         cut = (pdf / numpy.max(pdf)) > 1.e-10
         x = x[cut]

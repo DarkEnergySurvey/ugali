@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from collections import OrderedDict as odict
+import numpy as np
 
 """
 A Model object is just a container for a set of Parameter.
@@ -217,6 +218,7 @@ class Parameter(object):
         self.check_bounds(value)
         if   isinstance(value, (int, long, float)): self.__value__ = value
         elif isinstance(value, self.__class__): self.__value__ = value.__value__
+        elif np.isscalar(value): self.__value__ = np.asscalar(value) # Convert numpy types
         else: raise TypeError("Numeric type required")
 
     def set(self, value, bounds=None):

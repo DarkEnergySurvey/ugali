@@ -40,16 +40,17 @@ class LogLikelihood(object):
 
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):
         # Set the various models for the likelihood
-        self.models['richness'] = Richness()
-        self.models['color']    = isochrone
-        self.models['spatial']  = kernel
+        self.set_model('richness', Richness())
+        self.set_model('color', isochrone)
+        self.set_model('spatial', kernel) 
 
         # Toggle for tracking which models need to be synched
         self._sync = odict([(k,True) for k in self.models.keys()])
 
+        # Currently assuming that input mask is ROI-specific
         self.config = config
-        self.roi = roi
-        self.mask = mask # Currently assuming that input mask is ROI-specific
+        self.roi    = roi
+        self.mask   = mask
 
         self.catalog_full = catalog
         self.clip_catalog()
@@ -139,6 +140,12 @@ class LogLikelihood(object):
     # Methods for setting model parameters
     ############################################################################
 
+    def set_model(self, name, model):
+        if name not in self.models:
+            msg="%s does not contain model: %s"%(self.__class__.__name__,name)
+            raise AttributeError(msg)
+        self.models[name] = model
+
     def set_params(self,**kwargs):
         for key,value in kwargs.items():
             setattr(self,key,value)
@@ -148,7 +155,7 @@ class LogLikelihood(object):
             # but at least a warning should be printed if target outside of region.
             raise ValueError("Coordinate outside interior ROI.")
 
-    def sync_params(self,u_color=None,u_spatial=None,observable_fraction=None):
+    def sync_params(self):
         # The sync_params step updates internal quantities based on
         # newly set parameters. The goal is to only update required quantities
         # to keep computational time low.
@@ -200,7 +207,7 @@ class LogLikelihood(object):
         self.catalog_interior.spatialBin(self.roi)
 
         # Set the default catalog
-        logger.info("Using interior ROI for likelihood calculation")
+        #logger.info("Using interior ROI for likelihood calculation")
         self.catalog = self.catalog_interior
         #self.pixel_roi_cut = self.roi.pixel_interior_cut
 
@@ -208,10 +215,10 @@ class LogLikelihood(object):
         return self.isochrone.stellarMass()
 
     def calc_background(self):
-        #ADW: At some point we may want to make the background level and
-        # fittable parameter.
+        #ADW: At some point we may want to make the background level a fit parameter.
         logger.info('Calculating background CMD ...')
         self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
+        #self.cmd_background = self.mask.backgroundCMD(self.catalog_roi,mode='uniform')
 
         # Background density (deg^-2 mag^-2) and background probability for each object
         logger.info('Calculating background probabilities ...')
@@ -364,6 +371,24 @@ class LogLikelihood(object):
         index = numpy.argmax(loglike)
         return loglike[index], richness[index], parabola
 
+    def richness_interval(self, alpha=0.6827, n_pdf_points=100):
+        loglike_max, richness_max, parabola = self.fit_richness()
+
+        richness_range = parabola.profileUpperLimit(delta=25.) - richness_max
+        richness = numpy.linspace(max(0., richness_max - richness_range),
+                                  richness_max + richness_range,
+                                  n_pdf_points)
+        if richness[0] > 0.:
+            richness = numpy.insert(richness, 0, 0.)
+            n_pdf_points += 1
+        
+        log_likelihood = numpy.zeros(n_pdf_points)
+        for kk in range(0, n_pdf_points):
+            log_likelihood[kk] = self.value(richness=richness[kk])
+        parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
+        return parabola.confidenceInterval(alpha)
+
+
     def write_membership(self,filename):
         ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
         
@@ -392,6 +417,56 @@ class LogLikelihood(object):
             name = 'HIERARCH %s'%param.upper()
             hdu.header.set(name,value.value,param)
         hdu.writeto(filename,clobber=True)
+
+
+def createROI(config,lon,lat):
+    import ugali.observation.roi
+    roi = ugali.observation.roi.ROI(config, lon, lat)        
+    return roi
+
+def createKernel(config,lon=0.0,lat=0.0):
+    import ugali.analysis.kernel
+    params = dict(config['scan']['kernel'])
+    params.setdefault('lon',lon)
+    params.setdefault('lat',lat)
+    return ugali.analysis.kernel.kernelFactory(**params)
+
+def createIsochrone(config):
+    import ugali.analysis.isochrone
+    isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
+    return isochrone
+
+def createCatalog(config,roi=None,lon=None,lat=None):
+    """
+    Create a catalog object
+    """
+    import ugali.observation.catalog
+    if roi is None: roi = createROI(config,lon,lat)
+    catalog = ugali.observation.catalog.Catalog(config,roi=roi)  
+    return catalog
+
+def simulateCatalog(config,roi=None,lon=None,lat=None):
+    """
+    Simulate a catalog object.
+    """
+    import ugali.simulation.simulator
+    if roi is None: roi = createROI(config,lon,lat)
+    sim = ugali.simulation.simulator.Simulator(config,roi)
+    return sim.catalog()
+
+def createMask(config,roi=None,lon=None,lat=None):
+    import ugali.observation.mask
+    if roi is None: roi = createROI(config,lon,lat)
+    mask = ugali.observation.mask.Mask(config, roi)
+    return mask
+
+def createLoglike(config,lon=None,lat=None):
+    roi = createROI(config,lon,lat)
+    kernel = createKernel(config,lon,lat)
+    isochrone = createIsochrone(config)
+    catalog = createCatalog(config,roi)
+    mask = createMask(config,roi)
+    return LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
 
 if __name__ == "__main__":
     import argparse

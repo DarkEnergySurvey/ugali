@@ -3,6 +3,7 @@
 toolkit for working with healpix
 """
 import numpy
+import numpy as np
 import healpy
 
 ############################################################
@@ -11,6 +12,7 @@ def superpixel(subpix, nside_subpix, nside_superpix):
     """
     Return the indices of the super-pixels which contain each of the sub-pixels.
     """
+    if nside_subpix==nside_superpix: return subpix
     theta, phi =  healpy.pix2ang(nside_subpix, subpix)
     return healpy.ang2pix(nside_superpix, theta, phi)
 
@@ -18,6 +20,7 @@ def subpixel(superpix, nside_superpix, nside_subpix):
     """
     Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
     """
+    if nside_superpix==nside_subpix: return superpix
     vec = healpy.pix2vec(nside_superpix, superpix)
     radius = numpy.degrees(2. * healpy.max_pixrad(nside_superpix))
     subpix = query_disc(nside_subpix, vec, radius)
@@ -71,15 +74,17 @@ def index_pixels(lon,lat,pixels,nside):
    Set index of objects outside the pixel subset to -1
 
    # ADW: Not really safe to set index = -1 (accesses last entry); 
-   # -np.inf would be better, but breaks code...
+   # -np.inf would be better, but breaks other code...
    """
    pix = ang2pix(nside,lon,lat)
-
-   # pixels should be pre-sorted, otherwise...
+   # pixels should be pre-sorted, otherwise...???
    index = numpy.searchsorted(pixels,pix)
-   # Find objects that are outside the roi
-   #index[numpy.take(pixels,index,mode='clip')!=pix] = -1
-   index[~numpy.in1d(pix,pixels)] = -1
+   if numpy.isscalar(index):
+       if not numpy.in1d(pix,pixels).any(): index = -1
+   else:
+       # Find objects that are outside the roi
+       #index[numpy.take(pixels,index,mode='clip')!=pix] = -1
+       index[~numpy.in1d(pix,pixels)] = -1
    return index
 
 ############################################################
@@ -114,7 +119,6 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
         return healpy.query_disc(nside, vec, numpy.radians(radius), nest, deg=False)
 
 ############################################################
-
 
 if __name__ == "__main__":
     import argparse

@@ -111,10 +111,14 @@ class Projector:
     def sphereToImage(self, lon, lat):
         lon_rotated, lat_rotated = self.rotator.rotate(lon, lat)
         return self.sphere_to_image_func(lon_rotated, lat_rotated)
+
+    sphere2image = sphereToImage
         
     def imageToSphere(self, x, y):
         lon_rotated, lat_rotated = self.image_to_sphere_func(x, y)
         return self.rotator.rotate(lon_rotated, lat_rotated, invert = True)
+
+    image2sphere = imageToSphere
 
 ############################################################
 
@@ -376,6 +380,12 @@ def dms2dec(dms):
     decimal = numpy.abs(degree) + minute * 1./MINUTE + second * 1./SECOND
     decimal *= sign
     return decimal
+
+def sr2deg(solid_angle):
+    return np.degrees(np.degrees(solid_angle))
+
+def deg2sr(solid_angle):
+    return np.radians(np.radians(solid_angle))
 
 ############################################################
 

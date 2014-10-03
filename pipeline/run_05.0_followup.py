@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from os.path import join, exists
+from os.path import join, exists,basename,splitext
 import numpy
 import numpy as np
 
@@ -33,9 +33,11 @@ def run(self):
             glon,glat,radius = coord
             print name,'(%.4f,%.4f)'%(glon,glat)
             outfile=join(outdir,self.config['output']['mcmcfile']%label)
-            logfile=outfile.replace('.fits','.log')
-            jobname=label
-            cmd='ugali/analysis/mcmc.py %s --gal %.4f %.4f %s'%(self.opts.config,glon,glat,outfile)
+            base = splitext(basename(outfile))[0]
+            logfile=join(logdir,base+'.log')
+            jobname=base
+            script = self.config['mcmc']['script']
+            cmd='%s %s --gal %.4f %.4f %s'%(script,self.opts.config,glon,glat,outfile)
             nthreads = self.config['mcmc']['nthreads']
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
     if 'membership' in self.opts.run:

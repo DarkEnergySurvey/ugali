@@ -23,7 +23,6 @@ class Kernel(Model):
     Base class for kernels.
     """
     _params = odict([
-        #('richness', Parameter(1.0, [0.0,  np.inf])),
         ('lon',      Parameter(0.0, [0.0,  360.  ])),
         ('lat',      Parameter(0.0, [-90., 90.   ])),
     ])
@@ -148,10 +147,16 @@ class EllipticalKernel(Kernel):
         # From http://en.wikipedia.org/wiki/Ellipse#General_parametric_form
         # However, Martin et al. (2009) use PA theta "from north to east"
         # Maybe the definitions of phi and theta are both offset by pi/2???
-        # In the end, everything is messed up because we use glon, glat
+        # In the end, everything is messed up because we use glon, glat...
         x = a*cosphi*costheta - b*sinphi*sintheta
         y = a*cosphi*sintheta + b*sinphi*costheta
-        lon, lat = self.projector.imageToSphere(x, y)
+        
+        if self.projector  is None:
+            logger.debug("Creating AITOFF projector for sampling")
+            projector = Projector(self.lon,self.lat,'ait')
+        else:
+            projector = self.projector
+        lon, lat = projector.imageToSphere(x, y)
         return lon, lat
  
     simulate = sample_lonlat
@@ -189,7 +194,7 @@ class EllipticalDisk(EllipticalKernel):
 class EllipticalGaussian(EllipticalKernel):
     """
     Simple Gaussian kernel for testing:
-    f(r) = C * exp(-r / 2*sigma**2)
+    f(r) = C * exp(-r**2 / 2*sigma**2)
     """
     _params = EllipticalKernel._params
     _mapping = odict(
@@ -200,12 +205,12 @@ class EllipticalGaussian(EllipticalKernel):
  
     ### ADW: stellar mass conversion?
     def _kernel(self, radius):
-        return np.exp(-radius/(2*self.sigma**2))
+        return np.exp(-radius**2/(2*self.sigma**2))
  
     @property
     def norm(self):
         # Analytic integral from 0 to edge
-        return 1./(2*np.pi*self.sigma**2*(1-np.exp(-self.edge/(2*self.sigma**2)))*self.jacobian)
+        return 1./(2*np.pi*self.sigma**2*(1-np.exp(-self.edge**2/(2*self.sigma**2)))*self.jacobian)
  
 class EllipticalExponential(EllipticalKernel):
     """

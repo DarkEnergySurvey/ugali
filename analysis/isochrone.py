@@ -16,7 +16,7 @@ import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
 from ugali.analysis.model import Model, Parameter
 
-
+from ugali.utils.config import Config
 from ugali.utils.logger import logger
 ############################################################
 
@@ -32,16 +32,16 @@ class Isochrone(Model):
         """
         super(Isochrone,self).__init__(**kwargs)
 
-        self.config = config
+        self.config = Config(config)
         self.infile = infile
         
         if infile_format.lower() == 'padova':
-            #self._parseIsochronePadova(self.config.params['isochrone']['instrument'])
-            self._parseIsochronePadova(self.config.params['data']['survey'])
+            #self._parseIsochronePadova(self.config['isochrone']['instrument'])
+            self._parseIsochronePadova(self.config['data']['survey'])
         else:
             logger.warning('did not recognize infile format %s'%(infile_format))
 
-        self.imf = ugali.analysis.imf.IMF(self.config.params['isochrone']['imf'])
+        self.imf = ugali.analysis.imf.IMF(self.config['isochrone']['imf'])
 
         # Check where post-AGB isochrone data points begin
         self.mass_init_upper_bound = numpy.max(self.mass_init)
@@ -51,7 +51,7 @@ class Isochrone(Model):
             self.index = len(self.mass_init)
         
         # Other housekeeping
-        if self.config.params['catalog']['band_1_detection']:
+        if self.config['catalog']['band_1_detection']:
             self.mag = self.mag_1
         else:
             self.mag = self.mag_2
@@ -84,9 +84,9 @@ class Isochrone(Model):
         Reads an isochrone file in the Padova format and returns the age (log yrs), metallicity (Z), and an
         array with initial stellar mass and corresponding magnitudes.
         """
-        mass_init_field = self.config.params['isochrone']['mass_init_field']
-        mag_1_field = self.config.params['isochrone']['mag_1_field']
-        mag_2_field = self.config.params['isochrone']['mag_2_field']
+        mass_init_field = self.config['isochrone']['mass_init_field']
+        mag_1_field = self.config['isochrone']['mag_1_field']
+        mag_2_field = self.config['isochrone']['mag_2_field']
         
         reader = open(self.infile)
         lines = reader.readlines()
@@ -131,12 +131,12 @@ class Isochrone(Model):
         the initial stellar mass and corresponding magnitudes for each step along the isochrone.
         http://stev.oapd.inaf.it/cgi-bin/cmd
         """
-        mass_init_field = self.config.params['isochrone']['mass_init_field']
-        mass_act_field = self.config.params['isochrone']['mass_act_field']
-        luminosity_field = self.config.params['isochrone']['luminosity_field']
-        mag_1_field = self.config.params['isochrone']['mag_1_field']
-        mag_2_field = self.config.params['isochrone']['mag_2_field']
-        stage_field = self.config.params['isochrone']['stage_field']
+        mass_init_field = self.config['isochrone']['mass_init_field']
+        mass_act_field = self.config['isochrone']['mass_act_field']
+        luminosity_field = self.config['isochrone']['luminosity_field']
+        mag_1_field = self.config['isochrone']['mag_1_field']
+        mag_2_field = self.config['isochrone']['mag_2_field']
+        stage_field = self.config['isochrone']['stage_field']
 
         if survey.lower() == 'des':
             index_dict = {mass_init_field: 1,
@@ -382,7 +382,7 @@ class Isochrone(Model):
 
         histo = numpy.histogram2d(mag_1_observed - mag_2_observed,
                                   mag_1_observed,
-                                  #mag_1_observed if self.config.params['catalog']['band_1_detection'] else mag_2_observed,
+                                  #mag_1_observed if self.config['catalog']['band_1_detection'] else mag_2_observed,
                                   [bins_color, bins_mag],
                                   weights = pdf)[0].transpose()
 
@@ -402,7 +402,7 @@ class Isochrone(Model):
         """
         mass_init_array,mass_pdf_array,mass_act_array,mag_1_array,mag_2_array = self.sample(mass_min=mass_min,full_data_range=False)
                                                                                                 
-        if self.config.params['catalog']['band_1_detection']:
+        if self.config['catalog']['band_1_detection']:
             mag = mag_1_array
         else:
             mag = mag_2_array
@@ -519,7 +519,7 @@ class Isochrone(Model):
 
     
         # Next, weight by detection probability
-        if self.config.params['catalog']['band_1_detection']:
+        if self.config['catalog']['band_1_detection']:
             detection_pdf_array = self.irfs.completeness_function(mag_1_array)
         else:
             detection_pdf_array = self.irfs.completeness_function(mag_2_array)
@@ -543,7 +543,7 @@ class Isochrone(Model):
                              * (std_centers[yy] - numpy.mean(std_centers[yy])))).flatten()
 
         return numpy.histogram2d(mag_1_observed - mag_2_observed,
-                                 mag_1_observed if self.config.params['catalog']['band_1_detection'] else mag_2_observed,
+                                 mag_1_observed if self.config['catalog']['band_1_detection'] else mag_2_observed,
                                  [self.irfs.color_bins, self.irfs.mag_bins],
                                  weights = pdf)[0]
 
@@ -588,12 +588,15 @@ class CompositeIsochrone(Model):
     ])
     _mapping = odict([])
 
-    def __init__(self, isochrones, weights, **kwargs):
+    def __init__(self, config, **kwargs):
         super(CompositeIsochrone,self).__init__(**kwargs)
+        self.config = Config(config)
 
-        self.isochrones = isochrones
-        self.weights = weights
-        self.config = self.isochrones[0].config
+        self.isochrones = []
+        for name in self.config['isochrone']['infiles']:
+            self.isochrones.append(Isochrone(self.config, name))
+
+        self.weights = self.config['isochrone']['weights']
 
         if len(self.isochrones) != len(self.weights):
             sys.exit('ERROR: size of isochrone array and weight array must be equal')
@@ -661,9 +664,8 @@ class CompositeIsochrone(Model):
 
     def simulate(self, stellar_mass, distance_modulus=0.):
         """
-
         """
-        n = stellar_mass / self.stellarMass() # Number of stars in system
+        n = stellar_mass/self.stellarMass() # Number of stars in system
         mass_init_array, mass_pdf_array, mass_act_array, mag_1_array, mag_2_array = self.sample()
         cdf = numpy.cumsum(mass_pdf_array)
         cdf = numpy.insert(cdf, 0, 0.)

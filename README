@@ -81,9 +81,8 @@ Code:
 * (2b) Automated data processing to get mangle masks and catalogs from DESDM
 * (2b) Merge config file with default config
 * (2b) Switch to astropy for coordinate conversion, etc.
-* (1b) Create real composite isochrone rather than looping over individual isochrones
+* (1b) Create true composite isochrone (subclassing isochrone) rather than container of isochrones
 * (2b) Examine gzipped standard healpix files instead of sparse healpix maps
-Projects:
 * (1c) Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
 * (2b) SVA1 data products
 * (2b) Consider updating DES isochrones

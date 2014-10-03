@@ -13,6 +13,7 @@ import pyfits
 import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
 from ugali.utils.logger import logger
+from ugali.utils.config import Config
 
 ############################################################
 
@@ -30,6 +31,56 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
             subpix = subpixel(pix[ii], nside_pix, nside_subpix)
             subpix_array.append(subpix)
         return pix, numpy.array(subpix_array)
+
+def inFootprint(config, pixels, nside=None):
+    """
+    Open each valid filename for the set of pixels and determine the set 
+    of subpixels with valid data.
+    """
+    config = Config(config)
+    nside_catalog    = config['coords']['nside_catalog']
+    nside_likelihood = config['coords']['nside_likelihood']
+    nside_pixel      = config['coords']['nside_pixel']
+
+    if numpy.isscalar(pixels): pixels = numpy.array([pixels])
+    if nside is None: nside = nside_likelihood
+
+    filenames = config.getFilenames()
+    catalog_pixels = filenames['pix'].compressed()
+
+    inside = numpy.zeros(len(pixels), dtype=bool)
+    if not nside_catalog:
+        catalog_pix = [0]
+    else:
+        catalog_pix = superpixel(pixels,nside,nside_catalog)
+        catalog_pix = numpy.intersect1d(catalog_pix,catalog_pixels)
+
+    for fnames in filenames[catalog_pix]:
+        logger.debug("Loading %s"%filenames['mask_1'])
+        subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_1'],'MAGLIM',construct_map=False)
+        logger.debug("Loading %s"%fnames['mask_2'])
+        subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_2'],'MAGLIM',construct_map=False)
+        subpix = numpy.intersect1d(subpix_1,subpix_2)
+        superpix = numpy.unique(superpixel(subpix,nside_pixel,nside))
+        inside |= numpy.in1d(pixels, superpix)
+        
+    return inside
+
+def footprint(config, nside=None):
+    """
+    UNTESTED.
+    Should return a boolean array representing the pixels in the footprint.
+    """
+    config = Config(config)
+    if nside is None:
+        nside = config['coords']['nside_pixel']
+    elif nside < config['coords']['nside_catalog']:
+        raise Exception('Requested nside=%i is greater than catalog_nside'%nside)
+    elif nside > config['coords']['nside_pixel']:
+        raise Exception('Requested nside=%i is less than pixel_nside'%nside)
+    pix = numpy.arange(healpy.nside2npix(nside), dtype=int)
+    return inFootprint(config,pix)
+
 
 ############################################################
 
