@@ -116,7 +116,7 @@ class Generator:
             simulator = Simulator(self.config,roi)
             #catalog   = simulator.simulate(seed=self.seed, **params)
             catalog   = simulator.simulate(**params)
-            print "Catalog annulus contains:",roi.inAnnulus(simulator.catalog.lon,simulator.catalog.lat).sum()
+            #print "Catalog annulus contains:",roi.inAnnulus(simulator.catalog.lon,simulator.catalog.lat).sum()
             print "Simulated catalog annulus contains:",roi.inAnnulus(catalog.lon,catalog.lat).sum()
         
 
@@ -140,23 +140,27 @@ class Generator:
 
             # Index of closest distance modulus
             grid = ugali.analysis.scan.GridSearch(self.config,roi,mask,catalog,isochrone,kernel)
-            grid.search(coords=(lon,lat))
 
             self.catalog = catalog
             self.simulator = simulator
             self.grid = grid
             self.loglike = self.grid.loglike
 
-            mle = grid.mle()
-            err = grid.err()
+            # ADW: Should allow fit_distance to float in order to model search procedure
+            #fit_distance = float(distance_modulus)
             distance_idx = np.fabs(grid.distance_modulus_array-params['distance_modulus']).argmin()
+            fit_distance = grid.distance_modulus_array[distance_idx]
+            grid.search(coords=(lon,lat),distance_modulus=fit_distance)
+
+            mle = grid.mle()
+            #err = grid.err()
             results[i]['kernel'] = simulator.kernel.name
             results[i]['ts'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
             results[i]['fit_ts'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
             results[i]['fit_mass'] = grid.stellar_mass_conversion*mle['richness']
-            results[i]['fit_mass_err'] = grid.stellar_mass_conversion*err['richness']
-            results[i]['fit_distance'] = mle['distance_modulus']
-            results[i]['fit_distance_err'] = err['distance_modulus']
+            #results[i]['fit_mass_err'] = grid.stellar_mass_conversion*err['richness']
+            results[i]['fit_distance'] = fit_distance #mle['distance_modulus']
+            #results[i]['fit_distance_err'] = err['distance_modulus']
 
             for d in dtype:
                 logger.info('\t%s: %s'%(d[0], results[i][d[0]]))
@@ -187,13 +191,19 @@ class Simulator:
 
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
-        self.catalog = ugali.analysis.loglike.createCatalog(self.config,self.roi)
-        cut = self.mask.restrictCatalogToObservableSpace(self.catalog)
-        self.catalog = self.catalog.applyCut(cut)
-        
+        self._create_catalog()
         self._photometricErrors()
-        self._setup_background()
+        self._setup_subpix()
+        #self._setup_cmd()
 
+    def _create_catalog(self):
+        """
+        Bundle it.
+        """
+        catalog = ugali.analysis.loglike.createCatalog(self.config,self.roi)
+        cut = self.mask.restrictCatalogToObservableSpace(catalog)
+        self.catalog = catalog.applyCut(cut)
+        
     def _photometricErrors(self, n_per_bin=100, plot=False):
         """
         Realistic photometric errors estimated from catalog objects and mask.
@@ -212,6 +222,7 @@ class Simulator:
         mag_1_thresh_sort = mag_1_thresh[sorting_indices]
         mag_err_1_sort = self.catalog.mag_err_1[sorting_indices]
 
+        # ADW: Can't this be done with numpy.median(axis=?)
         mag_1_thresh_medians = []
         mag_err_1_medians = []
         for ii in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
@@ -252,22 +263,27 @@ class Simulator:
         ###     pylab.plot(x, self.photo_err_1(x), c='red')
 
 
-    def _setup_background(self,mode='cloud-in-cells'):
+    def _setup_subpix(self,nside=2**16):
         """
-        The purpose here is to create a more finely binned
-        background CMD to sample from.
+        Subpixels for random position generation.
         """
         # Simulate over full ROI
         self.roi_radius  = self.config['coords']['roi_radius']
 
         # Setup background spatial stuff
-        logger.info("Setup spatial...")
+        logger.info("Setup subpixels...")
         self.nside_pixel = self.config['coords']['nside_pixel']
         self.nside_subpixel = self.nside_pixel * 2**4 # Could be config parameter
         epsilon = np.degrees(healpy.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
         subpix = ugali.utils.healpix.query_disc(self.nside_subpixel,self.roi.vec,self.roi_radius+epsilon)
         superpix = ugali.utils.healpix.superpixel(subpix,self.nside_subpixel,self.nside_pixel)
         self.subpix = subpix[np.in1d(superpix,self.roi.pixels)]
+
+    def _setup_cmd(self,mode='cloud-in-cells'):
+        """
+        The purpose here is to create a more finely binned
+        background CMD to sample from.
+        """
 
         logger.info("Setup color...")
         # In the limit theta->0: 2*pi*(1-cos(theta)) -> pi*theta**2
@@ -289,11 +305,64 @@ class Simulator:
         # Background CMD has units: [objs / deg^2 / mag^2]
         cmd_background = mask.backgroundCMD(self.catalog,mode)
         
-        self.bkg_lambda = cmd_background*solid_angle_roi*roi.delta_color*roi.delta_mag
+        self.bkg_lambda=cmd_background*solid_angle_roi*roi.delta_color*roi.delta_mag
         np.sum(self.bkg_lambda)
 
         # Clean up 
         del config, roi, mask
+
+
+    def toy_background(self,mc_source_id=2,seed=None):
+        size = 20000
+        nstar = np.random.poisson(size)
+        #np.random.seed(0)
+
+        ### # Random points from roi pixels
+        ### idx = np.random.randint(len(self.roi.pixels)-1,size=nstar)
+        ### pix = self.roi.pixels[idx]
+
+        # Random points drawn from subpixels
+        logger.info("Background positions...")
+        idx = np.random.randint(0,len(self.subpix)-1,size=nstar)
+        lon,lat = pix2ang(self.nside_subpixel,self.subpix[idx])
+
+        pix = ang2pix(self.nside_pixel, lon, lat)
+        lon,lat = pix2ang(self.nside_pixel,pix)
+
+        # Single color
+        #mag_1 = 19.05*np.ones(len(pix))
+        #mag_2 = 19.10*np.ones(len(pix))
+
+        logger.info("Simulating %i background stars..."%nstar)
+        mag_1 = np.random.uniform(self.config['mag']['min'],self.config['mag']['max'],size=nstar)
+        color = np.random.uniform(self.config['color']['min'],self.config['color']['max'],size=nstar)
+        #mag_1 = np.ones(nstar)*(self.config['mag']['min']+self.config['mag']['max'])/2.
+        #color = np.ones(nstar)*(self.config['color']['min']+self.config['color']['max'])/2.
+        mag_2 = mag_1 - color
+
+
+        # There is probably a better way to do this step without creating the full HEALPix map
+        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
+        mag_lim_1 = mask[pix]
+        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
+        mag_lim_2 = mask[pix]
+        
+        #mag_err_1 = 1.0*np.ones(len(pix))
+        #mag_err_2 = 1.0*np.ones(len(pix))
+        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
+        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+
+        select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
+        
+        hdu = ugali.observation.catalog.makeHDU(self.config,mag_1[select],mag_err_1[select],
+                                                mag_2[select],mag_err_2[select],
+                                                lon[select],lat[select],mc_source_id[select])
+        catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
+        return catalog
+
 
     def background(self,mc_source_id=2,seed=None):
         """
@@ -371,7 +440,6 @@ class Simulator:
 
         nside_pixel = self.nside_pixel
         pix = ang2pix(nside_pixel, lon, lat)
-        print "Outside ROI:",np.sum(~self.roi.inROI(lon,lat))
 
         # There is probably a better way to do this step without creating the full HEALPix map
         mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
@@ -417,7 +485,9 @@ class Simulator:
         logger.info("Clipping %i simulated background stars..."%(~select).sum())
         mc_source_id = mc_source_id * numpy.ones(len(mag_1))
         
-        hdu = self.makeHDU(mag_1[select],mag_err_1[select],mag_2[select],mag_err_2[select],lon[select],lat[select],mc_source_id[select])
+        hdu = ugali.observation.catalog.makeHDU(config,mag_1[select],mag_err_1[select],
+                                                mag_2[select],mag_err_2[select],
+                                                lon[select],lat[select],mc_source_id[select])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
@@ -457,7 +527,9 @@ class Simulator:
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
         mc_source_id = mc_source_id * numpy.ones(len(mag_1))
         
-        hdu = self.makeHDU(mag_obs_1[select], mag_err_1[select], mag_obs_2[select], mag_err_2[select], lon[select], lat[select], mc_source_id[select])
+        hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
+                                                mag_obs_2[select],mag_err_2[select], 
+                                                lon[select],lat[select],mc_source_id[select])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
@@ -466,8 +538,9 @@ class Simulator:
 
         logger.info("Simulating object catalog...")
         catalogs = []
-        catalogs.append(self.background(seed=seed))
-        catalogs.append(self.satellite(seed=seed,**kwargs))
+        catalogs.append(self.toy_background(seed=seed))
+        #catalogs.append(self.background(seed=seed))
+        #catalogs.append(self.satellite(seed=seed,**kwargs))
         logger.info("Merging simulated catalogs...")
         return ugali.observation.catalog.mergeCatalogs(catalogs)
 

@@ -14,16 +14,16 @@ import ugali.utils.shell
 
 DATABASES = {
     'sdss':['dr10'],
-    'des' :['sva1'],
+    'des' :['sva1','sva1_gold'],
     }
 
-def databaseFactory(config):
-    if config.params['data']['survey'].lower() == 'sdss':
-        return SDSSDatabase(release = config.params['data']['survey'])
-    elif config.params['data']['survey'].lower() == 'des':
-        return DESDatabase(release = config.params['data']['survey'])
+def databaseFactory(survey,release):
+    if survey == 'sdss':
+        return SDSSDatabase(release = release)
+    elif survey == 'des':
+        return DESDatabase(release = release)
     else:
-        logger.error("Unrecognized survey %s"%config.params['data']['survey'])
+        logger.error("Unrecognized survey: %s"%survey)
         return None
 
 class Database(object):
@@ -72,8 +72,16 @@ class SDSSDatabase(Database):
         self.basename = "sdss_%s_photometry"%self.release
 
     def _setup_casjobs(self):
-        # Function here to install casjobs.jar and CasJobs.config
-        pass
+        # Function here to install casjobs.jar and CasJobs.config...
+        # "wget http://skyserver.sdss3.org/CasJobs/download/casjobs.jar"
+        # "wget http://skyserver.sdss3.org/CasJobs/download/CasJobs.config.x -o CasJobs.config"
+
+        # For now, just check that they exist
+        files = ['casjobs.jar','CasJobs.config']
+        for f in files:
+            if not os.path.exists(f):
+                msg = "Can't find: %s"%f
+                raise IOError(msg)
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         outfile = open(filename,"w")
@@ -86,7 +94,10 @@ class SDSSDatabase(Database):
         outfile.write('s.psfmag_r - s.extinction_r AS "MAG_PSF_SFD_R",\n')
         outfile.write('s.psfmag_i AS "MAG_PSF_I",\n')
         outfile.write('s.psfmagerr_i AS "MAGERR_PSF_I",\n')
-        outfile.write('s.psfmag_i - s.extinction_i AS "MAG_PSF_SFD_I"\n')
+        outfile.write('s.psfmag_i - s.extinction_i AS "MAG_PSF_SFD_I",\n')
+        outfile.write('s.psfmag_z AS "MAG_PSF_Z",\n')
+        outfile.write('s.psfmagerr_z AS "MAGERR_PSF_Z",\n')
+        outfile.write('s.psfmag_z - s.extinction_z AS "MAG_PSF_SFD_Z"\n')
         outfile.write('INTO MyDB.%s\n' % (db))
         outfile.write('FROM %s.StarTag as s\n'%(self.release))
         outfile.write('WHERE s.ra > %.7f AND s.ra < %.7f\n' % (ra_min,ra_max))
@@ -135,12 +146,14 @@ class SDSSDatabase(Database):
         if outdir is None: outdir = './'
         else:              ugali.utils.shell.mkdir(outdir)
         sqldir = ugali.utils.shell.mkdir(os.path.join(outdir,'sql'))
+        self._setup_casjobs()
 
         basename = self.basename + "_%04d"%pixel['name']
         sqlname = os.path.join(sqldir,basename+'.sql')
         dbname = basename+'_output'
         taskname = basename
         outfile = os.path.join(outdir,basename+".fits")
+        # ADW: There should be a 'force' option here
         if os.path.exists(outfile):
             logger.warning("Found %s; skipping..."%(outfile))
             return
@@ -232,7 +245,7 @@ class SDSSDatabase(Database):
         print res
 
 
-    def run(self,pixfile,outdir=None):
+    def run(self,pixfile=None,outdir=None):
         self.load_pixels(pixfile)
         for pixel in self.pixels:
             self.download(pixel,outdir)
@@ -289,46 +302,107 @@ class DESDatabase(Database):
     ###### !!! NOT IMPLEMENTED !!! #####
     ####################################
 
-    def __init__(self,pixfile,release='SVA1'):
+    def __init__(self,release='SVA1_GOLD'):
         super(DESDatabase,self).__init__()
         self.release = release.lower()
         self.basename = "des_%s_photometry"%self.release
-        self.load_pixels(pixfile)
+
+    def _setup_desdbi(self):
+        # Function here to setup trivialAccess client
+        import coreutils.desdbi
+        import pyfits
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
         outfile = open(filename,"w")
-        outfile.write('SELECT s.objID, s.ra AS "RA", s.dec as "DEC",\n')
-        outfile.write('s.MAG_PSF_G,\n')
-        outfile.write('s.MAGERR_PSF_G,\n')
-        outfile.write('s.MAG_PSF_R,\n')
-        outfile.write('s.MAGERR_PSF_R,\n')
-        outfile.write('s.MAG_PSF_I,\n')
-        outfile.write('s.MAGERR_PSF_I,\n')
-        outfile.write("INTO MyDB.%s\n" % (db))
-        outfile.write("FROM %s.COADD_OBJECTS as s\n"%(self.release))
-        outfile.write("WHERE s.ra > %.7f AND s.ra < %.7f\n" % (ra_min,ra_max))
-        outfile.write("AND s.dec > %.7f AND s.dec < %.7f\n" % (dec_min,dec_max))
+
+        outfile.write('SELECT s.COADD_OBJECTS_ID, s.RA, s.DEC, \n')
+        outfile.write('s.MAG_PSF_G, s.MAGERR_PSF_G, \n')
+        outfile.write('s.MAG_PSF_R, s.MAGERR_PSF_R, \n')
+        outfile.write('s.MAG_PSF_I, s.MAGERR_PSF_I  \n')
+        outfile.write('FROM %s s \n'%(self.release))
+        outfile.write('WHERE s.MODEST_CLASS = 2 \n')
+        outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))
+        outfile.write('AND s.DEC > %.7f AND s.DEC < %.7f ' % (dec_min,dec_max))
         outfile.close()
+
+    def query(self,dbase,task,query):
+        import coreutils.desdbi
+        logger.info("Running query...")
+
+        desfile = os.path.join(os.getenv('HOME'),'.desservices.ini')
+        section = 'db-dessci'
+        dbi = coreutils.desdbi.DesDbi(desfile,section)
+        cursor = dbi.cursor()
+        cursor.execute(open(query,'r').read())
+
+        header = [d[0] for d in cursor.description]
+        data = cursor.fetchall()
+           
+        logger.info("Found %i rows."%len(data))
+        if not len(header) or not len(data): return None
+        array = np.rec.array(data,names=header)
+        return array
+
+
+    def download(self, pixel, outdir=None):
+        import pyfits 
+
+        if outdir is None: outdir = './'
+        else:              ugali.utils.shell.mkdir(outdir)
+        sqldir = ugali.utils.shell.mkdir(os.path.join(outdir,'sql'))
+        self._setup_desdbi()
+
+        basename = self.basename + "_%04d"%pixel['name']
+        sqlname = os.path.join(sqldir,basename+'.sql')
+        dbname = basename+'_output'
+        taskname = basename
+        outfile = os.path.join(outdir,basename+".fits")
+        # ADW: There should be a 'force' option here
+        if os.path.exists(outfile):
+            logger.warning("Found %s; skipping..."%(outfile))
+            return
+
+        logger.info("\nDownloading pixel: %(name)i (ra=%(ra_min)g:%(ra_max)g,dec=%(dec_min)g:%(dec_max)g)"%(pixel))
+        logger.info("Working on "+sqlname)
+         
+        self.generate_query(pixel['ra_min'],pixel['ra_max'],pixel['dec_min'],pixel['dec_max'],sqlname,dbname)
+        
+
+        try:
+            array = self.query(self.release,taskname,sqlname)
+            if array is None: return
+            logger.info("Found %i rows."%len(array))
+            hdu = pyfits.new_table(array)
+            hdu.writeto(outfile)
+        except Exception, e:
+            #print e.output
+            print e
+            #raise e
+
+    def run(self,pixfile=None,outdir=None):
+        self.load_pixels(pixfile)
+        for pixel in self.pixels:
+            self.download(pixel,outdir)
 
 
 if __name__ == "__main__":
-    from optparse import OptionParser
-    usage = "Usage: %prog  [options] pixels.txt"
+    import ugali.utils.parser
     description = "Download dataset."
-    parser = OptionParser(usage=usage,description=description)
-    parser.add_option('--db',default='DR10',
-                      help="Data set to download.")
-    parser.add_option('-o','--outdir',default=None,
-                      help="Output directory")
-    (opts, args) = parser.parse_args()
+    parser = ugali.utils.parser.Parser(description=description)
+    parser.add_config()
+    parser.add_debug()
+    parser.add_verbose()
+    parser.add_argument('pixfile',metavar='pixels.txt',default=None,
+                        nargs='?',help='Input pixel file.')
+    opts = parser.parse_args()
 
-    if len(args) == 0:
-        args = [ None ]
+    from ugali.utils.config import Config
+    config = Config(opts.config)
 
-    for arg in args:
-        if opts.db == 'DR10':
-            db = SDSSDatabase(release='DR10')
-        elif opts.db == 'SVA1':
-            pass
-        db.run(pixfile=arg,outdir=opts.outdir)
+    survey = config['data']['survey'].lower()
+    release = config['data']['release'].lower()
+    outdir = config['data']['dirname']
+
+    db = databaseFactory(survey,release)
+    db.run(pixfile=opts.pixfile,outdir=outdir)

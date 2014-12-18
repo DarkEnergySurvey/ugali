@@ -25,10 +25,10 @@ batch:
   jobname: ugali
   opts : {}
   max_jobs: 250
-  chunk: 100
+  chunk: 25
   
 scan:
-  script : ugali/analysis/scan.py
+  script : /u/ki/kadrlica/software/ugali/master/ugali/analysis/scan.py
   distance_modulus_array: [16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0, 21.5, 22.0, 22.5, 23.0, 23.5, 24.0]
   #distance_modulus_array: [18.0, 18.5, 19.0]
   #distance_modulus_array: [16.0 ]
@@ -47,12 +47,13 @@ search:
   xsize    : 1.0e+4
   minpix   : 1
   catalogs: [ [McConnachie12],                                        # ASSOC1
-              [Rykoff14, Harris96, Corwen04, Nilson73]                # ASSOC2
+              [Rykoff14, Harris96, Corwen04, Nilson73,                # ASSOC2
+              Webbink85, Kharchenko13]               
             ]
   proximity: 0.1 # deg
   
 mcmc:
-  script : ugali/analysis/mcmc.py
+  script : /u/ki/kadrlica/software/ugali/master/ugali/analysis/mcmc.py
   #params  : ['richness','lon','lat','extension','distance_modulus']
   #params  : ['richness','extension','ellipticity','position_angle']
   #params  : ['richness','lon','lat','extension','ellipticity','position_angle']
@@ -71,17 +72,17 @@ mcmc:
       proj: 'ait'
 
 simulate:
-  script : ugali/simulation/simulator.py
+  script : /u/ki/kadrlica/software/ugali/master/ugali/simulation/simulator.py
   njobs  : 200
   size   : 10000
-  save   : 3
+  save   : 1
   isochrone : null # default to using 'isochrone'
   kernel    : null # default to use 'kernel'
   params: 
     lon              : 45
     lat              : 45
     stellar_mass     : [0.0,0.0,'log']
-    distance_modulus : [16.,24.,'linear']
+    distance_modulus : [19.,19.,'linear']
     extension        : [0.1,0.1,'linear']
     ellipticity      : [0.0,0.0,'linear']
     
@@ -91,37 +92,28 @@ simulate:
   
 catalog:
   #infile: None
-  dirname: /u/ki/kadrlica/sdss/data/dr10/healpix/
+  dirname: /u/ki/kadrlica/des/data/sva1/gold/healpix
   basename: "catalog_hpx%04i.fits"
   lon_field: GLON
   lat_field: GLAT
   coordsys : gal
   # Color always defined as mag_1 - mag_2
-  objid_field       : OBJID
-  mag_1_field       : MAG_PSF_SFD_G 
+  objid_field       : COADD_OBJECTS_ID
+  mag_1_field       : MAG_PSF_G 
   mag_err_1_field   : MAGERR_PSF_G
-  mag_2_field       : MAG_PSF_SFD_R
+  mag_2_field       : MAG_PSF_R
   mag_err_2_field   : MAGERR_PSF_R
   mc_source_id_field: MC_SOURCE_ID
   #mc_source_id_field: None
   # True = band 1 is detection band; False = band 2 is detection band     
-  band_1_detection: True 
-
-# Deprecated?
-mangle: 
-  infile_1: /u/ki/kadrlica/sdss/data/dr10/mangle/sdss.dr10.holy.uni.ply
-  infile_2: /u/ki/kadrlica/sdss/data/dr10/mangle/sdss.dr10.holy.uni.ply
-  coordsys: gal
-  #manglebindir: /home/s1/bechtol/des10.a/code/mangle/mangle2.2/bin}
+  band_1_detection: True
 
 mask:
-  dirname    : /u/ki/kadrlica/sdss/data/dr10/simple
+  #dirname    : /u/ki/kadrlica/des/data/sva1/gold/maglim
+  dirname    : /u/ki/kadrlica/des/data/sva1/gold/simple
   basename_1 : "maglim_g_hpx%04i.fits"
   basename_2 : "maglim_r_hpx%04i.fits"
   minimum_solid_angle: 0.1 # deg^2
-  # DEPRICATED
-  infile_1: /u/gl/bechtol/disk/DES/mw_substructure/sv_test/y1c2/data/mask/hpx_4096_y1c2_coadd_holymolys_maglims_g_sparse_scaled.fits
-  infile_2: /u/gl/bechtol/disk/DES/mw_substructure/sv_test/y1c2/data/mask/hpx_4096_y1c2_coadd_holymolys_maglims_r_sparse_scaled.fits
           
 color:
   min   : -0.5
@@ -129,7 +121,7 @@ color:
   n_bins: 12  # 15
 
 mag:
-  min   : 18.5 # 18
+  min   : 17   # 18
   max   : 23   # 25
   n_bins: 70   # 0.1, 0.02
 
@@ -148,7 +140,7 @@ mag:
 coords:
   nside_catalog   : 4      # Size of patches for catalog binning
   nside_mask      : 64     # Size of patches for mask creation
-  nside_likelihood: 256     # Size of target pixel
+  nside_likelihood: 256    # Size of target pixel
   nside_pixel     : 4096   # Size of pixels within target region
   roi_radius      : 2.0    # Outer radius of background annulus
   roi_radius_annulus: 0.5  # Inner radius of background annulus
@@ -158,11 +150,12 @@ coords:
 
 data: 
   script : /u/ki/kadrlica/software/ugali/master/ugali/preprocess/database.py
-  survey : sdss
-  release: dr10
-  dirname: /u/ki/kadrlica/sdss/data/dr10/raw
-  density: "/u/ki/kadrlica/sdss/data/dr10/density/density_hpx%04i.fits"
-
+  survey : des
+  release: sva1_gold
+  dirname: /u/ki/kadrlica/des/data/sva1/gold/raw
+  density: /u/ki/kadrlica/des/data/sva1/gold/density/density_hpx%04i.fits
+  footprint: /u/ki/kadrlica/des/data/sva1/gold/footprint/sva1_gold_1.0_goodregions_equ_nest_2048.fits.gz
+  
 # Default kernel specification
 kernel:
   type: RadialPlummer
@@ -185,24 +178,18 @@ isochrone:
   #horizontal_branch_dispersion: [0.0] # mag
   #horizontal_branch_dispersion: [-0.2, -0.1, 0.0, 0.1] # mag
   horizontal_branch_dispersion: 0.1
-  #infiles: [/home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.1.dat
-  #          /home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1010z0.2.dat
-  #          /home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1015z0.1.dat
-  #          /home/s1/bechtol/des10.a/projects/mw_substructure/stellar_evolution/isochrones/des/isota1015z0.2.dat]
   #fe/h = [-2.27,-1.5]; z    = [0.10 , 0.6]
   #age  = [8, 14]     ; age* = [090., 114.00]
-  infiles: [/u/ki/kadrlica/sdss/data/isochrones/isota90.00z0.120.dat,
-            /u/ki/kadrlica/sdss/data/isochrones/isota90.00z0.600.dat,
-            /u/ki/kadrlica/sdss/data/isochrones/isota110.00z0.120.dat,
-            /u/ki/kadrlica/sdss/data/isochrones/isota110.00z0.600.dat]
+  infiles: [/u/ki/kadrlica/des/isochrones/v0/isota1010z0.1.dat,
+            /u/ki/kadrlica/des/isochrones/v0/isota1010z0.2.dat,
+            /u/ki/kadrlica/des/isochrones/v0/isota1015z0.1.dat,
+            /u/ki/kadrlica/des/isochrones/v0/isota1015z0.2.dat]
   weights: [0.25, 0.25, 0.25, 0.25]
   mass_steps: 400
 
 likelihood:
   delta_mag: 0.03 # 1.e-3 
-  spatial_only: False
-  color_only:   False
-  
+
 color_lut:
   infile: null
   delta_mag: 0.03

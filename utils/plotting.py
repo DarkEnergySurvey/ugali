@@ -23,6 +23,9 @@ import ugali.observation.roi
 import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
+import ugali.utils.healpix
+
+from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist
 
 from ugali.utils.logger import logger
@@ -110,12 +113,12 @@ def zoomedHealpixMap(title, map, lon, lat, radius,
 
 ############################################################
 
-def projScatter(ax, lon, lat, **kwargs):
+def projScatter(lon, lat, **kwargs):
     """
     Create a scatter plot on HEALPix projected axes.
     Inputs: lon (deg), lat (deg)
     """
-    healpy.projscatter(x,y, lonlat=True, **kwargs)
+    healpy.projscatter(lon, lat, lonlat=True, **kwargs)
 
 ############################################################
 
@@ -174,6 +177,28 @@ class BasePlotter(object):
                                  textcoords='offset points',ha='left', va='bottom',size=10,
                                  bbox={'boxstyle':"round",'fc':'1'}, zorder=10)
         
+    def drawROI(self, ax, value=None, pixel=None):
+        roi_map = numpy.array(healpy.UNSEEN * np.ones(healpy.nside2npix(self.nside)))
+        
+        if value is None:
+            #roi_map[self.pixels] = ugali.utils.projector.angsep(self.lon, self.lat, self.centers_lon, self.centers_lat)
+            roi_map[self.roi.pixels] = 1
+            roi_map[self.roi.pixels_annulus] = 0
+            roi_map[self.roi.pixels_target] = 2
+        elif value is not None and pixel is None:
+            roi_map[self.pixels] = value
+        elif value is not None and pixel is not None:
+            roi_map[pixel] = value
+        else:
+            print 'ERROR: count not parse input'
+        im = healpy.gnomview(roi_map,**self.gnom_kwargs)
+
+    def drawCatalog(self, ax):
+        # Stellar Catalog
+        catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        healpy.projscatter(catalog.lon,catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
+        ax.annotate("Stars",**self.label_kwargs)
+
     def drawImage(self,ax,invert=True):
         # Optical Image
         im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
@@ -192,7 +217,7 @@ class BasePlotter(object):
     def drawStellarDensity(self,ax):
         # Stellar Catalog
         catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
-        pix = ugali.utils.projector.angToPix(self.nside, catalog.lon, catalog.lat)
+        pix = ang2pix(self.nside, catalog.lon, catalog.lat)
         counts = collections.Counter(pix)
         pixels, number = numpy.array(sorted(counts.items())).T
         star_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
@@ -207,11 +232,15 @@ class BasePlotter(object):
         except: pylab.colorbar(im)
         ax.annotate("Stars",**self.label_kwargs)
 
-    def drawMask(self,ax):
+    def drawMask(self,ax, mask=None):
         # MAGLIM Mask
-        filenames = self.config.getFilenames()
-        catalog_pixels = self.roi.getCatalogPixels()
-        mask_map = ugali.utils.skymap.readSparseHealpixMaps(filenames['mask_1'][catalog_pixels], field='MAGLIM')
+        if mask is None:
+            filenames = self.config.getFilenames()
+            catalog_pixels = self.roi.getCatalogPixels()
+            mask_map = ugali.utils.skymap.readSparseHealpixMaps(filenames['mask_1'][catalog_pixels], field='MAGLIM')
+        else:
+            mask_map = healpy.UNSEEN*np.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+            mask_map[mask.roi.pixels] = mask.mask_1.mask_roi_sparse
         mask_map = numpy.where(mask_map == healpy.UNSEEN, 0, mask_map)
          
         im = healpy.gnomview(mask_map,**self.gnom_kwargs)
@@ -302,7 +331,7 @@ class BasePlotter(object):
             #ax.plot(isochrone.color,mag, lw=20, color='0.5', zorder=0)
 
 
-        pix = ugali.utils.projector.angToPix(self.nside, self.glon, self.glat)
+        pix = ang2pix(self.nside, self.glon, self.glat)
         likelihood_pix = ugali.utils.skymap.superpixel(pix,self.nside,self.config.params['coords']['nside_likelihood'])
         config = self.config
         scan = ugali.analysis.scan.Scan(self.config,likelihood_pix)
@@ -430,6 +459,19 @@ class ObjectPlotter(BasePlotter):
     def drawMembership(self, ax, radius=None, zidx=None, mc_source_id=1):
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawMembership(ax,radius,zidx,mc_source_id)
+
+
+def plot_candidates(candidates, config, ts_min=50, outdir='./'):
+    
+    for candidate in candidates:
+        if candidate['TS'] < ts_min: continue
+        logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
+        plotter = ugali.utils.plotting.ObjectPlotter(candidate,config)
+        fig,ax = plotter.plot4()
+        basename = '%s_plot.png'%candidate['name']
+        outfile = os.path.join(outdir,basename)
+        plt.savefig(outfile)
+
 
 ###################################################
 
@@ -612,7 +654,7 @@ def drawIsochrone(ax, config, distance_modulus, **kwargs):
     ax.set_xlim(-0.5,1.5)
     ax.set_ylim(23,18)
 
-def drawChernoff(ax,ts,bands='smooth'):
+def drawChernoff(ax,ts,bands='smooth',pdf=False):
     from scipy.stats import chi2
 
     logger.debug("Drawing %i simulations..."%len(ts))
@@ -627,12 +669,25 @@ def drawChernoff(ax,ts,bands='smooth'):
     patches,labels = [],[]
     label = r"$\chi^2_{1} / 2$"
     kwargs = dict(label=label, lw=2, c='k',dashes=(5,2))
-    ax.plot(x,(1-chi2.cdf(x,dof))/2.,**kwargs)
-    #fudge = 1/1.4
-    #ax.plot(x,(1-chi2.cdf(x,dof))/2.*fudge,**kwargs)
 
     clip_ts = np.where(ts<1e-4, 0, ts)
-    n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step')
+    if not pdf:
+        ax.plot(x,(1-chi2.cdf(x,dof))/2.,**kwargs)
+        #fudge = 1/1.4
+        #ax.plot(x,(1-chi2.cdf(x,dof))/2.*fudge,**kwargs)
+        # Histogram is normalized so first bin = 1 
+        n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step',color='r')
+    else:
+        num,b = np.histogram(clip_ts,bins=bins)
+        c = (b[1:]+b[:-1])/2.
+        norm = float(num.sum()*(b[1]-b[0]))
+        n = num/norm
+        ax.plot(x,(chi2.pdf(x,dof))/2.,**kwargs)
+        err = np.sqrt(num)/norm
+        yerr = [np.where(err>=n,0.9999*n,err),err]
+        # Histogram is normalized so n = num/(len(x)*dbin)
+        ax.errorbar(c,n,yerr=yerr,fmt='_',color='r',zorder=0)
+        n,b,p = ax.hist(clip_ts,bins=bins,normed=True,log=True,color='r')
 
     idx = np.argmax(n==0)
     n = n[1:idx]; b=b[1:idx+1]
@@ -640,40 +695,46 @@ def drawChernoff(ax,ts,bands='smooth'):
     ax.set_xlim([0,np.ceil(ts.max())])
     ax.set_ylim([10**np.floor(np.log10(n.min())),1])
 
-    # Smoother bands
-    if bands=='smooth':
-        xvals = np.hstack([b[0],((b[1:]+b[:-1])/2.),b[-1]])
-        yvals = np.hstack([n[0],n,n[-1]])
-    elif bands=='sharp':
-        xvals = np.repeat(b,2)[1:-1]
-        yvals = np.repeat(n,2)
-    else:
-        msg = 'Unrecognized band type: %s'%bands
-        raise Exception(msg)
+    if bands != 'none':
+        if bands == 'smooth':
+            xvals = np.hstack([b[0],((b[1:]+b[:-1])/2.),b[-1]])
+            yvals = np.hstack([n[0],n,n[-1]])
+        elif bands == 'sharp':
+            xvals = np.repeat(b,2)[1:-1]
+            yvals = np.repeat(n,2)
+        else:
+            msg = 'Unrecognized band type: %s'%bands
+            raise Exception(msg)
+         
+        # Bands...
+        err = np.sqrt(yvals/float(len(ts)))
+        y_hi = np.clip(yvals+err,1e-32,np.inf)
+        y_lo = np.clip(yvals-err,1e-32,np.inf)
+         
+        #cut = (y_lo > 0)
+        kwargs = dict(color='r', alpha='0.5', zorder=0.5)
+         
+        #ax.fill_between(c[cut], y_lo[cut], y_hi[cut], **kwargs)
+        ax.fill_between(xvals, y_lo, y_hi, **kwargs)
+        ax.add_patch(plt.Rectangle((0,0),0,0, **kwargs)) # Legend
 
-    # Bands...
-    err = np.sqrt(yvals/float(len(ts)))
-    y_hi = np.clip(yvals+err,1e-32,np.inf)
-    y_lo = np.clip(yvals-err,1e-32,np.inf)
+    ax.set_xlabel('TS')
+    ax.set_ylabel('PDF' if pdf else 'CDF')
 
-    #cut = (y_lo > 0)
-    kwargs = dict(color='r', alpha='0.5', zorder=0.5)
-
-    #ax.fill_between(c[cut], y_lo[cut], y_hi[cut], **kwargs)
-    ax.fill_between(xvals, y_lo, y_hi, **kwargs)
-    ax.add_patch(plt.Rectangle((0,0),0,0, **kwargs)) # Legend
-
-
-def plotChernoff(ts):
+def plotChernoff(ts,bands='smooth',pdf=False):
     fig,ax = plt.subplots(1,1)
-    drawChernoff(ax,ts)
+
+    drawChernoff(ax,ts,bands,pdf)
     
-def plotSkymap(lon,lat,**kwargs):
+def plotSkymapCatalog(lon,lat,**kwargs):
+    """
+    Plot a catalog of coordinates on a full-sky map.
+    """
     fig = plt.figure()
     ax = plt.subplot(111,projection=projection)
-    drawSkymap(ax,lon,lat,**kwargs)
+    drawSkymapCatalog(ax,lon,lat,**kwargs)
 
-def drawSkymap(ax,lon,lat,**kwargs):
+def drawSkymapCatalog(ax,lon,lat,**kwargs):
     mapping = {
         'ait':'aitoff',
         'mol':'mollweide',
@@ -687,9 +748,17 @@ def drawSkymap(ax,lon,lat,**kwargs):
 
     proj = kwargs.pop('proj')
     projection = mapping.get(proj,proj)
-    ax.grid()
+    #ax.grid()
     # Convert from 
     # [0. < lon < 360] -> [-pi < lon < pi]
     # [-90 < lat < 90] -> [-pi/2 < lat < pi/2]
     lon,lat= np.radians([lon-360.*(lon>180),lat])
     ax.scatter(lon,lat,**kwargs)
+
+def plotSkymap(skymap, proj='mol', **kwargs):
+    kwargs.setdefault('xsize',1000)
+    if proj.upper() == 'MOL':
+        im = healpy.mollview(skymap,**kwargs)
+    elif proj.upper() == 'CAR':
+        im = healpy.cartview(skymap,**kwargs)
+    return im

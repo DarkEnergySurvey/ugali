@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+Simulate the likelihood search.
+
+"""
+
 import glob
 import os
 from os.path import join, exists, basename, splitext
@@ -11,15 +16,13 @@ import pyfits
 from ugali.analysis.pipeline import Pipeline
 import ugali.analysis.loglike
 import ugali.simulation.simulator
-import ugali.utils.plotting
 import ugali.utils.skymap
 
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.healpix import pix2ang
 
-
-description="Simulate the likelihood search."
+description=__doc__
 components = ['simulate','merge','plot']
 
 def run(self):
@@ -47,6 +50,7 @@ def run(self):
 
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
+
         filenames=join(outdir,self.config['output']['simfile']).split('_%')[0]+'_*'
         infiles=sorted(glob.glob(filenames))
 
@@ -66,17 +70,27 @@ def run(self):
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
+        import ugali.utils.plotting
         import pylab as plt
-        import scipy.stats
 
         data = pyfits.open(join(outdir,"merged_sims.fits"))[1].data
         data = data[~np.isnan(data['ts'])]
-        ugali.utils.plotting.plotChernoff(data['ts'])
+        for dist in np.unique(data['fit_distance']):
+            logger.info('  Plotting distance: %s'%dist)
+            ts = data['ts'][data['fit_distance'] == dist]
+            fig,ax = plt.subplots(1,2,figsize=(10,5))
+            ugali.utils.plotting.drawChernoff(ax[0],ts,bands='none',pdf=True)
+            ugali.utils.plotting.drawChernoff(ax[1],ts)
+            fig.suptitle(r'Chernoff ($\mu = %g$)'%dist)
+            outdir = mkdir(self.config['output']['plotdir'])
+            basename = 'chernoff_u%g.png'%dist
+            outfile = os.path.join(outdir,basename)
+            plt.savefig(outfile)
         #idx=np.random.randint(len(data['ts'])-1,size=400)
         #idx=slice(400)
         #ugali.utils.plotting.plotChernoff(data['ts'][idx])
         #ugali.utils.plotting.plotChernoff(data['fit_ts'])
-
+        plt.ion()
         """
         try:
             fig = plt.figure()
