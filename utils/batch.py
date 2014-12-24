@@ -69,6 +69,7 @@ class Batch(object):
                          stdin=sub.PIPE,stdout=sub.PIPE,stderr=sub.PIPE)
 
     def call(self, command):
+        logger.debug(command)
         return sub.call(command,shell=True)
 
     def remap_options(self,opts):
@@ -116,6 +117,23 @@ class LSF(Batch):
 
         self.jobs_cmd = "bjobs -u %s"%self.username
         self.submit_cmd = "bsub %(opts)s %(command)s"
+
+    def queue2runlimit(self, queue):
+        """
+        Translate queue to wallclock runlimit.
+        """
+        if queue == 'express':
+            return "0:01"
+        elif queue == 'short':
+            return "0:30"
+        elif queue == 'medium':
+            return "1:00"
+        elif queue == 'long':
+            return "24:00"
+        elif queue == 'xlong':
+            return "96:00"
+        elif queue == 'xxl':
+            return "168:00"
     
     def parse_options(self, **opts):
         options = odict(self.default_opts)

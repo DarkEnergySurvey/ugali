@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 import numpy
 import numpy as np
+import scipy.special
+
+def norm_cdf(x):
+    # Faster than scipy.stats.norm.cdf
+    #https://en.wikipedia.org.wiki/Normal_distribution
+    return 0.5*(1 + scipy.special.erf(x/np.sqrt(2)))
 
 def sky(lon=None,lat=None,size=1):
     """

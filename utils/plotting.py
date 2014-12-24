@@ -654,7 +654,7 @@ def drawIsochrone(ax, config, distance_modulus, **kwargs):
     ax.set_xlim(-0.5,1.5)
     ax.set_ylim(23,18)
 
-def drawChernoff(ax,ts,bands='smooth',pdf=False):
+def drawChernoff(ax,ts,bands='smooth',pdf=False,color='r'):
     from scipy.stats import chi2
 
     logger.debug("Drawing %i simulations..."%len(ts))
@@ -676,7 +676,7 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False):
         #fudge = 1/1.4
         #ax.plot(x,(1-chi2.cdf(x,dof))/2.*fudge,**kwargs)
         # Histogram is normalized so first bin = 1 
-        n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step',color='r')
+        n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step',color=color)
     else:
         num,b = np.histogram(clip_ts,bins=bins)
         c = (b[1:]+b[:-1])/2.
@@ -686,8 +686,8 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False):
         err = np.sqrt(num)/norm
         yerr = [np.where(err>=n,0.9999*n,err),err]
         # Histogram is normalized so n = num/(len(x)*dbin)
-        ax.errorbar(c,n,yerr=yerr,fmt='_',color='r',zorder=0)
-        n,b,p = ax.hist(clip_ts,bins=bins,normed=True,log=True,color='r')
+        ax.errorbar(c,n,yerr=yerr,fmt='_',color=color,zorder=0)
+        n,b,p = ax.hist(clip_ts,bins=bins,normed=True,log=True,color=color)
 
     idx = np.argmax(n==0)
     n = n[1:idx]; b=b[1:idx+1]
@@ -717,6 +717,9 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False):
         #ax.fill_between(c[cut], y_lo[cut], y_hi[cut], **kwargs)
         ax.fill_between(xvals, y_lo, y_hi, **kwargs)
         ax.add_patch(plt.Rectangle((0,0),0,0, **kwargs)) # Legend
+        
+    #ax.annotate(r"$N=%i$"%len(ts), xy=(0.15,0.85), xycoords='axes fraction', 
+    #            bbox={'boxstyle':"round",'fc':'1'})
 
     ax.set_xlabel('TS')
     ax.set_ylabel('PDF' if pdf else 'CDF')

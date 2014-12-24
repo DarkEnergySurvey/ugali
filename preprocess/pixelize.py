@@ -13,31 +13,31 @@ import healpy
 
 import ugali.utils.binning
 import ugali.utils.skymap
-from ugali.utils.projector import celToGal, galToCel
-from ugali.utils.projector import angToPix, pixToAng
+from ugali.utils.projector import cel2gal, gal2cel
+from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 
-def pixelizeCatalog(infiles, config):
+def pixelizeCatalog(infiles, config, force=False):
     """
     Break catalog up into a set of healpix files.
     """
-    nside_catalog = config.params['coords']['nside_catalog']
-    nside_pixel = config.params['coords']['nside_pixel']
-    outdir = mkdir(config.params['catalog']['dirname'])
+    nside_catalog = config['coords']['nside_catalog']
+    nside_pixel = config['coords']['nside_pixel']
+    outdir = mkdir(config['catalog']['dirname'])
     filenames = config.getFilenames()
     
-    for infile in infiles:
+    for ii,infile in enumerate(infiles):
         logger.info('(%i/%i) %s'%(ii+1, len(infiles), infile))
         f = pyfits.open(infile)
         data = f[1].data
         header = f[1].header
         logger.info("%i objects found"%len(data))
         if not len(data): continue
-        glon,glat = celToGal(data['RA'],data['DEC'])
-        catalog_pix = angToPix(nside_catalog,glon,glat,coord='GAL')
-        pixel_pix = angToPix(nside_pixel,glon,glat,coord='GAL')
+        glon,glat = cel2gal(data['RA'],data['DEC'])
+        catalog_pix = ang2pix(nside_catalog,glon,glat,coord='GAL')
+        pixel_pix = ang2pix(nside_pixel,glon,glat,coord='GAL')
         names = [n.upper() for n in data.columns.names]
         ra_idx = names.index('RA'); dec_idx = names.index('DEC')
         idx = ra_idx if ra_idx > dec_idx else dec_idx
@@ -80,37 +80,41 @@ def pixelizeCatalog(infiles, config):
             hdulist.flush()
             hdulist.close()
 
-def pixelizeDensity(config, nside=None):
+def pixelizeDensity(config, nside=None, force=False):
     if nside is None: 
-        nside = config.params['coords']['nside_likelihood']
+        nside = config['coords']['nside_likelihood']
     filenames = config.getFilenames()
     infiles = filenames[~filenames['catalog'].mask]
-    outfile = config.params['data']['density']
-    outdir = mkdir(os.path.dirname(outfile))
 
-    for ii,filename in enumerate(infiles):
-        infile = filename['catalog']
-        pix = filename['pix']
+    for ii,f in enumerate(infiles.data):
+        infile = f['catalog']
+        pix = f['pix']
         logger.info('(%i/%i) %s'%(ii+1, len(infiles), infile))
-        stellarDensity(infile,outfile%pix,nside)
 
-def stellarDensity(infile, outfile=None, nside=2**8): 
+        outfile = config['data']['density']%pix
+        if os.path.exists(outfile) and not force: 
+            logger.info("Found %s; skipping..."%outfile)
+            continue
+            
+        outdir = mkdir(os.path.dirname(outfile))
+        pixels, density = stellarDensity(infile,nside)
+        data_dict = dict( DENSITY=density )
+        logger.info("Writing %s..."%outfile)
+        ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,nside,outfile)
+
+def stellarDensity(infile, nside=2**8): 
     area = healpy.nside2pixarea(nside,degrees=True)
     f = pyfits.open(infile)
     data = f[1].data
     logger.debug("Reading %s"%infile)
     
     glon,glat = data['GLON'],data['GLAT']
-    pix = angToPix(nside,glon,glat,coord='GAL')
+    pix = ang2pix(nside,glon,glat,coord='GAL')
     counts = collections.Counter(pix)
     pixels, number = numpy.array(sorted(counts.items())).T
     density = number/area
-
-    if outfile is not None:
-        data_dict = dict( DENSITY=density )
-        logger.debug("Writing %s..."%outfile)
-        ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,nside,outfile)
     f.close()
+
     return pixels, density
 
 if __name__ == "__main__":

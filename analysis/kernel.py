@@ -11,10 +11,12 @@ from collections import OrderedDict as odict
 import numpy
 import numpy as np
 import scipy.integrate
+import healpy
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
 from ugali.analysis.model import Model, Parameter
+from ugali.utils.healpix import ang2vec, ang2pix, query_disc
 
 from ugali.utils.logger import logger
 
@@ -73,7 +75,36 @@ class Kernel(Model):
         integrand = lambda r: self._pdf(r) * 2*numpy.pi * r
         return scipy.integrate.quad(integrand,rmin,rmax,full_output=True,epsabs=0)[0]
 
+class ToyKernel(Kernel):
+    """
+    Simple toy kernel that selects healpix pixels within
+    the given extension radius. Similar to 'RadialDisk'.
+    """
 
+    _params = odict(
+        Kernel._params.items() + 
+        [
+            ('extension',     Parameter(0.5, [0.01,5.0]) ),
+            ('nside',         Parameter(4096,[4096,4096])),
+        ])
+
+    def _cache(self, name):
+        pixel_area = healpy.nside2pixarea(self.nside,degrees=True)
+        vec = ang2vec(self.lon, self.lat)
+        self.pix = query_disc(self.nside,vec,self.extension)
+        self._norm = 1./(len(self.pix)*pixel_area)
+
+    @property
+    def norm(self):
+        return self._norm
+
+    def _pdf(self,pix):
+        return  np.in1d(pix,self.pix)
+        
+    def pdf(self,lon,lat):
+        pix = ang2pix(self.nside,lon,lat)
+        return self.norm * self._pdf(pix)
+       
 class EllipticalKernel(Kernel):
     """
     Base class for elliptical kernels.

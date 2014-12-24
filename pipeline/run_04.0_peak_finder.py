@@ -10,7 +10,7 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
 description="Perform object finding and association."
-components = ['label','objects','associate','candidates']
+components = ['label','objects','associate','candidate','plot']
 
 def run(self):
     search = CandidateSearch(self.config)
@@ -40,14 +40,52 @@ def run(self):
             search.loadObjects()
             search.createAssociations()
             search.writeAssociations()
-    if 'candidates' in self.opts.run:
-        logger.info("Running 'candidates'...")
+    if 'candidate' in self.opts.run:
+        logger.info("Running 'candidate'...")
         if exists(search.candfile) and not self.opts.force:
             logger.info("  Found %s; skipping..."%search.candfile)
         else:
             search.loadAssociations()
             search.writeCandidates()
+    if 'plot' in self.opts.run:
+        logger.info("Running 'plot'...")
+        import ugali.utils.plotting
+        import pylab as plt
+        import pyfits
+
+        outdir = mkdir(self.config['output']['plotdir'])
+        # Eventually move this into 'plotting' module
+        candidates = pyfits.open(self.config.candfile)[1].data
+        candidates = candidates[candidates['TS'] >= 25]
+
+        maglims = ugali.utils.skymap.readSparseHealpixMaps(pipeline.config.filenames['mask_1'].compressed(),'MAGLIM')
+        ugali.utils.plotting.plotSkymap(maglims,coord='G')
+        ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='G')
+        basename = 'candidates_gal.png'
+        outfile = os.path.join(outdir,basename)
+        plt.savefig(outfile)
+
+        ugali.utils.plotting.plotSkymap(maglims,coord='GC')
+        ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='GC')
+        basename = 'candidates_equ.png'
+        outfile = os.path.join(outdir,basename)
+        plt.savefig(outfile)
         
+        for candidate in candidates:
+            logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
+            label = candidate['name'].lower().replace(' ','_')
+            plotter = ugali.utils.plotting.ObjectPlotter(candidate,self.config)
+         
+            fig,ax = plotter.plot4()
+            basename = '%s.png'%label
+            outfile = os.path.join(outdir,basename)
+            plt.savefig(outfile)
+         
+            fig,ax = plotter.plotDistance()
+            basename = '%s_dist.png'%label
+            outfile = os.path.join(outdir,basename)
+            plt.savefig(outfile)
+
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parse_args()

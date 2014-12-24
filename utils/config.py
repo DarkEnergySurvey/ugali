@@ -157,6 +157,7 @@ class Config(dict):
             mask[ii]['catalog'] = not os.path.exists(catalog)
             mask[ii]['mask_1']  = not os.path.exists(mask_1)
             mask[ii]['mask_2']  = not os.path.exists(mask_2)
+        # 'pix' is masked if all files not present
         mask['pix'] = mask['catalog'] | mask['mask_1'] | mask['mask_2']
         #return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
         return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])

@@ -169,7 +169,7 @@ class ROI(object):
         elif value is not None and pixel is not None:
             map_roi[pixel] = value
         else:
-            print 'ERROR: count not parse input'
+            logger.error("Can't parse input")
         
         ugali.utils.plotting.zoomedHealpixMap('Region of Interest',
                                               map_roi,

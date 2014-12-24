@@ -10,7 +10,7 @@ from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 
 description="Run the likelihood search."
-components = ['scan','merge']
+components = ['scan','merge','plot']
 
 def run(self):
     if 'scan' in self.opts.run:
@@ -28,7 +28,17 @@ def run(self):
             filenames = self.config.likefile.split('_%')[0]+'_*'
             infiles = sorted(glob.glob(filenames))
             ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
-            outdir = mkdir(self.config['output']['searchdir'])
+    if 'plot' in self.opts.run:
+        # WARNING: Loading the full 3D healpix map is memory intensive.
+        logger.info("Running 'plot'...")
+        import pylab as plt
+        import ugali.utils.plotting
+        skymap = ugali.utils.skymap.readSparseHealpixMap(self.config.mergefile,'LOG_LIKELIHOOD')[1]
+        ugali.utils.plotting.plotSkymap(skymap)
+        outdir = mkdir(self.config['output']['plotdir'])
+        basename = os.path.basename(self.config.mergefile.replace('.fits','.png'))
+        outfile = os.path.join(outdir,basename)
+        plt.savefig(outfile)
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

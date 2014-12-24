@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+"""
+Module for simulation.
 
 """
-Documentation.
-"""
+
 import copy
 
 import numpy
@@ -20,12 +21,15 @@ import ugali.utils.projector
 import ugali.utils.stats
 import ugali.analysis.scan
 
-from ugali.utils.projector import gal2cel, cel2gal, sr2deg
+from ugali.utils.projector import gal2cel, cel2gal, sr2deg, mod2dist
 from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 
 class Generator:
+    """
+    Class for generating the parameters of the simulation.
+    """
     def __init__(self,config, seed=None):
         self.config = Config(config)
         self.seed = seed
@@ -48,7 +52,7 @@ class Generator:
                 raise Exception('...')
         return data
 
-    def sky(self,lon,lat,size=1):
+    def sky(self,lon=None,lat=None,size=1):
         logger.info("Generating %i random points..."%size)
         # Random longitue and latitude
         lon,lat = ugali.utils.stats.sky(lon,lat,size=10*size)
@@ -69,6 +73,20 @@ class Generator:
             logger.warning("Can't sample logarithmically with boundary of zero.")
             return np.zeros(size)
         return 10**np.random.uniform(np.log10(low),np.log10(high),size)
+
+    def detectability(self,**kwargs):
+        """
+        An a priori detectability proxy.
+        """
+        distance_modulus = kwargs.get('distance_modulus')
+        distance = mod2dist(distance_modulus)
+        stellar_mass = kwargs.get('stellar_mass')
+        extension = kwargs.get('extension')
+
+        # Normalized to 10^3 Msolar at mod=18
+        norm = 10**3/mod2dist(18)**2
+        detect = stellar_mass / distance**2
+        detect /= norm
 
     def write(self, filename, data=None):
         if data is None: data = self.results
@@ -117,8 +135,7 @@ class Generator:
             #catalog   = simulator.simulate(seed=self.seed, **params)
             catalog   = simulator.simulate(**params)
             #print "Catalog annulus contains:",roi.inAnnulus(simulator.catalog.lon,simulator.catalog.lat).sum()
-            print "Simulated catalog annulus contains:",roi.inAnnulus(catalog.lon,catalog.lat).sum()
-        
+            logger.info("Simulated catalog annulus contains %i stars"%roi.inAnnulus(catalog.lon,catalog.lat).sum())
 
             if len(catalog.lon) < 1000:
                 logger.error("Simulation contains too few objects; skipping...")
@@ -153,14 +170,18 @@ class Generator:
             grid.search(coords=(lon,lat),distance_modulus=fit_distance)
 
             mle = grid.mle()
-            #err = grid.err()
             results[i]['kernel'] = simulator.kernel.name
             results[i]['ts'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
             results[i]['fit_ts'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
             results[i]['fit_mass'] = grid.stellar_mass_conversion*mle['richness']
-            #results[i]['fit_mass_err'] = grid.stellar_mass_conversion*err['richness']
             results[i]['fit_distance'] = fit_distance #mle['distance_modulus']
-            #results[i]['fit_distance_err'] = err['distance_modulus']
+
+            err = grid.err()
+            richness_err = (err['richness'][1]-err['richness'][0])/2.
+            results[i]['fit_mass_err'] = grid.stellar_mass_conversion*richness_err
+
+            distance_modulus_err = (err['distance_modulus'][1]-err['distance_modulus'][0])/2.
+            results[i]['fit_distance_err'] = distance_modulus_err
 
             for d in dtype:
                 logger.info('\t%s: %s'%(d[0], results[i][d[0]]))
@@ -175,7 +196,10 @@ class Generator:
 ############################################################
 
 class Simulator:
-
+    """
+    Class for simulating catalog data.
+    """
+    
     def __init__(self, config, roi):
         self.config = ugali.utils.config.Config(config)
         self.roi = roi
@@ -192,7 +216,8 @@ class Simulator:
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
         self._create_catalog()
-        self._photometricErrors()
+        self.photo_err_1,self.photo_err_2 = self.mask.photo_err_1,self.mask.photo_err_2
+        #self._photometricErrors()
         self._setup_subpix()
         #self._setup_cmd()
 
@@ -225,9 +250,9 @@ class Simulator:
         # ADW: Can't this be done with numpy.median(axis=?)
         mag_1_thresh_medians = []
         mag_err_1_medians = []
-        for ii in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
-            mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
-            mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
+        for i in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
+            mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
         
         if mag_1_thresh_medians[0] > 0.:
             mag_1_thresh_medians = numpy.insert(mag_1_thresh_medians, 0, -99.)
@@ -244,9 +269,9 @@ class Simulator:
 
         mag_2_thresh_medians = []
         mag_err_2_medians = []
-        for ii in range(0, int(len(mag_2_thresh) / float(n_per_bin))):
-            mag_2_thresh_medians.append(numpy.median(mag_2_thresh_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
-            mag_err_2_medians.append(numpy.median(mag_err_2_sort[n_per_bin * ii: n_per_bin * (ii + 1)]))
+        for i in range(0, int(len(mag_2_thresh) / float(n_per_bin))):
+            mag_2_thresh_medians.append(numpy.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_2_medians.append(numpy.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
 
         if mag_2_thresh_medians[0] > 0.:
             mag_2_thresh_medians = numpy.insert(mag_2_thresh_medians, 0, -99.)
@@ -255,18 +280,14 @@ class Simulator:
         self.photo_err_2 = scipy.interpolate.interp1d(mag_2_thresh_medians, mag_err_2_medians,
                                                       bounds_error=False, fill_value=mag_err_2_medians[-1])
 
-        ### if plot:
-        ###     pylab.figure()
-        ###     pylab.scatter(mag_1_thresh, self.catalog.mag_err_1, c='blue')
-        ###     x = numpy.linspace(0., 10., 1.e4)        
-        ###     #pylab.scatter(mag_1_thresh_medians, mag_err_1_medians, c='red')
-        ###     pylab.plot(x, self.photo_err_1(x), c='red')
-
 
     def _setup_subpix(self,nside=2**16):
         """
         Subpixels for random position generation.
         """
+        # Only setup once...
+        if hasattr(self,'subpix'): return
+
         # Simulate over full ROI
         self.roi_radius  = self.config['coords']['roi_radius']
 
@@ -284,6 +305,8 @@ class Simulator:
         The purpose here is to create a more finely binned
         background CMD to sample from.
         """
+        # Only setup once...
+        if hasattr(self,'bkg_lambda'): return
 
         logger.info("Setup color...")
         # In the limit theta->0: 2*pi*(1-cos(theta)) -> pi*theta**2
@@ -313,16 +336,22 @@ class Simulator:
 
 
     def toy_background(self,mc_source_id=2,seed=None):
+        """
+        Quick uniform background generation.
+        """
+
+        logger.info("Running toy background simulation...")
         size = 20000
         nstar = np.random.poisson(size)
         #np.random.seed(0)
+        logger.info("Simulating %i background stars..."%nstar)
 
         ### # Random points from roi pixels
         ### idx = np.random.randint(len(self.roi.pixels)-1,size=nstar)
         ### pix = self.roi.pixels[idx]
 
         # Random points drawn from subpixels
-        logger.info("Background positions...")
+        logger.info("Generating uniform positions...")
         idx = np.random.randint(0,len(self.subpix)-1,size=nstar)
         lon,lat = pix2ang(self.nside_subpixel,self.subpix[idx])
 
@@ -333,13 +362,12 @@ class Simulator:
         #mag_1 = 19.05*np.ones(len(pix))
         #mag_2 = 19.10*np.ones(len(pix))
 
-        logger.info("Simulating %i background stars..."%nstar)
+        # Uniform in color
+        logger.info("Generating uniform CMD...")
         mag_1 = np.random.uniform(self.config['mag']['min'],self.config['mag']['max'],size=nstar)
         color = np.random.uniform(self.config['color']['min'],self.config['color']['max'],size=nstar)
-        #mag_1 = np.ones(nstar)*(self.config['mag']['min']+self.config['mag']['max'])/2.
-        #color = np.ones(nstar)*(self.config['color']['min']+self.config['color']['max'])/2.
-        mag_2 = mag_1 - color
 
+        mag_2 = mag_1 - color
 
         # There is probably a better way to do this step without creating the full HEALPix map
         mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
@@ -372,7 +400,7 @@ class Simulator:
         background as compared to the true catalog.
 
         The simulation of background object colors relies on the
-        data derived CMD. As such, it is a binned random generator
+        data-derived CMD. As such, it is a binned random generator
         and thus has some fundamental limitations.
         - The expected number of counts per bin is drawn ra
 
@@ -392,49 +420,37 @@ class Simulator:
         - Magnitudes are not randomized according to their errors
         """
         if seed is not None: np.random.seed(seed)
+        self._setup_cmd()
 
-        """
-        # ADW: For testing fix the number of stars per bin
-        #nstar_per_bin = numpy.round(self.bkg_lambda).astype(int) 
         # Randomize the number of stars per bin according to Poisson distribution
         nstar_per_bin = numpy.random.poisson(lam=self.bkg_lambda)
         nstar = nstar_per_bin.sum()
+
         logger.info("Simulating %i background stars..."%nstar)
 
-        # Uniformly distribute the stars within each CMD bin
-        delta_color = self.bkg_centers_color[1]-self.bkg_centers_color[0]
-        delta_mag   = self.bkg_centers_mag[1]-self.bkg_centers_mag[0]
+        if not self.config['simulate']['uniform']:
+            logger.info("Generating colors from background CMD.")
 
-        # Uniformly distribute points in color-mag bins
-        xx,yy = np.meshgrid(self.bkg_centers_color,self.bkg_centers_mag)
-        color = numpy.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
-        color += numpy.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
-        mag_1 = numpy.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
-        mag_1 += numpy.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
-        mag_2 = mag_1 - color
-        """
-        
-        print "Generating uniform CMD"
-        nstar = np.random.poisson(20000)
-        
-        logger.info("Simulating %i background stars..."%nstar)
-        mag_1 = np.random.uniform(self.config['mag']['min'],self.config['mag']['max'],size=nstar)
-        color = np.random.uniform(self.config['color']['min'],self.config['color']['max'],size=nstar)
-        #mag_1 = np.ones(nstar)*(self.config['mag']['min']+self.config['mag']['max'])/2.
-        #color = np.ones(nstar)*(self.config['color']['min']+self.config['color']['max'])/2.
-        mag_2 = mag_1 - color
+            # Distribute the stars within each CMD bin
+            delta_color = self.bkg_centers_color[1]-self.bkg_centers_color[0]
+            delta_mag   = self.bkg_centers_mag[1]-self.bkg_centers_mag[0]
 
-        # Spatial distribution
-        ### # Random points on a spherical cap:
-        ### # http://math.stackexchange.com/q/56784/
-        ### # Remember arcsin instead of arcos for elevation angle
-        ### phi = np.degrees(2*numpy.pi*numpy.random.uniform(size=nstar))
-        ### theta = np.degrees(np.arcsin(np.random.uniform(np.cos(np.radians(self.roi_radius)),1,size=nstar)))
-        ### rotator = ugali.utils.projector.SphericalRotator(self.roi.lon,self.roi.lat,zenithal=True)
-        ### lon,lat = rotator.rotate(phi,theta,invert=True)
+            # Distribute points within each color-mag bins
+            xx,yy = np.meshgrid(self.bkg_centers_color,self.bkg_centers_mag)
+            color = numpy.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
+            color += numpy.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
+            mag_1 = numpy.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
+            mag_1 += numpy.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
+        else:
+            # Uniform color-magnitude distribution
+            logger.info("Generating uniform CMD.")
+            mag_1 = np.random.uniform(self.config['mag']['min'],self.config['mag']['max'],size=nstar)
+            color = np.random.uniform(self.config['color']['min'],self.config['color']['max'],size=nstar)
+
+        mag_2 = mag_1 - color
 
         # Random points drawn from healpix subpixels
-        logger.info("Background positions...")
+        logger.info("Generating uniform positions...")
         idx = np.random.randint(0,len(self.subpix)-1,size=nstar)
         lon,lat = pix2ang(self.nside_subpixel,self.subpix[idx])
 
@@ -449,47 +465,80 @@ class Simulator:
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
-        ### print 'unique mag_lim_1',np.unique(mag_lim_1)
-        ### print 'unique mag_lim_2',np.unique(mag_lim_2)
-        ### print 'mag_lim_1 == 0', (mag_lim_1==0).sum()
-        ### print 'mag_lim_1 > max', (mag_1 > mag_lim_1.max()).sum()
-        ### print 'mag_lim_2 == 0', (mag_lim_2==0).sum()
-        ### print 'mag_lim_2 > max', (mag_2 > mag_lim_2.max()).sum()
-        ###  
-        ### print (mag_lim_1 == 0).sum() / float(len(mag_lim_1))
-        ### print (self.mask.mask_1.mask_roi_sparse == 0).sum()/float(len(self.mask.mask_1.mask_roi_sparse))
-
-        solid_angle_roi = self.roi.area_pixel*len(self.roi.pixels)
-        ### print 'solid_angle_cmd',np.unique(self.mask.solid_angle_cmd)
-        ### print 'solid_angle_roi',solid_angle_roi
-        ### print 'solid_angle_roi > 0',self.roi.area_pixel*len(self.mask.mask_1.mask_roi_sparse > 0)
-
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
 
-        # ADW: Should positions be randomized by the erros?
+        # ADW: Should magnitudes be randomized by the erros?
         #mag_1 += (numpy.random.normal(size=len(mag_1)) * mag_err_1)
         #mag_2 += (numpy.random.normal(size=len(mag_2)) * mag_err_2)
 
-        #select = np.ones(len(mag_1),dtype=bool)
-        select = numpy.logical_and(mag_1 < mag_lim_1, mag_2 < mag_lim_2)
+        select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
 
-        ### print "mag_1 cut:", (mag_1>=mag_lim_1).sum()
-        ### print "mag_2 cut:", (mag_2>=mag_lim_2).sum()
-        select = numpy.logical_and(mag_1 < mag_lim_1, mag_2 < mag_lim_2)
-
-        # Make sure objects lie within the original cmd
-        select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
-                                              self.roi.bins_color, self.roi.bins_mag) > 0)
+        ### # Make sure objects lie within the original cmd (should be done later...)
+        ### select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
+        ###                                       self.roi.bins_color, self.roi.bins_mag) > 0)
 
         logger.info("Clipping %i simulated background stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
         
         hdu = ugali.observation.catalog.makeHDU(config,mag_1[select],mag_err_1[select],
                                                 mag_2[select],mag_err_2[select],
                                                 lon[select],lat[select],mc_source_id[select])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
+
+    def satellite2(self,stellar_mass,distance_modulus,mc_source_id=1,seed=None,**kwargs):
+        """
+        Create a simulated satellite. Returns a catalog object.
+        """
+        if seed is not None: np.random.seed(seed)
+
+        isochrone = kwargs.pop('isochrone',self.isochrone)
+        kernel    = kwargs.pop('kernel',self.kernel)
+
+        for k,v in kwargs.items():
+            if k in kernel.params.keys(): setattr(kernel,k,v)
+
+        mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
+        lon, lat     = kernel.simulate(len(mag_1))
+
+        logger.info("Simulating %i satellite stars..."%len(mag_1))
+        pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
+
+        # There is probably a better way to do this step without creating the full HEALPix map
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
+        mag_lim_1 = mask[pix]
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
+        mag_lim_2 = mask[pix]
+
+        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
+        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+
+        # Randomize magnitudes by their errors
+        #mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
+        #mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
+        mag_obs_1 = mag_1
+        mag_obs_2 = mag_2
+
+        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
+
+        ### # Make sure objects lie within the original cmd (should also be done later...)
+        ### select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
+        ###                                       self.roi.bins_color, self.roi.bins_mag) > 0)
+
+        #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
+        logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
+        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        
+        hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
+                                                mag_obs_2[select],mag_err_2[select], 
+                                                lon[select],lat[select],mc_source_id[select])
+        catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
+        return catalog
+
 
     def satellite(self,stellar_mass,distance_modulus,mc_source_id=1,seed=None,**kwargs):
         """
@@ -519,10 +568,18 @@ class Simulator:
 
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-        mag_obs_1 = mag_1 + (numpy.random.normal(size=len(mag_1)) * mag_err_1)
-        mag_obs_2 = mag_2 + (numpy.random.normal(size=len(mag_2)) * mag_err_2)
 
-        select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        # Randomize magnitudes by their errors
+        mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
+        mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
+
+        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
+
+        ### # Make sure objects lie within the original cmd (should also be done later...)
+        ### select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
+        ###                                       self.roi.bins_color, self.roi.bins_mag) > 0)
+
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
         mc_source_id = mc_source_id * numpy.ones(len(mag_1))
@@ -533,14 +590,15 @@ class Simulator:
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
 
+
     def simulate(self, seed=None, **kwargs):
         if seed is not None: np.random.seed(seed)
 
         logger.info("Simulating object catalog...")
         catalogs = []
-        catalogs.append(self.toy_background(seed=seed))
-        #catalogs.append(self.background(seed=seed))
-        #catalogs.append(self.satellite(seed=seed,**kwargs))
+        #catalogs.append(self.toy_background(seed=seed))
+        catalogs.append(self.background(seed=seed))
+        catalogs.append(self.satellite(seed=seed,**kwargs))
         logger.info("Merging simulated catalogs...")
         return ugali.observation.catalog.mergeCatalogs(catalogs)
 
@@ -590,6 +648,7 @@ class Simulator:
 
 def satellite(isochrone, kernel, stellar_mass, distance_modulus,**kwargs):
     """
+    Wrapping the isochrone and kernel simulate functions.
     """
     mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
     lon, lat     = kernel.simulate(len(mag_1))
@@ -608,14 +667,9 @@ if __name__ == "__main__":
     parser.add_debug()
     parser.add_verbose()
     parser.add_seed()
-    #parser.add_coords(required=True,radius=False)
+
     opts = parser.parse_args()
     config = Config(opts.config)
     generator = Generator(config,opts.seed)
     sim,like1,like2 = generator.run(opts.outfile)
     
-
-#import pylab as plt
-#import ugali.utils.plotting
-#plt.scatter(*sim.roi.projector.sphereToImage(sim.lon,sim.lat),c=like1.u)
-#plt.scatter(*sim.roi.projector.sphereToImage(like1.lon,like1.lat),c=like1.u)

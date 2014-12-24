@@ -6,7 +6,7 @@ Simulate the likelihood search.
 
 import glob
 import os
-from os.path import join, exists, basename, splitext
+from os.path import join, splitext
 import time
 
 import numpy as np
@@ -34,9 +34,10 @@ def run(self):
         mkdir(outdir)
         mkdir(logdir)
 
-        for i in range(self.config['simulate']['njobs']):
+        if self.opts.num is None: self.opts.num = self.config['simulate']['njobs']
+        for i in range(self.opts.num):
             outfile=join(outdir,self.config['output']['simfile']%i)
-            base = splitext(basename(outfile))[0]
+            base = splitext(os.path.basename(outfile))[0]
             logfile=join(logdir,base+'.log')
             jobname=base
             script = self.config['simulate']['script']
@@ -73,19 +74,32 @@ def run(self):
         import ugali.utils.plotting
         import pylab as plt
 
+        plotdir = mkdir(self.config['output']['plotdir'])
+
         data = pyfits.open(join(outdir,"merged_sims.fits"))[1].data
         data = data[~np.isnan(data['ts'])]
+        
+        bigfig,bigax = plt.subplots()
+        
         for dist in np.unique(data['fit_distance']):
             logger.info('  Plotting distance: %s'%dist)
             ts = data['ts'][data['fit_distance'] == dist]
+            ugali.utils.plotting.drawChernoff(bigax,ts,bands='none',color='gray')
+            
             fig,ax = plt.subplots(1,2,figsize=(10,5))
             ugali.utils.plotting.drawChernoff(ax[0],ts,bands='none',pdf=True)
             ugali.utils.plotting.drawChernoff(ax[1],ts)
             fig.suptitle(r'Chernoff ($\mu = %g$)'%dist)
-            outdir = mkdir(self.config['output']['plotdir'])
+            ax[0].annotate(r"$N=%i$"%len(ts), xy=(0.15,0.85), xycoords='axes fraction', 
+                           bbox={'boxstyle':"round",'fc':'1'})
             basename = 'chernoff_u%g.png'%dist
-            outfile = os.path.join(outdir,basename)
+            outfile = os.path.join(plotdir,basename)
             plt.savefig(outfile)
+        bigfig.suptitle('Chernoff!')
+        basename = 'chernoff_all.png'
+        outfile = os.path.join(plotdir,basename)
+        plt.savefig(outfile)
+
         #idx=np.random.randint(len(data['ts'])-1,size=400)
         #idx=slice(400)
         #ugali.utils.plotting.plotChernoff(data['ts'][idx])
@@ -111,7 +125,7 @@ def run(self):
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)
-pipeline.parser.add_argument('-n','--num',default=100,type=int)
+pipeline.parser.add_argument('-n','--num',default=None,type=int)
 pipeline.parse_args()
 pipeline.execute()
 

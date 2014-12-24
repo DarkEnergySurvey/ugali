@@ -58,6 +58,18 @@ class LogLikelihood(object):
         # Effective bin size in color-magnitude space
         self.delta_mag = self.config['likelihood']['delta_mag']
 
+        self.spatial_only = self.config['likelihood'].get('spatial_only',False)
+        self.color_only   = self.config['likelihood'].get('color_only',False)
+
+        if self.spatial_only and self.color_only:
+            msg = "Both 'spatial_only' and 'color_only' set"
+            logger.error(msg)
+            raise ValueError(msg)
+        elif self.spatial_only: 
+            logger.warning("Likelihood calculated from spatial information only!!!")
+        elif self.color_only:
+            logger.warning("Likelihood calculated from color information only!!!")
+
         self.calc_background()
 
     def __call__(self):
@@ -159,7 +171,7 @@ class LogLikelihood(object):
         # The sync_params step updates internal quantities based on
         # newly set parameters. The goal is to only update required quantities
         # to keep computational time low.
-
+ 
         if self._sync['richness']:
             # No sync necessary for richness
             pass
@@ -171,14 +183,26 @@ class LogLikelihood(object):
 
         # Combined object-by-object signal probability
         self._u = self.u_spatial * self.u_color
-
+         
         # Observable fraction requires update if isochrone changed
         # Fraction calculated over interior region
         self._f = self.roi.area_pixel * \
-                 (self.surface_intensity_sparse*self.observable_fraction).sum()
+            (self.surface_intensity_sparse*self.observable_fraction).sum()
+
+        ## ADW: Spatial information only (remember cmd binning in calc_background)
+        if self.spatial_only:
+            self._u = self.u_spatial
+            observable_fraction = (self.observable_fraction > 0)
+            self._f = self.roi.area_pixel * \
+                     (self.surface_intensity_sparse*observable_fraction).sum()
 
         # The signal probability for each object
         self._p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
+
+        #print 'b',np.unique(self.b)[:20]
+        #print 'u',np.unique(self.u)[:20]
+        #print 'f',np.unique(self.f)[:20]
+        #print 'p',np.unique(self.p)[:20] 
 
         # Reset the sync toggle
         for k in self._sync.keys(): self._sync[k]=False 
@@ -200,7 +224,8 @@ class LogLikelihood(object):
 
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog...")
-        cut_interior = numpy.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), self.roi.pixels_interior)
+        cut_interior = numpy.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
+                                  self.roi.pixels_interior)
         #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
         self.catalog_interior.project(self.roi.projector)
@@ -218,22 +243,49 @@ class LogLikelihood(object):
         #ADW: At some point we may want to make the background level a fit parameter.
         logger.info('Calculating background CMD ...')
         self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
+        #self.cmd_background = self.mask.backgroundCMD(self.catalog_roi,mode='histogram')
         #self.cmd_background = self.mask.backgroundCMD(self.catalog_roi,mode='uniform')
-
         # Background density (deg^-2 mag^-2) and background probability for each object
         logger.info('Calculating background probabilities ...')
         b_density = ugali.utils.binning.take2D(self.cmd_background,
                                                self.catalog.color, self.catalog.mag,
                                                self.roi.bins_color, self.roi.bins_mag)
-        self._b = b_density * self.roi.area_pixel * self.delta_mag**2
+
+        # ADW: I don't think this 'area_pixel' or 'delta_mag' factors are necessary, 
+        # so long as it is also removed from u_spatial and u_color
+        #self._b = b_density * self.roi.area_pixel * self.delta_mag**2
+        self._b = b_density
+
+        if self.spatial_only:
+            # ADW: This assumes a flat mask...
+            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
+            self._b = np.array([b_density*self.roi.area_pixel])
+
 
     def calc_observable_fraction(self,distance_modulus):
         """
         Calculated observable fraction within each pixel of the target region.
         """
+        # This is the observable fraction after magnitude cuts in each 
+        # pixel of the ROI.
         return self.isochrone.observableFraction(self.mask,distance_modulus)
 
     def calc_signal_color(self, distance_modulus, mass_steps=10000):
+        """
+        Compute signal color probability (u_color) for each catalog object on the fly.
+        """
+        mag_1, mag_2 = self.catalog.mag_1,self.catalog.mag_2
+        mag_err_1, mag_err_2 = self.catalog.mag_err_1,self.catalog.mag_err_2
+        u_density = self.isochrone.pdf(mag_1,mag_2,mag_err_1,mag_err_2,distance_modulus,self.delta_mag,mass_steps)
+
+        #u_color = u_density * self.delta_mag**2
+        u_color = u_density
+
+        return u_color
+
+
+    def calc_signal_color2(self, distance_modulus, mass_steps=10000):
         """
         Compute signal color probability (u_color) for each catalog object on the fly.
         """
@@ -308,11 +360,14 @@ class LogLikelihood(object):
         # Signal color probability is product of PDFs for each object-bin pair 
         # summed over isochrone bins
         u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
+        u_color *= delta_mag**2
         return u_color
+
 
     def calc_signal_spatial(self):
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
+
         #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
         #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
         self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
@@ -323,7 +378,8 @@ class LogLikelihood(object):
         self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,self.catalog.lat)
         
         # Spatial component of signal probability
-        u_spatial = self.roi.area_pixel * self.surface_intensity_object
+        #u_spatial = self.roi.area_pixel * self.surface_intensity_object
+        u_spatial = self.surface_intensity_object
         return u_spatial
 
     ############################################################################

@@ -3,13 +3,14 @@ Classes which manage object catalogs live here.
 """
 
 import numpy
+import numpy as np
 import pyfits
 import healpy
 import copy
 
 import ugali.utils.projector
-import ugali.utils.config
 
+from ugali.utils.config import Config
 from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import ang2pix,superpixel
 from ugali.utils.logger import logger
@@ -30,7 +31,7 @@ class Catalog:
             data[None]: pyfits table data (fitsrec) object.
         """
         #self = config.merge(config_merge) # Maybe you would want to update parameters??
-        self.config = config
+        self.config = Config(config)
 
         if data is None:
             self._parse(roi)
@@ -38,6 +39,9 @@ class Catalog:
             self.data = data
     
         self._defineVariables()
+
+    def __add__(self, other):
+        return mergeCatalogs([self,other])
 
     def applyCut(self, cut):
         """
@@ -77,8 +81,12 @@ class Catalog:
 
     def spatialBin(self, roi):
         """
-        Return indices of ROI pixels corresponding to object locations.
+        Calculate indices of ROI pixels corresponding to object locations.
         """
+        if hasattr(self,'pixel_roi_index') and hasattr(self,'pixel'): 
+            logger.warning('Catalog alread spatially binned')
+            return
+
         # ADW: Not safe to set index = -1 (since it will access last entry); 
         # np.inf would be better...
         self.pixel = ang2pix(self.config['coords']['nside_pixel'],self.lon,self.lat)
@@ -195,6 +203,7 @@ class Catalog:
                 self.data = pyfits.new_table(pyfits.new_table(self.data).columns + hdu.columns).data
                 self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
 
+        # should be @property
         if self.config['catalog']['band_1_detection']:
             self.mag = self.mag_1
             self.mag_err = self.mag_err_1
@@ -202,10 +211,12 @@ class Catalog:
             self.mag = self.mag_2
             self.mag_err = self.mag_err_2
             
+        # should be @property
         self.color = self.mag_1 - self.mag_2
         self.color_err = numpy.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
 
         logger.info('Catalog contains %i objects'%(len(self.data)))
+
 
 ############################################################
 
@@ -276,3 +287,39 @@ def readCatalogData(infiles):
                 raise Exception("Column %s not found in %"(name,infiles[ii]))
             table.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = data[ii].field(name)
     return table.data
+
+def makeHDU(config,mag_1,mag_err_1,mag_2,mag_err_2,lon,lat,mc_source_id):
+    """
+    Create a catalog fits file object based on input data.
+
+    ADW: This should be combined with the write_membership function of loglike.
+    """
+
+    if config['catalog']['coordsys'].lower() == 'cel' \
+       and config['coords']['coordsys'].lower() == 'gal':
+        lon, lat = ugali.utils.projector.gal2cel(lon, lat)
+    elif config['catalog']['coordsys'].lower() == 'gal' \
+       and config['coords']['coordsys'].lower() == 'cel':
+        lon, lat = ugali.utils.projector.cel2gal(lon, lat)
+
+    columns = [
+        pyfits.Column(name=config['catalog']['objid_field'],
+                      format = 'D',array = np.arange(len(lon))),
+        pyfits.Column(name=config['catalog']['lon_field'],
+                      format = 'D',array = lon),
+        pyfits.Column(name = config['catalog']['lat_field'],          
+                      format = 'D',array = lat), 
+        pyfits.Column(name = config['catalog']['mag_1_field'],        
+                      format = 'E',array = mag_1),
+        pyfits.Column(name = config['catalog']['mag_err_1_field'],    
+                      format = 'E',array = mag_err_1),
+        pyfits.Column(name = config['catalog']['mag_2_field'],        
+                      format = 'E',array = mag_2),
+        pyfits.Column(name = config['catalog']['mag_err_2_field'],    
+                      format = 'E',array = mag_err_2),
+        pyfits.Column(name = config['catalog']['mc_source_id_field'], 
+                      format = 'I',array = mc_source_id),
+    ]
+
+    hdu = pyfits.new_table(columns)
+    return hdu

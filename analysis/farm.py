@@ -65,12 +65,12 @@ class Farm:
         """
         if nside is None:
             nside = self.nside_pixel
-        elif nside > self.nside_catalog: 
-            raise Exception('Requested nside=%i is greater than catalog_nside'%nside)
-        elif nside < self.nside_pixel:
-            raise Exception('Requested nside=%i is less than pixel_nside'%nside)
+        elif nside < self.nside_catalog: 
+            raise Exception('Requested nside=%i is less than catalog_nside'%nside)
+        elif nside > self.nside_pixel:
+            raise Exception('Requested nside=%i is greater than pixel_nside'%nside)
         pix = numpy.arange(healpy.nside2npix(nside), dtype=int)
-        map = self.inFootprint(pix)
+        map = self.inFootprint(pix,nside)
         return map 
 
     # ADW: Should probably be in a utility
@@ -90,9 +90,9 @@ class Farm:
             catalog_pix = numpy.intersect1d(catalog_pix,self.catalog_pixels)
 
         for filenames in self.filenames[catalog_pix]:
-            logger.debug("Loading %s"%filenames['mask_1'])
+            #logger.debug("Loading %s"%filenames['mask_1'])
             subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(filenames['mask_1'],'MAGLIM',construct_map=False)
-            logger.debug("Loading %s"%filenames['mask_2'])
+            #logger.debug("Loading %s"%filenames['mask_2'])
             subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(filenames['mask_2'],'MAGLIM',construct_map=False)
             subpix = numpy.intersect1d(subpix_1,subpix_2)
             superpix = numpy.unique(ugali.utils.skymap.superpixel(subpix,self.nside_pixel,nside))

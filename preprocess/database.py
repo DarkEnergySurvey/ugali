@@ -37,18 +37,24 @@ class Database(object):
             # One-line input file
             if self.pixels.ndim == 0: self.pixels = np.array([self.pixels])
         else:
-            ra_step = 20
+            self.pixels = create_pixels()
+
+    @staticmethod
+    def create_pixels(nra=18, ndec=10):
+            ra_step = 360./nra #20
             ra_range = np.around(np.arange(0,360+ra_step,ra_step),0)
-            sin_dec_step = -0.2
             # Decreasing dec...
+            sin_dec_step = -(2.0/ndec) # -0.2
             dec_range = np.around(np.degrees(np.arcsin(np.arange(1,-1+sin_dec_step,sin_dec_step))),0)
+
             xx, yy = np.meshgrid( ra_range,dec_range)
             ra_min  = xx[1:,:-1].flatten(); ra_max = xx[1:,1:].flatten()
             dec_min = yy[1:,1:].flatten(); dec_max = yy[:-1,1:].flatten() # Decreasing...
             name = np.arange(len(ra_min),dtype=int)
-            self.pixels = np.rec.fromarrays([name, ra_min, ra_max, dec_min, dec_max],
-                                            dtype=[('name',int),('ra_min',float),('ra_max',float),
-                                                   ('dec_min',float),('dec_max',float)])
+            return  np.rec.fromarrays([name, ra_min, ra_max, dec_min, dec_max],
+                                      dtype=[('name',int),('ra_min',float),('ra_max',float),
+                                             ('dec_min',float),('dec_max',float)])
+
 
     def generate_query(self):
         """ Should be implemented by child class. """
@@ -309,7 +315,7 @@ class DESDatabase(Database):
 
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client
-        import coreutils.desdbi
+        import despydb.desdbi
         import pyfits
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
@@ -327,7 +333,7 @@ class DESDatabase(Database):
         outfile.close()
 
     def query(self,dbase,task,query):
-        import coreutils.desdbi
+        import despydb.desdbi
         logger.info("Running query...")
 
         desfile = os.path.join(os.getenv('HOME'),'.desservices.ini')

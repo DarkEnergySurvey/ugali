@@ -9,18 +9,21 @@ import collections
 from collections import OrderedDict as odict
 
 import numpy
+import numpy as np
 import scipy.interpolate
 import scipy.stats
 
 import ugali.analysis.imf
 #import ugali.observation.photometric_errors # Probably won't need this in the future since will be passed
 from ugali.analysis.model import Model, Parameter
+from ugali.utils.stats import norm_cdf
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 ############################################################
 
 class Isochrone(Model):
+
     _params = odict([
         ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
     ])
@@ -65,7 +68,7 @@ class Isochrone(Model):
         # Horizontal branch dispersion
         #self._setHorizontalBranch()
         self.horizontal_branch_dispersion = self.config['isochrone']['horizontal_branch_dispersion'] # mag
-        self.horizontal_branch_stage = self.config['isochrone']['horizontal_branch_stage']
+        self.horizontal_branch_stage      = self.config['isochrone']['horizontal_branch_stage']
 
     def plotCMD(self):
         """
@@ -81,6 +84,8 @@ class Isochrone(Model):
 
     def _parseIsochronePadova2(self):
         """
+        ADW: DEPRICATED (12/23/2014)
+
         Reads an isochrone file in the Padova format and returns the age (log yrs), metallicity (Z), and an
         array with initial stellar mass and corresponding magnitudes.
         """
@@ -345,6 +350,8 @@ class Isochrone(Model):
     
     def addPhotometricErrors(self, mag_delta_1, mag_delta_2):
         """
+        ADW: DEPRICATED (12/23/2014)
+
         Add photometric errors.
 
         mag_delta = mag_completeness - distance_modulus
@@ -393,15 +400,20 @@ class Isochrone(Model):
         #return pdf, mag_1_observed, mag_2_observed
         return histo
 
-    def observableFraction(self, mask, distance_modulus, mass_min=0.1):
+    def observableFractionX(self, mask, distance_modulus, mass_min=0.1):
         """
         Compute observable fraction of stars with masses greater than mass_min in each 
         pixel in the interior region of the mask.
 
-        # ADW: Could this be faster / more readable?
+        ADW: Careful, this function is fragile! The selection here should
+             be the same as mask.restrictCatalogToObservable space. However,
+             for technical reasons it is faster to do the calculation with
+             broadcasting here.
+        ADW: Could this function be even faster / more readable?
+        ADW: Should this include magnitude error leakage?
         """
         mass_init_array,mass_pdf_array,mass_act_array,mag_1_array,mag_2_array = self.sample(mass_min=mass_min,full_data_range=False)
-                                                                                                
+
         if self.config['catalog']['band_1_detection']:
             mag = mag_1_array
         else:
@@ -413,32 +425,139 @@ class Isochrone(Model):
         mag_1_mask = mask.mask_1.mask_roi_sparse[mask.roi.pixel_interior_cut]
         mag_2_mask = mask.mask_2.mask_roi_sparse[mask.roi.pixel_interior_cut]
 
-        npixels = len(pixels)
-        nsamples = len(mass_pdf_array)
+        # ADW: Restrict mag and color to range of mask with sufficient solid angle
+        cmd_cut = ugali.utils.binning.take2D(mask.solid_angle_cmd,color,mag+distance_modulus,
+                                             mask.roi.bins_color, mask.roi.bins_mag) > 0
+        # Pre-apply these cuts to the 1D mass_pdf_array to save time
+        mass_pdf_cut = mass_pdf_array*cmd_cut
 
-        # Simple 1D cuts on mag and color. size = nsamples
-        mag_cut = (mag + distance_modulus > mask.roi.bins_mag[0]) \
-                  & (mag + distance_modulus < mask.roi.bins_mag[-1])
-        color_cut = (color > mask.roi.bins_color[0]) \
-                    & (color < mask.roi.bins_color[-1])
-        # Pre-apply these cuts to the mass_pdf_array to save time
-        mass_pdf_cut = mass_pdf_array*(mag_cut&color_cut)
+        # Create 2D arrays of cuts for each pixel
+        mask_1_cut = (mag_1_array+distance_modulus)[:,np.newaxis] < mag_1_mask
+        mask_2_cut = (mag_2_array+distance_modulus)[:,np.newaxis] < mag_2_mask
+        mask_cut_repeat = mask_1_cut & mask_2_cut
 
-        # 2D on pixels and mags. Want to see if mag+mod > mask_mag for each pixel in the mask
-        # Need to create 2d array storing the output of the cut for each sample at each pixel
-        mag_1_repeat = numpy.repeat(mag_1_array,npixels).reshape(nsamples,npixels)
-        mag_2_repeat = numpy.repeat(mag_2_array,npixels).reshape(nsamples,npixels)        
-        mask_cut_repeat = (mag_1_repeat+distance_modulus < mag_1_mask) \
-                          & (mag_2_repeat+distance_modulus < mag_2_mask)
-
-        # To apply this cut to the mass_pdf_array, need to make this array 2d
-        mass_pdf_repeat = numpy.repeat(mass_pdf_cut,npixels).reshape(nsamples,npixels)
-
-        observable_fraction = (mass_pdf_repeat*mask_cut_repeat).sum(axis=0)
+        observable_fraction = (mass_pdf_cut[:,np.newaxis]*mask_cut_repeat).sum(axis=0)
         return observable_fraction
+
+    def observableFraction2(self, mask, distance_modulus, mass_min=0.1):
+        """
+        Compute observable fraction of stars with masses greater than mass_min in each 
+        pixel in the interior region of the mask. Incorporates simplistic
+        photometric errors.
+
+        ADW: Careful, this function is fragile! The selection here should
+             be the same as mask.restrictCatalogToObservable space. However,
+             for technical reasons it is faster to do the calculation with
+             broadcasting here.
+        ADW: This function is currently a rate-limiting step in the likelihood 
+             calculation. Could it be faster?
+        """
+        mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_min=mass_min,full_data_range=False)
+
+        mag_obs_1 = mag_1+distance_modulus
+        mag_obs_2 = mag_2+distance_modulus
+
+        # This is a selection of the analysis
+        if self.config['catalog']['band_1_detection']:
+            mag = mag_obs_1
+        else:
+            mag = mag_obs_2
+        color = mag_1 - mag_2
+
+        # Restrict mag and color to range of mask with sufficient solid angle.
+        # ADW: I'm not sure if this is exactly the right treatment. In the
+        # next steps we are calculating the photometric errors
+        cmd_cut = ugali.utils.binning.take2D(mask.solid_angle_cmd,color,mag,
+                                             mask.roi.bins_color, mask.roi.bins_mag) > 0
+
+        # Pre-apply these cuts at 1D mass_pdf to save time
+        mass_pdf_cut = mass_pdf[cmd_cut]
+        mag_obs_1 = mag_obs_1[cmd_cut]
+        mag_obs_2 = mag_obs_2[cmd_cut]
+
+        # This is a selection of the survey (select on "true" magnitude)
+        # ADW: Only calculate observable fraction over interior pixels...
+        mask_mag_1 = mask.mask_1.mask_roi_sparse[mask.roi.pixel_interior_cut]
+        mask_mag_2 = mask.mask_2.mask_roi_sparse[mask.roi.pixel_interior_cut]
+
+        # Create 2D arrays of cuts for each pixel
+        mag_delta_1 = mask_mag_1-mag_obs_1[:,np.newaxis]
+        mag_delta_2 = mask_mag_2-mag_obs_2[:,np.newaxis]
+
+        # Calculate total portion of cdf of each star above maglim
+        mag_err_1 = mask.photo_err_1(mag_delta_1)
+        mag_err_2 = mask.photo_err_2(mag_delta_2)
+        
+        # ADW: faster than scipy.stats.norm.cdf
+        cdf_1 = norm_cdf(mag_delta_1/mag_err_1)
+        cdf_2 = norm_cdf(mag_delta_2/mag_err_2)
+        cdf = cdf_1 * cdf_2
+
+        observable_fraction = (mass_pdf_cut[:,np.newaxis]*cdf).sum(axis=0)
+        return observable_fraction
+
+
+    def observableFraction(self, mask, distance_modulus, mass_min=0.1):
+        """
+        Compute observable fraction of stars with masses greater than mass_min in each 
+        pixel in the interior region of the mask. Incorporates simplistic
+        photometric errors.
+
+        ADW: Careful, this function is fragile! The selection here should
+             be the same as mask.restrictCatalogToObservable space. However,
+             for technical reasons it is faster to do the calculation with
+             broadcasting here.
+        ADW: This function is currently a rate-limiting step in the likelihood 
+             calculation. Could it be faster?
+        """
+        mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_min=mass_min,full_data_range=False)
+
+        mag_obs_1 = mag_1+distance_modulus
+        mag_obs_2 = mag_2+distance_modulus
+
+        if self.config['catalog']['band_1_detection']:
+            mag = mag_obs_1
+        else:
+            mag = mag_obs_2
+        color = mag_1 - mag_2
+
+        # Restrict mag and color to range of mask with sufficient solid angle.
+        # ADW: I'm not sure if this is exactly the right treatment. In the
+        # next steps we are calculating the photometric errors
+        cmd_cut = ugali.utils.binning.take2D(mask.solid_angle_cmd,color,mag,
+                                             mask.roi.bins_color, mask.roi.bins_mag) > 0
+
+        # Pre-apply these cuts at 1D mass_pdf to save time
+        mass_pdf_cut = mass_pdf[cmd_cut]
+        mag_obs_1 = mag_obs_1[cmd_cut]
+        mag_obs_2 = mag_obs_2[cmd_cut]
+
+        # ADW: Only calculate observable fraction over interior pixels...
+        pixels = mask.roi.pixels_interior
+        mask_mag_1 = mask.mask_1.mask_roi_sparse[mask.roi.pixel_interior_cut]
+        mask_mag_2 = mask.mask_2.mask_roi_sparse[mask.roi.pixel_interior_cut]
+
+        # Create 2D arrays of cuts for each pixel
+        mag_delta_1 = mask_mag_1-mag_obs_1[:,np.newaxis]
+        mag_delta_2 = mask_mag_2-mag_obs_2[:,np.newaxis]
+
+        # Calculate total portion of cdf of each star above maglim
+        mag_err_1 = mask.photo_err_1(mag_delta_1)
+        mag_err_2 = mask.photo_err_2(mag_delta_2)
+        
+        # ADW: faster than scipy.stats.norm.cdf
+        cdf_1 = norm_cdf(mag_delta_1/mag_err_1)
+        cdf_2 = norm_cdf(mag_delta_2/mag_err_2)
+        cdf = cdf_1 * cdf_2
+
+        observable_fraction = (mass_pdf_cut[:,np.newaxis]*cdf).sum(axis=0)
+        return observable_fraction
+
 
     def normalizeWithMask(self, mask, distance_modulus, mass_steps=1000, mass_min=0.1, kernel=None, plot=False):
         """
+        ADW: DEPRICATED (12/23/2014)
+
         Return fraction of stars that are observable as a spatial map with same dimensions as input mask.
         """
         mass_center_array, mass_pdf_array, mag_1_array, mag_2_array = self.sample(mass_steps=mass_steps)
@@ -496,6 +615,8 @@ class Isochrone(Model):
     
     def cmd_template(self, distance_modulus, mass_steps = 400):
         """
+        ADW: DEPRICATED (12/23/2014)
+
         Documentation here.
         """
         
@@ -580,6 +701,7 @@ class Isochrone(Model):
         value[cut] = self.horizontal_branch_density
         return value
 
+
 ############################################################
 
 class CompositeIsochrone(Model):
@@ -606,6 +728,13 @@ class CompositeIsochrone(Model):
 
     def __getitem__(self, key):
         return self.isochrones[key]
+
+    def __str__(self):
+        ret = super(CompositeIsochrone,self).__str__()
+        ret += '\n  Isochrone Files:'
+        for name in self.config['isochrone']['infiles']:
+            ret += '\n    %s'%name
+        return ret
 
     def sample(self, mass_steps=1000, mass_min=0.1, full_data_range=False):
         """
@@ -683,4 +812,212 @@ class CompositeIsochrone(Model):
             value.append(weight * isochrone.horizontalBranch(color, mag))
         return numpy.sum(value, axis=0)
 
+
+    def histo(self,distance_modulus,delta_mag=0.03,mass_steps=10000):
+        """
+        Histogram the isochrone in mag-mag space.
+        """
+        # Isochrone will be binned in next step, so can sample many points efficiently
+        isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.sample(mass_steps=mass_steps)
+
+        bins_mag_1 = np.arange(distance_modulus+isochrone_mag_1.min() - (0.5*delta_mag),
+                               distance_modulus+isochrone_mag_1.max() + (0.5*delta_mag),
+                               delta_mag)
+        bins_mag_2 = np.arange(distance_modulus+isochrone_mag_2.min() - (0.5*delta_mag),
+                               distance_modulus+isochrone_mag_2.max() + (0.5*delta_mag),
+                               delta_mag)        
+
+
+        histo_isochrone_pdf = np.histogram2d(distance_modulus + isochrone_mag_1,
+                                             distance_modulus + isochrone_mag_2,
+                                             bins=[bins_mag_1, bins_mag_2],
+                                             weights=isochrone_mass_pdf)[0]
+
+        return histo_isochrone_pdf, bins_mag_1, bins_mag_2
+        
+    def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus, delta_mag=0.03, mass_steps=10000):
+        """
+        Compute isochrone probability for each catalog object.
+
+        ADW: Still a little speed to be gained here (broadcasting)
+
+        Units 
+        """
+        nsigma = 5.0
+
+        # Histogram of the isochrone
+        histo_isochrone_pdf,bins_mag_1,bins_mag_2 = self.histo(distance_modulus,delta_mag,mass_steps)
+         
+        # Keep only isochrone bins that are within the color-magnitude space of the sample
+        mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
+        #pad = 1. # mag
+         
+        # pdf contribution only calculated out to nsigma,
+        # so padding shouldn't be necessary.
+        mag_1_max = np.max(mag_1+nsigma*mag_err_1)# +pad 
+        mag_1_min = np.min(mag_1-nsigma*mag_err_1)# -pad 
+        mag_2_max = np.max(mag_2+nsigma*mag_err_2)# +pad 
+        mag_2_min = np.min(mag_2-nsigma*mag_err_2)# -pad 
+         
+        in_color_magnitude_space = ((mag_1_mesh>=mag_1_min)&(mag_1_mesh<=mag_1_max))
+        in_color_magnitude_space*= ((mag_2_mesh>=mag_2_min)&(mag_2_mesh<=mag_2_max))
+        histo_isochrone_pdf *= in_color_magnitude_space
+
+        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
+        isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
+
+        n_catalog = len(mag_1)
+        n_isochrone_bins = len(index_mag_1)
+        ones = np.ones([n_catalog, n_isochrone_bins])
+
+        mag_1_reshape = mag_1.reshape([n_catalog, 1])
+        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
+        mag_2_reshape = mag_2.reshape([n_catalog, 1])
+        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
+
+        # Calculate distance between each catalog object and isochrone bin
+        # Assume normally distributed photometry uncertainties
+        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
+        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
+        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
+        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
+        #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
+         
+        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
+        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
+        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
+        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
+        #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
+         
+        # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
+        index_nonzero_0, index_nonzero_1 = numpy.nonzero((arg_mag_1_hi > -nsigma) \
+                                                         *(arg_mag_1_lo < nsigma) \
+                                                         *(arg_mag_2_hi > -nsigma) \
+                                                         *(arg_mag_2_lo < nsigma))
+        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_1[index_nonzero_0,index_nonzero_1] = norm_cdf(arg_mag_1_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - norm_cdf(arg_mag_1_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
+        pdf_mag_2[index_nonzero_0,index_nonzero_1] = norm_cdf(arg_mag_2_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - norm_cdf(arg_mag_2_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
+         
+        # Signal color probability is product of PDFs for each object-bin pair 
+        # summed over isochrone bins
+        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
+
+        # Remove the bin size to convert the pdf to units of mag^-2
+        u_color /= delta_mag**2
+
+        return u_color
+
+
+    def pdf2(self, mask, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus, delta_mag=0.03, mass_steps=10000):
+        """
+        ADW: DEPRICATED (12/23/2014)
+
+        Compute isochrone probability for each catalog object.
+
+        Units 
+        """
+        nsigma = 5.0
+
+        # Isochrone will be binned in next step, so can sample many points efficiently
+        isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.sample(mass_steps=mass_steps)
+
+        bins_mag_1 = np.arange(distance_modulus+isochrone_mag_1.min() - (0.5*delta_mag),
+                               distance_modulus+isochrone_mag_1.max() + (0.5*delta_mag),
+                               delta_mag)
+        bins_mag_2 = np.arange(distance_modulus+isochrone_mag_2.min() - (0.5*delta_mag),
+                               distance_modulus+isochrone_mag_2.max() + (0.5*delta_mag),
+                               delta_mag)        
+
+        # ADW: Restrict mag and color to range of mask with sufficient solid angle
+        cmd_cut = ugali.utils.binning.take2D(mask.solid_angle_cmd,isochrone_mag_1-isochrone_mag_2,
+                                             isochrone_mag_1+distance_modulus,
+                                             mask.roi.bins_color, mask.roi.bins_mag) > 0
+
+        # ADW: This does not account for the leakage out of CMD space
+        histo_isochrone_pdf = np.histogram2d(distance_modulus + isochrone_mag_1[cmd_cut],
+                                             distance_modulus + isochrone_mag_2[cmd_cut],
+                                             bins=[bins_mag_1, bins_mag_2],
+                                             weights=isochrone_mass_pdf[cmd_cut])[0]
+
+
+        
+        # Histogram of the isochrone
+        #histo_isochrone_pdf,bins_mag_1,bins_mag_2 = self.histo(distance_modulus,delta_mag,mass_steps)
+         
+        # Keep only isochrone bins that are within the color-magnitude space of the sample
+        mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
+        #pad = 1. # mag
+         
+        ### # pdf contribution only calculated out to nsigma,
+        ### # so padding shouldn't be necessary.
+        ### mag_1_max = np.max(mag_1+nsigma*mag_err_1)# +pad 
+        ### mag_1_min = np.min(mag_1-nsigma*mag_err_1)# -pad 
+        ### mag_2_max = np.max(mag_2+nsigma*mag_err_2)# +pad 
+        ### mag_2_min = np.min(mag_2-nsigma*mag_err_2)# -pad 
+        ###  
+        ### in_color_magnitude_space = ((mag_1_mesh>=mag_1_min)&(mag_1_mesh<=mag_1_max))
+        ### in_color_magnitude_space*= ((mag_2_mesh>=mag_2_min)&(mag_2_mesh<=mag_2_max))
+        ### histo_isochrone_pdf *= in_color_magnitude_space
+
+        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
+        isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
+
+        n_catalog = len(mag_1)
+        n_isochrone_bins = len(index_mag_1)
+        ones = np.ones([n_catalog, n_isochrone_bins])
+
+        mag_1_reshape = mag_1.reshape([n_catalog, 1])
+        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
+        mag_2_reshape = mag_2.reshape([n_catalog, 1])
+        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
+
+        # Calculate distance between each catalog object and isochrone bin
+        # Assume normally distributed photometry uncertainties
+        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
+        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
+        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
+        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
+        #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
+         
+        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
+        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
+        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
+        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
+        #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
+         
+        # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
+        index_nonzero_0, index_nonzero_1 = numpy.nonzero((arg_mag_1_hi > -nsigma) \
+                                                         *(arg_mag_1_lo < nsigma) \
+                                                         *(arg_mag_2_hi > -nsigma) \
+                                                         *(arg_mag_2_lo < nsigma))
+        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
+        pdf_mag_1[index_nonzero_0,index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_1_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - scipy.stats.norm.cdf(arg_mag_1_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
+        pdf_mag_2[index_nonzero_0,index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_2_hi[index_nonzero_0,
+                                                                           index_nonzero_1]) \
+                                                   - scipy.stats.norm.cdf(arg_mag_2_lo[index_nonzero_0,
+                                                                           index_nonzero_1])
+         
+        # Signal color probability is product of PDFs for each object-bin pair 
+        # summed over isochrone bins
+        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
+
+        # Remove the bin size to convert the pdf to units of mag^-2
+        u_color /= delta_mag**2
+
+        return u_color
+
+
+
+    
 ############################################################

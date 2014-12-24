@@ -17,7 +17,7 @@ class Pipeline(object):
     - A set of runtime components
     """
 
-    def __init__(self, description, components=[]):
+    def __init__(self, description=__doc__, components=[]):
         self.description = description
         self.components = components
         self._setup_parser()

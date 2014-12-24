@@ -196,9 +196,11 @@ class GridSearch:
         # Specific pixel/distance_modulus
         coord_idx, distance_modulus_idx = None, None
         if coords is not None:
+            # Match to nearest grid coordinate index
             coord_idx = self.roi.indexTarget(coords[0],coords[1])
         if distance_modulus is not None:
-            distance_modulus_idx=np.where(self.distance_modulus_array==distance_modulus)[0][0]
+            # Match to nearest distance modulus index
+            distance_modulus_idx=np.fabs(self.distance_modulus_array-distance_modulus).argmin()
 
         lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
             
@@ -299,9 +301,14 @@ class GridSearch:
 
     def err(self):
         """
-        A few rough symmetric approximations of the fit uncertainty. These
-        values shouldn't be trusted for anything real (use MCMC).
+        A few rough approximations of the fit uncertainty. These
+        values shouldn't be trusted for anything real (use MCMC instead).
         """
+        # Initiallize error to nan
+        err = odict(self.mle())
+        err.update([(k,np.nan*np.ones(2)) for k in err.keys()])
+
+        # Find the maximum likelihood
         a = self.log_likelihood_sparse_array
         j,k = np.unravel_index(a.argmax(),a.shape)
 
@@ -310,27 +317,32 @@ class GridSearch:
                                 lat=self.roi.pixels_target.lat[k])
         self.loglike.sync_params()
 
-        err= odict()
+        # Find the error in richness, starting at maximum
         lo,hi = np.array(self.loglike.richness_interval())
-        #err['richness'] = np.array([lo,hi])
-        err['richness'] = (hi-lo)/2.
-        err['lon'] = np.nan*np.ones(2)
-        err['lat'] = np.nan*np.ones(2)
-        
+        err['richness'] = np.array([lo,hi])
+
         # ADW: This is a rough estimate of the distance uncertainty 
         # hacked to keep the maximum distance modulus on a grid index
 
         # This is a hack to get the confidence interval to play nice...
-        parabola = Parabola(np.insert(self.distance_modulus_array,0,0.), 
-                            np.insert(a[:,k],0,0.) )
-        lo,hi = np.array(parabola.confidenceInterval())
-        #err['distance_modulus'] = self.distance_modulus_array[j] + (hi-lo)/2.*np.array([-1.,1.])
-        err['distance_modulus'] = (hi-lo)/2.
-        err['extension'] = np.nan*np.ones(2)
-        err['ellipticity'] = np.nan*np.ones(2)
-        err['position_angle'] = np.nan*np.ones(2)
-        return err
+        # Require at least three points.
+        if (a[:,k]>0).sum() >= 3:
+            parabola = Parabola(np.insert(self.distance_modulus_array,0,0.), 
+                                np.insert(a[:,k],0,0.) )
+            lo,hi = np.array(parabola.confidenceInterval())
+            err['distance_modulus'] = self.distance_modulus_array[j] + (hi-lo)/2.*np.array([-1.,1.])
 
+        # ADW: Could estimate lon and lat from the grid.
+        # This is just concept right now...
+        if (a[j,:]>0).sum() >= 10:
+            delta_ts = 2*(a[j,k] - a[j,:])
+            pix = np.where(a[j,:][delta_ts < 2.71])[0]
+            lons = self.roi.pixels_target.lon[pix]
+            lats = self.roi.pixels_target.lat[pix]
+            err['lon'] = np.array([ np.min(lons),np.max(lons)])
+            err['lat'] = np.array([ np.min(lats),np.max(lats)])
+
+        return err
 
     def write(self, outfile):
         """
@@ -387,7 +399,7 @@ if __name__ == "__main__":
     parser.add_coords(required=True,radius=False)
     opts = parser.parse_args()
 
-
+    print opts.coords
     scan = Scan(opts.config,opts.coords)
     if not opts.debug:
         result = scan.run()

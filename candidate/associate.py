@@ -1,6 +1,9 @@
 #!/usr/bin/env python
-import os
+import os,sys
 from os.path import join,abspath,split
+import inspect
+from collections import OrderedDict as odict
+
 import numpy
 import numpy as np
 import pyfits
@@ -53,23 +56,6 @@ from ugali.utils.healpix import ang2pix
 #            glon,glat = lon, lat
 #        return ugali.utils.projector.match(glon,glat,self.data['glon'],self.data['glat'],tol)
 
-def catalogFactory(name, filename=None):
-    match = name
-    if match in ["McConnachie12"]:
-        return McConnachie12(filename)
-    elif match in ["Rykoff14"]:
-        return Rykoff14(filename)
-    elif match in ["Harris96"]:
-        return Harris96(filename)
-    elif match in ["Steinicke10"]:
-        return Steinicke10(filename)
-    elif match in ["Corwen04"]:
-        return Corwen04(filename)
-    elif match in ["Nilson73"]:
-        return Nilson73(filename)
-    else:
-        raise Exception("Unrecognized catalog")
-    
 class SourceCatalog(object):
  
     DATADIR=join(split(abspath(__file__))[0],"../data/catalogs/")
@@ -276,6 +262,77 @@ class Nilson73(SourceCatalog):
         glon,glat = cel2gal(self.data['ra'],self.data['dec'])
         self.data['glon'],self.data['glat'] = glon,glat
 
+class Webbink85(SourceCatalog):
+    """
+    Structure parameters of Galactic globular clusters
+    http://vizier.cfa.harvard.edu/viz-bin/Cat?VII/151
+
+    NOTE: Includes Reticulum and some open clusters
+    http://spider.seds.org/spider/MWGC/mwgc.html
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter=[8,15,9,4,3,3,5,5],usecols=[1]+range(3,8),dtype=['S13']+5*[float])
+        if filename is None: 
+            raw = []
+            for basename in ['VII_151/table1a.dat','VII_151/table1c.dat']:
+                filename = os.path.join(self.DATADIR,basename)
+                raw.append(np.genfromtxt(filename,**kwargs))
+            raw = numpy.concatenate(raw)
+        else:
+            raw = np.genfromtxt(filename,**kwargs)
+        
+        self.data.resize(len(raw))
+        self.data['name'] = numpy.char.strip(raw['f0'])
+
+        ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
+        dec = raw[['f4','f5']].view(float).reshape(len(raw),-1)
+        dec = np.vstack([dec.T,np.zeros(len(raw))]).T
+        ra1950 = ugali.utils.projector.hms2dec(ra)
+        dec1950 = ugali.utils.projector.dms2dec(dec)
+        ra2000,dec2000 = ugali.utils.idl.jprecess(ra1950,dec1950)
+        self.data['ra'] = ra2000
+        self.data['dec'] = dec2000
+
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
+        self.data['glon'],self.data['glat'] = glon,glat
+
+
+class Kharchenko13(SourceCatalog):
+    """
+    Global survey of star clusters in the Milky Way
+    http://vizier.cfa.harvard.edu/viz-bin/Cat?J/A%2bA/558/A53
+
+    NOTE: CEL and GAL coordinates are consistent to < 0.01 deg.
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter=[4,18,20,8,8],usecols=[1,3,4],dtype=['S18',float,float])
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"J_AA_558_A53/catalog.dat")
+        raw = np.genfromtxt(filename,**kwargs)
+        
+        self.data.resize(len(raw))
+        self.data['name'] = numpy.char.strip(raw['f0'])
+
+        self.data['glon'] = raw['f1']
+        self.data['glat'] = raw['f2']
+
+        ra,dec = gal2cel(self.data['glon'],self.data['glat'])
+        self.data['ra'],self.data['dec'] = ra,dec
+
+def catalogFactory(name, **kwargs):
+    """
+    Factory for various catalogs.
+    """
+    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
+    catalogs = odict(inspect.getmembers(sys.modules[__name__], fn))
+
+    if name not in catalogs.keys():
+        msg = "%s not found in catalogs:\n %s"%(name,kernels.keys())
+        logger.error(msg)
+        msg = "Unrecognized catalog: %s"%name
+        raise Exception(msg)
+
+    return catalogs[name](**kwargs)
 
 if __name__ == "__main__":
     import argparse

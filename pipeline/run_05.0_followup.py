@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+Perform targeted followup.
+
+"""
+
 import os
 from os.path import join, exists,basename,splitext
 import numpy
@@ -11,7 +16,7 @@ from ugali.analysis.scan import Scan
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
-description="Perform targeted followup."
+description=__doc__
 components = ['mcmc','membership','plot']
 
 def run(self):

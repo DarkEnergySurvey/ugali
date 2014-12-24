@@ -18,64 +18,27 @@ from scipy.optimize import brentq
 
 import ugali.utils.skymap
 import ugali.utils.binning
-from ugali.utils.projector import celToGal, galToCel
-from ugali.utils.projector import angToPix, pixToAng
+from ugali.utils.projector import cel2gal, gal2cel
+from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
-
-# http://www.adsabs.harvard.edu/abs/2002AJ....123..485S
-# Determination of magnitude limits is rather complicated.
-# The technique applied here is to derive the magnitude at
-# which the 10sigma signal-to-noise threshold is reached.
-# For SDSS, these values are (Table 21):
-# u=22.12,g=22.60,r=22.29,i=21.85,z=20.35 
-# However, the quoted 95% completeness limits are (Table 2):
-# u=22.0,g=22.2,r=22.2,i=21.3,z=20.5
-# What is responsible for this disconnect? Well, I think 
-# the completeness was estimated by comparing with COSMOS
-# on nights that weren't all that good seeing.
-
-# http://des-docdb.fnal.gov:8080/cgi-bin/ShowDocument?docid=20
-# DES simple magnitude limits come from the science 
-# requirements document. These are 'requirements'
-# are somewhat pessimistic and the document also
-# conatains 'goals' for the magnitude limit:
-# g=25.4, r=24.9, i=24.6, z=23.8, y=21.7
-# Of course all of this is yet to be verified with
-# data...
-
-SIMPLE_MAGLIMS = dict(
-    sdss = {
-        'u': 22.12,
-        'g': 22.60,
-        'r': 22.29,
-        'i': 22.85,
-        'z': 20.35
-    },
-    des = {
-        'g': 24.6,
-        'r': 24.1,
-        'i': 24.3,
-        'z': 23.8,
-        'Y': 21.5
-    }
-)
+from ugali.utils.constants import MAGLIMS
 
 
 class Maglims(object):
     def __init__(self, config):
-        self.config = config
+        self.config = Config(config)
         self._setup()
 
     def _setup(self):
-        self.nside_catalog = self.config.params['coords']['nside_catalog']
-        self.nside_mask = self.config.params['coords']['nside_mask']
-        self.nside_pixel = self.config.params['coords']['nside_pixel']
+        self.nside_catalog = self.config['coords']['nside_catalog']
+        self.nside_mask = self.config['coords']['nside_mask']
+        self.nside_pixel = self.config['coords']['nside_pixel']
         
         self.filenames = self.config.getFilenames()
 
-    def run(self,field=None):
+    def run(self,field=None,simple=False,force=False):
         """
         Loop through pixels containing catalog objects and calculate
         the magnitude limit. This gets a bit convoluted due to all
@@ -87,20 +50,35 @@ class Maglims(object):
             infile = filenames['catalog']
             for f in fields:
                 outfile = filenames['mask_%i'%f]
-                self.calculate(infile,outfile,f)
-    
-    def calculate(self, infile, outfile, field=1):
+                if os.path.exists(outfile) and not force:
+                    logger.info("Found %s; skipping..."%outfile)
+                    continue
+                
+                pixels,maglims=self.calculate(infile,f,simple)
+                logger.info("Creating %s"%outfile)
+                outdir = mkdir(os.path.dirname(outfile))
+                data_dict = dict( MAGLIM=maglims )
+                ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,self.nside_pixel,outfile)
+
+
+    def calculate(self, infile, field=1, simple=False):
         logger.info("Calculating magnitude limit from %s"%infile)
 
-        manglefile = self.config.params['mangle']['infile_%i'%field]
-        mag_column = self.config.params['catalog']['mag_%i_field'%field]
-        magerr_column = self.config.params['catalog']['mag_err_%i_field'%field]
+        #manglefile = self.config['mangle']['infile_%i'%field]
+        footfile = self.config['data']['footprint']
+
+        mag_column = self.config['catalog']['mag_%i_field'%field]
+        magerr_column = self.config['catalog']['mag_err_%i_field'%field]
+
+        # For simple maglims
+        release = self.config['data']['release'].lower()
+        band    = self.config['isochrone']['mag_%i_field'%field]
          
         f = pyfits.open(infile)
         header = f[1].header
         data = f[1].data
          
-        mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
+        #mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
         mask_maglims = numpy.zeros( healpy.nside2npix(self.nside_mask) )
          
         out_pixels = numpy.zeros(0,dtype='int')
@@ -121,19 +99,24 @@ class Maglims(object):
             num = count[pix]
             objs = data[pix_digi[idx:idx+num]]
             idx += num
-            if num < min_num:
+            if simple:
+                # Set constant magnitude limits
+                logger.debug("Simple magnitude limit for %s"%infile)
+                mask_maglims[pix] = MAGLIMS[release][band]
+            elif num < min_num:
                 logger.info('Found <%i objects in pixel %i'%(min_num,pix))
                 mask_maglims[pix] = 0
             else:
                 mag = objs[mag_column]
                 magerr = objs[magerr_column]
                 # Estimate the magnitude limit as suggested by:
-                # https://desweb.cosmology.illinois.edu/confluence/display/Operations/SVA1+Doc
+                # https://deswiki.cosmology.illinois.edu/confluence/display/DO/SVA1+Release+Document
+                # (https://desweb.cosmology.illinois.edu/confluence/display/Operations/SVA1+Doc)
                 maglim = numpy.median(mag[(magerr>0.9*magerr_lim)&(magerr<1.1*magerr_lim)])
          
                 # Alternative method to estimate the magnitude limit by fitting median
                 #mag_min, mag_max = mag.min(),mag.max()
-                #mag_bins = numpy.arange(mag_min,mag_max,0.1)
+                #mag_bins = numpy.arange(mag_min,mag_max,0.1) #0.1086?
                 #x,y = ugali.utils.binning.binnedMedian(mag,magerr,mag_bins)
                 #x,y = x[~numpy.isnan(y)],y[~numpy.isnan(y)]
                 #magerr_med = interp1d(x,y)
@@ -155,23 +138,36 @@ class Maglims(object):
         out_maglims = out_maglims[idx]
          
         # Remove pixels outside the footprint
-        logger.info("Checking footprint against %s"%manglefile)
-        glon,glat = pixToAng(self.nside_pixel,out_pixels)
-        ra,dec = galToCel(glon,glat)
-        footprint = inMangle(manglefile,ra,dec)
+        logger.info("Checking footprint against %s"%footfile)
+        glon,glat = pix2ang(self.nside_pixel,out_pixels)
+        ra,dec = gal2cel(glon,glat)
+        footprint = inFootprint(footfile,ra,dec)
         idx = numpy.nonzero(footprint)[0]
         out_pixels = out_pixels[idx]
         out_maglims = out_maglims[idx]
          
-        logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))
-         
-        logger.info("Creating %s"%outfile)
-        outdir = mkdir(os.path.dirname(outfile))
-
-        data_dict = dict( MAGLIM=out_maglims )
-        ugali.utils.skymap.writeSparseHealpixMap(out_pixels,data_dict,self.nside_pixel,outfile)
-         
+        logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))         
         return out_pixels,out_maglims
+
+def inFootprint(filename,ra,dec):
+    """
+    Check if set of ra,dec combinations are in footprint.
+    Careful, input files must be in celestial coordinates.
+    
+    filename : Either healpix map or mangle polygon file
+    ra,dec   : Celestial coordinates
+
+    Returns:
+    inside   : boolean array of coordinates in footprint
+    """
+    try:
+        footprint = healpy.read_map(filename,verbose=False)
+        nside = healpy.npix2nside(len(footprint))
+        pix = ang2pix(nside,ra,dec)
+        inside = (footprint[pix] > 0)
+    except IOError:
+        inside = inMangle(filename,ra,dec)
+    return inside
 
 def inMangle(polyfile,ra,dec):
     coords = tempfile.NamedTemporaryFile(suffix='.txt',delete=False)
@@ -196,24 +192,24 @@ def inMangle(polyfile,ra,dec):
 
     return data > 0
 
-def simple_maglims(config,dirname='simple'):
+def simple_maglims(config,dirname='simple',force=False):
     """
     Creat simple, uniform magnitude limits based on nominal
     survey depth.
     """
     filenames = config.getFilenames()
-    survey = config.params['data']['survey'].lower()
-    band_1 = config.params['isochrone']['mag_1_field']
-    band_2 = config.params['isochrone']['mag_2_field']
+    release = config['data']['release'].lower()
+    band_1 = config['isochrone']['mag_1_field']
+    band_2 = config['isochrone']['mag_2_field']
     mask_1 = filenames['mask_1'].compressed()
     mask_2 = filenames['mask_2'].compressed()
-    basedir,basename = os.path.split(config.params['mask']['dirname'])
+    basedir,basename = os.path.split(config['mask']['dirname'])
     if basename == dirname:
         raise Exception("Input and output directory are the same.")
     outdir = mkdir(os.path.join(basedir,dirname))
 
     for band, infiles in [(band_1,mask_1),(band_2,mask_2)]:
-        maglim = SIMPLE_MAGLIMS[survey][band]
+        maglim = MAGLIMS[release][band]
         for infile in infiles:
             basename = os.path.basename(infile)
             outfile = join(outdir,basename)
