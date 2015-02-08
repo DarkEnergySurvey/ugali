@@ -15,7 +15,7 @@ CLUSTERS = odict([
 
 QUEUES = odict([
     ('local',[]),
-    ('lsf',['express','short','medium','long','xlong','xxl','kipac-ibq']),
+    ('lsf',['express','short','medium','long','xlong','xxl','kipac-ibq','bulletmpi']),
     ('slurm',[]),
     ('condor',['vanilla','universe']),
 ])

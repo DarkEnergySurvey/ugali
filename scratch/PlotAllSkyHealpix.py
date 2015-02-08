@@ -86,7 +86,6 @@ if __name__ == "__main__":
             kwargs = TARGETS[target[0]][1]
             glon,glat = celToGal(target[1],target[2])
 
-
             vec = healpy.rotator.dir2vec(glon,glat,lonlat=True)
             vec = (healpy.rotator.Rotator(rot=None,coord='G',eulertype='Y')).I(vec)
 

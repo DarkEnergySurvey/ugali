@@ -8,6 +8,14 @@ def norm_cdf(x):
     #https://en.wikipedia.org.wiki/Normal_distribution
     return 0.5*(1 + scipy.special.erf(x/np.sqrt(2)))
 
+def random_pdf(value,pdf,size=None):
+    if size is None: size = 1.0
+    cdf = np.cumsum(pdf)
+    cdf /= cdf[-1]
+    fn = scipy.interpolate.interp1d(cdf, range(0, len(cdf)))
+    index = numpy.rint(fn(numpy.random.uniform(size=size))).astype(int)
+    return value[index]
+
 def sky(lon=None,lat=None,size=1):
     """
     Outputs uniform points on sphere from:

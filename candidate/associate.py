@@ -319,6 +319,28 @@ class Kharchenko13(SourceCatalog):
         ra,dec = gal2cel(self.data['glon'],self.data['glat'])
         self.data['ra'],self.data['dec'] = ra,dec
 
+class WEBDA14(SourceCatalog):
+    """
+    Open cluster database.
+    http://www.univie.ac.at/webda/cgi-bin/selname.cgi?auth=
+    
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter='\t',usecols=[0,1,2],dtype=['S18',float,float])
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"WEBDA/webda.tsv")
+        raw = np.genfromtxt(filename,**kwargs)
+        
+        self.data.resize(len(raw))
+        self.data['name'] = numpy.char.strip(raw['f0'])
+
+        self.data['glon'] = raw['f1']
+        self.data['glat'] = raw['f2']
+
+        ra,dec = gal2cel(self.data['glon'],self.data['glat'])
+        self.data['ra'],self.data['dec'] = ra,dec
+    
+
 def catalogFactory(name, **kwargs):
     """
     Factory for various catalogs.

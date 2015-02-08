@@ -125,6 +125,7 @@ class Maglims(object):
                 # Median from just objects near magerr cut
          
                 mask_maglims[pix] = maglim
+
             logger.debug("%i (n=%i): maglim=%g"%(pix,num,mask_maglims[pix]))
             subpix = ugali.utils.skymap.subpixel(pix, self.nside_mask, self.nside_pixel)
             maglims = numpy.zeros(len(subpix)) + mask_maglims[pix] 

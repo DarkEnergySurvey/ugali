@@ -13,16 +13,16 @@ import numpy as np
 import scipy.stats
 
 import pyfits
-import healpy
 import emcee
 import yaml
 
 import ugali.analysis.scan
 import ugali.utils.config
 from ugali.analysis.kernel import kernelFactory
+from ugali.analysis.loglike import createIsochrone
 
 from ugali.utils.logger import logger
-from ugali.utils.projector import mod2dist
+from ugali.utils.projector import mod2dist, gal2cel
 
 
 """
@@ -53,8 +53,24 @@ class MCMC(object):
         self.scan.run()
         self.grid = self.scan.grid
         self.loglike = self.grid.loglike
-        kernel = kernelFactory(**self.config['mcmc']['kernel'])
+
+        if self.config['mcmc'].get('kernel') is not None:
+            kernel = kernelFactory(**self.config['mcmc']['kernel'])
+        else:
+            kernel = kernelFactory(**self.config['kernel'])
+        print kernel
         self.loglike.set_model('spatial',kernel)
+            
+
+        if self.config['mcmc'].get('isochrone') is not None:
+            config = dict(self.config)
+            config.update(isochrone=self.config['mcmc']['isochrone'])
+            iso = createIsochrone(config)
+        else:
+            iso = createIsochrone(config)
+        print iso
+        self.loglike.set_model('color',iso)
+
         self.roi = self.loglike.roi
 
     def get_mle(self):
@@ -86,6 +102,8 @@ class MCMC(object):
     def lnlike(self, theta):
         kwargs = dict(zip(self.params,theta))
         try:
+            #print kwargs,
+            #print self.loglike.value(**kwargs)
             return self.loglike.value(**kwargs)
         except ValueError,AssertionError:
             return -np.inf
@@ -97,10 +115,13 @@ class MCMC(object):
         return 0
 
     def run(self, params):
-        logger.info("Setting inital values...")
-
         # Initailize the likelihood to maximal value
         mle =self.grid.mle()
+        msg = "Setting inital values..."
+        for k,v in mle.items():
+            msg+='\n  %s : %s'%(k,v)
+        logger.info(msg)
+
         self.loglike.set_params(**mle)
         self.loglike.sync_params()
 
@@ -132,8 +153,9 @@ class MCMC(object):
 
         if param not in self.params: 
             mle = self.get_mle()
-            return [mle[param],0]
+            return [float(mle[param]),float(0)]
 
+        #ADW: This is just a first pass, need to do peak finding and decrease
         if burn is None: burn = self.config['mcmc']['nburn']
         burn *= self.nwalkers
         clip = scipy.stats.sigmaclip(self.samples[param][burn:],sigma,sigma)
@@ -147,16 +169,16 @@ class MCMC(object):
             out[param] = self.estimate(param,burn,sigma)
         return out
 
-    def write_samples(self,filename):
-        np.save(filename,self.samples)
-
-    def load_samples(self,filename):
-        self.samples = np.load(filename)
-
-    def write_results(self,filename):
+    def get_results(self,**kwargs):
         estimate = self.estimate_params()
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
+        
+        lon,lat = estimate['lon'][0],estimate['lat'][0]
+
+        results.update(gal=[float(lon),float(lat)])
+        ra,dec = gal2cel(lon,lat)
+        results.update(equ=[float(ra),float(dec)])
 
         mod,mod_err = estimate['distance_modulus']
         dist = mod2dist(mod)
@@ -165,20 +187,36 @@ class MCMC(object):
         rich,rich_err = estimate['richness']
 
         # Careful, depends on the isochrone...
-        stellar = self.loglike.stellar_mass()
+        stellar_mass = self.loglike.stellar_mass()
+        stellar_luminosity = self.loglike.stellar_luminosity()
 
-        mass,mass_err = rich*stellar,rich_err*stellar
+        mass,mass_err = rich*stellar_mass,rich_err*stellar_mass
         results['mass'] = [float(mass),float(mass_err)]
 
-        ts = 2*self.loglike.value()
+        lum,lum_err = rich*stellar_luminosity,rich_err*stellar_luminosity
+        results['luminosity'] = [float(lum),float(lum_err)]
+
+        ts = 2*self.loglike.value(**params)
         results['ts'] = [float(ts),0]
 
         output = dict()
         output['params'] = params
         output['results'] = results
+        return output
+        
+    def write_samples(self,filename):
+        np.save(filename,self.samples)
+
+    def load_samples(self,filename):
+        self.samples = np.load(filename)
+
+    def write_results(self,filename):
+        results = dict(self.get_results())
+        params  = dict(params=results.pop('params'))
 
         out = open(filename,'w')
-        out.write(yaml.dump(dict(output)))
+        out.write(yaml.dump(params,default_flow_style=False))
+        out.write(yaml.dump(results))
         out.close()
 
 if __name__ == "__main__":

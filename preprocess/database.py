@@ -10,17 +10,19 @@ import httplib
 import StringIO
 
 from ugali.utils.logger import logger
-import ugali.utils.shell
+from ugali.utils.shell import mkdir
 
 DATABASES = {
     'sdss':['dr10'],
-    'des' :['sva1','sva1_gold'],
+    'des' :['sva1','sva1_gold','y1a1'],
     }
 
 def databaseFactory(survey,release):
     if survey == 'sdss':
         return SDSSDatabase(release = release)
     elif survey == 'des':
+        if release == 'y1a1':
+            return Y1A1Database()
         return DESDatabase(release = release)
     else:
         logger.error("Unrecognized survey: %s"%survey)
@@ -37,7 +39,7 @@ class Database(object):
             # One-line input file
             if self.pixels.ndim == 0: self.pixels = np.array([self.pixels])
         else:
-            self.pixels = create_pixels()
+            self.pixels = self.create_pixels()
 
     @staticmethod
     def create_pixels(nra=18, ndec=10):
@@ -148,10 +150,10 @@ class SDSSDatabase(Database):
         logger.info(cmd)
         return subprocess.check_output(cmd,shell=True)
 
-    def download(self, pixel, outdir=None):
+    def download(self, pixel, outdir=None, force=False):
         if outdir is None: outdir = './'
-        else:              ugali.utils.shell.mkdir(outdir)
-        sqldir = ugali.utils.shell.mkdir(os.path.join(outdir,'sql'))
+        else:              mkdir(outdir)
+        sqldir = mkdir(os.path.join(outdir,'sql'))
         self._setup_casjobs()
 
         basename = self.basename + "_%04d"%pixel['name']
@@ -159,8 +161,7 @@ class SDSSDatabase(Database):
         dbname = basename+'_output'
         taskname = basename
         outfile = os.path.join(outdir,basename+".fits")
-        # ADW: There should be a 'force' option here
-        if os.path.exists(outfile):
+        if os.path.exists(outfile) and not force:
             logger.warning("Found %s; skipping..."%(outfile))
             return
 
@@ -314,7 +315,8 @@ class DESDatabase(Database):
         self.basename = "des_%s_photometry"%self.release
 
     def _setup_desdbi(self):
-        # Function here to setup trivialAccess client
+        # Function here to setup trivialAccess client...
+        # This should work but it doesn't
         import despydb.desdbi
         import pyfits
 
@@ -338,7 +340,7 @@ class DESDatabase(Database):
 
         desfile = os.path.join(os.getenv('HOME'),'.desservices.ini')
         section = 'db-dessci'
-        dbi = coreutils.desdbi.DesDbi(desfile,section)
+        dbi = despydb.desdbi.DesDbi(desfile,section)
         cursor = dbi.cursor()
         cursor.execute(open(query,'r').read())
 
@@ -351,12 +353,12 @@ class DESDatabase(Database):
         return array
 
 
-    def download(self, pixel, outdir=None):
+    def download(self, pixel, outdir=None, force=False):
         import pyfits 
 
         if outdir is None: outdir = './'
-        else:              ugali.utils.shell.mkdir(outdir)
-        sqldir = ugali.utils.shell.mkdir(os.path.join(outdir,'sql'))
+        else:              mkdir(outdir)
+        sqldir = mkdir(os.path.join(outdir,'sql'))
         self._setup_desdbi()
 
         basename = self.basename + "_%04d"%pixel['name']
@@ -365,7 +367,7 @@ class DESDatabase(Database):
         taskname = basename
         outfile = os.path.join(outdir,basename+".fits")
         # ADW: There should be a 'force' option here
-        if os.path.exists(outfile):
+        if os.path.exists(outfile) and not force:
             logger.warning("Found %s; skipping..."%(outfile))
             return
 
@@ -391,15 +393,61 @@ class DESDatabase(Database):
         for pixel in self.pixels:
             self.download(pixel,outdir)
 
+class Y1A1Database(DESDatabase):
+    def __init__(self):
+        release='Y1A1'
+        super(Y1A1Database,self).__init__(release=release)
+        self.release = release.lower()
+        self.basename = "des_%s_photometry"%self.release
+
+        print self.basename
+
+    #def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
+    #    # Preliminary and untested
+    #    outfile = open(filename,"w")
+    #    select = 'ABS(s.SPREAD_MODEL_I) < 0.002'
+    #    table = 'Y1A1_COADD_OBJECTS'
+    #    outfile.write('SELECT s.COADD_OBJECTS_ID, s.RA, s.DEC, \n')
+    #    outfile.write('s.MAG_PSF_G, s.MAGERR_PSF_G, \n')
+    #    outfile.write('s.MAG_PSF_R, s.MAGERR_PSF_R, \n')
+    #    outfile.write('s.MAG_PSF_I, s.MAGERR_PSF_I  \n')
+    #    outfile.write('FROM %s s \n'%(table))
+    #    outfile.write('WHERE %s \n'%(select))
+    #    outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))
+    #    outfile.write('AND s.DEC > %.7f AND s.DEC < %.7f ' % (dec_min,dec_max))
+    #    outfile.close()
+
+
+    def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
+        # Preliminary and untested
+        outfile = open(filename,"w")
+        select = 'ABS(s.WAVG_SPREAD_MODEL_I) < 0.002'
+        #select = '1 = 1'
+        table = 'Y1A1_COADD_OBJECTS'
+        outfile.write('SELECT s.COADD_OBJECTS_ID, s.RA, s.DEC, \n')
+        outfile.write('s.MAG_PSF_G, s.MAGERR_PSF_G, \n')
+        outfile.write('s.MAG_PSF_R, s.MAGERR_PSF_R, \n')
+        outfile.write('s.MAG_PSF_I, s.MAGERR_PSF_I, \n')
+        outfile.write('s.WAVGCALIB_MAG_PSF_G, s.WAVG_MAGERR_PSF_G, \n')
+        outfile.write('s.WAVGCALIB_MAG_PSF_R, s.WAVG_MAGERR_PSF_R, \n')
+        outfile.write('s.WAVGCALIB_MAG_PSF_I, s.WAVG_MAGERR_PSF_I  \n')
+        #outfile.write('s.WAVG_SPREAD_MODEL_I, s.WAVG_SPREADERR_MODEL_I, \n')
+        #outfile.write('s.SPREAD_MODEL_I, s.SPREADERR_MODEL_I  \n')
+        outfile.write('FROM %s s \n'%(table))
+        outfile.write('WHERE %s \n'%(select))
+        outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))
+        outfile.write('AND s.DEC > %.7f AND s.DEC < %.7f ' % (dec_min,dec_max))
+        outfile.close()
+
 
 if __name__ == "__main__":
     import ugali.utils.parser
-    description = "Download dataset."
+    description = "Download data set."
     parser = ugali.utils.parser.Parser(description=description)
     parser.add_config()
     parser.add_debug()
     parser.add_verbose()
-    parser.add_argument('pixfile',metavar='pixels.txt',default=None,
+    parser.add_argument('pixfile',metavar='pixels.dat',default=None,
                         nargs='?',help='Input pixel file.')
     opts = parser.parse_args()
 

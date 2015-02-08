@@ -41,9 +41,50 @@ class Mask:
         
         self.minimum_solid_angle = self.config.params['mask']['minimum_solid_angle'] # deg^2
 
+        # FIXME: Need to parallelize CMD and MMD formulation
         self._solidAngleCMD()
         self._pruneCMD(self.minimum_solid_angle)
+        
+        #self._solidAngleMMD()
+        #self._pruneMMD(self.minimum_solid_angle)
+
         self._photometricErrors()
+
+    @property
+    def mask_roi_unique(self):
+        """
+        Assemble a set of unique magnitude tuples for the ROI
+        """
+        # There is no good inherent way in numpy to do this...
+        # http://stackoverflow.com/q/16970982/
+
+        # Also possible and simple:
+        #return np.unique(zip(self.mask_1.mask_roi_sparse,self.mask_2.mask_roi_sparse))
+
+        A = np.vstack([self.mask_1.mask_roi_sparse,self.mask_2.mask_roi_sparse]).T
+        B = A[np.lexsort(A.T[::-1])]
+        return B[np.concatenate(([True],np.any(B[1:]!=B[:-1],axis=1)))]
+
+    @property
+    def mask_roi_digi(self):
+        """
+        Get the index of the unique magnitude tuple for each pixel in the ROI.
+        """
+        # http://stackoverflow.com/q/24205045/#24206440
+        A = np.vstack([self.mask_1.mask_roi_sparse,self.mask_2.mask_roi_sparse]).T
+        B = self.mask_roi_unique
+
+        AA = np.ascontiguousarray(A)
+        BB = np.ascontiguousarray(B)
+         
+        dt = np.dtype((np.void, AA.dtype.itemsize * AA.shape[1]))
+        a = AA.view(dt).ravel()
+        b = BB.view(dt).ravel()
+         
+        idx = np.argsort(b)
+        indices = np.searchsorted(b[idx],a)
+        return idx[indices]
+
 
 
     def _solidAngleMMD(self):
@@ -86,7 +127,6 @@ class Mask:
 
         # Compute which magnitudes the clipping correspond to
         index_mag_1, index_mag_2 = numpy.nonzero(self.solid_angle_mmd)
-        print np.max(index_mag_1),np.max(index_mag_2)
         self.mag_1_clip = self.roi.bins_mag[1:][np.max(index_mag_1)]
         self.mag_2_clip = self.roi.bins_mag[1:][np.max(index_mag_2)]
 
@@ -94,8 +134,6 @@ class Mask:
         logger.info('Clipping mask 2 at %.2f mag'%(self.mag_2_clip) )
         self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
         self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
-        self.mask_1.mask_annulus_sparse = numpy.clip(self.mask_1.mask_annulus_sparse, 0., self.mag_1_clip)
-        self.mask_2.mask_annulus_sparse = numpy.clip(self.mask_2.mask_annulus_sparse, 0., self.mag_2_clip)
 
     def _solidAngleCMD(self):
         """
@@ -173,9 +211,31 @@ class Mask:
         logger.info('Clipping mask 2 at %.2f mag'%(self.mag_2_clip) )
         self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
         self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
-        self.mask_1.mask_annulus_sparse = numpy.clip(self.mask_1.mask_annulus_sparse, 0., self.mag_1_clip)
-        self.mask_2.mask_annulus_sparse = numpy.clip(self.mask_2.mask_annulus_sparse, 0., self.mag_2_clip)
         
+
+    def completeness(self, delta, method='step'):
+        """
+        Return the completeness as a function of magnitude.
+
+        ADW: Eventually want a completeness mask to set overall efficiency.
+        """
+        delta = np.asarray(delta)
+        if method == 'step':
+            func = lambda delta: (delta > 0).astype(float)
+        elif method == 'erf':
+            # Trust the ERD???
+            # 95% completeness: 
+            def func(delta):
+                # Efficiency at bright end (assumed to be 100%)
+                e = 1.0
+                # EDR says full width is ~0.5 mag
+                width = 0.2 
+                # This should be the halfway point in the curve
+                return (e/2.0)*(1/np.sqrt(2*width))*(np.sqrt(2*width)-scipy.special.erf(-delta))
+        else:
+            raise Exception('...')
+        return func(delta)
+
     def _photometricErrors(self, catalog=None, n_per_bin=100):
         """
         Realistic photometric errors estimated from catalog objects and mask.
@@ -190,6 +250,7 @@ class Mask:
             
             DELMIN = 0.0
             pars_1 = MAGERR_PARAMS[release][band_1]
+            
             def photo_err_1(delta):
                 p = pars_1
                 return np.clip(np.exp(p[0]*delta+p[1])+p[2], 0, np.exp(p[0]*(DELMIN)+p[1])+p[2])
@@ -266,6 +327,23 @@ class Mask:
                                                      lim_y = [self.roi.bins_mag[-1],
                                                               self.roi.bins_mag[0]])
 
+    def plotSolidAngleMMD(self):
+        """
+        Solid angle within the mask as a function of color and magnitude.
+        """
+        import ugali.utils.plotting        
+
+        ugali.utils.plotting.twoDimensionalHistogram('mask', 'mag_2', 'mag_1',
+                                                     self.solid_angle_mmd,
+                                                     self.roi.bins_mag,
+                                                     self.roi.bins_mag,
+                                                     lim_x = [self.roi.bins_mag[0],
+                                                              self.roi.bins_mag[-1]],
+                                                     lim_y = [self.roi.bins_mag[-1],
+                                                              self.roi.bins_mag[0]])
+
+
+
     def backgroundMMD(self, catalog, method='cloud-in-cells', weights=None):
         """
         Generate an empirical background model in magnitude-magnitude space.
@@ -282,7 +360,7 @@ class Mask:
         mag_2 = catalog.mag_2[cut_annulus]
 
         # Units are (deg^2)
-        solid_angle = ugali.utils.binning.take2D(self.solid_angle_mmd, mag_1, mag_2,
+        solid_angle = ugali.utils.binning.take2D(self.solid_angle_mmd, mag_2, mag_1,
                                                  self.roi.bins_mag, self.roi.bins_mag)
 
         # Weight each object before binning
@@ -296,7 +374,7 @@ class Mask:
         method = str(method).lower()
         if method == 'cloud-in-cells':
             # Apply cloud-in-cells algorithm
-            mmd_background = ugali.utils.binning.cloudInCells(mag_1,mag_2,
+            mmd_background = ugali.utils.binning.cloudInCells(mag_2,mag_1,
                                                               [self.roi.bins_mag,self.roi.bins_mag],
                                                               weights=number_density)[0]
         elif method == 'bootstrap':
@@ -307,13 +385,13 @@ class Mask:
 
         elif method == 'histogram':
             # Apply raw histogram
-            mmd_background = np.histogram2d(mag_2,mag_1,bins=[self.roi.bins_mag,self.roi.bins_mag],
+            mmd_background = np.histogram2d(mag_1,mag_2,bins=[self.roi.bins_mag,self.roi.bins_mag],
                                             weights=number_density)[0]
 
         elif method == 'kde':
             # Gridded kernel density estimator
             logger.warning("### KDE not implemented properly")
-            mmd_background = ugali.utils.binning.kernelDensity(mag,mag,
+            mmd_background = ugali.utils.binning.kernelDensity(mag_2,mag_1,
                                                                [self.roi.bins_mag,self.roi.bins_mag],
                                                                weights=number_density)[0]
         elif method == 'uniform':
@@ -348,9 +426,9 @@ class Mask:
         index_mag_2 = numpy.arange(len(self.roi.centers_mag))
         # Add the cumulative leakage back into the last bin of the CMD
         leakage = (mmd_background * ~observable).sum(axis=0)
-        mmd_background[[index_mag_1,index_mag_2]] += leakage
+        ### mmd_background[[index_mag_1,index_mag_2]] += leakage
         # Zero out all non-observable bins
-        mmd_background *= observable
+        ### mmd_background *= observable
 
         # Avoid dividing by zero by setting empty bins to the value of the 
         # minimum filled bin of the CMD. This choice is arbitrary and 
@@ -474,7 +552,46 @@ class Mask:
 
         return cmd_background
 
-    def restrictCatalogToObservableSpace(self, catalog):
+    def restrictCatalogToObservableSpaceMMD(self, catalog):
+        """
+        Retain only the catalog objects which fall within the observable (i.e., unmasked) space.
+
+        INPUTS:
+            catalog: a Catalog object
+        OUTPUTS:
+            boolean cut array where True means the object would be observable (i.e., unmasked).
+
+        ADW: Careful, this function is fragile! The selection here should
+             be the same as isochrone.observableFraction space. However,
+             for technical reasons it is faster to do the calculation with
+             broadcasting there.
+        """
+
+        # ADW: This creates a slope in color-magnitude space near the magnitude limit
+        # i.e., if color=g-r then you can't have an object with g-r=1 and mag_r > mask_r-1
+        # Depending on which is the detection band, this slope will appear at blue
+        # or red colors. When it occurs at blue colors, it effects very few objects.
+        # However, when occuring for red objects it can cut many objects. It is 
+        # unclear that this is being correctly accounted for in the likelihood
+
+        catalog.spatialBin(self.roi)
+        cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
+        cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
+        cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
+
+        # and are located in the region of mag-mag space where background can be estimated
+        cut_mmd = ugali.utils.binning.take2D(self.solid_angle_mmd,
+                                             catalog.mag_2, catalog.mag_1,
+                                             self.roi.bins_mag, self.roi.bins_mag) > 0.
+
+        cut = numpy.all([cut_roi,
+                         cut_mag_1,
+                         cut_mag_2,
+                         cut_mmd], axis=0)
+                         
+        return cut
+
+    def restrictCatalogToObservableSpaceCMD(self, catalog):
         """
         Retain only the catalog objects which fall within the observable (i.e., unmasked) space.
 
@@ -522,6 +639,8 @@ class Mask:
                          cut_cmd], axis=0)
         return cut
     
+    # FIXME: Need to parallelize CMD and MMD formulation
+    restrictCatalogToObservableSpace = restrictCatalogToObservableSpaceCMD
 
 ############################################################
 
@@ -536,14 +655,26 @@ class MaskBand:
         """
         self.roi = roi
         mask = ugali.utils.skymap.readSparseHealpixMaps(infiles, field='MAGLIM')
-        self.mask_roi_sparse = mask[self.roi.pixels] # Sparse map for pixels in ROI
-        self.mask_annulus_sparse = mask[self.roi.pixels_annulus] # Sparse map for pixels in annulus part of ROI
-
-        #logger.warning("Uniform mask")
-        #self.mask_roi_sparse=self.mask_roi_sparse.max()*np.ones(self.mask_roi_sparse.shape)
-        #self.mask_annulus_sparse=self.mask_annulus_sparse.max()*np.ones(self.mask_annulus_sparse.shape)
-
         self.nside = healpy.npix2nside(len(mask))
+        # Sparse maps of pixels in various ROI regions
+        self.mask_roi_sparse = mask[self.roi.pixels] 
+
+    #ADW: Safer and more robust (though slightly slower)
+    @property
+    def mask_annulus_sparse(self):
+        return self.mask_roi_sparse[self.roi.pixel_annulus_cut]
+     
+    @property
+    def mask_interior_sparse(self):
+        return self.mask_roi_sparse[self.roi.pixel_interior_cut]
+
+    @property
+    def mask_roi_unique(self):
+        return np.unique(self.mask_roi_sparse)
+
+    @property
+    def mask_roi_digi(self):
+        return np.digitize(self.mask_roi_sparse,bins=self.mask_roi_unique)-1
 
     def completeness(self, mags, method='step'):
         """
@@ -552,18 +683,18 @@ class MaskBand:
         ADW: Eventually want a completeness mask to set overall efficiency.
         """
         if method == 'step':
-            func = lambda x: (x < self.mask_roi_sparse[:,np.newaxis]).astype(float)
+            func = lambda x: (x < self.mask_roi_unique[:,np.newaxis]).astype(float)
         elif method == 'erf':
             # Trust the ERD???
             # 95% completeness: 
             def func(x):
                 # Efficiency at bright end (assumed to be 100%)
-                e = 1 
+                e = 1.0
                 # EDR says full width is ~0.5 mag
                 width = 0.2 
                 # This should be the halfway point in the curve
-                maglim = self.mask_roi_sparse[:,np.newaxis]
-                return (e/2)*(1-scipy.special.erf(x-maglim))
+                maglim = self.mask_roi_unique[:,np.newaxis]
+                return (e/2.0)*(1/np.sqrt(2*width))*(np.sqrt(2*width)-scipy.special.erf((x-maglim)))
         else:
             raise Exception('...')
 
@@ -586,7 +717,7 @@ class MaskBand:
         mask[mask == 0.] = healpy.UNSEEN
         ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
                                               mask,
-                                              self.roi.lon, self.roi.lat,
+                                               self.roi.lon, self.roi.lat,
                                               self.roi.config.params['coords']['roi_radius'])
 
 ############################################################

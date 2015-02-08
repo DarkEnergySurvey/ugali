@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from collections import OrderedDict as odict
+import copy
 
 import numpy
 import numpy as np
@@ -32,11 +33,6 @@ class LogLikelihood(object):
     """
     Class for calculating the log-likelihood from a set of models.
     """
-    models = odict([
-        ('richness', Model()),
-        ('color'   , Model()),
-        ('spatial' , Model()),
-    ])
 
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):
         # Set the various models for the likelihood
@@ -78,6 +74,13 @@ class LogLikelihood(object):
         # The total model predicted counts
         return -1. * numpy.sum(numpy.log(1. - self.p)) - (self.f * self.richness)
         
+    def __getattr__(self, name):
+        for key,model in self.models.items():
+            if name in model.params:
+                return getattr(model, name)
+        # Raises AttributeError
+        return object.__getattribute__(self,name)
+
     def __setattr__(self, name, value):
         for key,model in self.models.items():
             if name in model.params:
@@ -86,13 +89,6 @@ class LogLikelihood(object):
         # Raises AttributeError?
         return object.__setattr__(self, name, value)
         
-    def __getattr__(self, name):
-        for key,model in self.models.items():
-            if name in model.params:
-                return getattr(model, name)
-        # Raises AttributeError
-        return object.__getattribute__(self,name)
-
     def __str__(self):
         ret = "%s:"%self.__class__.__name__
         for key,model in self.models.items():
@@ -153,9 +149,12 @@ class LogLikelihood(object):
     ############################################################################
 
     def set_model(self, name, model):
-        if name not in self.models:
-            msg="%s does not contain model: %s"%(self.__class__.__name__,name)
-            raise AttributeError(msg)
+        if not hasattr(self,'models'):
+            object.__setattr__(self, 'models',odict())
+        #ADW: Might want to consider this 
+        ###if name not in self.models:
+        ###    msg="%s does not contain model: %s"%(self.__class__.__name__,name)
+        ###    raise AttributeError(msg)
         self.models[name] = model
 
     def set_params(self,**kwargs):
@@ -189,7 +188,7 @@ class LogLikelihood(object):
         self._f = self.roi.area_pixel * \
             (self.surface_intensity_sparse*self.observable_fraction).sum()
 
-        ## ADW: Spatial information only (remember cmd binning in calc_background)
+        ## ADW: Spatial information only (remember mag binning in calc_background)
         if self.spatial_only:
             self._u = self.u_spatial
             observable_fraction = (self.observable_fraction > 0)
@@ -239,7 +238,10 @@ class LogLikelihood(object):
     def stellar_mass(self):
         return self.isochrone.stellarMass()
 
-    def calc_background(self):
+    def stellar_luminosity(self):
+        return self.isochrone.stellarLuminosity()
+
+    def calc_backgroundCMD(self):
         #ADW: At some point we may want to make the background level a fit parameter.
         logger.info('Calculating background CMD ...')
         self.cmd_background = self.mask.backgroundCMD(self.catalog_roi)
@@ -262,6 +264,31 @@ class LogLikelihood(object):
             b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
             self._b = np.array([b_density*self.roi.area_pixel])
 
+    def calc_backgroundMMD(self):
+        #ADW: At some point we may want to make the background level a fit parameter.
+        logger.info('Calculating background MMD ...')
+        self.mmd_background = self.mask.backgroundMMD(self.catalog_roi)
+        #self.mmd_background = self.mask.backgroundMMD(self.catalog_roi,mode='histogram')
+        #self.mmd_background = self.mask.backgroundMMD(self.catalog_roi,mode='uniform')
+        # Background density (deg^-2 mag^-2) and background probability for each object
+        logger.info('Calculating background probabilities ...')
+        b_density = ugali.utils.binning.take2D(self.mmd_background,
+                                               self.catalog.mag_2, self.catalog.mag_1,
+                                               self.roi.bins_mag, self.roi.bins_mag)
+
+        # ADW: I don't think this 'area_pixel' or 'delta_mag' factors are necessary, 
+        # so long as it is also removed from u_spatial and u_color
+        #self._b = b_density * self.roi.area_pixel * self.delta_mag**2
+        self._b = b_density
+
+        if self.spatial_only:
+            # ADW: This assumes a flat mask...
+            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
+            self._b = np.array([b_density*self.roi.area_pixel])
+
+    # FIXME: Need to parallelize CMD and MMD formulation
+    calc_background = calc_backgroundCMD
 
     def calc_observable_fraction(self,distance_modulus):
         """
@@ -269,9 +296,14 @@ class LogLikelihood(object):
         """
         # This is the observable fraction after magnitude cuts in each 
         # pixel of the ROI.
-        return self.isochrone.observableFraction(self.mask,distance_modulus)
+        observable_fraction = self.isochrone.observableFraction(self.mask,distance_modulus)
+        if not observable_fraction.sum() > 0:
+            msg = "No observable fraction"
+            logger.error(msg)
+            raise Exception(msg)
+        return observable_fraction
 
-    def calc_signal_color(self, distance_modulus, mass_steps=10000):
+    def calc_signal_color1(self, distance_modulus, mass_steps=10000):
         """
         Compute signal color probability (u_color) for each catalog object on the fly.
         """
@@ -284,85 +316,25 @@ class LogLikelihood(object):
 
         return u_color
 
-
-    def calc_signal_color2(self, distance_modulus, mass_steps=10000):
+    def calc_signal_color2(self, distance_modulus, mass_steps=1000):
         """
         Compute signal color probability (u_color) for each catalog object on the fly.
         """
-        # Isochrone will be binned in next step, so can sample many points efficiently
-        isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.isochrone.sample(mass_steps=mass_steps)
+        logger.info('Calculating signal color from MMD')
 
-        bins_mag_1 = np.arange(distance_modulus+isochrone_mag_1.min() - (0.5*self.delta_mag),
-                               distance_modulus+isochrone_mag_1.max() + (0.5*self.delta_mag),
-                               self.delta_mag)
-        bins_mag_2 = np.arange(distance_modulus+isochrone_mag_2.min() - (0.5*self.delta_mag),
-                               distance_modulus+isochrone_mag_2.max() + (0.5*self.delta_mag),
-                               self.delta_mag)        
+        mag_1, mag_2 = self.catalog.mag_1,self.catalog.mag_2
+        lon, lat = self.catalog.lon,self.catalog.lat
+        u_density = self.isochrone.pdf_mmd(lon,lat,mag_1,mag_2,distance_modulus,self.mask,self.delta_mag,mass_steps)
 
+        #u_color = u_density * self.delta_mag**2
+        u_color = u_density
 
-        histo_isochrone_pdf = np.histogram2d(distance_modulus + isochrone_mag_1,
-                                             distance_modulus + isochrone_mag_2,
-                                             bins=[bins_mag_1, bins_mag_2],
-                                             weights=isochrone_mass_pdf)[0]
+        # ADW: Should calculate observable fraction here as well...
 
-        # Keep only isochrone bins that are within the color-magnitude space of the ROI
-        mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
-        pad = 1. # mag
-        if self.config['catalog']['band_1_detection']:
-            in_color_magnitude_space = (mag_1_mesh < (self.mask.mag_1_clip + pad)) \
-                                       *(mag_2_mesh > (self.roi.bins_mag[0] - pad))
-        else:
-            in_color_magnitude_space = (mag_2_mesh < (self.mask.mag_2_clip + pad)) \
-                                       *(mag_2_mesh > (self.roi.bins_mag[0] - pad))
-        histo_isochrone_pdf *= in_color_magnitude_space
-        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
-        isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
-
-        n_catalog = len(self.catalog.mag_1)
-        n_isochrone_bins = len(index_mag_1)
-        ones = np.ones([n_catalog, n_isochrone_bins])
-
-        mag_1_reshape = self.catalog.mag_1.reshape([n_catalog, 1])
-        mag_err_1_reshape = self.catalog.mag_err_1.reshape([n_catalog, 1])
-        mag_2_reshape = self.catalog.mag_2.reshape([n_catalog, 1])
-        mag_err_2_reshape = self.catalog.mag_err_2.reshape([n_catalog, 1])
-
-        # Calculate distance between each catalog object and isochrone bin
-        # Assume normally distributed photometry uncertainties
-        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
-        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
-        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
-        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
-        #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
-
-        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
-        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
-        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
-        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
-        #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
-
-        # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
-        index_nonzero_0, index_nonzero_1 = numpy.nonzero((arg_mag_1_hi > -5.) \
-                                                         *(arg_mag_1_lo < 5.) \
-                                                         *(arg_mag_2_hi > -5.) \
-                                                         *(arg_mag_2_lo < 5.))
-        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_1[index_nonzero_0,index_nonzero_1] = norm.cdf(arg_mag_1_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - norm.cdf(arg_mag_1_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
-        pdf_mag_2[index_nonzero_0,index_nonzero_1] = norm.cdf(arg_mag_2_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - norm.cdf(arg_mag_2_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
-
-        # Signal color probability is product of PDFs for each object-bin pair 
-        # summed over isochrone bins
-        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
-        u_color *= delta_mag**2
         return u_color
 
+    # FIXME: Need to parallelize CMD and MMD formulation
+    calc_signal_color = calc_signal_color1
 
     def calc_signal_spatial(self):
         # At the pixel level over the ROI
@@ -482,7 +454,7 @@ def createROI(config,lon,lat):
 
 def createKernel(config,lon=0.0,lat=0.0):
     import ugali.analysis.kernel
-    params = dict(config['scan']['kernel'])
+    params = dict(config['kernel'])
     params.setdefault('lon',lon)
     params.setdefault('lat',lat)
     return ugali.analysis.kernel.kernelFactory(**params)

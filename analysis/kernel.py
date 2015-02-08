@@ -7,6 +7,7 @@ import sys
 import inspect
 from abc import abstractmethod
 from collections import OrderedDict as odict
+import copy
 
 import numpy
 import numpy as np
@@ -33,7 +34,7 @@ class Kernel(Model):
     def __init__(self, proj='ait',**kwargs):
         self.proj = proj
         super(Kernel,self).__init__(**kwargs)
- 
+
     def __call__(self, lon, lat):
         return self.pdf(lon, lat)
 
@@ -84,11 +85,11 @@ class ToyKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.01,5.0]) ),
+            ('extension',     Parameter(0.5, [0.01,5.0]) ), 
             ('nside',         Parameter(4096,[4096,4096])),
         ])
 
-    def _cache(self, name):
+    def _cache(self, name=None):
         pixel_area = healpy.nside2pixarea(self.nside,degrees=True)
         vec = ang2vec(self.lon, self.lat)
         self.pix = query_disc(self.nside,vec,self.extension)
@@ -116,9 +117,9 @@ class EllipticalKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.01,5.0]) ),
-            ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),  # Default 0 for RadialKernel
-            ('position_angle',Parameter(0.0, [0.0, 1.0]) ),  # Default 0 for RadialKernel
+            ('extension',     Parameter(0.5, [0.001,5.0]) ),    
+            ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),    # Default 0 for RadialKernel
+            ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
         ])
     _mapping = odict([
         ('e','ellipticity'),
@@ -127,7 +128,8 @@ class EllipticalKernel(Kernel):
 
     @property
     def norm(self):
-        return super(EllipticalKernel,self).norm * 1./self.jacobian
+        norm = super(EllipticalKernel,self).norm
+        return  norm * 1./self.jacobian
 
     @property
     def jacobian(self):
@@ -145,11 +147,14 @@ class EllipticalKernel(Kernel):
     def edge(self):
         return 5.*self.extension
 
-    def pdf(self,lon,lat):
+    def radius(self,lon,lat):
         x,y = self.projector.sphereToImage(lon,lat)
         costh = np.cos(np.radians(self.theta))
         sinth = np.sin(np.radians(self.theta))
-        radius = np.sqrt(((x*costh-y*sinth)/(1-self.e))**2 + (x*sinth+y*costh)**2)
+        return np.sqrt(((x*costh-y*sinth)/(1-self.e))**2 + (x*sinth+y*costh)**2)
+        
+    def pdf(self,lon,lat):
+        radius = self.radius(lon,lat)
         return self.norm*self._pdf(radius)
 
     def sample_radius(self, n):
@@ -159,11 +164,11 @@ class EllipticalKernel(Kernel):
         """
         edge = self.edge if self.edge<20*self.extension else 20*self.extension
         radius = np.linspace(0, edge, 1.e5)
-        rpdf = self._pdf(radius) * np.sin(np.radians(radius))
-        rcdf = np.cumsum(rpdf)
-        rcdf /= rcdf[-1]
-        fn = scipy.interpolate.interp1d(rcdf, range(0, len(rcdf)), bounds_error=False, fill_value=-1)
-        index = numpy.floor(fn(numpy.random.rand(n))).astype(int)
+        pdf = self._pdf(radius) * np.sin(np.radians(radius))
+        cdf = np.cumsum(pdf)
+        cdf /= cdf[-1]
+        fn = scipy.interpolate.interp1d(cdf, range(0, len(cdf)))
+        index = numpy.floor(fn(numpy.random.uniform(size=n))).astype(int)
         return radius[index]
  
     def sample_lonlat(self, n):
@@ -278,7 +283,7 @@ class EllipticalExponential(EllipticalKernel):
 class EllipticalPlummer(EllipticalKernel):
     """
     Stellar density distribution for Plummer profile:
-    f(r) = C * r_h**2 / (r_h**2 + r**2)**2
+    f(r) = C * r_c**2 / (r_c**2 + r**2)**2
     http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 6)
     """
     _params = odict(
@@ -289,7 +294,8 @@ class EllipticalPlummer(EllipticalKernel):
     _mapping = odict(
         EllipticalKernel._mapping.items() +
         [
-            ('r_h','extension'), # Half-light radius
+            ('r_c','extension'), # Plummer radius
+            ('r_h','extension'), # ADW: Depricated
             ('r_t','truncate'),  # Tidal radius
         ])
  
@@ -297,8 +303,8 @@ class EllipticalPlummer(EllipticalKernel):
         return 1./(numpy.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
 
     def _cache(self, name=None):
-        if name in ['extension','ellipticity','truncate']:
-            self._norm = 1./self.integrate()
+        if name in [None,'extension','ellipticity','truncate']:
+            self._norm = 1./self.integrate() * 1./self.jacobian
         else:
             return
 
@@ -366,8 +372,12 @@ class RadialKernel(EllipticalKernel):
     _fixed_params = ['ellipticity','position_angle']
 
     def __init__(self,**kwargs):
-        self._params['ellipticity'].set(0.0, [0.0,0.0])
-        self._params['position_angle'].set(0.0, [0.0,0.0])
+        # This is a bit messy because the defaults are set
+        # at the instance level not at the class level
+        self._params = copy.deepcopy(self._params)
+        self._params['ellipticity'].set(0, [0, 0])
+        self._params['position_angle'].set(0, [0, 0])
+
         super(RadialKernel,self).__init__(**kwargs)
         
     def pdf(self, lon, lat):

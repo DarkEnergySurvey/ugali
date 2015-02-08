@@ -3,7 +3,7 @@ import glob
 import os
 from os.path import join, exists
 
-import ugali.analysis.farm
+from ugali.analysis.farm import Farm
 from ugali.analysis.pipeline import Pipeline
 
 from ugali.utils.shell import mkdir
@@ -15,7 +15,7 @@ components = ['scan','merge','plot']
 def run(self):
     if 'scan' in self.opts.run:
         logger.info("Running 'scan'...")
-        farm = ugali.analysis.farm.Farm(self.config)
+        farm = Farm(self.config)
         farm.submit_all(coords=self.opts.coords,queue=self.opts.queue,debug=self.opts.debug)
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
@@ -32,9 +32,9 @@ def run(self):
         # WARNING: Loading the full 3D healpix map is memory intensive.
         logger.info("Running 'plot'...")
         import pylab as plt
-        import ugali.utils.plotting
+        import ugali.utils.plotting as plotting
         skymap = ugali.utils.skymap.readSparseHealpixMap(self.config.mergefile,'LOG_LIKELIHOOD')[1]
-        ugali.utils.plotting.plotSkymap(skymap)
+        plotting.plotSkymap(skymap)
         outdir = mkdir(self.config['output']['plotdir'])
         basename = os.path.basename(self.config.mergefile.replace('.fits','.png'))
         outfile = os.path.join(outdir,basename)

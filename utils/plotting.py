@@ -26,7 +26,7 @@ import ugali.utils.projector
 import ugali.utils.healpix
 
 from ugali.utils.healpix import ang2pix
-from ugali.utils.projector import mod2dist
+from ugali.utils.projector import mod2dist,gal2cel,cel2gal
 
 from ugali.utils.logger import logger
 #pylab.ion()
@@ -177,6 +177,14 @@ class BasePlotter(object):
                                  textcoords='offset points',ha='left', va='bottom',size=10,
                                  bbox={'boxstyle':"round",'fc':'1'}, zorder=10)
         
+    def _create_catalog(self):
+        if hasattr(self,'catalog'): return
+        catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        sep = ugali.utils.projector.angsep(self.glon, self.glat, catalog.lon, catalog.lat)
+        radius = self.radius*np.sqrt(2)
+        cut = (sep < radius)
+        self.catalog = catalog.applyCut(cut)
+
     def drawROI(self, ax, value=None, pixel=None):
         roi_map = numpy.array(healpy.UNSEEN * np.ones(healpy.nside2npix(self.nside)))
         
@@ -193,30 +201,27 @@ class BasePlotter(object):
             print 'ERROR: count not parse input'
         im = healpy.gnomview(roi_map,**self.gnom_kwargs)
 
-    def drawCatalog(self, ax):
-        # Stellar Catalog
-        catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
-        healpy.projscatter(catalog.lon,catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
-        ax.annotate("Stars",**self.label_kwargs)
-
     def drawImage(self,ax,invert=True):
-        # Optical Image
-        im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
-        # Flipping JPEG:
-        # https://github.com/matplotlib/matplotlib/issues/101
-        if invert: im =ax.imshow(im[::-1])
-        else:      im =ax.imshow(im)
-        try:
-            ax.cax.axis["right"].toggle(ticks=False, ticklabels=False)
-            ax.cax.axis["top"].toggle(ticks=False, ticklabels=False)
-        except AttributeError: 
-            pass
+        if self.config['data']['survey']=='sdss':
+            # Optical Image
+            im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
+            # Flipping JPEG:
+            # https://github.com/matplotlib/matplotlib/issues/101
+            if invert: im =ax.imshow(im[::-1])
+            else:      im =ax.imshow(im)
+            try:
+                ax.cax.axis["right"].toggle(ticks=False, ticklabels=False)
+                ax.cax.axis["top"].toggle(ticks=False, ticklabels=False)
+            except AttributeError: 
+                pass
         ax.annotate("Image",**self.label_kwargs)
         return ax
 
     def drawStellarDensity(self,ax):
         # Stellar Catalog
-        catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        self._create_catalog()
+        catalog = self.catalog
+        #catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
         pix = ang2pix(self.nside, catalog.lon, catalog.lat)
         counts = collections.Counter(pix)
         pixels, number = numpy.array(sorted(counts.items())).T
@@ -277,6 +282,24 @@ class BasePlotter(object):
         except: pylab.colorbar(im)
         ax.annotate("TS",**self.label_kwargs)
 
+    def drawCatalog(self, ax):
+        # Stellar Catalog
+        self._create_catalog()
+        healpy.projscatter(self.catalog.lon,self.catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
+        ax.annotate("Stars",**self.label_kwargs)
+
+    def drawSpatial(self, ax):
+        # Stellar Catalog
+        self._create_catalog()
+        cut = (self.catalog.color > 0) & (self.catalog.color < 1)
+        catalog = self.catalog.applyCut(cut)
+        ax.scatter(catalog.lon,catalog.lat,c='k',marker='.',s=1)
+        ax.set_xlim(self.glon-0.5,self.glon+0.5)
+        ax.set_ylim(self.glat-0.5,self.glat+0.5)
+        ax.set_xlabel('GLON (deg)')
+        ax.set_ylabel('GLAT (deg)')
+        #ax.annotate("Stars",**self.label_kwargs)
+
     def drawCMD(self, ax, radius=None, zidx=None):
         import ugali.analysis.isochrone
 
@@ -291,17 +314,22 @@ class BasePlotter(object):
 
             for ii, name in enumerate(self.config.params['isochrone']['infiles']):
                 print ii, name
-                isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
-                mag = isochrone.mag + distance_modulus
-                ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
+                drawIsochrone(ax, self.config, distance_modulus,lw=25,c='0.5')
+                drawIsochrone(ax, self.config, distance_modulus,ls='',marker='.',ms=1,c='k')
+                #isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+                #mag = isochrone.mag + distance_modulus
+                #ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
         
         # Stellar Catalog
-        catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
-        sep = ugali.utils.projector.angsep(self.glon, self.glat, catalog.lon, catalog.lat)
-        radius = self.radius if radius is None else radius
-        cut = (sep < radius)
-        catalog_cmd = catalog.applyCut(cut)
-        ax.scatter(catalog_cmd.color, catalog_cmd.mag,color='b')
+        self._create_catalog()
+        if radius is not None:
+            sep = ugali.utils.projector.angsep(self.glon,self.glat,self.catalog.lon,self.catalog.lat)
+            cut = (sep < radius)
+            catalog_cmd = self.catalog.applyCut(cut)
+        else:
+            catalog_cmd = self.catalog
+    
+        ax.scatter(catalog_cmd.color, catalog_cmd.mag,color='b',marker='.',s=1)
         ax.set_xlim(self.roi.bins_color[0],self.roi.bins_color[-1])
         ax.set_ylim(self.roi.bins_mag[-1],self.roi.bins_mag[0])
         ax.set_xlabel('Color (mag)')
@@ -517,7 +545,7 @@ def plotKernel(kernel):
                     cbar_location='top', share_all=True)
     drawKernel(axes[0],kernel)
 
-def drawKernel(ax, kernel):
+def drawKernelHist(ax, kernel):
     ext = kernel.extension
     theta = kernel.theta
     lon, lat = kernel.lon, kernel.lat
@@ -573,18 +601,27 @@ def drawKernel(ax, kernel):
 
 ###################################################
 
-def plotMembership(data, config, distance_modulus=None):
+def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     if isinstance(data,basestring):
         data = pyfits.open(data)[1].data
 
+    kwargs.setdefault('s',20)
+    kwargs.setdefault('edgecolor','none')
+    kwargs.setdefault('vmin',0)
+    kwargs.setdefault('vmax',1)
+    kwargs.setdefault('zorder',3)
 
-    sort = np.argsort(data['PROB'])
-    prob = data['PROB'][sort]
+    try: 
+        sort = np.argsort(data['PROB'])
+        prob = data['PROB'][sort]
+    except:
+        prob = np.zeros(len(data['RA']))+1
 
     lon,lat = data['RA'][sort],data['DEC'][sort]
     color = data['COLOR'][sort]
+    cut = (prob > 0)
 
     # ADW: Sometimes may be mag_1
     mag = data[config['catalog']['mag_1_field']][sort]
@@ -592,27 +629,41 @@ def plotMembership(data, config, distance_modulus=None):
     mag_err_2 = data[config['catalog']['mag_err_2_field']][sort]
 
     fig,axes = plt.subplots(1,2,figsize=(10,5))
+        
+    #proj = ugali.utils.projector.Projector(np.median(lon),np.median(lat))
+    #x,y = proj.sphereToImage(lon,lat)
+    #sc = axes[0].scatter(x,y,c=prob,vmin=0,vmax=1)
 
-    proj = ugali.utils.projector.Projector(np.median(lon),np.median(lat))
-    x,y = proj.sphereToImage(lon,lat)
-    sc = axes[0].scatter(x,y,c=prob,vmin=0,vmax=1)
-    axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
-    axes[0].set_xlabel(r'$\Delta$ RA (deg)')
+    axes[0].scatter(lon[~cut],lat[~cut],c='0.7',**kwargs)
+    axes[0].scatter(lon[cut],lat[cut],c=prob[cut],**kwargs)
+    if kernel is not None:
+        plt.sca(axes[0])
+        drawKernel(kernel,contour=True,linewidths=2,zorder=0)
+        ra,dec = gal2cel(kernel.lon,kernel.lat)
+        axes[0].set_xlim(ra-0.4,ra+0.4)
+        axes[0].set_ylim(dec-0.4,dec+0.4)
+
+    #axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
+    #axes[0].set_xlabel(r'$\Delta$ RA (deg)')
+    axes[0].set_xlabel('RA (deg)')
+    axes[0].set_ylabel('DEC (deg)')
     axes[0].xaxis.set_major_locator(MaxNLocator(4))
     axes[0].yaxis.set_major_locator(MaxNLocator(4))
 
-    axes[1].errorbar(color,mag,yerr=mag_err_1,fmt='.',c='k',zorder=0.5)
-    sc = axes[1].scatter(color,mag,c=prob,vmin=0,vmax=1,zorder=10)
-    if distance_modulus is not None:
-        drawIsochrone(axes[1],config,distance_modulus,lw=25,c='0.5')
-        drawIsochrone(axes[1],config,distance_modulus,ls='',marker='.',ms=1,c='k')
+    axes[1].errorbar(color[cut],mag[cut],yerr=mag_err_1[cut],fmt='.',c='k',zorder=0.5)
+    axes[1].scatter(color[~cut],mag[~cut],c='0.7',**kwargs)
+    sc = axes[1].scatter(color[cut],mag[cut],c=prob[cut],**kwargs)
+
+    if isochrone is not None:
+        plt.sca(axes[1])
+        drawIsochrone(isochrone,lw=25,c='0.5')
+        drawIsochrone(isochrone,ls='',marker='.',ms=1,c='k')
 
     axes[1].set_ylabel(r'$g$')
     axes[1].set_xlabel(r'$g-r$')
-    axes[1].set_ylim(23,18)
-    axes[1].set_xlim(-0.5,1.0)
+    axes[1].set_ylim(config['mag']['max'],config['mag']['min'])
+    axes[1].set_xlim(config['color']['min'],config['color']['max'])
     axes[1].xaxis.set_major_locator(MaxNLocator(4))
-
 
     divider = make_axes_locatable(axes[1])
     #ax_cb = divider.new_vertical(size="5%", pad=0.05)
@@ -620,21 +671,20 @@ def plotMembership(data, config, distance_modulus=None):
     fig.add_axes(ax_cb)
     plt.colorbar(sc, cax=ax_cb, orientation='vertical')
     ax_cb.yaxis.tick_right()
-    
+    return fig,axes
 
-def drawIsochrone(ax, config, distance_modulus, **kwargs):
-    from ugali.analysis.scan import Scan
+def drawIsochrone(isochrone, **kwargs):
+    ax = plt.gca()
+
     kwargs.setdefault('c','0.5')
     kwargs.setdefault('lw',25)
     kwargs.setdefault('zorder',0)
     kwargs.setdefault('ls','-')
-
-    isochrone = Scan.createIsochrone(config)
     
     for iso in isochrone.isochrones:
         logger.debug(iso.infile)
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = iso.sample(mass_steps=5e4)
-        mag = mag_1 + distance_modulus
+        mag = mag_1 + isochrone.distance_modulus
         color = mag_1 - mag_2
 
         # Find discontinuities in the color magnitude distributions
@@ -653,6 +703,49 @@ def drawIsochrone(ax, config, distance_modulus, **kwargs):
     ax.invert_yaxis()
     ax.set_xlim(-0.5,1.5)
     ax.set_ylim(23,18)
+
+def drawKernel(kernel, contour=False, coords='C', **kwargs):
+    ax = plt.gca()
+
+    kwargs.setdefault('cmap',matplotlib.cm.jet)
+    kwargs.setdefault('origin','lower')
+
+    ext = kernel.extension
+    theta = kernel.theta
+
+    xmin,xmax = -5*ext,5*ext
+    ymin,ymax = -5*ext,5*ext,
+
+    if coords[-1] == 'G':
+        lon, lat = kernel.lon, kernel.lat
+    elif coords[-1] == 'C':
+        lon,lat = gal2cel(kernel.lon, kernel.lat)
+    else:
+        msg = 'Unrecognized coordinate: %s'%coords
+        raise Exception(msg)
+
+    x = np.linspace(xmin,xmax,100)+lon
+    y = np.linspace(ymin,ymax,100)+lat
+    xx,yy = np.meshgrid(x,y)
+    extent = [x[0],x[-1],y[0],y[-1]]
+    kwargs.setdefault('extent',extent)
+    if coords[-1] == 'C':
+        xx,yy = cel2gal(xx,yy)
+    
+    zz = kernel.pdf(xx.flat,yy.flat).reshape(xx.shape)
+    zmax = zz.max()
+
+    if contour:
+        levels = 10
+        #levels = np.logspace(np.log10(zmax)-1,np.log10(zmax),7)
+        ret = ax.contour(zz,levels,**kwargs)
+    else:
+        val = np.ma.array(zz,mask=zz<zz.max()/100.)
+        ret = ax.imshow(val,**kwargs)
+
+    return ret
+
+###################################################
 
 def drawChernoff(ax,ts,bands='smooth',pdf=False,color='r'):
     from scipy.stats import chi2
@@ -765,3 +858,4 @@ def plotSkymap(skymap, proj='mol', **kwargs):
     elif proj.upper() == 'CAR':
         im = healpy.cartview(skymap,**kwargs)
     return im
+

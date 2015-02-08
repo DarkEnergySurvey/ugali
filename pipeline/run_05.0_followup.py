@@ -8,6 +8,7 @@ import os
 from os.path import join, exists,basename,splitext
 import numpy
 import numpy as np
+import yaml
 
 from ugali.analysis.mcmc import MCMC
 from ugali.analysis.pipeline import Pipeline
@@ -47,6 +48,7 @@ def run(self):
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
     if 'membership' in self.opts.run:
         logger.info("Running 'membership'...")
+        from ugali.analysis.kernel import kernelFactory
         for name,label,coord in zip(names,labels,coords):
             glon,glat,radius = coord
             print name,'(%.4f,%.4f)'%(glon,glat)
@@ -55,7 +57,13 @@ def run(self):
             #params = scan.grid.mle()
             #params['ellipticity'] = None
             #params['position_angle'] = None
-            params = dict(distance_modulus=19.,extension=0.16,lat=69.63,lon=358.09,richness=51514.)
+            #params = dict(distance_modulus=19.,extension=0.16,lat=69.63,lon=358.09,richness=51514.)
+            datfile = join(outdir,self.config['output']['mcmcfile']%label)
+            datfile = datfile.replace('.npy','.dat')
+            params = yaml.load(open(datfile))['params']
+
+            kernel = kernelFactory(**self.config['mcmc']['kernel'])
+            scan.loglike.set_model('spatial',kernel)
             scan.loglike.set_params(**params)
             scan.loglike.sync_params()
             outfile=join(outdir,self.config['output']['mcmcfile']%label).replace('.npy','.fits')
@@ -77,7 +85,15 @@ def run(self):
             samples = np.load(infile)[nburn*nwalkers:]
             if len(params) != len(samples.dtype):
                 raise Exception("Samples shape does not match number of params")
-            fig = triangle.corner(samples.view((float,len(params))), labels=params)
+            
+            datfile = join(outdir,self.config['output']['mcmcfile']%label)
+            datfile = datfile.replace('.npy','.dat')
+            if os.path.exists(datfile):
+                results = yaml.load(open(datfile))['results']
+                truths = [results[param][0] for param in params]
+            else:
+                truths = None
+            fig = triangle.corner(samples.view((float,len(params))), labels=params, truths=truths)
             fig.suptitle(name)
             logger.info("  Writing %s..."%outfile)
             fig.savefig(outfile)

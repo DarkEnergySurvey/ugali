@@ -1,10 +1,20 @@
 #!/usr/bin/env python
 from collections import OrderedDict as odict
 import numpy as np
+import copy
 
 """
 A Model object is just a container for a set of Parameter.
 Implements __getattr__ and __setattr__.
+
+The model has a set of default parameters stored in Model._params. 
+Careful, if these are changex, they will be changed for all 
+subsequent instances of the Model.
+
+The parameters for a given instance of a model are stored in the
+Model.params attribute. This attribute is a deepcopy of 
+Model._params created during instantiation.
+
 """
 
 
@@ -18,13 +28,15 @@ class Model(object):
 
     def __init__(self,*args,**kwargs):
         self.name = self.__class__.__name__
-        params = dict()
-        params.update(**kwargs)
-        for param, value in params.items():
+        self.params = copy.deepcopy(self._params)
+        pars = dict(**kwargs)
+        for par, value in pars.items():
             # Raise AttributeError if attribute not found
-            self.__getattr__(param) 
+            self.__getattr__(par) 
             # Set attribute
-            self.__setattr__(param,value)
+            self.__setattr__(par,value)
+        # In case no properties were set, cache anyway
+        self._cache()
 
     def __getattr__(self,name):
         # Return 'value' of parameters
@@ -50,11 +62,11 @@ class Model(object):
     def __str__(self):
         ret = "%s:\n"%self.name
         ret += "  Parameters:"
-        if len(self._params)==0:
+        if len(self.params)==0:
             ret += "\n"
         else:            
-            width = len(max(self._params.keys(),key=len))
-            for name,value in self._params.items():
+            width = len(max(self.params.keys(),key=len))
+            for name,value in self.params.items():
                 ret += '\n    {0!s:{width}} : {1!r}'.format(name,value,width=width)
         return ret
 
@@ -72,7 +84,7 @@ class Model(object):
         value : scalar
             The parameter value.
         """
-        return self._params[name].value
+        return self.params[name].value
 
     def _setp(self, name, value):
         """ 
@@ -87,7 +99,7 @@ class Model(object):
         -------
         None
         """
-        self._params[name].set_value(value)
+        self.params[name].set_value(value)
         self._cache(name)
 
     def _cache(self, name=None):
@@ -106,9 +118,9 @@ class Model(object):
         """
         pass
 
-    @property
-    def params(self):
-        return self._params
+    #@property
+    #def params(self):
+    #    return self._params
 
 class Parameter(object):
     """

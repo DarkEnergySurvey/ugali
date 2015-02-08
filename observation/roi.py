@@ -122,7 +122,8 @@ class ROI(object):
         
         self.centers_lon, self.centers_lat = self.projector.imageToSphere(self.centers_x, self.centers_y)
         """
-        
+
+        # ADW: These are really bin edges, should be careful and consistent
         self.bins_mag = numpy.linspace(self.config.params['mag']['min'],
                                        self.config.params['mag']['max'],
                                        self.config.params['mag']['n_bins'] + 1)

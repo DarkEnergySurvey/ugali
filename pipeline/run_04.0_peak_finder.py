@@ -58,18 +58,18 @@ def run(self):
         candidates = pyfits.open(self.config.candfile)[1].data
         candidates = candidates[candidates['TS'] >= 25]
 
-        maglims = ugali.utils.skymap.readSparseHealpixMaps(pipeline.config.filenames['mask_1'].compressed(),'MAGLIM')
-        ugali.utils.plotting.plotSkymap(maglims,coord='G')
-        ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='G')
-        basename = 'candidates_gal.png'
-        outfile = os.path.join(outdir,basename)
-        plt.savefig(outfile)
-
-        ugali.utils.plotting.plotSkymap(maglims,coord='GC')
-        ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='GC')
-        basename = 'candidates_equ.png'
-        outfile = os.path.join(outdir,basename)
-        plt.savefig(outfile)
+        #maglims = ugali.utils.skymap.readSparseHealpixMaps(pipeline.config.filenames['mask_1'].compressed(),'MAGLIM')
+        #ugali.utils.plotting.plotSkymap(maglims,coord='G')
+        #ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='G')
+        #basename = 'candidates_gal.png'
+        #outfile = os.path.join(outdir,basename)
+        #plt.savefig(outfile)
+        # 
+        #ugali.utils.plotting.plotSkymap(maglims,coord='GC')
+        #ugali.utils.plotting.projScatter(candidates['glon'],candidates['glat'],c='r',coord='GC')
+        #basename = 'candidates_equ.png'
+        #outfile = os.path.join(outdir,basename)
+        #plt.savefig(outfile)
         
         for candidate in candidates:
             logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
@@ -79,12 +79,19 @@ def run(self):
             fig,ax = plotter.plot4()
             basename = '%s.png'%label
             outfile = os.path.join(outdir,basename)
-            plt.savefig(outfile)
+            plt.savefig(outfile,bbox_inches='tight')
          
             fig,ax = plotter.plotDistance()
             basename = '%s_dist.png'%label
             outfile = os.path.join(outdir,basename)
-            plt.savefig(outfile)
+            plt.savefig(outfile,bbox_inches='tight')
+
+            fig,axes = plt.subplots(1,2)
+            plotter.drawSpatial(axes[0])
+            plotter.drawCMD(axes[1],radius=0.2)
+            basename = '%s_scat.png'%label
+            outfile = os.path.join(outdir,basename)
+            plt.savefig(outfile,bbox_inches='tight')
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

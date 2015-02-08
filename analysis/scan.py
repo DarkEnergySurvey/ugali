@@ -83,7 +83,11 @@ class Scan(object):
 
     @staticmethod
     def createKernel(config,lon=0.0,lat=0.0):
-        return ugali.analysis.loglike.createKernel(config,lon,lat)
+        # ADW: This is sort of a hack
+        if config['scan'].get('kernel') is not None:
+            return ugali.analysis.loglike.createKernel(config['scan'],lon,lat)
+        else:
+            return ugali.analysis.loglike.createKernel(config,lon,lat)
 
     @staticmethod
     def createIsochrone(config):
@@ -135,7 +139,7 @@ class GridSearch:
 
         logger.info("Creating log-likelihood...")
         self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
-
+        logger.info(str(self.loglike))
         self.stellar_mass_conversion = self.loglike.stellar_mass()
         self.distance_modulus_array = np.asarray(self.config['scan']['distance_modulus_array'])
 

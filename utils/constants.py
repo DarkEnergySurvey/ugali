@@ -28,7 +28,7 @@ import numpy as np
 # data...
 
 MAGLIMS = dict(
-    ### ADW: Need to rectify these numbers!!!
+    ### ADW: Need to make sure everything matches
     # 95% completeness from ERD
     sdss = {
         'u': 22.0,
@@ -37,7 +37,6 @@ MAGLIMS = dict(
         'i': 21.3,
         'z': 20.5
     },
-    ### ADW: Need to rectify these numbers!!!
     # 10 sigma mag-limit
     dr10 = {
         'u': 22.12,
@@ -60,6 +59,10 @@ MAGLIMS = dict(
         'z': 22.0,
         'Y': 21.0
     },
+    y1a1 = {
+        'g': 23.7, # Probably closer to 23.9 (magerr) or 24.2 (mangle)
+        'r': 23.7, # Probably closer to 23.9 (mangle)
+        }
 )
 
 
@@ -82,4 +85,9 @@ MAGERR_PARAMS = dict(
         'i': [-0.94704984, -2.23306942, 0.01381268],
         'z': [np.nan, np.nan, np.nan]
     },
+
+    y1a1 = {
+        'g': [ -8.71852748e-01,  -2.52245237e+00,   5.12942930e-04], 
+        'r': [ -8.86883525e-01,  -2.38329071e+00,   4.56457328e-04], 
+        }
 )

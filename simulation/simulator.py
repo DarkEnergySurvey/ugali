@@ -206,12 +206,13 @@ class Simulator:
         #np.random.seed(0)
 
         params = dict(self.config)
-        if not self.config['simulate']['isochrone']:
+        if self.config['simulate'].get('isochrone') is None:
             params['simulate']['isochrone'] = params['isochrone']
-        if not self.config['simulate']['kernel']:
+        if self.config['simulate'].get('kernel') is None:
             params['simulate']['kernel'] = params['kernel']
+
         self.isochrone = ugali.analysis.loglike.createIsochrone(params)
-        self.kernel = ugali.analysis.loglike.createKernel(params,self.roi.lon,self.roi.lat)
+        self.kernel = ugali.analysis.loglike.createKernel(params['simulate'],self.roi.lon,self.roi.lat)
 
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
@@ -428,7 +429,7 @@ class Simulator:
 
         logger.info("Simulating %i background stars..."%nstar)
 
-        if not self.config['simulate']['uniform']:
+        if not self.config['simulate'].get('uniform'):
             logger.info("Generating colors from background CMD.")
 
             # Distribute the stars within each CMD bin
@@ -481,11 +482,63 @@ class Simulator:
 
         logger.info("Clipping %i simulated background stars..."%(~select).sum())
         
-        hdu = ugali.observation.catalog.makeHDU(config,mag_1[select],mag_err_1[select],
+        hdu = ugali.observation.catalog.makeHDU(self.config,mag_1[select],mag_err_1[select],
                                                 mag_2[select],mag_err_2[select],
                                                 lon[select],lat[select],mc_source_id[select])
         catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
         return catalog
+
+    def satellite(self,stellar_mass,distance_modulus,mc_source_id=1,seed=None,**kwargs):
+        """
+        Create a simulated satellite. Returns a catalog object.
+        """
+        if seed is not None: np.random.seed(seed)
+
+        isochrone = kwargs.pop('isochrone',self.isochrone)
+        kernel    = kwargs.pop('kernel',self.kernel)
+
+        for k,v in kwargs.items():
+            if k in kernel.params.keys(): setattr(kernel,k,v)
+
+        mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
+        lon, lat     = kernel.simulate(len(mag_1))
+ 
+        logger.info("Simulating %i satellite stars..."%len(mag_1))
+        pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
+
+        # There is probably a better way to do this step without creating the full HEALPix map
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
+        mag_lim_1 = mask[pix]
+        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
+        mag_lim_2 = mask[pix]
+
+        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
+        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+
+        # Randomize magnitudes by their errors
+        #mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
+        #mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
+        mag_obs_1 = mag_1
+        mag_obs_2 = mag_2
+
+        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
+
+        # Make sure objects lie within the original cmd (should also be done later...)
+        #select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, mag_obs_1 - mag_obs_2, mag_obs_1,self.roi.bins_color, self.roi.bins_mag) > 0)
+
+        #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
+        logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
+        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        
+        hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
+                                                mag_obs_2[select],mag_err_2[select], 
+                                                lon[select],lat[select],mc_source_id[select])
+        catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
+        return catalog
+
 
     def satellite2(self,stellar_mass,distance_modulus,mc_source_id=1,seed=None,**kwargs):
         """
@@ -513,68 +566,29 @@ class Simulator:
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
-        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
-        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
+        mag_err_1 = self.mask.photo_err_1(mag_lim_1 - mag_1)
+        mag_err_2 = self.mask.photo_err_2(mag_lim_2 - mag_2)
+
+        # Completeness is a function of true magnitude
+        method = 'step'
+        if method is None or method == 'none':
+            comp = np.ones(len(mag_1))
+        elif self.config['catalog']['band_1_detection']:
+            comp=self.mask.completeness(mag_lim_1-mag_1, method=method)
+        elif not self.config['catalog']['band_1_detection']:
+            comp=self.mask.completeness(mag_lim_2-mag_2, method=method)
+        else:
+            comp_1 = self.mask.completeness(mag_lim_1-mag_1, method=method)
+            comp_2 = self.mask.completeness(mag_lim_2-mag_2, method=method)
+            comp = comp_1*comp_2
+        accept = comp > 1 - np.random.uniform(size=len(mag_1))
 
         # Randomize magnitudes by their errors
-        #mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
-        #mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
-        mag_obs_1 = mag_1
-        mag_obs_2 = mag_2
+        mag_obs_1 = mag_1 + (numpy.random.normal(size=len(mag_1))*mag_err_1)
+        mag_obs_2 = mag_2 + (numpy.random.normal(size=len(mag_2))*mag_err_2)
 
         #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
-        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
-
-        ### # Make sure objects lie within the original cmd (should also be done later...)
-        ### select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
-        ###                                       self.roi.bins_color, self.roi.bins_mag) > 0)
-
-        #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
-        logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
-        
-        hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
-                                                mag_obs_2[select],mag_err_2[select], 
-                                                lon[select],lat[select],mc_source_id[select])
-        catalog = ugali.observation.catalog.Catalog(self.config, data=hdu.data)
-        return catalog
-
-
-    def satellite(self,stellar_mass,distance_modulus,mc_source_id=1,seed=None,**kwargs):
-        """
-        Create a simulated satellite. Returns a catalog object.
-        """
-        if seed is not None: np.random.seed(seed)
-
-        isochrone = kwargs.pop('isochrone',self.isochrone)
-        kernel    = kwargs.pop('kernel',self.kernel)
-
-        for k,v in kwargs.items():
-            if k in kernel.params.keys(): setattr(kernel,k,v)
-
-        mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
-        lon, lat     = kernel.simulate(len(mag_1))
-
-        logger.info("Simulating %i satellite stars..."%len(mag_1))
-        pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
-
-        # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
-        mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
-        mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
-        mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
-        mag_lim_2 = mask[pix]
-
-        mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
-        mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-
-        # Randomize magnitudes by their errors
-        mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
-        mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
-
-        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
-        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
+        select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)&accept
 
         ### # Make sure objects lie within the original cmd (should also be done later...)
         ### select &= (ugali.utils.binning.take2D(self.mask.solid_angle_cmd, color, mag_1,
@@ -600,7 +614,12 @@ class Simulator:
         catalogs.append(self.background(seed=seed))
         catalogs.append(self.satellite(seed=seed,**kwargs))
         logger.info("Merging simulated catalogs...")
-        return ugali.observation.catalog.mergeCatalogs(catalogs)
+        catalog = ugali.observation.catalog.mergeCatalogs(catalogs)
+        nsig = (catalog.mc_source_id == 1).sum()
+        nbkg = (catalog.mc_source_id == 2).sum()
+        logger.info("Simulated catalog contains: %i background stars"%nbkg)
+        logger.info("Simulated catalog contains: %i satellite stars"%nsig)
+        return catalog
 
     def makeHDU(self, mag_1, mag_err_1, mag_2, mag_err_2, lon, lat, mc_source_id):
         """
