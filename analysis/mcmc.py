@@ -49,6 +49,7 @@ class MCMC(object):
         self.nwalkers = self.config['mcmc']['nwalkers']
         self.nsamples = self.config['mcmc']['nsamples'] 
         self.nthreads = self.config['mcmc']['nthreads'] 
+        self.nburn = self.config['mcmc']['nburn']
         
         self.scan.run()
         self.grid = self.scan.grid
@@ -87,6 +88,8 @@ class MCMC(object):
             ('extension',0.01),               # delta_ext (deg)
             ('ellipticity',0.1),              # delta_e 
             ('position_angle',15.0),          # delta_pa (deg)
+            ('age',0.5),                      # delta_age (Gyr)
+            ('metallicity',0.0001),           # delta_z
         ])
         return std
 
@@ -145,28 +148,23 @@ class MCMC(object):
         ## Non-optimal conversion...
         #self.samples = np.core.records.fromrecords(samples,names=self.params)
         # Faster...
-        self.samples = np.rec.fromarrays(samples.T,names=self.params)
+        self.samples = Samples(samples.T,names=self.params)
 
-    def estimate(self,param,burn=None,sigma=5.0):
+    def estimate(self,param,burn=None,clip=10.0):
         if param not in self.loglike.params.keys():
             raise Exception('Unrecognized parameter: %s'%param)
 
         if param not in self.params: 
             mle = self.get_mle()
-            return [float(mle[param]),float(0)]
+            return [float(mle[param]),[0,0]]
 
-        #ADW: This is just a first pass, need to do peak finding and decrease
-        if burn is None: burn = self.config['mcmc']['nburn']
-        burn *= self.nwalkers
-        clip = scipy.stats.sigmaclip(self.samples[param][burn:],sigma,sigma)
-        mu,sigma = scipy.stats.norm.fit(clip[0])
-        return [float(mu), float(sigma)]
+        return self.samples.peak_interval(param)
 
-    def estimate_params(self,burn=None,sigma=5.0):
+    def estimate_params(self,burn=None,clip=10.0):
         mle = self.get_mle()
         out = odict()
         for param in mle.keys():
-            out[param] = self.estimate(param,burn,sigma)
+            out[param] = self.estimate(param,burn,clip)
         return out
 
     def get_results(self,**kwargs):
@@ -174,6 +172,9 @@ class MCMC(object):
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
         
+        ts = 2*self.loglike.value(**params)
+        results['ts'] = [float(ts),0]
+
         lon,lat = estimate['lon'][0],estimate['lat'][0]
 
         results.update(gal=[float(lon),float(lat)])
@@ -182,22 +183,22 @@ class MCMC(object):
 
         mod,mod_err = estimate['distance_modulus']
         dist = mod2dist(mod)
-        dist_err = (mod2dist(mod+mod_err)-mod2dist(mod-mod_err))/2.
-        results['distance'] = [float(dist),float(dist_err)]
+        dist_lo,dist_hi = [mod2dist(mod_err[0]),mod2dist(mod_err[1])]
+        results['distance'] = Samples._interval(dist,dist_lo,dist_hi)
+        
         rich,rich_err = estimate['richness']
 
         # Careful, depends on the isochrone...
         stellar_mass = self.loglike.stellar_mass()
         stellar_luminosity = self.loglike.stellar_luminosity()
 
-        mass,mass_err = rich*stellar_mass,rich_err*stellar_mass
-        results['mass'] = [float(mass),float(mass_err)]
+        mass = rich*stellar_mass
+        mass_lo,mass_hi = rich_err[0]*stellar_mass,rich_err[1]*stellar_mass
+        results['mass'] = Samples._interval(mass,mass_lo,mass_hi)
 
-        lum,lum_err = rich*stellar_luminosity,rich_err*stellar_luminosity
-        results['luminosity'] = [float(lum),float(lum_err)]
-
-        ts = 2*self.loglike.value(**params)
-        results['ts'] = [float(ts),0]
+        lum = rich*stellar_luminosity
+        lum_lo,lum_hi = rich_err[0]*stellar_luminosity,rich_err[1]*stellar_luminosity
+        results['luminosity'] = Samples._interval(lum,lum_lo,lum_hi)
 
         output = dict()
         output['params'] = params
@@ -208,7 +209,7 @@ class MCMC(object):
         np.save(filename,self.samples)
 
     def load_samples(self,filename):
-        self.samples = np.load(filename)
+        self.samples = Samples(filename)
 
     def write_results(self,filename):
         results = dict(self.get_results())
@@ -218,6 +219,135 @@ class MCMC(object):
         out.write(yaml.dump(params,default_flow_style=False))
         out.write(yaml.dump(results))
         out.close()
+
+
+#class Samples(np.ndarray):
+class Samples(np.recarray):
+    """
+    Wrapper class for recarray to deal with MCMC samples.
+    
+    A nice summary of various bayesian credible intervals can be found here:
+    http://www.sumsar.net/blog/2014/10/probable-points-and-credible-intervals-part-one/
+    """
+    _alpha = 0.32
+
+    def __new__(cls, input, names=None):
+        # Load the array from file
+        if not isinstance(input,np.ndarray):
+            obj = np.load(input).view(cls)
+        else:
+            obj = np.asarray(input).view(cls)
+            
+        # (re)set the column names
+        if names is not None:
+            if obj.dtype.names is None:
+                obj = np.rec.fromarrays(obj,names=names).view(cls)
+            else:
+                obj.dtype.names = names
+
+        return obj
+
+    def __array_wrap__(self, out_arr, context=None):
+        return np.ndarray.__array_wrap__(self,out_arr,context)
+
+    @property
+    def names(self):
+        return self.dtype.names
+
+    def data(self, name, burn=None, clip=None):
+        burn = slice(burn,None)
+        data = self[name][burn]
+        if clip is not None:
+            data,low,high = scipy.stats.sigmaclip(data,clip,clip)   
+        return data
+
+    @classmethod
+    def _interval(cls,best,lo,hi):
+        """
+        Pythonized interval for easy output to yaml
+        """
+        
+        return [float(best),[float(lo),float(hi)]]
+
+    def mean(self, name, **kwargs):
+        """
+        Mean of the distribution.
+        """
+        return np.mean(self.data(name,**kwargs))
+
+    def mean_interval(self, name, alpha=_alpha, **kwargs):
+        """
+        Inerval assuming gaussin posterior.
+        """
+        data = self.data(name,**kwargs)
+        mean =np.mean(data)
+        sigma = np.std(data)
+        return self._interval(mean,mean-sigma,mean+sigma)
+
+    def median(self, name, **kwargs):
+        """
+        Median of the distribution.
+        """
+        data = self.data(name,**kwargs)
+        q = [50]
+        return np.percentile(data,q)
+
+    def median_interval(self,name,alpha=_alpha, **kwargs):
+        """
+        Median including bayesian credible interval.
+        """
+        data = self.data(name,**kwargs)
+        q = [100*alpha/2., 50, 100*(1-alpha/2.)]
+        lo,med,hi = numpy.percentile(data,q)
+        return self._interval(med,lo,hi)
+        
+    def peak(self, name, **kwargs):
+        data = self.data(name,**kwargs)
+        num,edges = np.histogram(data,bins=100)
+        centers = (edges[1:]+edges[:-1])/2.
+        return centers[np.argmax(num)]
+
+    def peak_interval(self, name, alpha=_alpha, **kwargs):
+        data = self.data(name, **kwargs)
+        peak = self.peak(name, **kwargs)
+        x = np.sort(data); n = len(x)
+        # The number of entries in the interval
+        window = int(np.rint((1.0-alpha)*n))
+        # The start, stop, and width of all possible intervals
+        starts = x[:n-window]; ends = x[window:]
+        widths = ends - starts
+        # Just the intervals containing the peak
+        select = (peak >= starts) & (peak <= ends)
+        widths = widths[select]
+        if len(widths) == 0:
+            raise ValueError('Too few elements for interval calculation')
+        min_idx = np.argmin(widths)
+        lo = x[min_idx]
+        hi = x[min_idx+window]
+        return self._interval(peak,lo,hi)
+
+    def min_interval(self,name, alpha=_alpha, **kwargs):
+        data = self.data(name, **kwargs)
+        x = np.sort(data); n = len(x)
+        # The number of entries in the interval
+        window = int(np.rint((1.0-alpha)*n))
+        # The start, stop, and width of all possible intervals
+        starts = x[:n-window]; ends = x[window:]
+        widths = ends - starts
+        if len(widths) == 0:
+            raise ValueError('Too few elements for interval calculation')
+        min_idx = np.argmin(widths)
+        lo = x[min_idx]
+        hi = x[min_idx+window]
+        mean = (hi+lo)/2.
+        return self._interval(mean,lo,hi)
+
+    def results(self, names=None, alpha=_alpha, mode='peak', **kwargs):
+        if names is None: names = self.names
+        ret = odict()
+        for n in names:
+            ret[n] = getattr(self,'%s_interval'%mode)(n, **kwargs)
+        return ret
 
 if __name__ == "__main__":
     import ugali.utils.parser
@@ -257,8 +387,8 @@ if __name__ == "__main__":
     mcmc.loglike.set_params(**kwargs)
     mcmc.loglike.sync_params()
 
-    resfile = opts.outfile.replace('.npy','.dat')
-    mcmc.write_results(resfile)
-
     membfile = opts.outfile.replace('.npy','.fits')
     mcmc.loglike.write_membership(membfile)
+
+    resfile = opts.outfile.replace('.npy','.dat')
+    mcmc.write_results(resfile)

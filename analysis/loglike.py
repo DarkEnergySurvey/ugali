@@ -92,8 +92,8 @@ class LogLikelihood(object):
     def __str__(self):
         ret = "%s:"%self.__class__.__name__
         for key,model in self.models.items():
-            ret += "\n %s Model (sync=%s):\n"%(key.capitalize(),self._sync[key])
-            ret += ("  " + str(model))
+            ret += "\n  %s Model (sync=%s):\n"%(key.capitalize(),self._sync[key])
+            ret += model.__str__(indent=4)
         return ret
 
     ############################################################################
@@ -460,8 +460,10 @@ def createKernel(config,lon=0.0,lat=0.0):
     return ugali.analysis.kernel.kernelFactory(**params)
 
 def createIsochrone(config):
-    import ugali.analysis.isochrone
-    isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
+    #import ugali.analysis.isochrone
+    #isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
+    import ugali.analysis.isochrone2
+    isochrone = ugali.analysis.isochrone2.isochroneFactory(**config['isochrone'])
     return isochrone
 
 def createCatalog(config,roi=None,lon=None,lat=None):
@@ -484,7 +486,11 @@ def simulateCatalog(config,roi=None,lon=None,lat=None):
 
 def createMask(config,roi=None,lon=None,lat=None):
     import ugali.observation.mask
-    if roi is None: roi = createROI(config,lon,lat)
+    if roi is None: 
+        if lon is None or lat is None: 
+            msg = "Without `roi`, `lon` and `lat` must be specified"
+            raise Exception(msg)
+        roi = createROI(config,lon,lat)
     mask = ugali.observation.mask.Mask(config, roi)
     return mask
 

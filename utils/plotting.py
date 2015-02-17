@@ -604,6 +604,7 @@ def drawKernelHist(ax, kernel):
 def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+    config = ugali.utils.config.Config(config)
     if isinstance(data,basestring):
         data = pyfits.open(data)[1].data
 
@@ -623,7 +624,7 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     color = data['COLOR'][sort]
     cut = (prob > 0)
 
-    # ADW: Sometimes may be mag_1
+    # ADW: Sometimes may be mag_2
     mag = data[config['catalog']['mag_1_field']][sort]
     mag_err_1 = data[config['catalog']['mag_err_1_field']][sort]
     mag_err_2 = data[config['catalog']['mag_err_2_field']][sort]
@@ -682,7 +683,7 @@ def drawIsochrone(isochrone, **kwargs):
     kwargs.setdefault('ls','-')
     
     for iso in isochrone.isochrones:
-        logger.debug(iso.infile)
+        logger.debug(iso.filename)
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = iso.sample(mass_steps=5e4)
         mag = mag_1 + isochrone.distance_modulus
         color = mag_1 - mag_2
@@ -821,6 +822,21 @@ def plotChernoff(ts,bands='smooth',pdf=False):
     fig,ax = plt.subplots(1,1)
 
     drawChernoff(ax,ts,bands,pdf)
+
+
+def plot_chain(chain,burn=None,clip=None):
+    import triangle
+    from ugali.analysis.mcmc import Samples 
+    samples = Samples(chain)
+    names = samples.names
+    results = samples.results(clip=clip,burn=burn)
+    truths = [results[n][0] for n in names]
+    data = samples[burn:].view((float,len(names)))
+    fig = triangle.corner(data, labels=names, truths=truths)
+    return fig
+
+###################################################
+
     
 def plotSkymapCatalog(lon,lat,**kwargs):
     """

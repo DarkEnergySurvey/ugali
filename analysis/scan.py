@@ -17,12 +17,6 @@ import numpy as np
 import pyfits
 import healpy
 
-import ugali.analysis.isochrone
-import ugali.analysis.kernel
-import ugali.analysis.color_lut
-import ugali.observation.catalog
-import ugali.observation.mask
-import ugali.utils.parabola
 import ugali.utils.skymap
 from ugali.analysis.loglike  import LogLikelihood 
 
@@ -31,7 +25,6 @@ from ugali.utils.parabola import Parabola
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
-
 
 ############################################################
 
@@ -301,6 +294,9 @@ class GridSearch:
         mle['extension'] = float(self.loglike.extension)
         mle['ellipticity'] = float(self.loglike.ellipticity)
         mle['position_angle'] = float(self.loglike.position_angle)
+        # ADW: FIXME!
+        mle['age'] = np.mean(self.loglike.age)
+        mle['metallicity'] = np.mean(self.loglike.metallicity)
         return mle
 
     def err(self):
@@ -403,7 +399,7 @@ if __name__ == "__main__":
     parser.add_coords(required=True,radius=False)
     opts = parser.parse_args()
 
-    print opts.coords
+    #print opts.coords
     scan = Scan(opts.config,opts.coords)
     if not opts.debug:
         result = scan.run()
