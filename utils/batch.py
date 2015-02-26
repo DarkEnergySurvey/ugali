@@ -20,6 +20,17 @@ QUEUES = odict([
     ('condor',['vanilla','universe']),
 ])
 
+RUNLIMITS = odict([
+        ('express','0:01'),
+        ('short','0:30'),
+        ('medium','1:00'),
+        ('long','24:00'),
+        ('xlong','96:00'),
+        ('xxl','168:00'),
+        ('kipac-ibq','10:00'),
+        ('bulletmpi','10:00'),
+        ])
+
 def batchFactory(queue,**kwargs):
     if queue is None: queue = 'local'
 
@@ -122,22 +133,14 @@ class LSF(Batch):
         """
         Translate queue to wallclock runlimit.
         """
-        if queue == 'express':
-            return "0:01"
-        elif queue == 'short':
-            return "0:30"
-        elif queue == 'medium':
-            return "1:00"
-        elif queue == 'long':
-            return "24:00"
-        elif queue == 'xlong':
-            return "96:00"
-        elif queue == 'xxl':
-            return "168:00"
-    
+        return RUNLIMITS[queue]
+        
+    q2w = queue2runlimit
+
     def parse_options(self, **opts):
         options = odict(self.default_opts)
         options.update(opts)
+        #options['W'] = q2w(options.pop('q'))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
 class Slurm(Batch):

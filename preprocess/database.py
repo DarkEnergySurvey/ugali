@@ -173,7 +173,7 @@ class SDSSDatabase(Database):
         try:
             self.query(self.release,taskname,sqlname)
         except subprocess.CalledProcessError, e:
-            print e.output
+            logger.error(e.output)
             self.drop(dbname)
             raise e
         
@@ -376,17 +376,25 @@ class DESDatabase(Database):
          
         self.generate_query(pixel['ra_min'],pixel['ra_max'],pixel['dec_min'],pixel['dec_max'],sqlname,dbname)
         
+        array = self.query(self.release,taskname,sqlname)
+        if array is None: 
+            logger.info("No rows found.")
+            return
+        logger.info("Found %i rows."%len(array))
+        hdu = pyfits.new_table(array)
+        hdu.writeto(outfile)
 
-        try:
-            array = self.query(self.release,taskname,sqlname)
-            if array is None: return
-            logger.info("Found %i rows."%len(array))
-            hdu = pyfits.new_table(array)
-            hdu.writeto(outfile)
-        except Exception, e:
-            #print e.output
-            print e
-            #raise e
+        #try:
+        #    array = self.query(self.release,taskname,sqlname)
+        #    if array is None: return
+        #    logger.info("Found %i rows."%len(array))
+        #    hdu = pyfits.new_table(array)
+        #    hdu.writeto(outfile)
+        #except Exception, e:
+        #    
+        #    #print e.output
+        #    logger.error(e)
+        #    #raise e
 
     def run(self,pixfile=None,outdir=None):
         self.load_pixels(pixfile)
@@ -421,18 +429,21 @@ class Y1A1Database(DESDatabase):
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
         outfile = open(filename,"w")
-        select = 'ABS(s.WAVG_SPREAD_MODEL_I) < 0.002'
+        select = 'ABS(s.WAVG_SPREAD_MODEL_I) < 0.004'
+        select += 'and s.FLAGS_G < 4 and s.FLAGS_R < 4 and s.FLAGS_I < 4'
+        select += 'and s.MAG_AUTO_G between 0 and 30 and s.MAG_AUTO_R between 0 and 30 and s.MAG_AUTO_I between 0 and 30'
+        select += 'and s.MAGERR_AUTO_G < 1 and s.MAGERR_AUTO_R < 1 and s.MAGERR_AUTO_I < 1'
         #select = '1 = 1'
         table = 'Y1A1_COADD_OBJECTS'
         outfile.write('SELECT s.COADD_OBJECTS_ID, s.RA, s.DEC, \n')
-        outfile.write('s.MAG_PSF_G, s.MAGERR_PSF_G, \n')
-        outfile.write('s.MAG_PSF_R, s.MAGERR_PSF_R, \n')
-        outfile.write('s.MAG_PSF_I, s.MAGERR_PSF_I, \n')
-        outfile.write('s.WAVGCALIB_MAG_PSF_G, s.WAVG_MAGERR_PSF_G, \n')
-        outfile.write('s.WAVGCALIB_MAG_PSF_R, s.WAVG_MAGERR_PSF_R, \n')
-        outfile.write('s.WAVGCALIB_MAG_PSF_I, s.WAVG_MAGERR_PSF_I  \n')
-        #outfile.write('s.WAVG_SPREAD_MODEL_I, s.WAVG_SPREADERR_MODEL_I, \n')
-        #outfile.write('s.SPREAD_MODEL_I, s.SPREADERR_MODEL_I  \n')
+        outfile.write('s.MAG_PSF_G-XCORR_SFD98_G as MAGSFD_PSF_G, s.MAGERR_PSF_G, \n')
+        outfile.write('s.MAG_PSF_R-XCORR_SFD98_R as MAGSFD_PSF_R, s.MAGERR_PSF_R, \n')
+        outfile.write('s.MAG_PSF_I-XCORR_SFD98_I as MAGSFD_PSF_I, s.MAGERR_PSF_I, \n')
+        outfile.write('s.MAG_AUTO_G-XCORR_SFD98_G as MAGSFD_AUTO_G, s.MAGERR_AUTO_G, \n')
+        outfile.write('s.MAG_AUTO_R-XCORR_SFD98_R as MAGSFD_AUTO_R, s.MAGERR_AUTO_R, \n')
+        outfile.write('s.MAG_AUTO_I-XCORR_SFD98_I as MAGSFD_AUTO_I, s.MAGERR_AUTO_I, \n')
+        outfile.write('s.WAVG_SPREAD_MODEL_I, s.WAVG_SPREADERR_MODEL_I, \n')
+        outfile.write('s.SPREAD_MODEL_I, s.SPREADERR_MODEL_I  \n')
         outfile.write('FROM %s s \n'%(table))
         outfile.write('WHERE %s \n'%(select))
         outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))

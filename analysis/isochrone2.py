@@ -131,8 +131,8 @@ class Isochrone(Model):
             # Mass interpolation with uniform coverage between data points from isochrone file 
             mass_interpolation = scipy.interpolate.interp1d(range(0, len(mass_init)), mass_init)
             mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
-            d_mass = mass_array[1:] - mass_array[0: -1]
-            mass_init_array = np.sqrt(mass_array[1:] * mass_array[0: -1])
+            d_mass = mass_array[1:] - mass_array[0:-1]
+            mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])
             mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode = False)
             mass_act_array = mass_act_interpolation(mass_init_array)
             mag_1_array = mag_1_interpolation(mass_init_array)
@@ -218,9 +218,73 @@ class Isochrone(Model):
 
         return np.sum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))
 
+    def stellar_luminosity2(self, steps=10000):
+        """
+        Compute the stellar luminosity (L_Sol; average per star). 
+        Usese "sample" to generate mass samplint and pdf.
+        The range of integration only covers the input isochrone data (no extrapolation used),
+        but this seems like a sub-percent effect if the isochrone goes to 0.15 stellar masses for the
+        old and metal-poor stellar populations of interest.
+
+        Note that the stellar luminosity is very sensitive to the post-AGB population.
+        """
+        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps=steps)
+        luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity,fill_value=0,bounds_error=False)
+        luminosity = luminosity_interpolation(mass_init)
+        return np.sum(luminosity * mass_pdf)
+
     # ADW: For temporary backward compatibility
     stellarMass = stellar_mass
     stellarLuminosity = stellar_luminosity
+
+    def absolute_magnitude(self, richness=1, steps=1e4):
+        # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
+        # for stars with R-I < 1.15
+        # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
+        # g_des = g_sdss - 0.104(g_sdss - r_sdss) - 0.01
+        # r_des = r_sdss - 0.102(g_sdss - r_sdss) - 0.02
+        if self.survey.lower() != 'des':
+            raise Exception('Only valid for DES')
+        if 'g' not in [self.band_1,self.band_2]:
+            msg = "Need g-band for absolute magnitude"
+            raise Exception(msg)    
+        if 'r' not in [self.band_1,self.band_2]:
+            msg = "Need r-band for absolute magnitude"
+            raise Exception(msg)    
+
+        mass_init,mass_pdf,mass_act,mag_1,mag_2=self.sample(mass_steps = steps)
+        g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
+        
+        V = g - 0.487*(g - r) - 0.0249
+        
+        flux = np.sum(mass_pdf*10**(-V/2.5))
+        Mv = -2.5*np.log10(richness*flux)
+        return Mv
+
+    def simulate(self, stellar_mass, distance_modulus=None):
+        """
+        Simulate observed magnitudes for satellite of given mass and distance.
+        """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
+        # Total number of stars in system
+        n = int(stellar_mass/self.stellar_mass()) 
+        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample()
+        
+        ## ADW: This assumes that everything is sorted by increasing mass
+        #mag_1, mag_2 = mag_1[::-1],mag_2[::-1]
+        #mass_pdf[::-1]
+
+        cdf = np.cumsum(mass_pdf[::-1])
+        cdf = np.insert(cdf, 0, 0.)
+
+        #mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False
+        #ADW: CDF is *not* normalized (because of minimum mass)
+        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
+        index = np.floor(f(np.random.uniform(size=n))).astype(int)
+        #print "WARNING: non-random isochrone simulation"
+        #index = np.floor(f(np.linspace(0,1,n))).astype(int)
+        index = index[index >= 0]
+        return mag_1[::-1][index]+distance_modulus, mag_2[::-1][index]+distance_modulus
 
     def observableFractionCMDX(self, mask, distance_modulus, mass_min=0.1):
         """
@@ -494,24 +558,6 @@ class Isochrone(Model):
         #final_pdf = sum_pdf.reshape(nmaglim,nbins,nbins)*cut
         return final_pdf
 
-    def simulate(self, stellar_mass, distance_modulus=None):
-        """
-        Simulate observed magnitudes for satellite of given mass and distance.
-        """
-        if distance_modulus is not None: self.distance_modulus = distance_modulus
-        # Total number of stars in system
-        n = int(stellar_mass/self.stellar_mass()) 
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample()
-        cdf = np.cumsum(mass_pdf)
-        cdf = np.insert(cdf, 0, 0.)
-        #ADW: CDF not normalized (because of minimum mass?)
-        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
-        index = np.floor(f(np.random.uniform(size=n))).astype(int)
-        #print "WARNING: non-random isochrone simulation"
-        #index = np.floor(f(np.linspace(0,1,n))).astype(int)
-        index = index[index >= 0]
-        return mag_1[index] + self.distance_modulus, mag_2[index] + self.distance_modulus
- 
     def histo(self,distance_modulus=None,delta_mag=0.03,mass_steps=10000):
         """
         Histogram the isochrone in mag-mag space.

@@ -10,6 +10,7 @@ from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
+import numpy.lib.recfunctions as recfuncs
 import scipy.stats
 
 import pyfits
@@ -50,7 +51,9 @@ class MCMC(object):
         self.nsamples = self.config['mcmc']['nsamples'] 
         self.nthreads = self.config['mcmc']['nthreads'] 
         self.nburn = self.config['mcmc']['nburn']
-        
+        self.nchunk = self.config['mcmc'].get('nchunk',25)
+        self.alpha = self.config['mcmc'].get('alpha',0.10)
+
         self.scan.run()
         self.grid = self.scan.grid
         self.loglike = self.grid.loglike
@@ -117,7 +120,7 @@ class MCMC(object):
         kwargs = dict(zip(self.params,theta))
         return 0
 
-    def run(self, params):
+    def run(self, params, outfile=None):
         # Initailize the likelihood to maximal value
         mle =self.grid.mle()
         msg = "Setting inital values..."
@@ -138,19 +141,26 @@ class MCMC(object):
         logger.info("Running MCMC chain...")
         p0 = self.get_ball(params,nwalkers)
         self.sampler = emcee.EnsembleSampler(nwalkers,ndim,lnprob,threads=nthreads)
-        self.sampler.run_mcmc(p0,nsamples)
+        #self.sampler.run_mcmc(p0,nsamples)
 
         # Chain is shape (nwalkers,nsteps,nparams)
-        self.chain = mcmc.sampler.chain
         # Samples is shape (nwalkers*nsteps,nparams):
-        # chain[walker][step] == samples[walker+nwalkers*step]
-        samples = self.chain.reshape(-1,len(params),order='F')
-        ## Non-optimal conversion...
-        #self.samples = np.core.records.fromrecords(samples,names=self.params)
-        # Faster...
-        self.samples = Samples(samples.T,names=self.params)
+        for i,result in enumerate(self.sampler.sample(p0,iterations=nsamples)):
+            steps = i+1
+            if steps%10 == 0: logger.info("%i steps ..."%steps)
+            self.chain = self.sampler.chain
+            if (i==0) or (steps%self.nchunk==0):
+                samples = self.chain.reshape(-1,len(self.params),order='F')
+                self.samples = Samples(samples.T,names=self.params)
+                if outfile is not None: 
+                    logger.info("Writing %i steps to %s..."%(steps,outfile))
+                    self.write_samples(outfile)
 
-    def estimate(self,param,burn=None,clip=10.0):
+        samples = self.chain.reshape(-1,len(self.params),order='F')
+        self.samples = Samples(samples.T,names=self.params)
+        if outfile is not None: self.write_samples(outfile)
+
+    def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
         if param not in self.loglike.params.keys():
             raise Exception('Unrecognized parameter: %s'%param)
 
@@ -158,13 +168,13 @@ class MCMC(object):
             mle = self.get_mle()
             return [float(mle[param]),[0,0]]
 
-        return self.samples.peak_interval(param)
+        return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
 
-    def estimate_params(self,burn=None,clip=10.0):
+    def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
         mle = self.get_mle()
         out = odict()
         for param in mle.keys():
-            out[param] = self.estimate(param,burn,clip)
+            out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
 
     def get_results(self,**kwargs):
@@ -254,9 +264,17 @@ class Samples(np.recarray):
     def names(self):
         return self.dtype.names
 
+    @property
+    def ndarray(self):
+        return self.view((float,len(self.dtype)))
+
     def data(self, name, burn=None, clip=None):
-        burn = slice(burn,None)
-        data = self[name][burn]
+        # Remove zero entries
+        zsel = ~np.all(self.ndarray==0,axis=1)
+        # Remove burn entries
+        bsel = np.zeros(len(self),dtype=bool)
+        bsel[slice(burn,None)] = 1
+        data = self[name][bsel&zsel]
         if clip is not None:
             data,low,high = scipy.stats.sigmaclip(data,clip,clip)   
         return data
@@ -303,7 +321,7 @@ class Samples(np.recarray):
         
     def peak(self, name, **kwargs):
         data = self.data(name,**kwargs)
-        num,edges = np.histogram(data,bins=100)
+        num,edges = np.histogram(data,bins=500)
         centers = (edges[1:]+edges[:-1])/2.
         return centers[np.argmax(num)]
 
@@ -349,6 +367,38 @@ class Samples(np.recarray):
             ret[n] = getattr(self,'%s_interval'%mode)(n, **kwargs)
         return ret
 
+    class Results(object):
+        def __init__(self, config, samples, loglike=None, coords=None):
+            self.samples = copy.deepcopy(samples)
+
+            if loglike is not None and coords is not None:
+                msg = "Loglike and coords both specified."
+                raise Exception(msg)
+                
+            if loglike is not None:
+                self.loglike = copy.deepcopy(loglike)
+            else:
+                self.loglike = self.createLoglike(config,coords[0],coords[1])
+            logger.info(str(loglike))
+
+        def createLoglike(self,config,lon,lat):
+            self.loglike = ugali.analysis.loglike.createLoglike(config,coords)
+
+            if self.config['mcmc'].get('kernel') is not None:
+                kernel = kernelFactory(**self.config['mcmc']['kernel'])
+            else:
+                kernel = kernelFactory(**self.config['kernel'])
+            self.loglike.set_model('spatial',kernel)
+            
+            if self.config['mcmc'].get('isochrone') is not None:
+                config = dict(self.config)
+                config.update(isochrone=self.config['mcmc']['isochrone'])
+                iso = createIsochrone(config)
+            else:
+                iso = createIsochrone(config)
+            self.loglike.set_model('color',iso)
+
+
 if __name__ == "__main__":
     import ugali.utils.parser
     description = "Script for running MCMC followup"
@@ -367,7 +417,7 @@ if __name__ == "__main__":
     def lnprob(theta):
         global niter
         if (niter%100==0):
-            logger.info("%i function calls ..."%niter)
+            logger.debug("%i function calls ..."%niter)
         niter+=1
         lp = mcmc.lnprior(theta)
         if not np.isfinite(lp):
@@ -378,8 +428,8 @@ if __name__ == "__main__":
     mcmc.lnprob = lnprob
 
     params = mcmc.config['mcmc']['params']
-    mcmc.run(params)
-    mcmc.write_samples(opts.outfile)
+    mcmc.run(params,opts.outfile)
+    #mcmc.write_samples(opts.outfile)
 
     estimate = mcmc.estimate_params()
     kwargs = {k:v[0] for k,v in estimate.items()}

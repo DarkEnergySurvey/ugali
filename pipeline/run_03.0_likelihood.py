@@ -8,6 +8,7 @@ from ugali.analysis.pipeline import Pipeline
 
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
+import ugali.utils.skymap
 
 description="Run the likelihood search."
 components = ['scan','merge','plot']

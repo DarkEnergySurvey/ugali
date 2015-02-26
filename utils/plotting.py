@@ -24,6 +24,7 @@ import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
+import ugali.analysis.isochrone2
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
@@ -301,7 +302,7 @@ class BasePlotter(object):
         #ax.annotate("Stars",**self.label_kwargs)
 
     def drawCMD(self, ax, radius=None, zidx=None):
-        import ugali.analysis.isochrone
+        import ugali.analysis.isochrone2
 
         if zidx is not None:
             #dirname = self.config.params['output2']['searchdir']
@@ -312,13 +313,16 @@ class BasePlotter(object):
             f = pyfits.open(filename)
             distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
 
-            for ii, name in enumerate(self.config.params['isochrone']['infiles']):
-                print ii, name
-                drawIsochrone(ax, self.config, distance_modulus,lw=25,c='0.5')
-                drawIsochrone(ax, self.config, distance_modulus,ls='',marker='.',ms=1,c='k')
-                #isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
-                #mag = isochrone.mag + distance_modulus
-                #ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
+            iso = ugali.analysis.isochrone2.Padova(age=12,z=0.0002,mod=distance_modulus)
+            drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
+
+            #for ii, name in enumerate(self.config.params['isochrone']['infiles']):
+            #    print ii, name
+            #    drawIsochrone(ax, self.config, distance_modulus,lw=25,c='0.5')
+            #    drawIsochrone(ax, self.config, distance_modulus,ls='',marker='.',ms=1,c='k')
+            #    #isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+            #    #mag = isochrone.mag + distance_modulus
+            #    #ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
         
         # Stellar Catalog
         self._create_catalog()
@@ -473,6 +477,7 @@ class ObjectPlotter(BasePlotter):
     def __init__(self,obj,config,radius=1.0):
         self.obj = obj
         glon,glat = self.obj['GLON'],self.obj['GLAT']
+
         self.zidx = self.obj['ZIDX_MAX'] 
         super(ObjectPlotter,self).__init__(glon,glat,config,radius)
 
@@ -681,8 +686,9 @@ def drawIsochrone(isochrone, **kwargs):
     kwargs.setdefault('lw',25)
     kwargs.setdefault('zorder',0)
     kwargs.setdefault('ls','-')
-    
-    for iso in isochrone.isochrones:
+
+    isos = isochrone.isochrones if hasattr(isochrone,'isochrones') else [isochrone]
+    for iso in isos:
         logger.debug(iso.filename)
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = iso.sample(mass_steps=5e4)
         mag = mag_1 + isochrone.distance_modulus
@@ -701,9 +707,9 @@ def drawIsochrone(isochrone, **kwargs):
             logger.debug(msg)
             ax.plot(c,m,**kwargs)
 
-    ax.invert_yaxis()
-    ax.set_xlim(-0.5,1.5)
-    ax.set_ylim(23,18)
+    #ax.invert_yaxis()
+    #ax.set_xlim(-0.5,1.5)
+    #ax.set_ylim(23,18)
 
 def drawKernel(kernel, contour=False, coords='C', **kwargs):
     ax = plt.gca()
@@ -714,8 +720,8 @@ def drawKernel(kernel, contour=False, coords='C', **kwargs):
     ext = kernel.extension
     theta = kernel.theta
 
-    xmin,xmax = -5*ext,5*ext
-    ymin,ymax = -5*ext,5*ext,
+    xmin,xmax = -kernel.edge,kernel.edge
+    ymin,ymax = -kernel.edge,kernel.edge
 
     if coords[-1] == 'G':
         lon, lat = kernel.lon, kernel.lat

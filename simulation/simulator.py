@@ -110,7 +110,7 @@ class Generator:
         if size is None: size = self.config['simulate']['size']
         data = self.generate(size)
         
-        dtype=[('kernel','S18'),('ts','>f4'),('fit_ts','>f4'),
+        dtype=[('kernel','S18'),('ts','>f4'),('fit_kernel','S18'),('fit_ts','>f4'),
                ('fit_mass','>f4'),('fit_mass_err','>f4'),
                ('fit_distance','>f4'),('fit_distance_err','>f4')]
         results = np.array(np.nan*np.ones(size),dtype=dtype)
@@ -169,8 +169,11 @@ class Generator:
             fit_distance = grid.distance_modulus_array[distance_idx]
             grid.search(coords=(lon,lat),distance_modulus=fit_distance)
 
+            logger.info(str(self.loglike))
+
             mle = grid.mle()
             results[i]['kernel'] = simulator.kernel.name
+            results[i]['fit_kernel'] = grid.loglike.kernel.name
             results[i]['ts'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
             results[i]['fit_ts'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
             results[i]['fit_mass'] = grid.stellar_mass_conversion*mle['richness']
@@ -195,12 +198,12 @@ class Generator:
 
 ############################################################
 
-class Simulator:
+class Simulator(object):
     """
     Class for simulating catalog data.
     """
     
-    def __init__(self, config, roi):
+    def __init__(self, config, roi, **kwargs):
         self.config = ugali.utils.config.Config(config)
         self.roi = roi
         #np.random.seed(0)
@@ -216,17 +219,19 @@ class Simulator:
 
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
-        self._create_catalog()
+        self._create_catalog(kwargs.get('catalog'))
+
         self.photo_err_1,self.photo_err_2 = self.mask.photo_err_1,self.mask.photo_err_2
         #self._photometricErrors()
         self._setup_subpix()
         #self._setup_cmd()
 
-    def _create_catalog(self):
+    def _create_catalog(self,catalog=None):
         """
         Bundle it.
         """
-        catalog = ugali.analysis.loglike.createCatalog(self.config,self.roi)
+        if catalog is None:
+            catalog = ugali.analysis.loglike.createCatalog(self.config,self.roi)
         cut = self.mask.restrictCatalogToObservableSpace(catalog)
         self.catalog = catalog.applyCut(cut)
         
@@ -518,10 +523,10 @@ class Simulator:
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
 
         # Randomize magnitudes by their errors
-        #mag_obs_1 = mag_1+(numpy.random.normal(size=len(mag_1))*mag_err_1)
-        #mag_obs_2 = mag_2+(numpy.random.normal(size=len(mag_2))*mag_err_2)
-        mag_obs_1 = mag_1
-        mag_obs_2 = mag_2
+        mag_obs_1 = mag_1+numpy.random.normal(size=len(mag_1))*mag_err_1
+        mag_obs_2 = mag_2+numpy.random.normal(size=len(mag_2))*mag_err_2
+        #mag_obs_1 = mag_1
+        #mag_obs_2 = mag_2
 
         #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
         select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)

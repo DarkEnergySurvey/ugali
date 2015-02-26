@@ -236,10 +236,19 @@ class LogLikelihood(object):
         #self.pixel_roi_cut = self.roi.pixel_interior_cut
 
     def stellar_mass(self):
+        # ADW: I think it makes more sense for this to be
+        #return self.richness * self.isochrone.stellarMass()
         return self.isochrone.stellarMass()
 
     def stellar_luminosity(self):
+        # ADW: I think it makes more sense for this to be
+        #return self.richness * self.isochrone.stellarLuminosity()
         return self.isochrone.stellarLuminosity()
+
+    def absolute_magnitude(self):
+        # ADW: I think it makes more sense for this to be
+        #return 4.85 - 2.5*np.log10(self.stellar_luminosity()))
+        return 4.85 - 2.5*np.log10(self.richness*self.stellar_luminosity())
 
     def calc_backgroundCMD(self):
         #ADW: At some point we may want to make the background level a fit parameter.
@@ -300,7 +309,7 @@ class LogLikelihood(object):
         if not observable_fraction.sum() > 0:
             msg = "No observable fraction"
             logger.error(msg)
-            raise Exception(msg)
+            raise ValueError(msg)
         return observable_fraction
 
     def calc_signal_color1(self, distance_modulus, mass_steps=10000):
@@ -460,8 +469,10 @@ def createKernel(config,lon=0.0,lat=0.0):
     return ugali.analysis.kernel.kernelFactory(**params)
 
 def createIsochrone(config):
+    #logger.warning("Creating old isochrone...")
     #import ugali.analysis.isochrone
     #isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
+    logger.warning("Creating new isochrone...")
     import ugali.analysis.isochrone2
     isochrone = ugali.analysis.isochrone2.isochroneFactory(**config['isochrone'])
     return isochrone
@@ -494,7 +505,7 @@ def createMask(config,roi=None,lon=None,lat=None):
     mask = ugali.observation.mask.Mask(config, roi)
     return mask
 
-def createLoglike(config,lon=None,lat=None):
+def createLoglike(config,lon,lat):
     roi = createROI(config,lon,lat)
     kernel = createKernel(config,lon,lat)
     isochrone = createIsochrone(config)

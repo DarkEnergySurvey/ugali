@@ -14,7 +14,7 @@ import healpy
 import ugali.utils.binning
 import ugali.utils.skymap
 from ugali.utils.projector import cel2gal, gal2cel
-from ugali.utils.healpix import ang2pix, pix2ang
+from ugali.utils.healpix import ang2pix, pix2ang, superpixel
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config

@@ -70,7 +70,24 @@ def run(self):
         #basename = 'candidates_equ.png'
         #outfile = os.path.join(outdir,basename)
         #plt.savefig(outfile)
-        
+
+        import numpy as np
+        from ugali.utils.projector import cel2gal
+
+        data = [
+            #['Grus 1'   , 344.17, -50.1633, 19.6, 8], 
+            #['Indus 1'  , 317.20, -51.1656, 20.0, 8], 
+            #['Phoenix 2', 354.99, -54.4060, 20.4, 8], 
+            ['J0443.8-5017',70.9, -50.3, 20, 8],
+            ]
+        print data
+        data = [ d + list(cel2gal(d[1],d[2])) for d in data]
+        print data
+        names=['NAME','RA','DEC','DISTANCE_MODULUS','ZIDX_MAX','GLON','GLAT']
+        rec = np.rec.fromrecords(data,names=names)
+
+        candidates = pyfits.new_table(rec).data
+
         for candidate in candidates:
             logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
             label = candidate['name'].lower().replace(' ','_')

@@ -60,8 +60,10 @@ MAGLIMS = dict(
         'Y': 21.0
     },
     y1a1 = {
-        'g': 23.7, # Probably closer to 23.9 (magerr) or 24.2 (mangle)
-        'r': 23.7, # Probably closer to 23.9 (mangle)
+        #'g': 23.7, # Probably closer to 23.9 (magerr) or 24.2 (mangle)
+        #'r': 23.7, # Probably closer to 23.9 (mangle)
+        'g': 23.0, # Truncate at 23.0
+        'r': 23.0, # Truncate at 23.0
         }
 )
 

@@ -17,6 +17,8 @@ Model._params created during instantiation.
 
 """
 
+def indent(string,width=0): 
+    return '{0:>{1}}{2}'.format('',width,string)
 
 class Model(object):
     # The _params member is an ordered dictionary
@@ -59,15 +61,16 @@ class Model(object):
         else:
             return object.__setattr__(self, name, value)
 
-    def __str__(self):
-        ret = "%s:\n"%self.name
-        ret += "  Parameters:"
+    def __str__(self,indent=0):
+        ret = '{0:>{2}}{1}'.format('',self.name,indent)
         if len(self.params)==0:
-            ret += "\n"
+            pass
         else:            
+            ret += '\n{0:>{2}}{1}'.format('','Parameters:',indent+2)
             width = len(max(self.params.keys(),key=len))
             for name,value in self.params.items():
-                ret += '\n    {0!s:{width}} : {1!r}'.format(name,value,width=width)
+                par = '{0!s:{width}} : {1!r}'.format(name,value,width=width)
+                ret += '\n{0:>{2}}{1}'.format('',par,indent+4)
         return ret
 
     def _getp(self, name):
@@ -201,7 +204,7 @@ class Parameter(object):
     # Represenation
     # ADW: This should probably be __str__ not __repr__
     def __repr__(self):         
-        return "%s(%s, %s)" % (self.__class__.__name__, self.__value__, self.__bounds__)
+        return "%s(%s, [%s, %s])"%(self.__class__.__name__, self.value,self.bounds[0],self.bounds[1])
 
     # Return the type of the inner value
     def innertype(self):        return type(self.__value__)

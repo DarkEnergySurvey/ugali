@@ -33,6 +33,9 @@ def run(self):
         #ugali.preprocess.maglims.simple_maglims(self.config,force=self.opts.force)
         maglims = ugali.preprocess.maglims.Maglims(self.config)
         x = maglims.run(simple=True,force=self.opts.force)
+    if 'split' in self.opts.run:
+        logger.info("Running 'split'...")
+        ugali.preprocess.simple_split(self.config,'split',force=self.opts.force)
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

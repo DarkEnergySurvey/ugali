@@ -8,6 +8,8 @@ import shutil
 
 import pyfits
 import numpy
+import numpy as np
+
 import numpy.lib.recfunctions as recfuncs
 import tempfile
 import subprocess
@@ -19,7 +21,7 @@ from scipy.optimize import brentq
 import ugali.utils.skymap
 import ugali.utils.binning
 from ugali.utils.projector import cel2gal, gal2cel
-from ugali.utils.healpix import ang2pix, pix2ang
+from ugali.utils.healpix import ang2pix, pix2ang,superpixel
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
@@ -195,13 +197,15 @@ def inMangle(polyfile,ra,dec):
 
 def simple_maglims(config,dirname='simple',force=False):
     """
-    Creat simple, uniform magnitude limits based on nominal
+    Create simple, uniform magnitude limits based on nominal
     survey depth.
     """
     filenames = config.getFilenames()
     release = config['data']['release'].lower()
-    band_1 = config['isochrone']['mag_1_field']
-    band_2 = config['isochrone']['mag_2_field']
+    #band_1 = config['isochrone']['mag_1_field']
+    #band_2 = config['isochrone']['mag_2_field']
+    band_1 = config['catalog']['mag_1_field']
+    band_2 = config['catalog']['mag_2_field']
     mask_1 = filenames['mask_1'].compressed()
     mask_2 = filenames['mask_2'].compressed()
     basedir,basename = os.path.split(config['mask']['dirname'])
@@ -220,7 +224,64 @@ def simple_maglims(config,dirname='simple',force=False):
             logger.debug('Writing %s...'%outfile)
             f.writeto(outfile,clobber=True)
 
+def simple_split(config,dirname='simple',force=False):
+    config = Config(config)
+    filenames = config.getFilenames()
+    healpix = filenames['pix'].compressed()
 
+    nside_catalog = config['coords']['nside_catalog']
+    nside_pixel = config['coords']['nside_pixel']
+
+    release = config['data']['release'].lower()
+    band_1 = config['catalog']['mag_1_band']
+    band_2 = config['catalog']['mag_2_band']
+
+    mangledir = config['mangle']['dirname']
+
+    mangle_file_1 = join(mangledir,config['mangle']['filename_1'])
+    logger.info("Reading %s..."%mangle_file_1)
+    mangle_1 = healpy.read_map(mangle_file_1)
+    
+    mangle_file_2 = join(mangledir,config['mangle']['filename_2'])
+    logger.info("Reading %s..."%mangle_file_2)
+    mangle_2 = healpy.read_map(mangle_file_2)
+
+    basedir,basename = os.path.split(config['mask']['dirname'])
+    if basename == dirname:
+        msg = "Input and output directory are the same."
+        raise Exception(msg)
+    outdir = mkdir(os.path.join(basedir,dirname))
+
+    mask_1 = os.path.basename(config['mask']['basename_1'])
+    mask_2 = os.path.basename(config['mask']['basename_2'])
+
+    for band,mangle,base in [(band_1,mangle_1,mask_1),(band_2,mangle_2,mask_2)]:
+        maglim = MAGLIMS[release][band]
+
+        nside_mangle = healpy.npix2nside(len(mangle))
+        if nside_mangle != nside_pixel:
+            msg = "Mangle nside different from pixel nside"
+            raise Exception(msg)
+
+
+        pixels = np.nonzero((mangle>0)&(mangle>maglim))[0]
+        print len(pixels)
+        superpix = superpixel(pixels,nside_mangle,nside_catalog)
+        print healpix
+        for hpx in healpix:
+            outfile = join(outdir,base)%hpx
+            if os.path.exists(outfile) and not force:
+                logger.warning("Found %s; skipping..."%outfile)
+                continue
+
+            pix = pixels[superpix == hpx]
+            print hpx, len(pix)
+
+            maglims = maglim*np.ones(len(pix))
+            data = dict(MAGLIM=maglims )
+            logger.info('Writing %s...'%outfile)
+            ugali.utils.skymap.writeSparseHealpixMap(pix,data,nside_pixel,outfile)
+        
 if __name__ == "__main__":
     from optparse import OptionParser
     usage = "Usage: %prog  [options] input"

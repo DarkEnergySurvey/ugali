@@ -77,23 +77,34 @@ def run(self):
 
         for name,label,coord in zip(names,labels,coords):
             infile = join(outdir,self.config['output']['mcmcfile']%label)
-            if not exists(infile): continue
+            if not exists(infile): 
+                logger.warning("Couldn't find %s; skipping..."%infile)
+                continue
             outfile = infile.replace('.npy','.png')
+            
+            samples = ugali.analysis.mcmc.Samples(infile)
+
             nburn = self.config['mcmc']['nburn']
             nwalkers = self.config['mcmc']['nwalkers']
-            params = self.config['mcmc']['params']
-            samples = np.load(infile)[nburn*nwalkers:]
-            if len(params) != len(samples.dtype):
-                raise Exception("Samples shape does not match number of params")
-            
+            burn = nburn * nwalkers
+            clip = 10.
+
+            params = samples.names
             datfile = join(outdir,self.config['output']['mcmcfile']%label)
             datfile = datfile.replace('.npy','.dat')
-            if os.path.exists(datfile):
+            if False: #os.path.exists(datfile):
                 results = yaml.load(open(datfile))['results']
                 truths = [results[param][0] for param in params]
             else:
-                truths = None
-            fig = triangle.corner(samples.view((float,len(params))), labels=params, truths=truths)
+                truths=[samples.peak(p,burn=burn,clip=clip) for p in samples.names]
+                #truths = None
+
+            chain = samples.ndarray[nburn*nwalkers:]
+            chain = chain[~np.all(chain==0,axis=1)]
+
+            extents = None
+            #extents = [[0,15e3],[323.6,323.8],[-59.8,-59.7],[0,0.1],[19.5,20.5]]
+            fig = triangle.corner(chain, labels=params, truths=truths,extents=extents)
             fig.suptitle(name)
             logger.info("  Writing %s..."%outfile)
             fig.savefig(outfile)

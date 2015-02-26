@@ -245,8 +245,10 @@ class Mask:
         if catalog is None:
             # Simple proxy for photometric errors
             release = self.config['data']['release']
-            band_1 = self.config['catalog']['mag_1_band']
-            band_2 = self.config['catalog']['mag_2_band']
+            band_1 = self.config['catalog'].get('mag_1_band')
+            if not band_1: band_1 = self.config['isochrone']['mag_1_field']
+            band_2 = self.config['catalog'].get('mag_2_band')
+            if not band_2: band_2 = self.config['isochrone']['mag_2_field']
             
             DELMIN = 0.0
             pars_1 = MAGERR_PARAMS[release][band_1]

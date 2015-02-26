@@ -21,6 +21,8 @@ from ugali.utils.healpix import ang2vec, ang2pix, query_disc
 
 from ugali.utils.logger import logger
 
+#ADW: WARNING some funky stuff may be happening at the origin (0,0)
+
 class Kernel(Model):
     """
     Base class for kernels.
@@ -117,7 +119,7 @@ class EllipticalKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.001,5.0]) ),    
+            ('extension',     Parameter(0.5, [0.001,5.0]) ),   
             ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),    # Default 0 for RadialKernel
             ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
         ])

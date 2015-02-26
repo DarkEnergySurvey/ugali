@@ -295,8 +295,13 @@ class GridSearch:
         mle['ellipticity'] = float(self.loglike.ellipticity)
         mle['position_angle'] = float(self.loglike.position_angle)
         # ADW: FIXME!
-        mle['age'] = np.mean(self.loglike.age)
-        mle['metallicity'] = np.mean(self.loglike.metallicity)
+        try: 
+            mle['age'] = np.mean(self.loglike.age)
+            mle['metallicity'] = np.mean(self.loglike.metallicity)
+        except AttributeError:
+            mle['age'] = np.nan
+            mle['metallicity'] = np.nan
+            
         return mle
 
     def err(self):

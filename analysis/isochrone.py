@@ -877,7 +877,7 @@ class CompositeIsochrone(Model):
     def __getitem__(self, key):
         return self.isochrones[key]
 
-    def __str__(self):
+    def __str__(self,indent=None):
         ret = super(CompositeIsochrone,self).__str__()
         ret += '\n  Isochrone Files:'
         for name in self.config['isochrone']['infiles']:
@@ -967,7 +967,7 @@ class CompositeIsochrone(Model):
         #print "WARNING: non-random isochrone simulation"
         #index = numpy.floor(f(np.linspace(0,1,n))).astype(int)
         index = index[index >= 0]
-        return mag_1[index] + distance_modulus, mag_2[index] + distance_modulus
+        return mag_1[index]+distance_modulus, mag_2[index]+distance_modulus
 
     def horizontalBranch(self, color, mag):
         """

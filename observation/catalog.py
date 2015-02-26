@@ -37,7 +37,7 @@ class Catalog:
             self._parse(roi)
         else:
             self.data = data
-    
+
         self._defineVariables()
 
     def __add__(self, other):
@@ -167,6 +167,20 @@ class Catalog:
                 logger.warning('Unrecognized catalog file extension %s'%(file_type))
         else:
             self.data = readCatalogData(filenames['catalog'].compressed())
+
+
+        # ADW: This is horrible and should never be done...
+        selection = self.config['catalog'].get('selection')
+        if not selection:
+            pass
+        elif 'self.data' not in selection:
+            msg = "Selection does not contain 'data'"
+            raise Exception(msg)
+        else:
+            logger.warning('Evaluating selection: \n"%s"'%selection)
+            sel = eval(selection)
+            self.data = self.data[sel]
+
         #print 'Found %i objects'%(len(self.data))
 
     def _defineVariables(self):
@@ -196,11 +210,12 @@ class Catalog:
                 self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
                 logger.info('Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0)))
             else:
+                #ADW: This is pretty kludgy, please fix... (FIXME)
                 columns_array = [pyfits.Column(name = self.config['catalog']['mc_source_id_field'],
                                                format = 'I',
                                                array = numpy.zeros(len(self.data)))]
                 hdu = pyfits.new_table(columns_array)
-                self.data = pyfits.new_table(pyfits.new_table(self.data).columns + hdu.columns).data
+                self.data = pyfits.new_table(pyfits.new_table(self.data.view(np.recarray)).columns + hdu.columns).data
                 self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
 
         # should be @property
@@ -286,6 +301,7 @@ def readCatalogData(infiles):
             if name not in data[ii].names:
                 raise Exception("Column %s not found in %"(name,infiles[ii]))
             table.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = data[ii].field(name)
+        
     return table.data
 
 def makeHDU(config,mag_1,mag_err_1,mag_2,mag_err_2,lon,lat,mc_source_id):
