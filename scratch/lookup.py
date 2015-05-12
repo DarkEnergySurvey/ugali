@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import ugali.candidate.associate
 import ugali.utils.parser
-
+import numpy as np
+from ugali.utils.projector import gal2cel
 #CATALOGS = ['McConnachie12','Rykoff14', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14']
 CATALOGS = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14']
 
@@ -13,22 +14,47 @@ if __name__ == "__main__":
     parser.add_argument('-n','--nnearest',default=1,type=int)
     opts = parser.parse_args()
 
-
-
     catalog = ugali.candidate.associate.SourceCatalog()
     for i in CATALOGS:
         catalog += ugali.candidate.associate.catalogFactory(i)
 
-
-    for glon,glat,radius in opts.coords:
+    for name,(glon,glat,radius) in zip(opts.names, opts.coords):
+        ra,dec = gal2cel(glon,glat)
         if radius <= 0: radius = None
     
         idx1,idx2,sep = catalog.match([glon],[glat],tol=radius,nnearest=opts.nnearest)
         match = catalog[idx2]
-         
-        for i,m in enumerate(match):
-            if opts.gal is not None:
-                msg='%s (GLON=%.2f,GLAT=%.2f): %.4f'%(m['name'],m['glon'],m['glat'],sep[i])
-            else:
-                msg='%s (RA=%.2f,DEC=%.2f): %.4f'%(m['name'],m['ra'],m['dec'],sep[i])
-            print msg
+
+        if len(match) > 0:
+            n = match[0]['name']
+            s = sep[0]
+            l,b = match[0]['glon'],match[0]['glat']
+            r,d = match[0]['ra'],match[0]['dec']
+        else:
+            n = 'NONE'
+            s = np.nan
+            l,b = np.nan,np.nan
+            r,d = np.nan,np.nan
+            
+        if opts.gal is not None:
+            msg='%s (GLON=%.2f,GLAT=%.2f) --> %s (GLON=%.2f,GLAT=%.2f): %.4f'%(name, glon,glat, n,l,b,s)
+        else:
+            msg='%s (RA=%.2f,DEC=%.2f) --> %s (RA=%.2f,DEC=%.2f): %.4f'%(name, ra, dec, n, r, d,s)
+        print msg
+
+
+        #for i,c in enumerate(opts.coords):
+        #    glon,glat,radius
+        #    if i in idx1:
+        #        name = catalog[idx2[np.where(idx1==i)[0]]]['name']
+        #        s = sep[np.where(idx1==i)[0]]
+        #    else:
+        #        name = "NONE"
+        #        s = np.nan
+        # 
+        #    if opts.gal is not None:
+        #        msg='%s (GLON=%.2f,GLAT=%.2f): %.4f'%(name,c[1],c[2],s)
+        #    else:
+        #        ra,dec = gal2cel(c1,c2)
+        #        msg='%s (RA=%.2f,DEC=%.2f): %.4f'%(name,ra,dec,s)
+        #    print msg
