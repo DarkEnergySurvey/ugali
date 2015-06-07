@@ -4,7 +4,7 @@ import ugali.utils.parser
 import numpy as np
 from ugali.utils.projector import gal2cel
 #CATALOGS = ['McConnachie12','Rykoff14', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14']
-CATALOGS = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14']
+CATALOGS = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
 
 if __name__ == "__main__":
     import argparse
