@@ -339,6 +339,44 @@ class WEBDA14(SourceCatalog):
 
         ra,dec = gal2cel(self.data['glon'],self.data['glat'])
         self.data['ra'],self.data['dec'] = ra,dec
+
+class ExtraDwarfs(SourceCatalog):
+    """
+    Collection of dwarf galaxy candidates discovered in 2015
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter=',')
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"extras/extra_dwarfs.csv")
+        raw = np.recfromcsv(filename,**kwargs)
+        
+        self.data.resize(len(raw))
+        self.data['name'] = raw['name']
+        
+        self.data['ra'] = raw['ra']
+        self.data['dec'] = raw['dec']
+
+        self.data['glon'],self.data['glat'] = cel2gal(raw['ra'],raw['dec'])
+
+
+class ExtraClusters(SourceCatalog):
+    """
+    Collection of recently discovered star clusters
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter=',')
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"extras/extra_clusters.csv")
+        raw = np.recfromcsv(filename,**kwargs)
+        
+        self.data.resize(len(raw))
+        self.data['name'] = raw['name']
+        
+        self.data['ra'] = raw['ra']
+        self.data['dec'] = raw['dec']
+
+        self.data['glon'],self.data['glat'] = cel2gal(raw['ra'],raw['dec'])
+
     
 
 def catalogFactory(name, **kwargs):

@@ -82,8 +82,10 @@ class Parser(argparse.ArgumentParser):
 
         if gal is not None:
             opts.coords = [(gal[0],gal[1],radius)]
+            opts.names = ['' for c in opts.coords]
         else:
             opts.coords = None
+            opts.names = None
 
         if vars(opts).get('targets') is not None:
             opts.names,opts.coords = self.parse_targets(opts.targets)
