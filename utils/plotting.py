@@ -705,6 +705,8 @@ def drawIsochrone(isochrone, **kwargs):
         for i,(c,m) in enumerate(zip(colors,mags)):
             msg = '%-4i (%g,%g) -- (%g,%g)'%(i,m[0],c[0],m[-1],c[-1])
             logger.debug(msg)
+            if i > 0:
+                kwargs['label'] = None
             ax.plot(c,m,**kwargs)
 
     #ax.invert_yaxis()
