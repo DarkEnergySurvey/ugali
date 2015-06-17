@@ -61,6 +61,19 @@ ang2vec = angToVec
 
 ############################################################
 
+def healpixMap(nside, lon, lat, fill_value=0.):
+    """
+    Input (lon, lat) in degrees instead of (theta, phi) in radians.
+    Returns HEALPix map at the desired resolution 
+    """
+    pix = angToPix(nside, lon, lat)
+    m = numpy.histogram(pix, numpy.arange(healpy.nside2npix(nside) + 1))[0].astype(float)
+    if fill_value != 0.:
+        m[m == 0.] = fill_value
+    return m
+
+############################################################
+
 def in_pixels(lon,lat,pixels,nside):
     """
     Check if (lon,lat) in pixel list.
