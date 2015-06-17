@@ -84,7 +84,13 @@ class Scan(object):
 
     @staticmethod
     def createIsochrone(config):
-        return ugali.analysis.loglike.createIsochrone(config)
+        # ADW: This is sort of a hack
+        if config['scan'].get('isochrone') is not None:
+            config = dict(config)
+            config.update(isochrone=config['scan']['isochrone'])
+            return ugali.analysis.loglike.createIsochrone(config)
+        else:
+            return ugali.analysis.loglike.createIsochrone(config)
 
     @staticmethod
     def createCatalog(config,roi=None,lon=None,lat=None):

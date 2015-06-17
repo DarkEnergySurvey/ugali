@@ -14,7 +14,7 @@ from ugali.utils.shell import mkdir
 
 DATABASES = {
     'sdss':['dr10'],
-    'des' :['sva1','sva1_gold','y1a1'],
+    'des' :['sva1','sva1_gold','y1a1','y2n'],
     }
 
 def databaseFactory(survey,release):
@@ -23,6 +23,11 @@ def databaseFactory(survey,release):
     elif survey == 'des':
         if release == 'y1a1':
             return Y1A1Database()
+        elif release == 'y2n':
+            return Y2NDatabase()
+        else:
+            msg = "Unrecognized release: %s"%release
+            raise Exception(msg)
         return DESDatabase(release = release)
     else:
         logger.error("Unrecognized survey: %s"%survey)
@@ -410,22 +415,6 @@ class Y1A1Database(DESDatabase):
 
         print self.basename
 
-    #def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
-    #    # Preliminary and untested
-    #    outfile = open(filename,"w")
-    #    select = 'ABS(s.SPREAD_MODEL_I) < 0.002'
-    #    table = 'Y1A1_COADD_OBJECTS'
-    #    outfile.write('SELECT s.COADD_OBJECTS_ID, s.RA, s.DEC, \n')
-    #    outfile.write('s.MAG_PSF_G, s.MAGERR_PSF_G, \n')
-    #    outfile.write('s.MAG_PSF_R, s.MAGERR_PSF_R, \n')
-    #    outfile.write('s.MAG_PSF_I, s.MAGERR_PSF_I  \n')
-    #    outfile.write('FROM %s s \n'%(table))
-    #    outfile.write('WHERE %s \n'%(select))
-    #    outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))
-    #    outfile.write('AND s.DEC > %.7f AND s.DEC < %.7f ' % (dec_min,dec_max))
-    #    outfile.close()
-
-
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
         outfile = open(filename,"w")
@@ -448,6 +437,35 @@ class Y1A1Database(DESDatabase):
         outfile.write('WHERE %s \n'%(select))
         outfile.write('AND s.RA > %.7f AND s.RA < %.7f \n' % (ra_min,ra_max))
         outfile.write('AND s.DEC > %.7f AND s.DEC < %.7f ' % (dec_min,dec_max))
+        outfile.close()
+
+
+class Y2NDatabase(DESDatabase):
+    def __init__(self):
+        release='Y2N'
+        super(Y2NDatabase,self).__init__(release=release)
+        self.release = release.lower()
+        self.basename = "des_%s_photometry"%self.release
+
+        print self.basename
+
+    def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
+        # Preliminary and untested
+        outfile = open(filename,"w")
+        select = 'ABS(s.WAVG_SPREAD_MODEL_R) < 0.003'
+        select += 'and s.WAVG_MAG_PSF_G between 0 and 30 and s.WAVG_MAG_PSF_R between 0 and 30'
+        select += 'and s.MAGERR_AUTO_G < 1 and s.MAGERR_AUTO_R < 1'
+        #select = '1 = 1'
+        table = 'kadrlica.Y2N_UNIQUE_OBJECTS@DESOPER'
+        outfile.write('SELECT s.CATALOG_ID, s.RA, s.DEC, \n')
+        outfile.write('s.WAVG_MAG_PSF_G, s.MAGERR_PSF_G, \n')
+        outfile.write('s.WAVG_MAG_PSF_R, s.MAGERR_PSF_R, \n')
+        outfile.write('s.WAVG_MAG_AUTO_G, s.MAGERR_AUTO_G, \n')
+        outfile.write('s.WAVG_MAG_AUTO_R, s.MAGERR_AUTO_R, \n')
+        outfile.write('s.WAVG_SPREAD_MODEL_R, s.WAVG_SPREADERR_MODEL_R, \n')
+        outfile.write('s.SPREAD_MODEL_R, s.SPREADERR_MODEL_R \n')
+        outfile.write('FROM %s s \n'%(table))
+        outfile.write('WHERE %s \n'%(select))
         outfile.close()
 
 

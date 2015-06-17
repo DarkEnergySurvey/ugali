@@ -12,6 +12,7 @@ import copy
 import numpy
 import numpy as np
 import scipy.integrate
+import scipy.interpolate
 import healpy
 
 import ugali.utils.projector
@@ -69,7 +70,7 @@ class Kernel(Model):
     def integrate(self, rmin=0, rmax=numpy.inf):
         """
         Calculate the 2D integral of the 1D surface brightness profile 
-        (i.e, the flux) between rmin and rmax. 
+        (i.e, the flux) between rmin and rmax (elliptical radii). 
         rmin : minimum integration radius (deg)
         rmax : maximum integration radius (deg)
         return : Solid angle integral (deg^2)
@@ -87,7 +88,7 @@ class ToyKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.01,5.0]) ), 
+            ('extension',     Parameter(0.5, [0.0001,5.0]) ), 
             ('nside',         Parameter(4096,[4096,4096])),
         ])
 
@@ -119,9 +120,11 @@ class EllipticalKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.001,5.0]) ),   
+            ('extension',     Parameter(0.5, [0.0001,0.5]) ),   
             ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),    # Default 0 for RadialKernel
             ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
+            # This is the PA *WEST* of North.
+            # to get the conventional PA EAST of North take 90-PA
         ])
     _mapping = odict([
         ('e','ellipticity'),
@@ -328,6 +331,11 @@ class EllipticalKing(EllipticalKernel):
     Stellar density distribution for King profile:
     f(r) = C * [ 1/sqrt(1 + (r/r_c)**2) - 1/sqrt(1 + (r_t/r_c)**2) ]**2
     http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 4)
+    
+    The half-light radius is related to the King radius for 
+    c = log10(r_t/r_c) = 0.7 :
+    r_h = 1.185 * r_c
+    http://adsabs.harvard.edu/abs/2010MNRAS.406.1220W (App.B)
     """
     _params = odict(
         EllipticalKernel._params.items() + 
@@ -379,6 +387,8 @@ class RadialKernel(EllipticalKernel):
         self._params = copy.deepcopy(self._params)
         self._params['ellipticity'].set(0, [0, 0])
         self._params['position_angle'].set(0, [0, 0])
+        logger.warning("Setting bounds on extension")
+        self._params['extension'].set(0.1, [1e-4, 0.1])
 
         super(RadialKernel,self).__init__(**kwargs)
         

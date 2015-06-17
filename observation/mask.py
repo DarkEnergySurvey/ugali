@@ -22,7 +22,7 @@ import ugali.observation.roi
 
 from ugali.utils.logger import logger
 from ugali.utils.healpix import ang2pix
-
+from ugali.utils.config import Config
 from ugali.utils.constants import MAGERR_PARAMS
 ############################################################
 
@@ -31,7 +31,7 @@ class Mask:
     Contains maps of completeness depth in magnitudes for multiple observing bands, and associated products.
     """
     def __init__(self, config, roi):
-        self.config = config
+        self.config = Config(config)
         self.roi = roi
         filenames = self.config.getFilenames()
         catalog_pixels = self.roi.getCatalogPixels()

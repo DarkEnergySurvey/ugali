@@ -35,3 +35,11 @@ logger.setLevel(logger.INFO)
 #logger.setLevel(logger.ERROR)
 #logger.setLevel(logger.CRITICAL) # Least verbose
 
+def file_found(filename,force):
+    if os.path.exists(filename) and not force:
+        logger.info("Found %s; skipping..."%filename)
+        return True
+    else:
+        return False
+
+logger.file_found = file_found

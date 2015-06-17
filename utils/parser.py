@@ -37,6 +37,10 @@ class Parser(argparse.ArgumentParser):
             group.add_argument('--radius',default=0,type=float,
                                help="Radius surrounding specified coordinates")
 
+    def add_name(self,**kwargs):
+        self.add_argument('-n','--name',
+                          help = "Target name",**kwargs)
+
     def add_verbose(self,**kwargs):
         self.add_argument('-v','--verbose',action='store_true',
                           help='Output verbosity.',**kwargs)
@@ -82,7 +86,7 @@ class Parser(argparse.ArgumentParser):
 
         if gal is not None:
             opts.coords = [(gal[0],gal[1],radius)]
-            opts.names = ['' for c in opts.coords]
+            opts.names = [vars(opts).get('name','')]
         else:
             opts.coords = None
             opts.names = None

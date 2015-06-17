@@ -1,7 +1,7 @@
 """
 Class for storing and updating config dictionaries.
 """
-import os
+import os,sys
 from os.path import join, exists
 import pprint
 import copy
@@ -43,7 +43,9 @@ class Config(dict):
             self.filenames = self.getFilenames()
             self._makeFilenames()
         except:
-            logger.warning("Filenames could not be created for Config object")
+            exc_type,exc_value,exc_traceback = sys.exc_info()
+            logger.warning("%s %s"%(exc_type,exc_value))
+            logger.warning("Filenames could not be created for config.")
 
     def __str__(self):
         return yaml.dump(self)
@@ -60,8 +62,11 @@ class Config(dict):
                 params = yaml.load(open(input))
             else:
                 raise Exception('Unrecognized config format: %s'%ext)
-        elif isinstance(input, dict):
+        elif isinstance(input, Config):
             # This is the copy constructor...
+            self.filename = input.filename
+            params = copy.deepcopy(input)
+        elif isinstance(input, dict):
             params = copy.deepcopy(input)
         elif input is None:
             params = {}

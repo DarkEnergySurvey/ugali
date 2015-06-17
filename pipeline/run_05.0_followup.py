@@ -9,6 +9,7 @@ from os.path import join, exists,basename,splitext
 import numpy
 import numpy as np
 import yaml
+import pyfits
 
 from ugali.analysis.mcmc import MCMC
 from ugali.analysis.pipeline import Pipeline
@@ -73,6 +74,7 @@ def run(self):
         logger.info("Running 'plot'...")
         import ugali.utils.plotting
         import matplotlib; matplotlib.use('Agg')
+        import pylab as plt
         import triangle
 
         for name,label,coord in zip(names,labels,coords):
@@ -108,7 +110,31 @@ def run(self):
             fig.suptitle(name)
             logger.info("  Writing %s..."%outfile)
             fig.savefig(outfile)
+
+            ### Plot membership probabilities
+            resfile = infile.replace('.npy','.dat')
+            params = yaml.load(open(resfile))['params']
+            data = pyfits.open(infile.replace('.npy','.fits'))[1].data
             
+            iso = MCMC.createIsochrone(self.config)
+            kernel = MCMC.createKernel(self.config)
+
+            for k,v in params.items():
+                try: 
+                    setattr(iso,k,v)
+                    setattr(kernel,k,v)
+                except:
+                    pass
+
+            print iso
+            print kernel
+
+            plt.figure()
+            ugali.utils.plotting.plotMembership(self.config,data,kernel,iso)
+            outfile = infile.replace('.npy','_mem.png')
+            logger.info("  Writing %s..."%outfile)
+            plt.savefig(outfile,bbox_inches='tight')
+
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parser.add_coords(radius=True,targets=True)

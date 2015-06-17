@@ -74,7 +74,7 @@ class Maglims(object):
 
         # For simple maglims
         release = self.config['data']['release'].lower()
-        band    = self.config['isochrone']['mag_%i_field'%field]
+        band    = self.config['catalog']['mag_%i_band'%field]
          
         f = pyfits.open(infile)
         header = f[1].header
@@ -169,6 +169,7 @@ def inFootprint(filename,ra,dec):
         pix = ang2pix(nside,ra,dec)
         inside = (footprint[pix] > 0)
     except IOError:
+        logger.warning("Failed to load healpix footprint; using MANGLE...")
         inside = inMangle(filename,ra,dec)
     return inside
 

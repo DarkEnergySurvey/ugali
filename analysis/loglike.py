@@ -17,6 +17,7 @@ from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
 from ugali.analysis.model import Model,Parameter
+from ugali.utils.config import Config
 
 class Richness(Model):
     """
@@ -44,7 +45,7 @@ class LogLikelihood(object):
         self._sync = odict([(k,True) for k in self.models.keys()])
 
         # Currently assuming that input mask is ROI-specific
-        self.config = config
+        self.config = Config(config)
         self.roi    = roi
         self.mask   = mask
 
@@ -143,6 +144,13 @@ class LogLikelihood(object):
         self.set_params(**kwargs)
         self.sync_params()
         return self()
+
+    @property
+    def nobs(self):
+        """
+        Number of observed stars.
+        """
+        return self.richness * self.f
 
     ############################################################################
     # Methods for setting model parameters
@@ -245,10 +253,8 @@ class LogLikelihood(object):
         #return self.richness * self.isochrone.stellarLuminosity()
         return self.isochrone.stellarLuminosity()
 
-    def absolute_magnitude(self):
-        # ADW: I think it makes more sense for this to be
-        #return 4.85 - 2.5*np.log10(self.stellar_luminosity()))
-        return 4.85 - 2.5*np.log10(self.richness*self.stellar_luminosity())
+    def absolute_magnitude(self, richness):
+        return self.isochrone.absolute_magnitude(richness)
 
     def calc_backgroundCMD(self):
         #ADW: At some point we may want to make the background level a fit parameter.
@@ -308,6 +314,7 @@ class LogLikelihood(object):
         observable_fraction = self.isochrone.observableFraction(self.mask,distance_modulus)
         if not observable_fraction.sum() > 0:
             msg = "No observable fraction"
+            msg += ("\n"+str(self.params))
             logger.error(msg)
             raise ValueError(msg)
         return observable_fraction
@@ -348,10 +355,18 @@ class LogLikelihood(object):
     def calc_signal_spatial(self):
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-
+        nside = self.config['coords']['nside_pixel']
         #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
         #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
-        self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
+        if self.kernel.extension < 2*np.degrees(healpy.max_pixrad(nside)):
+            #msg =  "small kernel"
+            #msg += ("\n"+str(self.params))
+            #logger.warning(msg)
+            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
+            self.surface_intensity_sparse = np.zeros(len(pix_lon))
+            self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
+        else:
+            self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
 
         # On the object-by-object level
         #self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
@@ -462,7 +477,9 @@ def createROI(config,lon,lat):
     return roi
 
 def createKernel(config,lon=0.0,lat=0.0):
+    # FIXME: The config needs coords
     import ugali.analysis.kernel
+    config = Config(config)
     params = dict(config['kernel'])
     params.setdefault('lon',lon)
     params.setdefault('lat',lat)
@@ -473,6 +490,7 @@ def createIsochrone(config):
     #import ugali.analysis.isochrone
     #isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
     logger.warning("Creating new isochrone...")
+    config = Config(config)
     import ugali.analysis.isochrone2
     isochrone = ugali.analysis.isochrone2.isochroneFactory(**config['isochrone'])
     return isochrone

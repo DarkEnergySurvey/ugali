@@ -24,7 +24,7 @@ from ugali.analysis.isochrone2 import PadovaIsochrone,OldPadovaIsochrone
 defaults_27 = {
     'cmd_version': 2.7,
     'submit_form': 'Submit',
-    'isoc_kind': 'parsec_CAF09_v1.2S',
+    'isoc_kind': 'parsec_CAF09_v1.2S', 
     'eta_reimers': 0.2,
     'photsys_file': 'tab_mag_odfnew/tab_mag_decam.dat',
     'kind_cspecmag': 'aringer09',
@@ -43,16 +43,25 @@ defaults_27 = {
     'output_gzip': 0,
     }
 
+class OldPadova(Padova):
+    defaults = defaults_27
+    defaults['isoc_kind'] = 'gi10a'
+
+    params2filename = OldPadovaIsochrone.params2filename
+    filename2params = OldPadovaIsochrone.filename2params
+
+class Girardi2010(Padova):
+    defaults = defaults_27
+    defaults['isoc_kind'] = 'gi10a'
+
 class Padova(object):
     defaults = defaults_27
 
-    def __init__(self,survey='des',**kwargs):
-        self.survey=survey
-
-    #params2filename = OldPadovaIsochrone.params2filename
-    #filename2params = OldPadovaIsochrone.filename2params
     params2filename = PadovaIsochrone.params2filename
     filename2params = PadovaIsochrone.filename2params
+
+    def __init__(self,survey='des',**kwargs):
+        self.survey=survey
 
     def create_grid(self,abins,zbins):
         arange = np.linspace(abins[0],abins[1],abins[2]+1)
@@ -157,7 +166,7 @@ if __name__ == "__main__":
     abins = config['binning']['age']
     zbins = config['binning']['z']
 
-    abins = np.arange(1,13.5,0.1)
+    abins = np.arange(1,13.6,0.1)
     zbins = np.arange(1e-4,1e-3,1e-5)
     if opts.age is not None: abins = [opts.age]
     if opts.metallicity is not None: zbins = [opts.metallicity]

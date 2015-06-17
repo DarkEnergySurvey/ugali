@@ -53,7 +53,7 @@ from ugali.utils.logger import logger
 class Isochrone(Model):
     _params = odict([
         ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
-        ('age',              Parameter(10, [0.1,15]) ),          # Gyr
+        ('age',              Parameter(10.0, [0.1, 15.0]) ),  # Gyr
         ('metallicity',      Parameter(0.0002, [0.0,0.02]) ),
     ])
 
@@ -241,8 +241,8 @@ class Isochrone(Model):
         # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
         # for stars with R-I < 1.15
         # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
-        # g_des = g_sdss - 0.104(g_sdss - r_sdss) - 0.01
-        # r_des = r_sdss - 0.102(g_sdss - r_sdss) - 0.02
+        # g_des = g_sdss - 0.104(g_sdss - r_sdss) + 0.01
+        # r_des = r_sdss - 0.102(g_sdss - r_sdss) + 0.02
         if self.survey.lower() != 'des':
             raise Exception('Only valid for DES')
         if 'g' not in [self.band_1,self.band_2]:
@@ -256,7 +256,6 @@ class Isochrone(Model):
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
         
         V = g - 0.487*(g - r) - 0.0249
-        
         flux = np.sum(mass_pdf*10**(-V/2.5))
         Mv = -2.5*np.log10(richness*flux)
         return Mv
@@ -567,7 +566,11 @@ class Isochrone(Model):
 
         # Isochrone will be binned in next step, so can sample many points efficiently
         mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_steps=mass_steps)
- 
+
+        #logger.warning("Fudging intrinisic dispersion in isochrone.")
+        #mag_1 += np.random.normal(scale=0.02,size=len(mag_1))
+        #mag_2 += np.random.normal(scale=0.02,size=len(mag_2))
+
         bins_mag_1 = np.arange(self.mod+mag_1.min() - (0.5*delta_mag),
                                self.mod+mag_1.max() + (0.5*delta_mag),
                                delta_mag)
@@ -623,6 +626,10 @@ class Isochrone(Model):
         Units 
         """
         nsigma = 5.0
+
+        # ADW: HACK FOR SYSTEMATIC UNCERTAINTY
+        mag_err_1 = np.sqrt(mag_err_1**2 + 0.01**2)
+        mag_err_2 = np.sqrt(mag_err_2**2 + 0.01**2)
  
         # Histogram of the isochrone
         histo_isochrone_pdf,bins_mag_1,bins_mag_2 = self.histo(distance_modulus,delta_mag,mass_steps)
@@ -800,7 +807,7 @@ class Isochrone(Model):
 class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
-    _dirname = '/u/ki/kadrlica/des/isochrones/v2/'
+    _dirname = '/u/ki/kadrlica/des/isochrones/v3/'
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1155,3 +1162,12 @@ def isochroneFactory(name, **kwargs):
         raise Exception(msg)
 
     return isochrones[name](**kwargs)
+
+
+def absolute_magnitude(distance_modulus,g,r,prob=None):
+    """ Calculate the absolute magnitude from a set of bands """
+    V = g - 0.487*(g - r) - 0.0249
+        
+    flux = np.sum(10**(-(V-distance_modulus)/2.5))
+    Mv = -2.5*np.log10(flux)
+    return Mv

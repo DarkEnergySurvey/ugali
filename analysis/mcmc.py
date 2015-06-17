@@ -45,37 +45,66 @@ class MCMC(object):
     - Run emcee
     """
     def __init__(self, config, coords):
-        self.scan = ugali.analysis.scan.Scan(config, coords)
-        self.config = self.scan.config
-        self.nwalkers = self.config['mcmc']['nwalkers']
+        self.config = ugali.utils.config.Config(config)
         self.nsamples = self.config['mcmc']['nsamples'] 
         self.nthreads = self.config['mcmc']['nthreads'] 
-        self.nburn = self.config['mcmc']['nburn']
         self.nchunk = self.config['mcmc'].get('nchunk',25)
+        self.nwalkers = self.config['mcmc']['nwalkers']
+        self.nburn = self.config['mcmc']['nburn']
         self.alpha = self.config['mcmc'].get('alpha',0.10)
 
+        self.scan = ugali.analysis.scan.Scan(config, coords)
         self.scan.run()
         self.grid = self.scan.grid
         self.loglike = self.grid.loglike
 
-        if self.config['mcmc'].get('kernel') is not None:
-            kernel = kernelFactory(**self.config['mcmc']['kernel'])
-        else:
-            kernel = kernelFactory(**self.config['kernel'])
-        print kernel
-        self.loglike.set_model('spatial',kernel)
-            
+        kernel = self.createKernel(self.config)
+        # ### FIXME: Adding prior
+        # logger.warning("### Setting prior on extension... ###")
+        # kernel.params['extension'].set_bounds([0.0001,0.03])
 
-        if self.config['mcmc'].get('isochrone') is not None:
-            config = dict(self.config)
-            config.update(isochrone=self.config['mcmc']['isochrone'])
-            iso = createIsochrone(config)
-        else:
-            iso = createIsochrone(config)
-        print iso
+        self.loglike.set_model('spatial',kernel)
+        logger.info('\n' + str(kernel))
+
+        iso = self.createIsochrone(self.config)
         self.loglike.set_model('color',iso)
+        logger.info('\n' + str(iso))
 
         self.roi = self.loglike.roi
+
+    @staticmethod
+    def createKernel(config):
+        config = ugali.utils.config.Config(config)
+        if config['mcmc'].get('kernel') is not None:
+            kernel = kernelFactory(**config['mcmc']['kernel'])
+        else:
+            kernel = kernelFactory(**config['kernel'])
+        return kernel
+        
+    @staticmethod
+    def createIsochrone(config):
+        config = ugali.utils.config.Config(config)
+        if config['mcmc'].get('isochrone') is not None:
+            config = dict(config)
+            config.update(isochrone=config['mcmc']['isochrone'])
+            iso = createIsochrone(config)
+        else:
+            iso = createIsochrone(config)
+        return iso
+
+    def load_srcmdl(self,srcmdl,source):
+        if isinstance(srcmdl,basestring):
+            srcmdl = yaml.load(srcmdl)
+        elif isinstance(srcmdl,dict):
+            pass
+        else:
+            msg = "Expected string or dict for srcmdl"
+            raise ValueError(msg)
+
+        for par,v in srcmdl[source].items():
+            if par in loglike.params:
+                setattr(loglike,par,val)
+        
 
     def get_mle(self):
         return self.grid.mle()
@@ -161,14 +190,20 @@ class MCMC(object):
         if outfile is not None: self.write_samples(outfile)
 
     def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
-        if param not in self.loglike.params.keys():
+        # FIXME: Need to add age and metallicity to composite isochrone
+        if param not in self.loglike.params.keys() + ['age','metallicity']:
             raise Exception('Unrecognized parameter: %s'%param)
 
         if param not in self.params: 
             mle = self.get_mle()
-            return [float(mle[param]),[0,0]]
+            return [float(mle[param]),[np.nan,np.nan]]
 
-        return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
+        if param not in self.samples.names: 
+            mle = self.get_mle()
+            return [float(mle[param]),[np.nan,np.nan]]
+
+        #return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
+        return self.samples.mean_interval(param,burn=burn,clip=clip,alpha=alpha)
 
     def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
         mle = self.get_mle()
@@ -178,18 +213,24 @@ class MCMC(object):
         return out
 
     def get_results(self,**kwargs):
+        import ephem
+        import astropy.coordinates
+
         estimate = self.estimate_params()
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
         
         ts = 2*self.loglike.value(**params)
-        results['ts'] = [float(ts),0]
+        results['ts'] = Samples._interval(ts,np.nan,np.nan)
 
         lon,lat = estimate['lon'][0],estimate['lat'][0]
+        #coord = astropy.coordinates.SkyCoord(lon,lat,frame='galactic',unit='deg')
 
         results.update(gal=[float(lon),float(lat)])
         ra,dec = gal2cel(lon,lat)
         results.update(equ=[float(ra),float(dec)])
+        results['ra'] = Samples._interval(ra,np.nan,np.nan)
+        results['dec'] = Samples._interval(dec,np.nan,np.nan)
 
         mod,mod_err = estimate['distance_modulus']
         dist = mod2dist(mod)
@@ -198,17 +239,25 @@ class MCMC(object):
         
         rich,rich_err = estimate['richness']
 
+        nobs = self.loglike.f*rich
+        nobs_lo,nobs_hi = rich_err[0]*self.loglike.f,rich_err[1]*self.loglike.f
+        results['nobs'] = Samples._interval(nobs,nobs_lo,nobs_hi)
+        
         # Careful, depends on the isochrone...
         stellar_mass = self.loglike.stellar_mass()
-        stellar_luminosity = self.loglike.stellar_luminosity()
-
         mass = rich*stellar_mass
         mass_lo,mass_hi = rich_err[0]*stellar_mass,rich_err[1]*stellar_mass
         results['mass'] = Samples._interval(mass,mass_lo,mass_hi)
 
+        stellar_luminosity = self.loglike.stellar_luminosity()
         lum = rich*stellar_luminosity
         lum_lo,lum_hi = rich_err[0]*stellar_luminosity,rich_err[1]*stellar_luminosity
         results['luminosity'] = Samples._interval(lum,lum_lo,lum_hi)
+
+        Mv = self.loglike.absolute_magnitude(rich)
+        Mv_lo = self.loglike.absolute_magnitude(rich_err[0])
+        Mv_hi = self.loglike.absolute_magnitude(rich_err[1])
+        results['Mv'] = Samples._interval(Mv,Mv_lo,Mv_hi)
 
         output = dict()
         output['params'] = params
@@ -239,7 +288,8 @@ class Samples(np.recarray):
     A nice summary of various bayesian credible intervals can be found here:
     http://www.sumsar.net/blog/2014/10/probable-points-and-credible-intervals-part-one/
     """
-    _alpha = 0.32
+    _alpha = 0.10
+    _nbins = 300
 
     def __new__(cls, input, names=None):
         # Load the array from file
@@ -300,7 +350,8 @@ class Samples(np.recarray):
         data = self.data(name,**kwargs)
         mean =np.mean(data)
         sigma = np.std(data)
-        return self._interval(mean,mean-sigma,mean+sigma)
+        scale = scipy.stats.norm.ppf(1-alpha/2.)
+        return self._interval(mean,mean-scale*sigma,mean+scale*sigma)
 
     def median(self, name, **kwargs):
         """
@@ -321,7 +372,7 @@ class Samples(np.recarray):
         
     def peak(self, name, **kwargs):
         data = self.data(name,**kwargs)
-        num,edges = np.histogram(data,bins=500)
+        num,edges = np.histogram(data,bins=self._nbins)
         centers = (edges[1:]+edges[:-1])/2.
         return centers[np.argmax(num)]
 
@@ -366,37 +417,6 @@ class Samples(np.recarray):
         for n in names:
             ret[n] = getattr(self,'%s_interval'%mode)(n, **kwargs)
         return ret
-
-    class Results(object):
-        def __init__(self, config, samples, loglike=None, coords=None):
-            self.samples = copy.deepcopy(samples)
-
-            if loglike is not None and coords is not None:
-                msg = "Loglike and coords both specified."
-                raise Exception(msg)
-                
-            if loglike is not None:
-                self.loglike = copy.deepcopy(loglike)
-            else:
-                self.loglike = self.createLoglike(config,coords[0],coords[1])
-            logger.info(str(loglike))
-
-        def createLoglike(self,config,lon,lat):
-            self.loglike = ugali.analysis.loglike.createLoglike(config,coords)
-
-            if self.config['mcmc'].get('kernel') is not None:
-                kernel = kernelFactory(**self.config['mcmc']['kernel'])
-            else:
-                kernel = kernelFactory(**self.config['kernel'])
-            self.loglike.set_model('spatial',kernel)
-            
-            if self.config['mcmc'].get('isochrone') is not None:
-                config = dict(self.config)
-                config.update(isochrone=self.config['mcmc']['isochrone'])
-                iso = createIsochrone(config)
-            else:
-                iso = createIsochrone(config)
-            self.loglike.set_model('color',iso)
 
 
 if __name__ == "__main__":

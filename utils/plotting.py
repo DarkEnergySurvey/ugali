@@ -17,6 +17,7 @@ import pyfits
 
 from mpl_toolkits.axes_grid1 import AxesGrid    
 from matplotlib.ticker import MaxNLocator
+import mpl_toolkits.axes_grid1.axes_divider as axes_divider
 
 import ugali.utils.config
 import ugali.observation.roi
@@ -477,9 +478,26 @@ class ObjectPlotter(BasePlotter):
     def __init__(self,obj,config,radius=1.0):
         self.obj = obj
         glon,glat = self.obj['GLON'],self.obj['GLAT']
-
-        self.zidx = self.obj['ZIDX_MAX'] 
         super(ObjectPlotter,self).__init__(glon,glat,config,radius)
+        self.set_zidx()
+
+    def set_zidx(self):
+        names = [n.upper() for n in self.obj.array.dtype.names]
+        mod = np.array(self.config['scan']['distance_modulus_array'])
+        if 'ZIDX_MAX' in names:
+            self.zidx = self.obj['ZIDX_MAX'] 
+        elif 'DISTANCE_MODULUS' in names:
+            dist_mod = self.obj['DISTANCE_MODULUS']
+            self.zidx = np.abs(mod - dist_mod).argmin()
+        elif 'MODULUS' in names:
+            dist_mod = self.obj['MODULUS']
+            self.zidx = np.abs(mod - dist_mod).argmin()
+        elif 'DISTANCE' in names:
+            dist_mod = mod2dist(self.obj['DISTANCE'])
+            self.zidx = np.argmax((mod - dist_mod) > 0)
+        else:
+            msg = "Failed to parse distance index"
+            raise Exception(msg)
 
     def drawTS(self,ax, filename=None, zidx=None):
         if zidx is None: zidx = self.zidx
@@ -509,39 +527,47 @@ def plot_candidates(candidates, config, ts_min=50, outdir='./'):
 ###################################################
 
 
-def draw_slices(ax, hist, **kwargs):
+def draw_slices(hist, **kwargs):
     """ Draw horizontal and vertical slices through histogram """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     kwargs.setdefault('ls','-')
+    ax = plt.gca()
 
     data = hist
     npix = np.array(data.shape)
-    xlim,ylim = plt.array(zip([0,0],npix-1))
+    #xlim,ylim = plt.array(zip([0,0],npix-1))
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    #extent = ax.get_extent()
+    #xlim =extent[:2]
+    #ylim = extent[2:]
 
     # Slices
     vslice = data.sum(axis=0)
     hslice = data.sum(axis=1)
     # Bin centers
-    xbin = np.linspace(xlim[0],xlim[1],len(vslice))+0.5 
-    ybin = np.linspace(ylim[0],ylim[1],len(hslice))+0.5
+    xbin = np.linspace(xlim[0],xlim[1],len(vslice))#+0.5 
+    ybin = np.linspace(ylim[0],ylim[1],len(hslice))#+0.5
     divider = make_axes_locatable(ax)
-
+    
     #gh2 = pywcsgrid2.GridHelperSimple(wcs=self.header, axis_nums=[2, 1])
-    hax = divider.append_axes("right", size=1.2, pad=0.05,sharey=ax)
-                              #axes_class=axes_divider.LocatableAxes)
+    hax = divider.append_axes("right", size=1.2, pad=0.05,sharey=ax,
+                              axes_class=axes_divider.LocatableAxes)
     hax.axis["left"].toggle(label=False, ticklabels=False)
     #hax.plot(hslice, plt.arange(*ylim)+0.5,'-') # Bin center
     hax.plot(hslice, ybin, **kwargs) # Bin center
     hax.xaxis.set_major_locator(MaxNLocator(4,prune='both'))
+    hax.set_ylim(*ylim)
 
     #gh1 = pywcsgrid2.GridHelperSimple(wcs=self.header, axis_nums=[0, 2])
-    vax = divider.append_axes("top", size=1.2, pad=0.05, sharex=ax)
-                              #axes_class=axes_divider.LocatableAxes)
+    vax = divider.append_axes("top", size=1.2, pad=0.05, sharex=ax,
+                              axes_class=axes_divider.LocatableAxes)
     vax.axis["bottom"].toggle(label=False, ticklabels=False)
     vax.plot(xbin, vslice, **kwargs) 
-    vax.xaxis.set_major_locator(MaxNLocator(4,prune='lower'))
+    vax.yaxis.set_major_locator(MaxNLocator(4,prune='lower'))
+    vax.set_xlim(*xlim)
 
-    return hax, vax
+    return vax,hax
 
 def plotKernel(kernel):
     fig = plt.figure()
@@ -606,7 +632,7 @@ def drawKernelHist(ax, kernel):
 
 ###################################################
 
-def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
+def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     config = ugali.utils.config.Config(config)
@@ -619,6 +645,11 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     kwargs.setdefault('vmax',1)
     kwargs.setdefault('zorder',3)
 
+    bkg_kwargs = dict(kwargs)
+    bkg_kwargs['s'] = 3
+    bkg_kwargs['zorder'] = 0
+    bkg_kwargs['c'] = '0.70'
+
     try: 
         sort = np.argsort(data['PROB'])
         prob = data['PROB'][sort]
@@ -626,8 +657,9 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
         prob = np.zeros(len(data['RA']))+1
 
     lon,lat = data['RA'][sort],data['DEC'][sort]
+
     color = data['COLOR'][sort]
-    cut = (prob > 0)
+    cut = (prob > 0.01)
 
     # ADW: Sometimes may be mag_2
     mag = data[config['catalog']['mag_1_field']][sort]
@@ -640,14 +672,16 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     #x,y = proj.sphereToImage(lon,lat)
     #sc = axes[0].scatter(x,y,c=prob,vmin=0,vmax=1)
 
-    axes[0].scatter(lon[~cut],lat[~cut],c='0.7',**kwargs)
+    axes[0].scatter(lon[~cut],lat[~cut],**bkg_kwargs)
     axes[0].scatter(lon[cut],lat[cut],c=prob[cut],**kwargs)
     if kernel is not None:
         plt.sca(axes[0])
-        drawKernel(kernel,contour=True,linewidths=2,zorder=0)
+        levels=[0,kernel._pdf(kernel.extension),np.inf]
+        drawKernel(kernel,contour=True,linewidths=2,zorder=0,levels=levels)
         ra,dec = gal2cel(kernel.lon,kernel.lat)
-        axes[0].set_xlim(ra-0.4,ra+0.4)
-        axes[0].set_ylim(dec-0.4,dec+0.4)
+
+    axes[0].set_xlim(np.median(lon)-0.4,np.median(lon)+0.4)
+    axes[0].set_ylim(np.median(lat)-0.4,np.median(lat)+0.4)
 
     #axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
     #axes[0].set_xlabel(r'$\Delta$ RA (deg)')
@@ -657,13 +691,13 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     axes[0].yaxis.set_major_locator(MaxNLocator(4))
 
     axes[1].errorbar(color[cut],mag[cut],yerr=mag_err_1[cut],fmt='.',c='k',zorder=0.5)
-    axes[1].scatter(color[~cut],mag[~cut],c='0.7',**kwargs)
+    axes[1].scatter(color[~cut],mag[~cut],**bkg_kwargs)
     sc = axes[1].scatter(color[cut],mag[cut],c=prob[cut],**kwargs)
 
     if isochrone is not None:
         plt.sca(axes[1])
-        drawIsochrone(isochrone,lw=25,c='0.5')
-        drawIsochrone(isochrone,ls='',marker='.',ms=1,c='k')
+        #drawIsochrone(isochrone,cookie=True)
+        drawIsochrone(isochrone,cookie=False)
 
     axes[1].set_ylabel(r'$g$')
     axes[1].set_xlabel(r'$g-r$')
@@ -671,21 +705,33 @@ def plotMembership(config, data=None, kernel=None, isochrone=None,**kwargs):
     axes[1].set_xlim(config['color']['min'],config['color']['max'])
     axes[1].xaxis.set_major_locator(MaxNLocator(4))
 
-    divider = make_axes_locatable(axes[1])
-    #ax_cb = divider.new_vertical(size="5%", pad=0.05)
-    ax_cb = divider.new_horizontal(size="7%", pad=0.1)
-    fig.add_axes(ax_cb)
-    plt.colorbar(sc, cax=ax_cb, orientation='vertical')
-    ax_cb.yaxis.tick_right()
+    try: 
+        divider = make_axes_locatable(axes[1])
+        #ax_cb = divider.new_vertical(size="5%", pad=0.05)
+        ax_cb = divider.new_horizontal(size="7%", pad=0.1)
+        fig.add_axes(ax_cb)
+        plt.colorbar(sc, cax=ax_cb, orientation='vertical')
+        ax_cb.yaxis.tick_right()
+    except:
+        logger.warning("No colorbar")
     return fig,axes
 
 def drawIsochrone(isochrone, **kwargs):
     ax = plt.gca()
-
-    kwargs.setdefault('c','0.5')
-    kwargs.setdefault('lw',25)
-    kwargs.setdefault('zorder',0)
-    kwargs.setdefault('ls','-')
+    print isochrone
+    if kwargs.pop('cookie',None):
+        # Broad cookie cutter
+        kwargs.setdefault('alpha',0.5)
+        kwargs.setdefault('c','0.5')
+        kwargs.setdefault('lw',15)
+        kwargs.setdefault('zorder',0)
+        kwargs.setdefault('ls','-')
+    else:
+        # Thin lines
+        kwargs.setdefault('ls','')
+        kwargs.setdefault('marker','.')
+        kwargs.setdefault('ms',1)
+        kwargs.setdefault('c','k')
 
     isos = isochrone.isochrones if hasattr(isochrone,'isochrones') else [isochrone]
     for iso in isos:
@@ -711,13 +757,14 @@ def drawIsochrone(isochrone, **kwargs):
     #ax.set_xlim(-0.5,1.5)
     #ax.set_ylim(23,18)
 
-def drawKernel(kernel, contour=False, coords='C', **kwargs):
+def drawKernel(kernel, contour=False, coords='C', proj=None, **kwargs):
     ax = plt.gca()
 
-    kwargs.setdefault('cmap',matplotlib.cm.jet)
+    if 'colors' not in kwargs:
+        kwargs.setdefault('cmap',matplotlib.cm.jet)
     kwargs.setdefault('origin','lower')
 
-    ext = kernel.extension
+    ext   = kernel.extension
     theta = kernel.theta
 
     xmin,xmax = -kernel.edge,kernel.edge
@@ -731,19 +778,19 @@ def drawKernel(kernel, contour=False, coords='C', **kwargs):
         msg = 'Unrecognized coordinate: %s'%coords
         raise Exception(msg)
 
-    x = np.linspace(xmin,xmax,100)+lon
-    y = np.linspace(ymin,ymax,100)+lat
+    x = np.linspace(xmin,xmax,500)+lon
+    y = np.linspace(ymin,ymax,500)+lat
     xx,yy = np.meshgrid(x,y)
     extent = [x[0],x[-1],y[0],y[-1]]
     kwargs.setdefault('extent',extent)
-    if coords[-1] == 'C':
-        xx,yy = cel2gal(xx,yy)
+
+    if coords[-1] == 'C': xx,yy = cel2gal(xx,yy)
     
     zz = kernel.pdf(xx.flat,yy.flat).reshape(xx.shape)
     zmax = zz.max()
 
     if contour:
-        levels = 10
+        levels = kwargs.pop('levels',10)
         #levels = np.logspace(np.log10(zmax)-1,np.log10(zmax),7)
         ret = ax.contour(zz,levels,**kwargs)
     else:
@@ -751,6 +798,50 @@ def drawKernel(kernel, contour=False, coords='C', **kwargs):
         ret = ax.imshow(val,**kwargs)
 
     return ret
+
+
+def drawKernel(kernel, contour=False, coords='C', **kwargs):
+    ax = plt.gca()
+
+    if 'colors' not in kwargs:
+        kwargs.setdefault('cmap',matplotlib.cm.jet)
+    kwargs.setdefault('origin','lower')
+
+    ext   = kernel.extension
+    theta = kernel.theta
+
+    xmin,xmax = -kernel.edge,kernel.edge
+    ymin,ymax = -kernel.edge,kernel.edge
+
+    if coords[-1] == 'G':
+        lon, lat = kernel.lon, kernel.lat
+    elif coords[-1] == 'C':
+        lon,lat = gal2cel(kernel.lon, kernel.lat)
+    else:
+        msg = 'Unrecognized coordinate: %s'%coords
+        raise Exception(msg)
+
+    x = np.linspace(xmin,xmax,500)+lon
+    y = np.linspace(ymin,ymax,500)+lat
+    xx,yy = np.meshgrid(x,y)
+    extent = [x[0],x[-1],y[0],y[-1]]
+    kwargs.setdefault('extent',extent)
+
+    if coords[-1] == 'C': xx,yy = cel2gal(xx,yy)
+    
+    zz = kernel.pdf(xx.flat,yy.flat).reshape(xx.shape)
+    zmax = zz.max()
+
+    if contour:
+        levels = kwargs.pop('levels',10)
+        #levels = np.logspace(np.log10(zmax)-1,np.log10(zmax),7)
+        ret = ax.contour(zz,levels,**kwargs)
+    else:
+        val = np.ma.array(zz,mask=zz<zz.max()/100.)
+        ret = ax.imshow(val,**kwargs)
+
+    return ret
+
 
 ###################################################
 

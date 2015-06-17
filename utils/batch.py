@@ -20,15 +20,15 @@ QUEUES = odict([
     ('condor',['vanilla','universe']),
 ])
 
-RUNLIMITS = odict([
-        ('express','0:01'),
-        ('short','0:30'),
-        ('medium','1:00'),
-        ('long','24:00'),
-        ('xlong','96:00'),
+RUNLIMITS = odict([            #Hard limits
+        ('express','0:01'),    # 0:01
+        ('short','0:30'),      # 0:30
+        ('medium','1:00'),     # 4:00
+        ('long','4:00'),       # 32:00
+        ('xlong','72:00'),     # 72:00
         ('xxl','168:00'),
-        ('kipac-ibq','10:00'),
-        ('bulletmpi','10:00'),
+        ('kipac-ibq','24:00'),
+        ('bulletmpi','24:00'),
         ])
 
 def batchFactory(queue,**kwargs):
@@ -140,7 +140,10 @@ class LSF(Batch):
     def parse_options(self, **opts):
         options = odict(self.default_opts)
         options.update(opts)
-        #options['W'] = q2w(options.pop('q'))
+        if 'n' in options.keys():
+            options['a'] = 'mpirun'
+            options['R'] += ' -R "span[ptile=4]"'
+        options.setdefault('W',self.q2w(options['q']))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
 class Slurm(Batch):

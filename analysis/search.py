@@ -320,7 +320,8 @@ class CandidateSearch(object):
 
         # Default name formatting
         # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
-        fmt = "UGALI J%(hour)02i%(hmin)04.1f%(deg)+03i%(dmin)02i"
+        # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
+        fmt = "J%(hour)02i%(hmin)04.1f%(deg)+03i%(dmin)02i"
         for obj,_ra,_dec in zip(objs,ra,dec):
             hms = dec2hms(_ra); dms = dec2dms(_dec)
             params = dict(hour=hms[0],hmin=hms[1]+hms[2]/60.,

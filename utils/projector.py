@@ -289,6 +289,41 @@ def celToGal(ra, dec):
     return numpy.degrees(ll), numpy.degrees(bb)
 
 cel2gal = celToGal
+
+def gal2cel_angle(glon,glat,angle):
+    """
+    WARNING: Not vectorized
+    """
+    gal_angle = np.radians(angle)
+    galproj = Projector(glon,glat)
+    x,y = np.sin(gal_angle),np.cos(gal_angle)
+    alon,alat = galproj.imageToSphere(0.1*x,0.1*y)
+
+    ra,dec = gal2cel(glon,glat)
+    ara,adec = gal2cel(alon,alat)
+    celproj = Projector(ra,dec)
+    cel_x,cel_y = celproj.sphereToImage(ara,adec)
+    cel_angle = np.degrees(np.arctan2(cel_x,cel_y))
+    return cel_angle + 360*(cel_angle<0)
+
+### ADW: WARNING DOESN'T WORK YET
+### def cel2gal_angle(ra,dec,angle):
+###     """
+###     WARNING: Not vectorized
+###     """
+###     cel_angle = np.radians(angle)
+###     celproj = Projector(ra,dec)
+###     x,y = np.sin(cel_angle),np.cos(cel_angle)
+###     angle_ra,angle_dec = celproj.imageToSphere(1e-2*x,1e-2*y)
+###  
+###     glon,glat = gal2cel(ra,dec)
+###     angle_glon,angle_glat = cel2gal(angle_ra,angle_dec)
+###     galproj = Projector(glon,glat)
+###     gal_x,gal_y = galproj.sphereToImage(angle_glon,angle_glat)
+###     gal_angle = np.degrees(np.arctan2(gal_x,gal_y))
+###     return gal_angle + 360*(gal_angle<0)
+
+
 ############################################################
 
 def dec2hms(dec):

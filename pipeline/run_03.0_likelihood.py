@@ -32,6 +32,8 @@ def run(self):
     if 'plot' in self.opts.run:
         # WARNING: Loading the full 3D healpix map is memory intensive.
         logger.info("Running 'plot'...")
+        import matplotlib
+        matplotlib.use('Agg')
         import pylab as plt
         import ugali.utils.plotting as plotting
         skymap = ugali.utils.skymap.readSparseHealpixMap(self.config.mergefile,'LOG_LIKELIHOOD')[1]
