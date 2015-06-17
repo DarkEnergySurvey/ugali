@@ -201,9 +201,9 @@ class MCMC(object):
         if param not in self.samples.names: 
             mle = self.get_mle()
             return [float(mle[param]),[np.nan,np.nan]]
-
-        #return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
-        return self.samples.mean_interval(param,burn=burn,clip=clip,alpha=alpha)
+        
+        #return self.samples.mean_interval(param,burn=burn,clip=clip,alpha=alpha)
+        return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
 
     def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
         mle = self.get_mle()
@@ -345,7 +345,7 @@ class Samples(np.recarray):
 
     def mean_interval(self, name, alpha=_alpha, **kwargs):
         """
-        Inerval assuming gaussin posterior.
+        Interval assuming gaussian posterior.
         """
         data = self.data(name,**kwargs)
         mean =np.mean(data)
@@ -376,9 +376,24 @@ class Samples(np.recarray):
         centers = (edges[1:]+edges[:-1])/2.
         return centers[np.argmax(num)]
 
+    def kde_peak(self, name, **kwargs):
+        """
+        Identify peak using Gaussian kernel density estimator.
+        """
+        data = self.data(name,**kwargs)
+        # Clipping of severe outliers to concentrate more KDE samples in the parameter range of interest
+        mad = numpy.median(numpy.fabs(numpy.median(data) - data))
+        cut = (data > numpy.median(data) - 5. * mad) & (data < numpy.median(data) + 5. * mad)
+        x = data[cut]
+        kde = scipy.stats.gaussian_kde(x)
+        # No penalty for using a finer sampling for KDE evaluation except computation time, 1000 seems sufficient
+        values = numpy.linspace(numpy.min(x), numpy.max(x), 1000) 
+        kde_values = kde.evaluate(values)
+        return values[numpy.argmax(kde_values)]
+
     def peak_interval(self, name, alpha=_alpha, **kwargs):
         data = self.data(name, **kwargs)
-        peak = self.peak(name, **kwargs)
+        peak = self.kde_peak(name, **kwargs)
         x = np.sort(data); n = len(x)
         # The number of entries in the interval
         window = int(np.rint((1.0-alpha)*n))
