@@ -387,8 +387,8 @@ class RadialKernel(EllipticalKernel):
         self._params = copy.deepcopy(self._params)
         self._params['ellipticity'].set(0, [0, 0])
         self._params['position_angle'].set(0, [0, 0])
-        logger.warning("Setting bounds on extension")
-        self._params['extension'].set(0.1, [1e-4, 0.1])
+        #logger.warning("Setting bounds on extension")
+        #self._params['extension'].set(0.1, [1e-4, 0.1])
 
         super(RadialKernel,self).__init__(**kwargs)
         

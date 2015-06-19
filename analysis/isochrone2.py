@@ -804,6 +804,27 @@ class Isochrone(Model):
  
         return u_color
 
+    def separation(self,mag_1,mag_2,steps=10000):
+        """ Separation in magnitude-magnitude space between points and isochrone """
+
+        # http://stackoverflow.com/q/12653120/
+        mag_1 = np.array(mag_1,copy=False,ndmin=1)
+        mag_2 = np.array(mag_2,copy=False,ndmin=1)
+
+        init,pdf,act,iso_mag_1,iso_mag_2 = self.sample(mass_steps=steps)
+        iso_mag_1+=self.distance_modulus
+        iso_mag_2+=self.distance_modulus
+
+        iso_cut = (iso_mag_1<np.max(mag_1))&(iso_mag_1>np.min(mag_1)) | \
+            (iso_mag_2<np.max(mag_2))&(iso_mag_2>np.min(mag_2))
+        iso_mag_1 = iso_mag_1[iso_cut]
+        iso_mag_2 = iso_mag_2[iso_cut]
+         
+        dist_mag_1 = mag_1[:,np.newaxis]-iso_mag_1
+        dist_mag_2 = mag_2[:,np.newaxis]-iso_mag_2
+         
+        return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
+
 class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
@@ -937,10 +958,10 @@ class PadovaIsochrone(Isochrone):
         self.mag = self.mag_1 if self.band_1_detection else self.mag_2
         self.color = self.mag_1 - self.mag_2
 
-class OldPadovaIsochrone(PadovaIsochrone):
-    _prefix = 'isot'
-    _basename = '%(prefix)sa%(age)iz%(z)g.dat'
-    _dirname = '/u/ki/kadrlica/des/isochrones/v0/'
+class Bressan2012(PadovaIsochrone): pass
+
+class Girardi2002(PadovaIsochrone):
+    _dirname = '/u/ki/kadrlica/des/isochrones/v5/'
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -948,61 +969,34 @@ class OldPadovaIsochrone(PadovaIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
-    @property
-    def feh(self):
-        # Anders & Grevesse 1989
-        metallicity_solar = 0.019 
-        feh = np.log10(self.metallicity / metallicity_solar)
-
-    @classmethod
-    def params2filename(cls,age,metallicity):
-        z = 1e3 * metallicity
-        a = 1e2 * np.log10(age*1e9) # Gyr
-        return cls._basename%dict(prefix=cls._prefix,age=a,z=z)
-
-    @classmethod
-    def filename2params(cls,filename):
-        #ADW: Could probably do something more clever so that parsing info
-        #is stored in only one place...
-        infile = os.path.basename(filename)
-        log_age = 1.e-2 * float(infile.split('isota')[1].split('z')[0])
-        metallicity = 1.e-3 * float(infile.split('z')[1].split('.dat')[0])
-        age = 10**(log_age) / 1e9 # Gyr
-        return age, metallicity
-
+    columns = dict(
+            des = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (4, ('log_lum',float)),
+                (9, ('g',float)),
+                (10, ('r',float)),
+                (11,('i',float)),
+                (12,('z',float)),
+                (13,('Y',float)),
+                (15,('stage',object))
+                ]),
+            )
+    
     def _parse(self,filename):
         """
-        Reads an isochrone file in the Padova (Marigo 2008) format and determines
-        the age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and creates arrays with
-        the initial stellar mass and corresponding magnitudes for each step along the isochrone.
+        Reads an isochrone in the old Padova format (Girardi 2002,
+        Marigo 2008) and determines the age (log10 yrs and Gyr),
+        metallicity (Z and [Fe/H]), and creates arrays with the
+        initial stellar mass and corresponding magnitudes for each
+        step along the isochrone.
         http://stev.oapd.inaf.it/cgi-bin/cmd
         """
-        if self.survey.lower() == 'des':
-            columns = odict([
-                    (2, ('mass_init',float)),
-                    (3, ('mass_act',float)),
-                    (4, ('log_lum',float)),
-                    (8, ('g',float)),
-                    (9, ('r',float)),
-                    (10,('i',float)),
-                    (11,('z',float)),
-                    (12,('Y',float)),
-                    (19,('stage',object)),
-                    ])
-        elif self.survey.lower() == 'sdss':
-            columns = odict([
-                    (2, ('mass_init',float)),
-                    (3, ('mass_act',float)),
-                    (4, ('log_lum',float)),
-                    (8, ('u',float)),
-                    (9, ('g',float)),
-                    (10,('r',float)),
-                    (11,('i',float)),
-                    (12,('z',float)),
-                    (19,('stage',object)),
-                    ])
-        else:
+        try:
+            columns = self.columns[self.survey.lower()]
+        except KeyError, e:
             logger.warning('did not recognize survey %s'%(survey))
+            raise(e)
 
         kwargs = dict(delimiter='\t',usecols=columns.keys(),dtype=columns.values())
         data = np.genfromtxt(filename,**kwargs)
@@ -1026,6 +1020,88 @@ class OldPadovaIsochrone(PadovaIsochrone):
 
         self.mag = self.mag_1 if self.band_1_detection else self.mag_2
         self.color = self.mag_1 - self.mag_2
+
+class Girardi2010(Girardi2002):
+    _dirname = '/u/ki/kadrlica/des/isochrones/v4/'
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage','BHeb','Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+            des = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (4, ('log_lum',float)),
+                (9, ('g',float)),
+                (10, ('r',float)),
+                (11,('i',float)),
+                (12,('z',float)),
+                (13,('Y',float)),
+                (19,('stage',object))
+                ]),
+            )
+
+class OldPadovaIsochrone(Girardi2002):
+    _prefix = 'isot'
+    _basename = '%(prefix)sa%(age)iz%(z)g.dat'
+    _dirname = '/u/ki/kadrlica/des/isochrones/v0/' # won't work for SDSS...
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage','BHeb','Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+        des = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (4, ('log_lum',float)),
+                (8, ('g',float)),
+                (9, ('r',float)),
+                (10,('i',float)),
+                (11,('z',float)),
+                (12,('Y',float)),
+                (19,('stage',object)),
+                ]),
+        sdss = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (4, ('log_lum',float)),
+                (8, ('u',float)),
+                (9, ('g',float)),
+                (10,('r',float)),
+                (11,('i',float)),
+                (12,('z',float)),
+                (19,('stage',object)),
+                ]),
+        )
+
+    @property
+    def feh(self):
+        # Anders & Grevesse 1989
+        metallicity_solar = 0.019 
+        feh = np.log10(self.metallicity / metallicity_solar)
+
+    @classmethod
+    def params2filename(cls,age,metallicity):
+        z = 1e3 * metallicity
+        a = 1e2 * np.log10(age*1e9) # Gyr
+        return cls._basename%dict(prefix=cls._prefix,age=a,z=z)
+
+    @classmethod
+    def filename2params(cls,filename):
+        #ADW: Could probably do something more clever so that parsing info
+        #is stored in only one place...
+        infile = os.path.basename(filename)
+        log_age = 1.e-2 * float(infile.split('isota')[1].split('z')[0])
+        metallicity = 1.e-3 * float(infile.split('z')[1].split('.dat')[0])
+        age = 10**(log_age) / 1e9 # Gyr
+        return age, metallicity
+    
 
 class CompositeIsochrone(Isochrone):
     _params = odict([

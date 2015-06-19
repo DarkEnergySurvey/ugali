@@ -47,6 +47,9 @@ def run(self):
             cmd='%s %s --gal %.4f %.4f %s'%(script,self.opts.config,glon,glat,outfile)
             nthreads = self.config['mcmc']['nthreads']
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
+    if 'results' is self.opts.run:
+        logger.info("Running 'results'...")
+        # Not implemented yet because no way to get the fixed parameter values...
     if 'membership' in self.opts.run:
         logger.info("Running 'membership'...")
         from ugali.analysis.kernel import kernelFactory
@@ -98,7 +101,7 @@ def run(self):
                 results = yaml.load(open(datfile))['results']
                 truths = [results[param][0] for param in params]
             else:
-                truths=[samples.peak(p,burn=burn,clip=clip) for p in samples.names]
+                truths=[samples.kde_peak(p,burn=burn,clip=clip) for p in samples.names]
                 #truths = None
 
             chain = samples.ndarray[nburn*nwalkers:]

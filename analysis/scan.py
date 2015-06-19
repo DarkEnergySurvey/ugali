@@ -127,9 +127,6 @@ class GridSearch:
     def __init__(self, config, roi, mask, catalog, isochrone, kernel):
         """
         Object to efficiently search over a grid of ROI positions.
-
-        ADW: This should probably be renamed GridSearch or something like that
-        since we would like a pure access to the likelihood itself.
         """
 
         self.config = config

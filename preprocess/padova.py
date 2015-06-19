@@ -21,41 +21,53 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 from ugali.analysis.isochrone2 import PadovaIsochrone,OldPadovaIsochrone
 
-defaults_27 = {
-    'cmd_version': 2.7,
-    'submit_form': 'Submit',
-    'isoc_kind': 'parsec_CAF09_v1.2S', 
-    'eta_reimers': 0.2,
-    'photsys_file': 'tab_mag_odfnew/tab_mag_decam.dat',
-    'kind_cspecmag': 'aringer09',
-    'dust_sourceC': 'nodustC', 
-    'dust_sourceM': 'nodustM', 
-    'imf_file': 'tab_imf/imf_chabrier_lognormal.dat',
-    'isoc_val': 0,
-    'isoc_age': 1e9,
-    'isoc_zeta': 2e-4,
-    'isoc_lage0':6.602,   #Minimum allowed age
-    'isoc_lage1':10.1303, #Maximum allowed age
-    'isoc_z0':0.0001,     #Minimum allowed metallicity  
-    'isoc_z1':0.03,       #Maximum allowed metallicity
-    'output_kind': 0,
-    'output_evstage': 1,
-    'output_gzip': 0,
-    }
-
-class OldPadova(Padova):
-    defaults = defaults_27
-    defaults['isoc_kind'] = 'gi10a'
-
-    params2filename = OldPadovaIsochrone.params2filename
-    filename2params = OldPadovaIsochrone.filename2params
-
-class Girardi2010(Padova):
-    defaults = defaults_27
-    defaults['isoc_kind'] = 'gi10a'
+# Commented options may need to be restored for older
+# version/isochrones.
+defaults_27 =  {#'binary_frac': 0.3,
+                #'binary_kind': 1,
+                #'binary_mrinf': 0.7,
+                #'binary_mrsup': 1,
+                'cmd_version': 2.7,
+                'dust_source': 'nodust',
+                'dust_sourceC': 'nodustC',
+                'dust_sourceM': 'nodustM',
+                'eta_reimers': 0.2,
+                #'extinction_av': 0,
+                #'icm_lim': 4,
+                'imf_file': 'tab_imf/imf_chabrier_lognormal.dat',
+                'isoc_age': 1e9,
+                'isoc_age0': 12.7e9,
+                'isoc_dlage': 0.05,
+                'isoc_dz': 0.0001,
+                'isoc_kind': 'parsec_CAF09_v1.2S',
+                'isoc_lage0': 6.602,   #Minimum allowed age                 
+                'isoc_lage1': 10.1303, #Maximum allowed age                 
+                'isoc_val': 0,               
+                'isoc_z0': 0.0001,     #Minimum allowed metallicity         
+                'isoc_z1': 0.03,       #Maximum allowed metallicity   
+                'isoc_zeta': 0.0002,
+                'isoc_zeta0': 0.0002,
+                'kind_cspecmag': 'aringer09',
+                'kind_dust': 0,
+                'kind_interp': 1,
+                'kind_mag': 2,
+                'kind_postagb': -1,
+                'kind_pulsecycle': 0,
+                #'kind_tpagb': 0,
+                #'lf_deltamag': 0.2,
+                #'lf_maginf': 20,
+                #'lf_magsup': -20,
+                #'mag_lim': 26,
+                #'mag_res': 0.1,
+                'output_evstage': 1,
+                'output_gzip': 0,
+                'output_kind': 0,
+                'photsys_file': 'tab_mag_odfnew/tab_mag_decam.dat',
+                #'photsys_version': 'yang',
+                'submit_form': 'Submit'}
 
 class Padova(object):
-    defaults = defaults_27
+    defaults = dict(defaults_27)
 
     params2filename = PadovaIsochrone.params2filename
     filename2params = PadovaIsochrone.filename2params
@@ -142,6 +154,34 @@ class Padova(object):
             #print(c)
             raise RuntimeError('Server Response is incorrect')
 
+class OldPadova(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'gi10a'
+
+    params2filename = OldPadovaIsochrone.params2filename
+    filename2params = OldPadovaIsochrone.filename2params
+
+class Girardi2002(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'gi2000'
+
+class Marigo2008(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'ma08'
+
+class Girardi2010a(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'gi10a'
+
+class Girardi2010b(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'gi10b'
+
+class Bressan2012(Padova):
+    defaults = dict(defaults_27)
+    defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
+
+
 if __name__ == "__main__":
     import ugali.utils.parser
     description = "Download isochrones"
@@ -159,15 +199,30 @@ if __name__ == "__main__":
 
     #outdir = '/u/ki/kadrlica/des/isochrones/v1'
     #outdir = '/u/ki/kadrlica/sdss/isochrones/v2'
-    outdir = '/u/ki/kadrlica/des/isochrones/v2'
-    outdir = '/u/ki/kadrlica/des/isochrones/v3'
+    #outdir = '/u/ki/kadrlica/des/isochrones/v2'
+    #outdir = '/u/ki/kadrlica/des/isochrones/v3'
+    #outdir = '/u/ki/kadrlica/des/isochrones/v4'
+    outdir = '/u/ki/kadrlica/des/isochrones/v5'
+    #outdir = '/u/ki/kadrlica/des/isochrones/v6'
     survey = config['data']['survey']
-    p = Padova(survey=survey)
-    abins = config['binning']['age']
-    zbins = config['binning']['z']
 
-    abins = np.arange(1,13.6,0.1)
-    zbins = np.arange(1e-4,1e-3,1e-5)
+    #p = Padova(survey=survey)
+    p = Girardi2010a(survey=survey)
+    #p = Girardi2010b(survey=survey)
+    #p = Marigo2008(survey=survey)
+    p = Girardi2002(survey=survey)
+
+    # Binning from config
+    #abins = config['binning']['age']
+    #zbins = config['binning']['z']
+    #abins = np.arange(1,13.6,0.1)
+    #zbins = np.arange(1e-4,1e-3,1e-5)
+    abins = np.arange(10,14,1)
+    zbins = np.arange(1e-4,2e-4,1e-4)
+    #abins = np.arange(10,10.1,0.1)
+    #zbins = np.arange(1e-4,1.1e-4,1e-5)
+
+
     if opts.age is not None: abins = [opts.age]
     if opts.metallicity is not None: zbins = [opts.metallicity]
     grid = [g.flatten() for g in np.meshgrid(abins,zbins)]
