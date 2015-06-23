@@ -25,7 +25,7 @@ import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
-import ugali.analysis.isochrone2
+import ugali.analysis.isochrone
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
@@ -728,7 +728,7 @@ def drawIsochrone(isochrone, **kwargs):
         kwargs.setdefault('ls','-')
     else:
         # Thin lines
-        kwargs.setdefault('ls','')
+        kwargs.setdefault('ls','-')
         kwargs.setdefault('marker','.')
         kwargs.setdefault('ms',1)
         kwargs.setdefault('c','k')
@@ -754,7 +754,7 @@ def drawIsochrone(isochrone, **kwargs):
             if i > 0:
                 kwargs['label'] = None
             ax.plot(c,m,**kwargs)
-
+    
     #ax.invert_yaxis()
     #ax.set_xlim(-0.5,1.5)
     #ax.set_ylim(23,18)
