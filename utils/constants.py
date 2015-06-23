@@ -123,7 +123,8 @@ MAGERR_PARAMS = dict(
 # Calibration uncertainty
 CALIB_ERR = dict(
     sdss = 0.03,
-    y1a1 = 0.01,
-    y2n  = 0.01,
-    y2u1 = 0.01,
+    y1a1 = 0.015,
+    y2n  = 0.015,
+    y2u1 = 0.015,
+    y2q1 = 0.015,
 )

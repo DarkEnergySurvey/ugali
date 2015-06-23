@@ -18,7 +18,9 @@ import pyfits
 import healpy
 
 import ugali.utils.skymap
-from ugali.analysis.loglike  import LogLikelihood 
+import ugali.analysis.loglike
+from ugali.analysis.loglike import LogLikelihood
+from ugali.analysis.source import Source
 
 from ugali.utils.parabola import Parabola
 
@@ -60,11 +62,15 @@ class Scan(object):
 
         self.kernel = self.createKernel(self.config,self.lon,self.lat)
         self.isochrone = self.createIsochrone(self.config)
+        self.source = Source()
+        self.source.set_kernel(self.kernel)
+        self.source.set_isochrone(self.isochrone)
+        
         self.catalog = self.createCatalog(self.config,self.roi)
         self.mask = self.createMask(self.config,self.roi)
 
-        self.grid = GridSearch(self.config, self.roi, self.mask,self.catalog, 
-                               self.isochrone, self.kernel)
+        self.grid = GridSearch(self.config,self.roi,self.mask,self.catalog,self.source)
+
 
     @property
     def loglike(self):
@@ -91,6 +97,15 @@ class Scan(object):
             return ugali.analysis.loglike.createIsochrone(config)
         else:
             return ugali.analysis.loglike.createIsochrone(config)
+
+    @staticmethod
+    def createSource(config,lon=0.0,lat=0.0):
+        kernel = GridSearch.createKernel(config,lon,lat)
+        iso  = GridSearch.createIsochrone(config)
+        source = Source()
+        source.set_kernel(kernel)
+        source.set_isochrone(iso)
+        return source
 
     @staticmethod
     def createCatalog(config,roi=None,lon=None,lat=None):
@@ -124,7 +139,8 @@ class Scan(object):
 
 class GridSearch:
 
-    def __init__(self, config, roi, mask, catalog, isochrone, kernel):
+    #def __init__(self, config, roi, mask, catalog, isochrone, kernel):
+    def __init__(self, config, roi, mask, catalog, source):
         """
         Object to efficiently search over a grid of ROI positions.
         """
@@ -134,9 +150,10 @@ class GridSearch:
         self.mask = mask # Currently assuming that input mask is ROI-specific
 
         logger.info("Creating log-likelihood...")
-        self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
+        #self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
+        self.loglike=LogLikelihood(config,roi,mask,catalog,source)
         logger.info(str(self.loglike))
-        self.stellar_mass_conversion = self.loglike.stellar_mass()
+        self.stellar_mass_conversion = self.loglike.source.stellar_mass()
         self.distance_modulus_array = np.asarray(self.config['scan']['distance_modulus_array'])
 
     def precompute(self, distance_modulus_array=None):
@@ -226,7 +243,7 @@ class GridSearch:
                 # Doesn't re-sync distance_modulus each time
                 self.loglike.sync_params()
                                          
-                args = (jj+1, npixels, self.loglike.lon, self.loglike.lat)
+                args = (jj+1, npixels, self.loglike.source.lon, self.loglike.source.lat)
                 message = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '%(args)
 
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
@@ -294,13 +311,13 @@ class GridSearch:
         mle['lon'] = self.roi.pixels_target.lon[k]
         mle['lat'] = self.roi.pixels_target.lat[k]
         mle['distance_modulus'] = self.distance_modulus_array[j]
-        mle['extension'] = float(self.loglike.extension)
-        mle['ellipticity'] = float(self.loglike.ellipticity)
-        mle['position_angle'] = float(self.loglike.position_angle)
+        mle['extension'] = float(self.loglike.source.extension)
+        mle['ellipticity'] = float(self.loglike.source.ellipticity)
+        mle['position_angle'] = float(self.loglike.source.position_angle)
         # ADW: FIXME!
         try: 
-            mle['age'] = np.mean(self.loglike.age)
-            mle['metallicity'] = np.mean(self.loglike.metallicity)
+            mle['age'] = np.mean(self.loglike.source.age)
+            mle['metallicity'] = np.mean(self.loglike.source.metallicity)
         except AttributeError:
             mle['age'] = np.nan
             mle['metallicity'] = np.nan

@@ -17,7 +17,7 @@ import healpy
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
-from ugali.analysis.model import Model, Parameter
+from ugali.analysis.model import Model, Parameter, modelFactory
 from ugali.utils.healpix import ang2vec, ang2pix, query_disc
 
 from ugali.utils.logger import logger
@@ -125,6 +125,7 @@ class EllipticalKernel(Kernel):
             ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
             # This is the PA *WEST* of North.
             # to get the conventional PA EAST of North take 90-PA
+            # Would it be better to have bounds [-90,90]?
         ])
     _mapping = odict([
         ('e','ellipticity'),
@@ -416,7 +417,7 @@ Exponential = RadialExponential
 Plummer     = RadialPlummer
 King        = RadialKing
 
-def kernelFactory(name, **kwargs):
+def kernelFactory2(name, **kwargs):
     """
     Factory for cerating spatial kernels. Arguments
     are passed directly to the constructor of the chosen
@@ -431,6 +432,24 @@ def kernelFactory(name, **kwargs):
         msg = "Unrecognized kernel: %s"%name
         raise Exception(msg)
 
+    return kernels[name](**kwargs)
+
+
+def kernelFactory(name, **kwargs):
+    """
+    Factory for cerating spatial kernels. Arguments
+    are passed directly to the constructor of the chosen
+    kernel.
+    """
+    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
+    kernels = odict(inspect.getmembers(sys.modules[__name__], fn))
+ 
+    if name not in kernels.keys():
+        msg = "%s not found in kernels:\n %s"%(name,kernels.keys())
+        logger.error(msg)
+        msg = "Unrecognized kernel: %s"%name
+        raise Exception(msg)
+ 
     return kernels[name](**kwargs)
 
 if __name__ == "__main__":

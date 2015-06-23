@@ -17,33 +17,15 @@ from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
 from ugali.analysis.model import Model,Parameter
+from ugali.analysis.source import Source
 from ugali.utils.config import Config
-
-class Richness(Model):
-    """
-    Dummy model to hold the richness, which is not
-    directly connected to either the spatial or 
-    color information and doesn't require a sync
-    when updated.
-    """
-    _params = odict([
-        ('richness', Parameter(1.0, [0.0,  np.inf])),
-    ])
 
 class LogLikelihood(object):
     """
     Class for calculating the log-likelihood from a set of models.
     """
 
-    def __init__(self, config, roi, mask, catalog, isochrone, kernel):
-        # Set the various models for the likelihood
-        self.set_model('richness', Richness())
-        self.set_model('color', isochrone)
-        self.set_model('spatial', kernel) 
-
-        # Toggle for tracking which models need to be synched
-        self._sync = odict([(k,True) for k in self.models.keys()])
-
+    def __init__(self, config, roi, mask, catalog, source):
         # Currently assuming that input mask is ROI-specific
         self.config = Config(config)
         self.roi    = roi
@@ -51,6 +33,9 @@ class LogLikelihood(object):
 
         self.catalog_full = catalog
         self.clip_catalog()
+
+        # The source model (includes kernel and isochrone)
+        self.source = source
 
         # Effective bin size in color-magnitude space
         self.delta_mag = self.config['likelihood']['delta_mag']
@@ -73,28 +58,11 @@ class LogLikelihood(object):
         # The signal probability for each object
         #self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
         # The total model predicted counts
-        return -1. * numpy.sum(numpy.log(1. - self.p)) - (self.f * self.richness)
-        
-    def __getattr__(self, name):
-        for key,model in self.models.items():
-            if name in model.params:
-                return getattr(model, name)
-        # Raises AttributeError
-        return object.__getattribute__(self,name)
-
-    def __setattr__(self, name, value):
-        for key,model in self.models.items():
-            if name in model.params:
-                self._sync[key] = True
-                return setattr(model, name, value)
-        # Raises AttributeError?
-        return object.__setattr__(self, name, value)
+        return -1. * numpy.sum(numpy.log(1.-self.p)) - (self.f * self.source.richness)
         
     def __str__(self):
-        ret = "%s:"%self.__class__.__name__
-        for key,model in self.models.items():
-            ret += "\n  %s Model (sync=%s):\n"%(key.capitalize(),self._sync[key])
-            ret += model.__str__(indent=4)
+        ret = "%s:\n"%self.__class__.__name__
+        ret += str(self.source)
         return ret
 
     ############################################################################
@@ -104,23 +72,18 @@ class LogLikelihood(object):
     # Various derived properties
     @property
     def kernel(self):
-        return self.models['spatial']
+        #return self.models['spatial']
+        return self.source.kernel
 
     @property
     def isochrone(self):
-        return self.models['color']
-
-    @property
-    def params(self):
-        params = odict([])
-        for key,model in self.models.items():
-            params.update(model.params)
-        return params
+        #return self.models['color']
+        return self.source.isochrone
 
     @property
     def pixel(self):
         nside = self.config.params['coords']['nside_pixel']
-        pixel = ang2pix(nside,float(self.lon),float(self.lat))
+        pixel = ang2pix(nside,float(self.source.lon),float(self.source.lat))
         return pixel
 
     # Protect the basic elements of the likelihood
@@ -150,24 +113,14 @@ class LogLikelihood(object):
         """
         Number of observed stars.
         """
-        return self.richness * self.f
+        return self.source.richness * self.f
 
     ############################################################################
     # Methods for setting model parameters
     ############################################################################
 
-    def set_model(self, name, model):
-        if not hasattr(self,'models'):
-            object.__setattr__(self, 'models',odict())
-        #ADW: Might want to consider this 
-        ###if name not in self.models:
-        ###    msg="%s does not contain model: %s"%(self.__class__.__name__,name)
-        ###    raise AttributeError(msg)
-        self.models[name] = model
-
     def set_params(self,**kwargs):
-        for key,value in kwargs.items():
-            setattr(self,key,value)
+        self.source.set_params(**kwargs)
 
         if self.pixel not in self.roi.pixels_interior:
             # ADW: Raising this exception is not strictly necessary, 
@@ -179,13 +132,13 @@ class LogLikelihood(object):
         # newly set parameters. The goal is to only update required quantities
         # to keep computational time low.
  
-        if self._sync['richness']:
+        if self.source.get_sync('richness'):
             # No sync necessary for richness
             pass
-        if self._sync['color']:
-            self.observable_fraction = self.calc_observable_fraction(self.distance_modulus)
-            self.u_color = self.calc_signal_color(self.distance_modulus)
-        if self._sync['spatial']:
+        if self.source.get_sync('color'):
+            self.observable_fraction = self.calc_observable_fraction(self.source.distance_modulus)
+            self.u_color = self.calc_signal_color(self.source.distance_modulus)
+        if self.source.get_sync('spatial'):
             self.u_spatial = self.calc_signal_spatial()
 
         # Combined object-by-object signal probability
@@ -204,7 +157,7 @@ class LogLikelihood(object):
                      (self.surface_intensity_sparse*observable_fraction).sum()
 
         # The signal probability for each object
-        self._p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
+        self._p = (self.source.richness * self.u)/((self.source.richness * self.u) + self.b)
 
         #print 'b',np.unique(self.b)[:20]
         #print 'u',np.unique(self.u)[:20]
@@ -212,7 +165,8 @@ class LogLikelihood(object):
         #print 'p',np.unique(self.p)[:20] 
 
         # Reset the sync toggle
-        for k in self._sync.keys(): self._sync[k]=False 
+        #for k in self._sync.keys(): self._sync[k]=False 
+        self.source.reset_sync()
 
     ############################################################################
     # Methods for calculating observation quantities
@@ -242,19 +196,6 @@ class LogLikelihood(object):
         #logger.info("Using interior ROI for likelihood calculation")
         self.catalog = self.catalog_interior
         #self.pixel_roi_cut = self.roi.pixel_interior_cut
-
-    def stellar_mass(self):
-        # ADW: I think it makes more sense for this to be
-        #return self.richness * self.isochrone.stellarMass()
-        return self.isochrone.stellarMass()
-
-    def stellar_luminosity(self):
-        # ADW: I think it makes more sense for this to be
-        #return self.richness * self.isochrone.stellarLuminosity()
-        return self.isochrone.stellarLuminosity()
-
-    def absolute_magnitude(self, richness):
-        return self.isochrone.absolute_magnitude(richness)
 
     def calc_backgroundCMD(self):
         #ADW: At some point we may want to make the background level a fit parameter.
@@ -470,7 +411,6 @@ class LogLikelihood(object):
             hdu.header.set(name,value.value,param)
         hdu.writeto(filename,clobber=True)
 
-
 def createROI(config,lon,lat):
     import ugali.observation.roi
     roi = ugali.observation.roi.ROI(config, lon, lat)        
@@ -480,7 +420,7 @@ def createKernel(config,lon=0.0,lat=0.0):
     # FIXME: The config needs coords
     import ugali.analysis.kernel
     config = Config(config)
-    params = dict(config['kernel'])
+    params = copy.deepcopy(config['kernel'])
     params.setdefault('lon',lon)
     params.setdefault('lat',lat)
     return ugali.analysis.kernel.kernelFactory(**params)
@@ -489,9 +429,10 @@ def createIsochrone(config):
     #logger.warning("Creating old isochrone...")
     #import ugali.analysis.isochrone
     #isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
+    import ugali.analysis.isochrone2
     logger.warning("Creating new isochrone...")
     config = Config(config)
-    import ugali.analysis.isochrone2
+    params = copy.deepcopy(config['isochrone'])
     isochrone = ugali.analysis.isochrone2.isochroneFactory(**config['isochrone'])
     return isochrone
 
@@ -529,7 +470,12 @@ def createLoglike(config,lon,lat):
     isochrone = createIsochrone(config)
     catalog = createCatalog(config,roi)
     mask = createMask(config,roi)
-    return LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
+    
+    source = Source()
+    source.set_model('spatial',kernel)
+    source.set_model('color',isochrone)
+
+    return LogLikelihood(config,roi,mask,catalog)
 
 if __name__ == "__main__":
     import argparse

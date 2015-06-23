@@ -31,34 +31,46 @@ class Model(object):
     def __init__(self,*args,**kwargs):
         self.name = self.__class__.__name__
         self.params = copy.deepcopy(self._params)
-        pars = dict(**kwargs)
-        for par, value in pars.items():
-            # Raise AttributeError if attribute not found
-            self.__getattr__(par) 
-            # Set attribute
-            self.__setattr__(par,value)
+        self.set_attributes(**kwargs)
+        #pars = dict(**kwargs)
+        #for name, value in pars.items():
+        #    # Raise AttributeError if attribute not found
+        #    self.__getattr__(name) 
+        #    # Set attribute
+        #    self.__setattr__(name,value)
+        
         # In case no properties were set, cache anyway
         self._cache()
 
     def __getattr__(self,name):
         # Return 'value' of parameters
         # __getattr__ tries the usual places first.
-        if name in self._mapping:
-            return self.__getattr__(self._mapping[name])
-        if name in self._params:
-            return self._getp(name)
+        #if name in self._mapping:
+        #    return self.__getattr__(self._mapping[name])
+        #if name in self._params:
+        #    return self.getp(name).value
+        #else:
+        #    # Raises AttributeError
+        #    return object.__getattribute__(self,name)
+        if name in self._params or name in self._mapping:
+            return self.getp(name).value
         else:
             # Raises AttributeError
             return object.__getattribute__(self,name)
 
     def __setattr__(self, name, value):
-        # Call 'set_value' on parameters
-        # __setattr__ tries the usual places first.
-        if name in self._mapping.keys():
-            return self.__setattr__(self._mapping[name],value)
-        if name in self._params:
-            self._setp(name, value)
+        ## Call 'set_value' on parameters
+        ## __setattr__ tries the usual places first.
+        #if name in self._mapping.keys():
+        #    return self.__setattr__(self._mapping[name],value)
+        #if name in self._params:
+        #    self.setp(name, value)
+        #else:
+        #    return object.__setattr__(self, name, value)
+        if name in self._params or name in self._mapping:
+            self.setp(name, value)
         else:
+            # Why is this a return statement
             return object.__setattr__(self, name, value)
 
     def __str__(self,indent=0):
@@ -73,9 +85,9 @@ class Model(object):
                 ret += '\n{0:>{2}}{1}'.format('',par,indent+4)
         return ret
 
-    def _getp(self, name):
+    def getp(self, name):
         """ 
-        Get the value of the named parameter.
+        Get the named parameter.
 
         Parameters
         ----------
@@ -84,27 +96,49 @@ class Model(object):
 
         Returns
         -------
-        value : scalar
-            The parameter value.
+        param : 
+            The parameter object.
         """
-        return self.params[name].value
+        name = self._mapping.get(name,name)
+        return self.params[name]
 
-    def _setp(self, name, value):
+    def setp(self, name, value, bounds=None, free=None):
         """ 
-        Set the value of the named parameter.
+        Set the value (and bounds) of the named parameter.
 
         Parameters
         ----------
         name : string
             The parameter name.
-
+        value: 
+            The value of the parameter
+        bounds: None
+            The bounds on the parameter
         Returns
         -------
         None
         """
-        self.params[name].set_value(value)
+        name = self._mapping.get(name,name)
+        self.params[name].set(value,bounds,free)
         self._cache(name)
 
+    def set_attributes(self, **kwargs):
+        """
+        Set a group of attributes (parameters and members).  Calls
+        `setp` directly, so kwargs can include more than just the
+        parameter value (e.g., bounds, free, etc.).
+        """
+        kwargs = dict(kwargs)
+        for name,value in kwargs.items():
+            # Raise AttributeError if param not found
+            self.__getattr__(name) 
+            # Set attributes
+            try: self.setp(name,**value)
+            except TypeError:
+                try:  self.setp(name,*value)
+                except (TypeError,KeyError):  
+                    self.__setattr__(name,value)
+        
     def _cache(self, name=None):
         """ 
         Method called in _setp to cache any computationally
@@ -125,15 +159,23 @@ class Model(object):
     #def params(self):
     #    return self._params
 
+def modelFactory(cls,**kwargs):
+    self = cls()
+    self.set_attributes(**kwargs)
+    return self
+
 class Parameter(object):
     """
-    Parameter class for storing a value and bounds.
+    Parameter class for storing a value, bounds, and freedom.
 
     Adapted from MutableNum from https://gist.github.com/jheiv/6656349
     """
     __value__ = None
     __bounds__ = None
-    def __init__(self, value, bounds=None): self.set(value,bounds)
+    __free__ = False
+
+    def __init__(self, value, bounds=None, free=None): 
+        self.set(value,bounds,free)
 
     # Comparison Methods
     def __eq__(self, x):        return self.__value__ == x
@@ -181,6 +223,7 @@ class Parameter(object):
     def __rxor__(self, x):      return x ^ self.__value__
     def __rlshift__(self, x):   return x << self.__value__
     def __rrshift__(self, x):   return x >> self.__value__
+    # ADW: Don't allow compound assignments
     ## Compound Assignment
     #def __iadd__(self, x):      self.set(self + x); return self
     #def __isub__(self, x):      self.set(self - x); return self
@@ -204,10 +247,10 @@ class Parameter(object):
     # Represenation
     # ADW: This should probably be __str__ not __repr__
     def __repr__(self):         
-        return "%s(%s, [%s, %s])"%(self.__class__.__name__, self.value,self.bounds[0],self.bounds[1])
+        return "%s(%s, [%s, %s], %s)"%(self.__class__.__name__, self.value,self.bounds[0],self.bounds[1],self.free)
 
     # Return the type of the inner value
-    def innertype(self):        return type(self.__value__)
+    def innertype(self):  return type(self.__value__)
 
     @property
     def bounds(self):
@@ -217,9 +260,9 @@ class Parameter(object):
     def value(self):
         return self.__value__
 
-    def set_bounds(self, bounds):
-        if bounds is None: return
-        else: self.__bounds__ = bounds
+    @property
+    def free(self):
+        return self.__free__
 
     def check_bounds(self, value):
         if self.__bounds__ is None:
@@ -229,6 +272,10 @@ class Parameter(object):
             msg=msg%(value,self.__bounds__[0],self.__bounds__[1])
             raise ValueError(msg)
 
+    def set_bounds(self, bounds):
+        if bounds is None: return
+        else: self.__bounds__ = bounds
+
     def set_value(self, value):
         self.check_bounds(value)
         if   isinstance(value, (int, long, float)): self.__value__ = value
@@ -236,10 +283,15 @@ class Parameter(object):
         elif np.isscalar(value): self.__value__ = np.asscalar(value) # Convert numpy types
         else: raise TypeError("Numeric type required")
 
-    def set(self, value, bounds=None):
+    def set_free(self, free):
+        if free is None: return
+        else: self.__free__ = bool(free)
+
+    def set(self, value, bounds=None, free=None):
+        # Probably want to reset bounds if set fails
         self.set_bounds(bounds)
         self.set_value(value)
-
+        self.set_free(free)
 
 if __name__ == "__main__":
     import argparse
