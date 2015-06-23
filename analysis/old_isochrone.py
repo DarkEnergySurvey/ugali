@@ -46,6 +46,13 @@ from ugali.utils.config import Config
 from ugali.utils.logger import logger
 ############################################################
 
+import warnings
+warnings.simplefilter('module', DeprecationWarning)
+msg = "Old isochrone is deprecated"
+warnings.warn(msg,DeprecationWarning)
+warnings.simplefilter('default', DeprecationWarning)
+
+
 class Isochrone(Model):
 
     _params = odict([
