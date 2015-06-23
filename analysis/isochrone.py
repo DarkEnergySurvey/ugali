@@ -1109,6 +1109,73 @@ class OldPadovaIsochrone(Girardi2002):
         age = 10**(log_age) / 1e9 # Gyr
         return age, metallicity
     
+############################################################
+
+class DotterIsochrone(PadovaIsochrone):
+    """
+    KCB: currently inheriting from PadovaIsochrone because there are 
+    several useful functions where we would basically be copying code.
+    """
+
+    _dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
+    
+    # KCB: What to do about horizontal branch
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage','BHeb','Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+            des = odict([
+                (1, ('mass',float)),
+                (4, ('log_lum',float)),
+                (5, ('u',float)),
+                (6, ('g',float)),
+                (7, ('r',float)),
+                (8,('i',float)),
+                (9,('z',float))
+                ]),
+            )
+
+    def _parse(self,filename):
+        """
+        Reads an isochrone in the Dotter format and determines the 
+        age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and 
+        creates arrays with the initial stellar mass and 
+        corresponding magnitudes for each step along the isochrone.
+        http://stellar.dartmouth.edu/models/isolf_new.html
+        """
+        try:
+            columns = self.columns[self.survey.lower()]
+        except KeyError, e:
+            logger.warning('did not recognize survey %s'%(survey))
+            raise(e)
+
+        kwargs = dict(delimiter='',comments='#',usecols=columns.keys(),dtype=columns.values())
+        data = np.genfromtxt(filename,**kwargs)
+
+        # KCB: Not sure whether the mass in Dotter isochrone output files is initial mass or current mass
+        self.mass_init = data['mass']
+        self.mass_act  = data['mass']
+        self.luminosity = 10**data['log_lum']
+        self.mag_1 = data[self.band_1]
+        self.mag_2 = data[self.band_2]
+        self.stage = numpy.tile('Main', len(data))
+        
+        # KCB: No post-AGB isochrone data points, right?
+        self.mass_init_upper_bound = np.max(self.mass_init)
+
+        self.mag = self.mag_1 if self.band_1_detection else self.mag_2
+        self.color = self.mag_1 - self.mag_2
+
+    @property
+    def feh(self):
+        # Dotter convention
+        metallicity_solar = 0.02
+        feh = np.log10(self.metallicity / metallicity_solar)
+
+############################################################
 
 class CompositeIsochrone(Isochrone):
     _params = odict([
@@ -1229,6 +1296,7 @@ class OldCompositeIsochrone(CompositeIsochrone):
 Padova = PadovaIsochrone
 OldPadova = OldPadovaIsochrone
 Composite = CompositeIsochrone
+Dotter = DotterIsochrone
 
 def isochroneFactory2(name, **kwargs):
     """
