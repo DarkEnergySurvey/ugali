@@ -16,7 +16,7 @@ def gammalnStirling(z):
 
 ############################################################
 
-def confidenceInterval(n, k, alpha = 0.68):
+def confidenceInterval(n, k, alpha = 0.68, errorbar=False):
     """
     Given n tests and k successes, return efficiency and confidence interval.
     """
@@ -61,10 +61,16 @@ def confidenceInterval(n, k, alpha = 0.68):
     low = min(numpy.min(s) * dx, e)
     high = max(numpy.max(s) * dx, e)
 
-    return e, [low, high]
+    if not errorbar:
+        return e, [low, high]
+    else:
+        return e, [e - low, high - e]
+
+############################################################
 
 bayesianInterval = confidenceInterval
 
+############################################################
 
 def binomialInterval(n, k, alpha = 0.68):
     """
@@ -73,4 +79,5 @@ def binomialInterval(n, k, alpha = 0.68):
     e = float(k)/n
     delta_e = 1/float(n) * numpy.sqrt(e * (1 - e) * float(n)) * alpha/0.68
     return e, [e - delta_e, e + delta_e]
+
 ############################################################
