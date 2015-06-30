@@ -16,7 +16,7 @@ import ugali.utils.shell
 
 ############################################################
 
-def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DECam', force=False):
+def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DECam', clobber=False):
     """
     See Vargas et al. 2013 for the distribution of alpha elements in dSphs
     http://adsabs.harvard.edu/abs/2013ApJ...767..134V
@@ -32,8 +32,9 @@ def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DEC
     best compromise.
     """
 
-    outfile = '%s/iso_a%.1f_z%.5f.dat'%(outdir, age, z)
-    if os.path.exists(outfile) and not force:
+    # KCB: This check won't work if the isochrone files have to be nenamed
+    outfile = '%s/iso_a%.1f_z%.5f_temp.dat'%(outdir, age, z)
+    if os.path.exists(outfile) and not clobber:
         ugali.utils.logger.logger.warning('Found %s; skipping...'%(outfile))
         return
 
@@ -48,12 +49,12 @@ def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DEC
         ugali.utils.logger.logger.error('Photometric system %s not in available options: %s'%(clr, ', '.join(dict_clr.keys())))
         sys.exit()
 
-    dict_afe = {'-0.2': '0',
-                '0 (scaled-solar)': '1',
-                '+0.2': '2',
-                '+0.4': '3',
-                '+0.6': '4',
-                '+0.8': '5'}
+    dict_afe = {'-0.2': '1',
+                '0 (scaled-solar)': '2',
+                '+0.2': '3',
+                '+0.4': '4',
+                '+0.6': '5',
+                '+0.8': '6'}
     if afe not in dict_afe.keys():
         ugali.utils.logger.logger.error('[alpha/Fe] ratio %s not in available options: %s'%(afe, ', '.join(dict_afe.keys())))
         sys.exit()
@@ -67,8 +68,10 @@ def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DEC
 
     #####
 
-    z_solar = 0.02 # Dotter convention
+    z_solar = 0.02 # Approximately the Dotter convention
+    #z_solar = 0.0163 # Dotter convention
     feh = numpy.log10(z / z_solar)
+    #print feh
     query = 'http://stellar.dartmouth.edu/models/isolf_new.php?int=1&out=1&age=%.1f&feh=%.5f&hel=%i&afe=%i&clr=%i&flt=&bin=&imf=1&pls=&lnm=&lns='%(age, 
                                                                                                                                                    feh, 
                                                                                                                                                    int(dict_hel[hel]), 
@@ -80,10 +83,20 @@ def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DEC
     infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(isochrone_id)
     command = 'wget -q %s -O %s'%(infile, outfile)
     os.system(command)
+
+    # Now rename the output file based on Z effective
+    reader = open(outfile)
+    lines = reader.readlines()
+    reader.close()
+    z_eff = float(lines[3].split()[4])
+
+    outfile_new = '%s/iso_a%.1f_z%.5f.dat'%(outdir, age, z_eff)
     #outfile = 'iso_a%.1f_z%.5f.dat'%(age, z)
-    #command = 'mv tmp%s.iso %s'%(isochrone_id, outfile)
+    #command = 'mv tmp%s.iso %s'%(isochrone_id, outfile_new)
+    command = 'mv %s %s'%(outfile, outfile_new)
+
     #print command
-    #os.system(command)
+    os.system(command)
 
 ############################################################
 
@@ -95,26 +108,33 @@ if __name__ == "__main__":
     #from ugali.utils.config import Config
     #config = Config(opts.config)
 
-    outdir = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
+    #outdir = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
+    outdir = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v4/'
 
     if outdir is None: outdir = './'
     ugali.utils.shell.mkdir(outdir)
 
-    z_array = 10**numpy.linspace(numpy.log10(1.e-4), numpy.log10(1.e-2), 33)
-    age_array = numpy.arange(1., 13.5 + 0.1, 0.1)
-
-    # Test
-    getDotterIsochrone(12.2, 1.1e-4, outdir=outdir)
+    # Range used for PARSEC isochrone library
+    #z_array = 10**numpy.linspace(numpy.log10(1.e-4), numpy.log10(1.e-2), 33)
+    #age_array = numpy.arange(1., 13.5 + 0.1, 0.1)
+    # Going to higher metallicity, [Fe/H] = -2.49
+    z_array = 10**numpy.linspace(numpy.log10(6.5e-5), numpy.log10(5.e-3), 33)
+    age_array = numpy.arange(6., 13.5 + 0.1, 0.1)
     
-    print '\nIf this were not a test, this script would download the following isochrone grid...'
+    # Test
+    #getDotterIsochrone(12.2, 1.1e-4, outdir=outdir)
+    #print '\nIf this were not a test, this script would download the following isochrone grid...'
 
     print '\nAges:'
     print age_array
     print '\nMetallicities:'
     print z_array
 
-    #for z in z_array:
-    #    for age in age_array:
-    #        getDotterIsochrone(age, z, outdir=outdir)
+    count = 0
+    for z in z_array:
+        for age in age_array:
+            print '(%i/%i)'%(count, len(age_array) * len(z_array))
+            getDotterIsochrone(age, z, outdir=outdir)
+            count += 1
 
 ############################################################
