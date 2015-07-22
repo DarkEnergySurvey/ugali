@@ -729,7 +729,7 @@ def drawIsochrone(isochrone, **kwargs):
         kwargs.setdefault('ls','-')
     else:
         # Thin lines
-        kwargs.setdefault('ls','')
+        kwargs.setdefault('ls','-')
         kwargs.setdefault('marker','.')
         kwargs.setdefault('ms',1)
         kwargs.setdefault('c','k')
@@ -755,7 +755,7 @@ def drawIsochrone(isochrone, **kwargs):
             if i > 0:
                 kwargs['label'] = None
             ax.plot(c,m,**kwargs)
-
+    
     #ax.invert_yaxis()
     #ax.set_xlim(-0.5,1.5)
     #ax.set_ylim(23,18)

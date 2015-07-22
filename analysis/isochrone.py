@@ -832,13 +832,13 @@ class Isochrone(Model):
         iso_mag_2+=self.distance_modulus
 
         iso_cut = (iso_mag_1<np.max(mag_1))&(iso_mag_1>np.min(mag_1)) | \
-            (iso_mag_2<np.max(mag_2))&(iso_mag_2>np.min(mag_2))
+                  (iso_mag_2<np.max(mag_2))&(iso_mag_2>np.min(mag_2))
         iso_mag_1 = iso_mag_1[iso_cut]
         iso_mag_2 = iso_mag_2[iso_cut]
          
         dist_mag_1 = mag_1[:,np.newaxis]-iso_mag_1
         dist_mag_2 = mag_2[:,np.newaxis]-iso_mag_2
-         
+        
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
 class PadovaIsochrone(Isochrone):
