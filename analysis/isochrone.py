@@ -43,7 +43,7 @@ import scipy.spatial
 import scipy.ndimage as ndimage
 
 import ugali.analysis.imf
-from ugali.analysis.model import Model, Parameter, modelFactory
+from ugali.analysis.model import Model, Parameter
 from ugali.utils.stats import norm_cdf
 
 from ugali.utils.config import Config
@@ -70,12 +70,14 @@ class Isochrone(Model):
             ('z','metallicity'),
             ])
 
+    # ADW: Careful, there are weird things going on with adding defaults
+    # to subclasses...
     defaults = (
         ('survey','des','Name of survey filter system'),
         ('band_1','g','Field name for magnitude one'),
         ('band_2','r','Field name for magnitude two'),
         ('band_1_detection',True,'Band one is detection band'),
-        ('imf','chabrier','Initial mass function'),
+        ('imf_type','chabrier','Initial mass function'),
         ('hb_stage',None,'Horizontal branch stage name'),
         ('hb_spread',0.0,'Intrinisic spread added to horizontal branch'),
         )
@@ -91,12 +93,19 @@ class Isochrone(Model):
         for k,v in defaults.items():
             setattr(self,k,v)
 
-        self.imf = ugali.analysis.imf.IMF(defaults['imf'])
+        self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
         self.index = None
 
     def _parse(self,filename):
         msg = "Not implemented for base class"
         raise Exception(msg)
+
+    def todict(self):
+        ret = super(Isochrone,self).todict()
+        defaults = odict([(d[0],d[1]) for d in self.defaults])
+        for k,v in defaults.items():
+            if getattr(self,k) != v: ret[k] = getattr(self,k)
+        return ret
 
     @property
     def feh(self):
@@ -1207,7 +1216,8 @@ class CompositeIsochrone(Isochrone):
             self.isochrones.append(iso)
         
         if self.weights is None: self.weights = np.ones(len(self.isochrones))
-        self.weights /= np.sum(self.weights)
+        self.weights /= np.sum(np.asarray(self.weights))
+        self.weights = self.weights.tolist()
 
         if len(self.isochrones) != len(self.weights):
             msg = 'Length of isochrone and weight arrays must be equal'
@@ -1254,6 +1264,11 @@ class CompositeIsochrone(Isochrone):
 
         return np.hstack(samples)
 
+    def todict(self):
+        ret = super(CompositeIsochrone,self).todict()
+        ret['isochrones'] = [iso.todict() for iso in self.isochrones]
+        return ret
+
     @composite_decorator
     def stellar_mass(self, *args, **kwargs): pass
 
@@ -1274,24 +1289,24 @@ class CompositeIsochrone(Isochrone):
     stellarLuminosity = stellar_luminosity
     observableFraction = observable_fraction
 
-class OldCompositeIsochrone(CompositeIsochrone):
-    def __init__(self, isochrones, **kwargs):
-        super(CompositeIsochrone,self).__init__(**kwargs)
-
-        self.isochrones = []
-        for i in isochrones:
-            a,z = OldPadovaIsochrone.filename2params(i)
-            iso = OldPadovaIsochrone(a=a,z=z)
-            # Tie the distance modulus
-            iso.params['distance_modulus'] = self.params['distance_modulus']
-            self.isochrones.append(iso)
-        
-        if self.weights is None: self.weights = np.ones(len(self.isochrones))
-        self.weights /= np.sum(self.weights)
-
-        if len(self.isochrones) != len(self.weights):
-            msg = 'Length of isochrone and weight arrays must be equal'
-            raise ValueError(msg)
+### class OldCompositeIsochrone(CompositeIsochrone):
+###     def __init__(self, isochrones, **kwargs):
+###         super(CompositeIsochrone,self).__init__(**kwargs)
+###  
+###         self.isochrones = []
+###         for i in isochrones:
+###             a,z = OldPadovaIsochrone.filename2params(i)
+###             iso = OldPadovaIsochrone(a=a,z=z)
+###             # Tie the distance modulus
+###             iso.params['distance_modulus'] = self.params['distance_modulus']
+###             self.isochrones.append(iso)
+###         
+###         if self.weights is None: self.weights = np.ones(len(self.isochrones))
+###         self.weights /= np.sum(self.weights)
+###  
+###         if len(self.isochrones) != len(self.weights):
+###             msg = 'Length of isochrone and weight arrays must be equal'
+###             raise ValueError(msg)
 
 Padova = PadovaIsochrone
 OldPadova = OldPadovaIsochrone

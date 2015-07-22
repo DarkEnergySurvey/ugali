@@ -8,6 +8,7 @@ import matplotlib
 try:             os.environ['DISPLAY']
 except KeyError: matplotlib.use('Agg')
 
+import yaml
 import numpy
 import numpy as np
 import pylab
@@ -25,7 +26,7 @@ import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
-import ugali.analysis.isochrone2
+import ugali.analysis.isochrone
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
@@ -303,7 +304,7 @@ class BasePlotter(object):
         #ax.annotate("Stars",**self.label_kwargs)
 
     def drawCMD(self, ax, radius=None, zidx=None):
-        import ugali.analysis.isochrone2
+        import ugali.analysis.isochrone
 
         if zidx is not None:
             #dirname = self.config.params['output2']['searchdir']
@@ -314,7 +315,7 @@ class BasePlotter(object):
             f = pyfits.open(filename)
             distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
 
-            iso = ugali.analysis.isochrone2.Padova(age=12,z=0.0002,mod=distance_modulus)
+            iso = ugali.analysis.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
             drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
 
             #for ii, name in enumerate(self.config.params['isochrone']['infiles']):
@@ -974,3 +975,38 @@ def plotSkymap(skymap, proj='mol', **kwargs):
         im = healpy.cartview(skymap,**kwargs)
     return im
 
+def plotTriangle(srcfile,samples,burn=0,**kwargs):
+    import triangle
+    import ugali.analysis.source
+    import ugali.analysis.mcmc
+
+    source = ugali.analysis.source.Source()
+    source.load(srcfile,section='source')
+    params = source.get_params()
+    results = yaml.load(open(srcfile))['results']
+    samples = ugali.analysis.mcmc.Samples(samples)
+
+    names = samples.names
+    truths = [params[n] for n in names]
+    chain = samples.get(burn=burn,clip=5)
+
+    ### Triangle plot
+    extents = None
+    #extents = [[0,15e3],[323.6,323.8],[-59.8,-59.7],[0,0.1],[19.5,20.5]]
+    quantiles = [0.16,0.84]
+    fig = triangle.corner(chain,labels=names,truths=truths,extents=extents,quantiles=quantiles,verbose=False,plot_datapoints=True,plot_contours=True)
+
+    try:
+        text  = 'RA,DEC = (%.2f,%.2f)\n'%(results['ra'][0],results['dec'][0])
+        text += '(m-M,D) = (%.1f, %.0f kpc)\n'%(results['distance_modulus'][0],results['distance'][0])
+        text += r'$r_h$ = %.1f arcmin'%(results['extarcmin'][0])+'\n'
+        text += 'TS = %.1f\n'%results['ts'][0]
+        text += 'NSamples = %i\n'%(len(chain))
+        plt.figtext(0.65,0.90,text,ha='left',va='top')
+    except KeyError:
+        pass
+
+    label = map(str.capitalize,source.name.split('_'))
+    label[-1] = label[-1].upper()
+    title = '%s'%' '.join(label)
+    plt.suptitle(title)

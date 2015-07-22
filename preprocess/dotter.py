@@ -18,18 +18,21 @@ import ugali.utils.shell
 
 def getDotterIsochrone(age, z, outdir, afe='+0.4', hel='Y=0.245+1.5*Z', clr='DECam', force=False):
     """
-    See Vargas et al. 2013 for the distribution of alpha elements in dSphs
-    http://adsabs.harvard.edu/abs/2013ApJ...767..134V
+    See Vargas et al. 2013 for the distribution of alpha elements in
+    dSphs: http://adsabs.harvard.edu/abs/2013ApJ...767..134V
     
-    Josh Simon remarks:
-    For stars at [Fe/H] > -2, [a/Fe] tends to be around zero. [Note, though, that this paper does not attempt to 
-    do any membership classification, it just accepts the lists from Simon & Geha 2007.  I suspect now that we 
-    were not sufficiently conservative on selecting members in those early days, and so some of the relatively 
-    metal-rich stars may in fact be foreground Milky Way stars.]  More metal-poor stars tend to average more 
-    like [a/Fe] = 0.4-0.5.  Fig. 5 of Frebel et al. (2014) shows similar plots for individual elements from 
-    high-resolution spectra.  Given these data, plus the empirical fact that the mean metallicities of the 
-    ultra-faint dwarfs are almost universally [Fe/H] < -2, I guess I would say [a/Fe] = 0.3 is probably the 
-    best compromise.
+    Josh Simon remarks: For stars at [Fe/H] > -2, [a/Fe] tends to be
+    around zero. [Note, though, that this paper does not attempt to do
+    any membership classification, it just accepts the lists from
+    Simon & Geha 2007.  I suspect now that we were not sufficiently
+    conservative on selecting members in those early days, and so some
+    of the relatively metal-rich stars may in fact be foreground Milky
+    Way stars.]  More metal-poor stars tend to average more like
+    [a/Fe] = 0.4-0.5.  Fig. 5 of Frebel et al. (2014) shows similar
+    plots for individual elements from high-resolution spectra.  Given
+    these data, plus the empirical fact that the mean metallicities of
+    the ultra-faint dwarfs are almost universally [Fe/H] < -2, I guess
+    I would say [a/Fe] = 0.3 is probably the best compromise.
     """
 
     outfile = '%s/iso_a%.1f_z%.5f.dat'%(outdir, age, z)
