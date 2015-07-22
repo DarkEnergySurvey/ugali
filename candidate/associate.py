@@ -319,6 +319,30 @@ class Kharchenko13(SourceCatalog):
         ra,dec = gal2cel(self.data['glon'],self.data['glat'])
         self.data['ra'],self.data['dec'] = ra,dec
 
+class Bica08(SourceCatalog):
+    """
+    LMC star clusters
+    http://cdsarc.u-strasbg.fr/viz-bin/Cat?J/MNRAS/389/678
+
+    NOTE: CEL and GAL coordinates are consistent to < 0.01 deg.
+    """
+    def _load(self,filename):
+        kwargs = dict(delimiter=[32,2,3,3,5,3,3],dtype=['S32']+6*[float])
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"J_MNRAS_389_678/table3.dat")
+        raw = np.genfromtxt(filename,**kwargs)
+
+        self.data.resize(len(raw))
+        self.data['name'] = numpy.char.strip(raw['f0'])
+ 
+        ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
+        dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
+        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
+        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
+        
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
+        self.data['glon'],self.data['glat'] = glon,glat
+
 class WEBDA14(SourceCatalog):
     """
     Open cluster database.
