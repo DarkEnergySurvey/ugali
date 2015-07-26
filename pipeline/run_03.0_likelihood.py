@@ -11,13 +11,14 @@ from ugali.utils.logger import logger
 import ugali.utils.skymap
 
 description="Run the likelihood search."
-components = ['scan','merge','plot']
+components = ['scan','merge','tar','plot']
 
 def run(self):
     if 'scan' in self.opts.run:
         logger.info("Running 'scan'...")
         farm = Farm(self.config)
         farm.submit_all(coords=self.opts.coords,queue=self.opts.queue,debug=self.opts.debug)
+
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
         mergefile = self.config.mergefile
@@ -29,6 +30,20 @@ def run(self):
             filenames = self.config.likefile.split('_%')[0]+'_*'
             infiles = sorted(glob.glob(filenames))
             ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
+
+    if 'tar' in self.opts.run:
+        logger.info("Running 'tar'...")
+        outdir = mkdir(self.config['output']['likedir'])
+        logdir = mkdir(join(outdir,'log'))
+
+        scanfile = self.config.likefile.split('_%')[0]+'_[0-9]*.fits'
+        tarfile = join(self.config.likefile.split('_%')[0]+'_pixels.tar.gz')
+        jobname = 'tar'
+        logfile = os.path.join(logdir,'scan_tar.log')
+        cmd = 'tar --remove-files -cvzf %s %s'%(tarfile,scanfile)
+        print cmd
+        self.batch.submit(cmd,jobname,logfile)
+
     if 'plot' in self.opts.run:
         # WARNING: Loading the full 3D healpix map is memory intensive.
         logger.info("Running 'plot'...")

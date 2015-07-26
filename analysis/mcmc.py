@@ -2,6 +2,15 @@
 
 """
 Run MCMC follow-up on target parameters.
+
+The default parellel execution by emcee uses multiprocess and pickeling
+the function that is being evaluated. Things become a bit complicated 
+because you can't pickle instance methods.
+Steven Bethard has a solution registering a method with pickle:
+http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods#edit2155350
+
+Another simple solution is to create a plain method linked to a static method.
+http://stackoverflow.com/questions/21111106/cant-pickle-static-method-multiprocessing-python
 """
 
 import os
@@ -17,25 +26,17 @@ import pyfits
 import emcee
 import yaml
 
+import ugali.utils.stats
 import ugali.analysis.scan
-import ugali.utils.config
+from ugali.utils.config import Config
 from ugali.analysis.kernel import kernelFactory
-from ugali.analysis.loglike import createIsochrone
+from ugali.analysis.loglike import createSource, createLoglike
+from ugali.analysis.prior import UniformPrior, InversePrior
 
 from ugali.utils.logger import logger
 from ugali.utils.projector import mod2dist, gal2cel
 
-
-"""
-The default parellel execution by emcee uses multiprocess and pickeling
-the function that is being evaluated. Things become a bit complicated 
-because you can't pickle instance methods.
-Steven Bethard has a solution registering a method with pickle:
-http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods#edit2155350
-
-Another simple solution is to create a plain method linked to a static method.
-http://stackoverflow.com/questions/21111106/cant-pickle-static-method-multiprocessing-python
-"""
+# Write some class to store priors
 
 class MCMC(object):
     """
@@ -44,70 +45,31 @@ class MCMC(object):
     - Create the log-probability in a way that emcee can handle
     - Run emcee
     """
-    def __init__(self, config, coords):
-        self.config = ugali.utils.config.Config(config)
-        self.nsamples = self.config['mcmc']['nsamples'] 
-        self.nthreads = self.config['mcmc']['nthreads'] 
+    def __init__(self, config, loglike):
+        self.config = Config(config)
+        self.nsamples = self.config['mcmc'].get('nsamples',100)
+        self.nthreads = self.config['mcmc'].get('nthreads',16)
         self.nchunk = self.config['mcmc'].get('nchunk',25)
-        self.nwalkers = self.config['mcmc']['nwalkers']
-        self.nburn = self.config['mcmc']['nburn']
+        self.nwalkers = self.config['mcmc'].get('nwalkers',50)
+        self.nburn = self.config['mcmc'].get('nburn',10)
         self.alpha = self.config['mcmc'].get('alpha',0.10)
 
-        self.scan = ugali.analysis.scan.Scan(config, coords)
-        self.scan.run()
-        self.grid = self.scan.grid
-        self.loglike = self.grid.loglike
+        self.loglike = loglike
+        self.source = self.loglike.source
+        self.params = self.source.get_free_params().keys()
+        self.samples = None
 
-        kernel = self.createKernel(self.config)
-        # ### FIXME: Adding prior
-        # logger.warning("### Setting prior on extension... ###")
-        # kernel.params['extension'].set_bounds([0.0001,0.03])
+        self.priors = odict(zip(self.params,len(self.params)*[UniformPrior()]))
+        self.priors['extension'] = InversePrior()
 
-        self.loglike.set_model('spatial',kernel)
-        logger.info('\n' + str(kernel))
-
-        iso = self.createIsochrone(self.config)
-        self.loglike.set_model('color',iso)
-        logger.info('\n' + str(iso))
-
-        self.roi = self.loglike.roi
-
-    @staticmethod
-    def createKernel(config):
-        config = ugali.utils.config.Config(config)
-        if config['mcmc'].get('kernel') is not None:
-            kernel = kernelFactory(**config['mcmc']['kernel'])
-        else:
-            kernel = kernelFactory(**config['kernel'])
-        return kernel
-        
-    @staticmethod
-    def createIsochrone(config):
-        config = ugali.utils.config.Config(config)
-        if config['mcmc'].get('isochrone') is not None:
-            config = dict(config)
-            config.update(isochrone=config['mcmc']['isochrone'])
-            iso = createIsochrone(config)
-        else:
-            iso = createIsochrone(config)
-        return iso
-
-    def load_srcmdl(self,srcmdl,source):
-        if isinstance(srcmdl,basestring):
-            srcmdl = yaml.load(srcmdl)
-        elif isinstance(srcmdl,dict):
-            pass
-        else:
-            msg = "Expected string or dict for srcmdl"
-            raise ValueError(msg)
-
-        for par,v in srcmdl[source].items():
-            if par in loglike.params:
-                setattr(loglike,par,val)
-        
+    def __str__(self):
+        ret = "%s:\n"%self.__class__.__name__
+        ret += str(self.loglike)
+        return ret
 
     def get_mle(self):
-        return self.grid.mle()
+        #return self.grid.mle()
+        return self.source.get_params()
 
     def get_std(self):
         mle = self.get_mle()
@@ -135,23 +97,28 @@ class MCMC(object):
         return emcee.utils.sample_ball(p0,s0,size)
 
     def lnlike(self, theta):
+        """ Logarithm of the likelihood """
         kwargs = dict(zip(self.params,theta))
         try:
-            #print kwargs,
-            #print self.loglike.value(**kwargs)
-            return self.loglike.value(**kwargs)
+            lnlike = self.loglike.value(**kwargs)
         except ValueError,AssertionError:
-            return -np.inf
-        
-    def lnprior(self,theta):
-        # Nothing to see here...
-        # but don't forget that the probability is the lkhd x prior
-        kwargs = dict(zip(self.params,theta))
-        return 0
+            lnlike = -np.inf
+        return lnlike
 
-    def run(self, params, outfile=None):
+    def lnprior(self,theta):
+        """ Logarithm of the prior """
+        kwargs = dict(zip(self.params,theta))
+        err = np.seterr(invalid='raise')
+        try:
+            lnprior = np.sum(np.log([self.priors[k](v) for k,v in kwargs.items()]))
+        except FloatingPointError,ValueError:
+            lnprior = -np.inf
+        np.seterr(**err)
+        return lnprior
+
+    def run(self, params=None, outfile=None):
         # Initailize the likelihood to maximal value
-        mle =self.grid.mle()
+        mle =self.get_mle()
         msg = "Setting inital values..."
         for k,v in mle.items():
             msg+='\n  %s : %s'%(k,v)
@@ -160,7 +127,7 @@ class MCMC(object):
         self.loglike.set_params(**mle)
         self.loglike.sync_params()
 
-        self.params = params
+        if params is not None: self.params = params
  
         nwalkers = self.nwalkers
         nsamples = self.nsamples
@@ -191,7 +158,7 @@ class MCMC(object):
 
     def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
         # FIXME: Need to add age and metallicity to composite isochrone
-        if param not in self.loglike.params.keys() + ['age','metallicity']:
+        if param not in self.source.params.keys() + ['age','metallicity']:
             raise Exception('Unrecognized parameter: %s'%param)
 
         if param not in self.params: 
@@ -213,51 +180,68 @@ class MCMC(object):
         return out
 
     def get_results(self,**kwargs):
-        import ephem
         import astropy.coordinates
-
+        
         estimate = self.estimate_params()
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
         
         ts = 2*self.loglike.value(**params)
-        results['ts'] = Samples._interval(ts,np.nan,np.nan)
+        results['ts'] = ugali.utils.stats.interval(ts,np.nan,np.nan)
 
         lon,lat = estimate['lon'][0],estimate['lat'][0]
         #coord = astropy.coordinates.SkyCoord(lon,lat,frame='galactic',unit='deg')
 
         results.update(gal=[float(lon),float(lat)])
         ra,dec = gal2cel(lon,lat)
-        results.update(equ=[float(ra),float(dec)])
-        results['ra'] = Samples._interval(ra,np.nan,np.nan)
-        results['dec'] = Samples._interval(dec,np.nan,np.nan)
+        results.update(cel=[float(ra),float(dec)])
+        results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
+        results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
 
         mod,mod_err = estimate['distance_modulus']
         dist = mod2dist(mod)
         dist_lo,dist_hi = [mod2dist(mod_err[0]),mod2dist(mod_err[1])]
-        results['distance'] = Samples._interval(dist,dist_lo,dist_hi)
-        
+        results['distance'] = ugali.utils.stats.interval(dist,dist_lo,dist_hi)
+        dist,dist_err = results['distance']
+
+        ext,ext_err = estimate['extension']
+        results['extarcmin'] = ugali.utils.stats.interval(60*ext,60*ext_err[0],60*ext_err[1])
+
+        # Physical Size (should do this with the posteriors)
+        size = np.arctan(np.radians(ext)) * dist
+        ext_sigma = np.nan_to_num(np.array(ext_err) - ext)
+        dist_sigma = np.nan_to_num(np.array(dist_err) - dist)
+        size_sigma = size * np.sqrt((ext_sigma/ext)**2 + (dist_sigma/dist)**2)
+        size_err = [size-size_sigma[0],size+size_sigma[1]]
+        results['physical_size'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
+
         rich,rich_err = estimate['richness']
 
         nobs = self.loglike.f*rich
         nobs_lo,nobs_hi = rich_err[0]*self.loglike.f,rich_err[1]*self.loglike.f
-        results['nobs'] = Samples._interval(nobs,nobs_lo,nobs_hi)
+        results['nobs'] = ugali.utils.stats.interval(nobs,nobs_lo,nobs_hi)
         
         # Careful, depends on the isochrone...
-        stellar_mass = self.loglike.stellar_mass()
+        stellar_mass = self.source.stellar_mass()
         mass = rich*stellar_mass
         mass_lo,mass_hi = rich_err[0]*stellar_mass,rich_err[1]*stellar_mass
-        results['mass'] = Samples._interval(mass,mass_lo,mass_hi)
+        results['mass'] = ugali.utils.stats.interval(mass,mass_lo,mass_hi)
 
-        stellar_luminosity = self.loglike.stellar_luminosity()
+        stellar_luminosity = self.source.stellar_luminosity()
         lum = rich*stellar_luminosity
         lum_lo,lum_hi = rich_err[0]*stellar_luminosity,rich_err[1]*stellar_luminosity
-        results['luminosity'] = Samples._interval(lum,lum_lo,lum_hi)
+        results['luminosity'] = ugali.utils.stats.interval(lum,lum_lo,lum_hi)
 
-        Mv = self.loglike.absolute_magnitude(rich)
-        Mv_lo = self.loglike.absolute_magnitude(rich_err[0])
-        Mv_hi = self.loglike.absolute_magnitude(rich_err[1])
-        results['Mv'] = Samples._interval(Mv,Mv_lo,Mv_hi)
+        Mv = self.source.absolute_magnitude(rich)
+        Mv_lo = self.source.absolute_magnitude(rich_err[0])
+        Mv_hi = self.source.absolute_magnitude(rich_err[1])
+        results['Mv'] = ugali.utils.stats.interval(Mv,Mv_lo,Mv_hi)
+
+        try: 
+            results['constellation'] = ugali.utils.projector.ang2const(lon,lat)[1]
+        except:
+            pass
+        results['iau'] = ugali.utils.projector.ang2iau(lon,lat)
 
         output = dict()
         output['params'] = params
@@ -271,13 +255,22 @@ class MCMC(object):
         self.samples = Samples(filename)
 
     def write_results(self,filename):
-        results = dict(self.get_results())
-        params  = dict(params=results.pop('params'))
+        if self.samples is not None:
+            results = dict(self.get_results())
+            params  = dict(params=results.pop('params'))
+        else:
+            results = dict(results=dict())
+            params = dict(params=dict())
+        source = dict(source=self.source.todict())
 
         out = open(filename,'w')
         out.write(yaml.dump(params,default_flow_style=False))
         out.write(yaml.dump(results))
+        out.write(yaml.dump(source))
         out.close()
+
+    def load_srcmdl(self,filename,section='source'):
+        self.source.load(filename,section)
 
 
 #class Samples(np.ndarray):
@@ -318,113 +311,97 @@ class Samples(np.recarray):
     def ndarray(self):
         return self.view((float,len(self.dtype)))
 
-    def data(self, name, burn=None, clip=None):
+    # ADW: Depricated for Samples.get
+    #def data(self, name, burn=None, clip=None):
+    #    # Remove zero entries
+    #    zsel = ~np.all(self.ndarray==0,axis=1)
+    #    # Remove burn entries
+    #    bsel = np.zeros(len(self),dtype=bool)
+    #    bsel[slice(burn,None)] = 1
+    #    data = self[name][bsel&zsel]
+    #    if clip is not None:
+    #        data,low,high = scipy.stats.sigmaclip(data,clip,clip)   
+    #    return data
+
+    def get(self, names=None, burn=None, clip=None):
+        if names is None: names = list(self.dtype.names)
+        names = np.array(names,ndmin=1)
+
+        missing = names[~np.in1d(names,self.dtype.names)]
+        if len(missing):
+            msg = "field(s) named %s not found"%(missing)
+            print msg
+            raise ValueError(msg)
+        idx = np.where(np.in1d(self.dtype.names,names))[0]
+
         # Remove zero entries
         zsel = ~np.all(self.ndarray==0,axis=1)
         # Remove burn entries
         bsel = np.zeros(len(self),dtype=bool)
         bsel[slice(burn,None)] = 1
-        data = self[name][bsel&zsel]
+
+        data = self.ndarray[:,idx][bsel&zsel]
         if clip is not None:
-            data,low,high = scipy.stats.sigmaclip(data,clip,clip)   
+            from astropy.stats import sigma_clip
+            mask = sigma_clip(data,sig=clip,copy=False,axis=0).mask
+            data = data[np.where(~mask.any(axis=1))]
+
         return data
+
 
     @classmethod
     def _interval(cls,best,lo,hi):
         """
         Pythonized interval for easy output to yaml
         """
-        
-        return [float(best),[float(lo),float(hi)]]
+        return ugali.utils.stats.interval(best,lo,hi)
 
     def mean(self, name, **kwargs):
         """
         Mean of the distribution.
         """
-        return np.mean(self.data(name,**kwargs))
+        return np.mean(self.get(name,**kwargs))
 
     def mean_interval(self, name, alpha=_alpha, **kwargs):
         """
         Interval assuming gaussian posterior.
         """
-        data = self.data(name,**kwargs)
-        mean =np.mean(data)
-        sigma = np.std(data)
-        scale = scipy.stats.norm.ppf(1-alpha/2.)
-        return self._interval(mean,mean-scale*sigma,mean+scale*sigma)
+        data = self.get(name,**kwargs)
+        return ugali.utils.stats.mean_interval(data,alpha)
 
     def median(self, name, **kwargs):
         """
         Median of the distribution.
         """
-        data = self.data(name,**kwargs)
-        q = [50]
-        return np.percentile(data,q)
+        data = self.get(name,**kwargs)
+        return np.percentile(data,[50])
 
     def median_interval(self,name,alpha=_alpha, **kwargs):
         """
         Median including bayesian credible interval.
         """
-        data = self.data(name,**kwargs)
-        q = [100*alpha/2., 50, 100*(1-alpha/2.)]
-        lo,med,hi = numpy.percentile(data,q)
-        return self._interval(med,lo,hi)
+        data = self.get(name,**kwargs)
+        return ugali.utils.stats.median_interval(data,alpha)
         
     def peak(self, name, **kwargs):
-        data = self.data(name,**kwargs)
-        num,edges = np.histogram(data,bins=self._nbins)
-        centers = (edges[1:]+edges[:-1])/2.
-        return centers[np.argmax(num)]
+        data = self.get(name,**kwargs)
+        return ugali.utils.stats.peak(data,bins=self._nbins)
 
     def kde_peak(self, name, **kwargs):
-        """
-        Identify peak using Gaussian kernel density estimator.
-        """
-        data = self.data(name,**kwargs)
-        # Clipping of severe outliers to concentrate more KDE samples in the parameter range of interest
-        mad = numpy.median(numpy.fabs(numpy.median(data) - data))
-        cut = (data > numpy.median(data) - 5. * mad) & (data < numpy.median(data) + 5. * mad)
-        x = data[cut]
-        kde = scipy.stats.gaussian_kde(x)
-        # No penalty for using a finer sampling for KDE evaluation except computation time, 1000 seems sufficient
-        values = numpy.linspace(numpy.min(x), numpy.max(x), 1000) 
-        kde_values = kde.evaluate(values)
-        return values[numpy.argmax(kde_values)]
+        data = self.get(name,**kwargs)
+        return ugali.utils.stats.kde_peak(data,samples=1000)
+
+    def kde(self, name, **kwargs):
+        data = self.get(name,**kwargs)
+        return ugali.utils.stats.kde(data,samples=1000)
 
     def peak_interval(self, name, alpha=_alpha, **kwargs):
-        data = self.data(name, **kwargs)
-        peak = self.kde_peak(name, **kwargs)
-        x = np.sort(data); n = len(x)
-        # The number of entries in the interval
-        window = int(np.rint((1.0-alpha)*n))
-        # The start, stop, and width of all possible intervals
-        starts = x[:n-window]; ends = x[window:]
-        widths = ends - starts
-        # Just the intervals containing the peak
-        select = (peak >= starts) & (peak <= ends)
-        widths = widths[select]
-        if len(widths) == 0:
-            raise ValueError('Too few elements for interval calculation')
-        min_idx = np.argmin(widths)
-        lo = x[min_idx]
-        hi = x[min_idx+window]
-        return self._interval(peak,lo,hi)
+        data = self.get(name, **kwargs)
+        return ugali.utils.stats.peak_interval(data,alpha,samples=100)
 
     def min_interval(self,name, alpha=_alpha, **kwargs):
-        data = self.data(name, **kwargs)
-        x = np.sort(data); n = len(x)
-        # The number of entries in the interval
-        window = int(np.rint((1.0-alpha)*n))
-        # The start, stop, and width of all possible intervals
-        starts = x[:n-window]; ends = x[window:]
-        widths = ends - starts
-        if len(widths) == 0:
-            raise ValueError('Too few elements for interval calculation')
-        min_idx = np.argmin(widths)
-        lo = x[min_idx]
-        hi = x[min_idx+window]
-        mean = (hi+lo)/2.
-        return self._interval(mean,lo,hi)
+        data = self.get(name, **kwargs)
+        return ugali.utils.min_interval(data,alpha)
 
     def results(self, names=None, alpha=_alpha, mode='peak', **kwargs):
         if names is None: names = self.names
@@ -433,6 +410,25 @@ class Samples(np.recarray):
             ret[n] = getattr(self,'%s_interval'%mode)(n, **kwargs)
         return ret
 
+def createMCMC(config,srcfile,section='source',samples=None):
+    """ Create an MCMC instance """
+    source = ugali.analysis.source.Source()
+    source.load(srcfile,section=section)
+    loglike = ugali.analysis.loglike.createLoglike(config,source)
+
+    mcmc = MCMC(config,loglike)
+    if samples is not None:
+        mcmc.load_samples(samples)
+
+    return mcmc
+
+def write_membership(config,srcfile,outfile):
+    mcmc = createMCMC(config,srcfile)
+    mcmc.loglike.write_membership(outfile)
+
+def write_results(config,srcfile,samples,outfile):
+    mcmc = createMCMC(config,srcfile,samples=samples)
+    mcmc.write_results(outfile)
 
 if __name__ == "__main__":
     import ugali.utils.parser
@@ -441,39 +437,78 @@ if __name__ == "__main__":
     parser.add_config()
     parser.add_debug()
     parser.add_verbose()
-    parser.add_coords(required=True)
+    #parser.add_coords(required=True)
+    parser.add_coords()
+    parser.add_name()
+    parser.add_argument('--srcmdl',help='Source model file')
+    parser.add_argument('--grid',action='store_true',help='Grid search for intial parameters')
     parser.add_argument('outfile',default=None,help="Output file name")
                         
     opts = parser.parse_args()
 
-    mcmc = MCMC(opts.config,opts.coords)
+    if opts.coords is not None and len(opts.coords) != 1: 
+        raise Exception('Must specify exactly one coordinate.')
+
+    config = Config(opts.config)
+
+    outfile = opts.outfile
+    srcfile = outfile.replace('.npy','.yaml')
+    memfile = outfile.replace('.npy','.fits')
+    
+    source = ugali.analysis.loglike.createSource(config,section='mcmc')
+    source.name = opts.name
+
+    if opts.srcmdl is not None:
+        source.load(opts.srcmdl,section=opts.name)
+    if opts.coords:
+        lon,lat,radius = opts.coords[0]
+        source.set_params(lon=lon,lat=lat)
+    if config['mcmc'].get('params'):
+        params = config['mcmc'].get('params')
+        source.set_free_params(params)
+
+    loglike = ugali.analysis.loglike.createLoglike(config,source)
+
+    if opts.grid:
+        grid = ugali.analysis.scan.GridSearch(config,loglike)
+        grid.search()
+        source.set_params(**grid.mle())
+
+    mcmc = MCMC(config,loglike)
+
+    #resfile = opts.outfile.replace('.npy','.dat')
+
+    logger.info("Writing %s..."%srcfile)
+    mcmc.write_results(srcfile)
 
     niter = 0
     def lnprob(theta):
         global niter
-        if (niter%100==0):
-            logger.debug("%i function calls ..."%niter)
-        niter+=1
-        lp = mcmc.lnprior(theta)
-        if not np.isfinite(lp):
-            return -np.inf
+        # Avoid extra likelihood calls with bad priors
+        lnprior = mcmc.lnprior(theta)
+        if not np.isfinite(lnprior):
+            lnprior = -np.inf
+            lnlike = -np.inf
         else:
-            return lp + mcmc.lnlike(theta)
+            lnlike = mcmc.lnlike(theta)
+        lnprob = lnprior + lnlike
 
+        if (niter%100==0):
+            msg = "%i function calls ...\n"%niter
+            msg += ', '.join('%s: %.3f'%(k,v) for k,v in zip(mcmc.params,theta))
+            msg += '\nlog(like): %.3f, log(prior): %.3f'%(lnprior,lnlike)
+            logger.debug(msg)
+        niter+=1
+        return lnprob
     mcmc.lnprob = lnprob
 
-    params = mcmc.config['mcmc']['params']
+    #params = mcmc.config['mcmc']['params']
+    params = source.get_free_params().keys()
     mcmc.run(params,opts.outfile)
-    #mcmc.write_samples(opts.outfile)
 
-    estimate = mcmc.estimate_params()
-    kwargs = {k:v[0] for k,v in estimate.items()}
+    logger.info("Writing %s..."%srcfile)
+    write_results(config,srcfile,outfile,srcfile)
 
-    mcmc.loglike.set_params(**kwargs)
-    mcmc.loglike.sync_params()
+    logger.info("Writing %s..."%memfile)
+    write_membership(config,srcfile,memfile)
 
-    membfile = opts.outfile.replace('.npy','.fits')
-    mcmc.loglike.write_membership(membfile)
-
-    resfile = opts.outfile.replace('.npy','.dat')
-    mcmc.write_results(resfile)

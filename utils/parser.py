@@ -21,6 +21,7 @@ class Parser(argparse.ArgumentParser):
 
         super(Parser,self).__init__(*args,**kwargs)
 
+
     def add_coords(self,required=False,radius=False,targets=False):
         group = self.add_argument_group(title="Target Coordinates")
         exclusive = group.add_mutually_exclusive_group(required=required)
@@ -93,7 +94,9 @@ class Parser(argparse.ArgumentParser):
 
         if vars(opts).get('targets') is not None:
             opts.names,opts.coords = self.parse_targets(opts.targets)
-
+            if vars(opts).get('radius') is not None:
+                opts.coords[:,2] = vars(opts).get('radius')
+            
     @staticmethod
     def parse_targets(filename):
         """

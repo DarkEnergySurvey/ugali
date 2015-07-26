@@ -6,7 +6,8 @@ from ugali.preprocess.database import databaseFactory
 from ugali.utils.shell import mkdir
 
 description="Download data from database."
-components = ['data','isochrone']
+#components = ['data','isochrone']
+components = ['data']
 
 def run(self):
 

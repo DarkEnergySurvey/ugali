@@ -16,22 +16,25 @@ import ugali.utils.parabola
 from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
-from ugali.analysis.model import Model,Parameter
-from ugali.analysis.source import Source
+#from ugali.analysis.model import Model,Parameter
+#import ugali.analysis.source
 from ugali.utils.config import Config
+from ugali.analysis.source import Source
+from ugali.observation.observation import Observation
 
 class LogLikelihood(object):
     """
     Class for calculating the log-likelihood from a set of models.
     """
 
-    def __init__(self, config, roi, mask, catalog, source):
+    def __init__(self, config, observation, source):
         # Currently assuming that input mask is ROI-specific
         self.config = Config(config)
-        self.roi    = roi
-        self.mask   = mask
 
-        self.catalog_full = catalog
+        self.roi = observation.roi
+        self.mask = observation.mask
+        self.catalog_full = observation.catalog
+
         self.clip_catalog()
 
         # The source model (includes kernel and isochrone)
@@ -58,7 +61,8 @@ class LogLikelihood(object):
         # The signal probability for each object
         #self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
         # The total model predicted counts
-        return -1. * numpy.sum(numpy.log(1.-self.p)) - (self.f * self.source.richness)
+        #return -1. * numpy.sum(numpy.log(1.-self.p)) - (self.f * self.source.richness)
+        return -1. * np.log(1.-self.p).sum() - (self.f * self.source.richness)
         
     def __str__(self):
         ret = "%s:\n"%self.__class__.__name__
@@ -135,10 +139,10 @@ class LogLikelihood(object):
         if self.source.get_sync('richness'):
             # No sync necessary for richness
             pass
-        if self.source.get_sync('color'):
+        if self.source.get_sync('isochrone'):
             self.observable_fraction = self.calc_observable_fraction(self.source.distance_modulus)
             self.u_color = self.calc_signal_color(self.source.distance_modulus)
-        if self.source.get_sync('spatial'):
+        if self.source.get_sync('kernel'):
             self.u_spatial = self.calc_signal_spatial()
 
         # Combined object-by-object signal probability
@@ -255,7 +259,7 @@ class LogLikelihood(object):
         observable_fraction = self.isochrone.observableFraction(self.mask,distance_modulus)
         if not observable_fraction.sum() > 0:
             msg = "No observable fraction"
-            msg += ("\n"+str(self.params))
+            msg += ("\n"+str(self.source.params))
             logger.error(msg)
             raise ValueError(msg)
         return observable_fraction
@@ -405,54 +409,47 @@ class LogLikelihood(object):
             pyfits.Column(name='PROB',format='E',array=self.p),
         ]
         hdu = pyfits.new_table(columns)
-        for param,value in self.params.items():
+        for param,value in self.source.params.items():
             # HIERARCH allows header keywords longer than 8 characters
             name = 'HIERARCH %s'%param.upper()
             hdu.header.set(name,value.value,param)
         hdu.writeto(filename,clobber=True)
 
+# These should probably be moved into Factory...
+
+def createSource(config, section=None, **kwargs):
+    config = Config(config)    
+    source = Source()
+
+    if config.get(section) is not None:
+        params = config.get(section).get('source')
+    else:
+        params = config.get('source')
+
+    if params is not None:
+        source.load(params)
+
+    source.set_params(**kwargs)
+    return source
+
+### probably don't need these ###
+def createKernel(config, **kwargs):
+    return createSource(config,**kwargs).kernel
+
+def createIsochrone(config, **kwargs):
+    return createSource(config,**kwargs).isochrone
+
+def createObservation(config,lon,lat):
+    roi = createROI(config,lon,lat)
+    catalog = createCatalog(config,roi)
+    mask = createMask(config,roi)
+    return Observation(roi=roi,mask=mask,catalog=catalog)
+
+### probably move these to observation ###
 def createROI(config,lon,lat):
     import ugali.observation.roi
     roi = ugali.observation.roi.ROI(config, lon, lat)        
     return roi
-
-def createKernel(config,lon=0.0,lat=0.0):
-    # FIXME: The config needs coords
-    import ugali.analysis.kernel
-    config = Config(config)
-    params = copy.deepcopy(config['kernel'])
-    params.setdefault('lon',lon)
-    params.setdefault('lat',lat)
-    return ugali.analysis.kernel.kernelFactory(**params)
-
-def createIsochrone(config):
-    #logger.warning("Creating old isochrone...")
-    #import ugali.analysis.isochrone
-    #isochrone = ugali.analysis.isochrone.CompositeIsochrone(config)
-    import ugali.analysis.isochrone2
-    logger.warning("Creating new isochrone...")
-    config = Config(config)
-    params = copy.deepcopy(config['isochrone'])
-    isochrone = ugali.analysis.isochrone2.isochroneFactory(**config['isochrone'])
-    return isochrone
-
-def createCatalog(config,roi=None,lon=None,lat=None):
-    """
-    Create a catalog object
-    """
-    import ugali.observation.catalog
-    if roi is None: roi = createROI(config,lon,lat)
-    catalog = ugali.observation.catalog.Catalog(config,roi=roi)  
-    return catalog
-
-def simulateCatalog(config,roi=None,lon=None,lat=None):
-    """
-    Simulate a catalog object.
-    """
-    import ugali.simulation.simulator
-    if roi is None: roi = createROI(config,lon,lat)
-    sim = ugali.simulation.simulator.Simulator(config,roi)
-    return sim.catalog()
 
 def createMask(config,roi=None,lon=None,lat=None):
     import ugali.observation.mask
@@ -464,18 +461,43 @@ def createMask(config,roi=None,lon=None,lat=None):
     mask = ugali.observation.mask.Mask(config, roi)
     return mask
 
-def createLoglike(config,lon,lat):
-    roi = createROI(config,lon,lat)
-    kernel = createKernel(config,lon,lat)
-    isochrone = createIsochrone(config)
-    catalog = createCatalog(config,roi)
-    mask = createMask(config,roi)
-    
-    source = Source()
-    source.set_model('spatial',kernel)
-    source.set_model('color',isochrone)
+def createCatalog(config,roi=None,lon=None,lat=None):
+    """
+    Create a catalog object
+    """
+    import ugali.observation.catalog
+    if roi is None: roi = createROI(config,lon,lat)
+    catalog = ugali.observation.catalog.Catalog(config,roi=roi)
+    return catalog
 
-    return LogLikelihood(config,roi,mask,catalog)
+### move to simulate ###
+def simulateCatalog(config,roi=None,lon=None,lat=None):
+    """
+    Simulate a catalog object.
+    """
+    import ugali.simulation.simulator
+    if roi is None: roi = createROI(config,lon,lat)
+    sim = ugali.simulation.simulator.Simulator(config,roi)
+    return sim.catalog()
+
+def createLoglike(config,source=None,lon=None,lat=None):
+
+    if isinstance(source,basestring):
+        srcfile = source
+        source = ugali.analysis.source.Source()
+        source.load(srcfile,section='source')
+    if source is not None:
+        lon,lat = source.lon,source.lat
+    else:
+        if lon is None or lat is None:
+            msg = "Without `source`, `lon` and `lat` must be specified"
+            raise Exception(msg)
+        source = createSource(config,lon=lon,lat=lat)
+        
+    observation = createObservation(config,lon,lat)
+    loglike = LogLikelihood(config,observation,source)
+    loglike.sync_params()
+    return loglike
 
 if __name__ == "__main__":
     import argparse

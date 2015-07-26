@@ -19,9 +19,8 @@ import healpy
 
 import ugali.utils.skymap
 import ugali.analysis.loglike
-from ugali.analysis.loglike import LogLikelihood
+from ugali.analysis.loglike import LogLikelihood, createSource, createObservation
 from ugali.analysis.source import Source
-
 from ugali.utils.parabola import Parabola
 
 from ugali.utils.config import Config
@@ -34,94 +33,26 @@ class Scan(object):
     """
     The base of a likelihood analysis scan.
 
-    ADW: This really does nothing now...
+    FIXME: This really does nothing now and should be absorbed into
+    GridSearch (confusing now).
     """
     def __init__(self, config, coords):
         self.config = Config(config)
         # Should only be one coordinate
-        if len(coords)!=1: raise Exception('Must specify one coordinate.')
+        if len(coords) != 1: raise Exception('Must specify one coordinate.')
         self.lon,self.lat,radius = coords[0]
         self._setup()
+        
 
     def _setup(self):
-        #self.nside_catalog    = self.config['coords']['nside_catalog']
-        #self.nside_likelihood = self.config['coords']['nside_likelihood']
-        #self.nside_pixel      = self.config['coords']['nside_pixel']
-
-        # All possible filenames
-        #self.filenames = self.config.getFilenames()
-        # ADW: Might consider storing only the good filenames
-        # self.filenames = self.filenames.compress(~self.filenames.mask['pix'])
-
-        #self.roi = ugali.observation.roi.ROI(self.config, self.lon, self.lat)
-        self.roi = self.createROI(self.config,self.lon,self.lat)
-        ### # All possible catalog pixels spanned by the ROI
-        ### catalog_pixels = numpy.unique(superpixel(self.roi.pixels,self.nside_pixel,self.nside_catalog))
-        ### # Only catalog pixels that exist in catalog files
-        ### self.catalog_pixels = numpy.intersect1d(catalog_pixels, self.filenames['pix'].compressed())
-
-        self.kernel = self.createKernel(self.config,self.lon,self.lat)
-        self.isochrone = self.createIsochrone(self.config)
-        self.source = Source()
-        self.source.set_kernel(self.kernel)
-        self.source.set_isochrone(self.isochrone)
-        
-        self.catalog = self.createCatalog(self.config,self.roi)
-        self.mask = self.createMask(self.config,self.roi)
-
-        self.grid = GridSearch(self.config,self.roi,self.mask,self.catalog,self.source)
-
+        self.observation = createObservation(self.config,self.lon,self.lat)
+        self.source = createSource(self.config,'scan',lon=self.lon,lat=self.lat)
+        loglike=LogLikelihood(self.config,self.observation,self.source)
+        self.grid = GridSearch(self.config,loglike)
 
     @property
     def loglike(self):
         return self.grid.loglike
-
-    @staticmethod
-    def createROI(config,lon,lat):
-        return ugali.analysis.loglike.createROI(config,lon,lat)
-
-    @staticmethod
-    def createKernel(config,lon=0.0,lat=0.0):
-        # ADW: This is sort of a hack
-        if config['scan'].get('kernel') is not None:
-            return ugali.analysis.loglike.createKernel(config['scan'],lon,lat)
-        else:
-            return ugali.analysis.loglike.createKernel(config,lon,lat)
-
-    @staticmethod
-    def createIsochrone(config):
-        # ADW: This is sort of a hack
-        if config['scan'].get('isochrone') is not None:
-            config = dict(config)
-            config.update(isochrone=config['scan']['isochrone'])
-            return ugali.analysis.loglike.createIsochrone(config)
-        else:
-            return ugali.analysis.loglike.createIsochrone(config)
-
-    @staticmethod
-    def createSource(config,lon=0.0,lat=0.0):
-        kernel = GridSearch.createKernel(config,lon,lat)
-        iso  = GridSearch.createIsochrone(config)
-        source = Source()
-        source.set_kernel(kernel)
-        source.set_isochrone(iso)
-        return source
-
-    @staticmethod
-    def createCatalog(config,roi=None,lon=None,lat=None):
-        return ugali.analysis.loglike.createCatalog(config,roi,lon,lat)
-
-    @staticmethod
-    def simulateCatalog(config,roi=None,lon=None,lat=None):
-        return ugali.analysis.loglike.simulateCatalog(config,roi,lon,lat)
-
-    @staticmethod
-    def createMask(config,roi=None,lon=None,lat=None):
-        return ugali.analysis.loglike.createMask(config,roi,lon,lat)
-
-    @staticmethod
-    def createLoglike(config,lon=None,lat=None):
-        return ugali.analysis.loglike.createLoglike(config,roi,lon,lat)
 
     def run(self, coords=None, debug=False):
         """
@@ -135,24 +66,36 @@ class Scan(object):
         self.grid.write(outfile)
 
 
+def createGridSearch(config,lon,lat):
+    config = Config(config)
+    obs = createObservation(config,lon,lat)
+    src = createSource(config,'scan',lon=lon,lat=lat)
+    loglike=LogLikelihood(config,obs,src)
+    return GridSearch(config,loglike)
+    
+
 ############################################################
 
 class GridSearch:
 
     #def __init__(self, config, roi, mask, catalog, isochrone, kernel):
-    def __init__(self, config, roi, mask, catalog, source):
+    #def __init__(self, config, observation, source):
+    def __init__(self, config, loglike): # What it should be...
         """
         Object to efficiently search over a grid of ROI positions.
         """
 
-        self.config = config
-        self.roi  = roi
-        self.mask = mask # Currently assuming that input mask is ROI-specific
+        self.config = Config(config)
+        self.loglike = loglike
+        self.roi  = self.loglike.roi
+        self.mask = self.loglike.mask
 
-        logger.info("Creating log-likelihood...")
+        #logger.info("Creating log-likelihood...")
         #self.loglike=LogLikelihood(config,roi,mask,catalog,isochrone,kernel)
-        self.loglike=LogLikelihood(config,roi,mask,catalog,source)
+        #self.loglike=LogLikelihood(config,observation,source)
+
         logger.info(str(self.loglike))
+
         self.stellar_mass_conversion = self.loglike.source.stellar_mass()
         self.distance_modulus_array = np.asarray(self.config['scan']['distance_modulus_array'])
 
@@ -190,7 +133,7 @@ class GridSearch:
             
             # Calculate over all pixels in ROI
             self.observable_fraction_sparse_array[ii] = self.loglike.calc_observable_fraction(distance_modulus)
-            
+
         self.u_color_array = numpy.array(self.u_color_array)
 
                 
@@ -302,7 +245,10 @@ class GridSearch:
             )
             message = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
             logger.info( message )
- 
+            #outfile = 'srcmdl_%i.yaml'%ii
+            #print "Writing %s..."%outfile
+            #self.loglike.source.write(outfile)
+            
     def mle(self):
         a = self.log_likelihood_sparse_array
         j,k = np.unravel_index(a.argmax(),a.shape)
@@ -424,8 +370,18 @@ if __name__ == "__main__":
     parser.add_coords(required=True,radius=False)
     opts = parser.parse_args()
 
-    #print opts.coords
-    scan = Scan(opts.config,opts.coords)
+    if len(opts.coords) != 1: 
+        raise Exception('Must specify exactly one coordinate.')
+    lon,lat,radius = opts.coords[0]
+
+    grid = createGridSearch(opts.config,lon,lat)
     if not opts.debug:
-        result = scan.run()
-        scan.write(opts.outfile)
+        result = grid.search()
+        grid.write(opts.outfile)
+
+
+    ##print opts.coords
+    #scan = Scan(opts.config,opts.coords)
+    #if not opts.debug:
+    #    result = scan.run()
+    #    scan.write(opts.outfile)

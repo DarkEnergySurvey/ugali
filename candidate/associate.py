@@ -163,8 +163,8 @@ class Harris96(SourceCatalog):
     def _load(self,filename):
         if filename is None: 
             filename = os.path.join(self.DATADIR,"VII_202/mwgc.dat")
-            
-        raw = numpy.genfromtxt(filename,delimiter=[12,12,3,3,6,5,3,6],dtype=2*['S12']+6*[float],skip_header=72,skip_footer=363)
+        kwargs = dict(delimiter=[12,12,3,3,6,5,3,6,8,8,6],dtype=2*['S12']+7*[float],skip_header=72,skip_footer=363)
+        raw = numpy.genfromtxt(filename,**kwargs)
 
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])

@@ -1,8 +1,4 @@
 #!/usr/bin/env python
-from collections import OrderedDict as odict
-import numpy as np
-import copy
-
 """
 A Model object is just a container for a set of Parameter.
 Implements __getattr__ and __setattr__.
@@ -16,9 +12,23 @@ Model.params attribute. This attribute is a deepcopy of
 Model._params created during instantiation.
 
 """
+from collections import OrderedDict as odict
+import numpy as np
+import copy
+import yaml
 
 def indent(string,width=0): 
     return '{0:>{1}}{2}'.format('',width,string)
+
+def asscalar(a):
+    """ https://github.com/numpy/numpy/issues/4701 """
+    # Do we want to check that the value is numeric?
+    #if   isinstance(value, (int, long, float)): return value
+    try:
+        return np.asscalar(a)
+    except AttributeError, e:
+        return np.asscalar(np.asarray(a))
+
 
 class Model(object):
     # The _params member is an ordered dictionary
@@ -102,7 +112,7 @@ class Model(object):
         name = self._mapping.get(name,name)
         return self.params[name]
 
-    def setp(self, name, value, bounds=None, free=None):
+    def setp(self, name, value=None, bounds=None, free=None):
         """ 
         Set the value (and bounds) of the named parameter.
 
@@ -139,6 +149,14 @@ class Model(object):
                 except (TypeError,KeyError):  
                     self.__setattr__(name,value)
         
+    def todict(self):
+        ret = odict(name = self.__class__.__name__)
+        ret.update(self.params)
+        return ret
+
+    def dump(self):
+        return yaml.dump(self.todict())
+
     def _cache(self, name=None):
         """ 
         Method called in _setp to cache any computationally
@@ -159,10 +177,6 @@ class Model(object):
     #def params(self):
     #    return self._params
 
-def modelFactory(cls,**kwargs):
-    self = cls()
-    self.set_attributes(**kwargs)
-    return self
 
 class Parameter(object):
     """
@@ -264,6 +278,10 @@ class Parameter(object):
     def free(self):
         return self.__free__
 
+    def item(self): 
+        """ For asscalar """
+        return self.value
+
     def check_bounds(self, value):
         if self.__bounds__ is None:
             return
@@ -274,24 +292,46 @@ class Parameter(object):
 
     def set_bounds(self, bounds):
         if bounds is None: return
-        else: self.__bounds__ = bounds
+        self.__bounds__ = [asscalar(b) for b in bounds]
 
     def set_value(self, value):
+        if value is None: return
         self.check_bounds(value)
-        if   isinstance(value, (int, long, float)): self.__value__ = value
-        elif isinstance(value, self.__class__): self.__value__ = value.__value__
-        elif np.isscalar(value): self.__value__ = np.asscalar(value) # Convert numpy types
-        else: raise TypeError("Numeric type required")
+        self.__value__ = asscalar(value)
 
     def set_free(self, free):
         if free is None: return
         else: self.__free__ = bool(free)
 
-    def set(self, value, bounds=None, free=None):
+    def set(self, value=None, bounds=None, free=None):
         # Probably want to reset bounds if set fails
         self.set_bounds(bounds)
         self.set_value(value)
         self.set_free(free)
+
+    def todict(self):
+        return odict(value=self.value,bounds=self.bounds,free=self.free)
+
+    def dump(self):
+        return yaml.dump(self)
+
+    @staticmethod
+    def representer(dumper, data):
+        """ 
+        http://stackoverflow.com/a/14001707/4075339
+        http://stackoverflow.com/a/21912744/4075339 
+        """
+        tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
+        return dumper.represent_mapping(tag,data.todict().items(),flow_style=True)
+
+def odict_representer(dumper, data):
+    """ http://stackoverflow.com/a/21912744/4075339 """
+    # Probably belongs in a util
+    return dumper.represent_mapping(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,data.items())
+
+yaml.add_representer(odict,odict_representer)
+yaml.add_representer(Parameter,Parameter.representer)
 
 if __name__ == "__main__":
     import argparse

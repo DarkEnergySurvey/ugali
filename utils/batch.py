@@ -28,7 +28,7 @@ RUNLIMITS = odict([            #Hard limits
         ('xlong','72:00'),     # 72:00
         ('xxl','168:00'),
         ('kipac-ibq','24:00'),
-        ('bulletmpi','24:00'),
+        ('bulletmpi','48:00'),
         ])
 
 def batchFactory(queue,**kwargs):

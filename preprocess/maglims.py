@@ -225,7 +225,7 @@ def simple_maglims(config,dirname='simple',force=False):
             logger.debug('Writing %s...'%outfile)
             f.writeto(outfile,clobber=True)
 
-def simple_split(config,dirname='simple',force=False):
+def simple_split(config,dirname='split',force=False):
     config = Config(config)
     filenames = config.getFilenames()
     healpix = filenames['pix'].compressed()
@@ -262,7 +262,8 @@ def simple_split(config,dirname='simple',force=False):
         nside_mangle = healpy.npix2nside(len(mangle))
         if nside_mangle != nside_pixel:
             msg = "Mangle nside different from pixel nside"
-            raise Exception(msg)
+            logger.warning(msg)
+            #raise Exception(msg)
 
 
         pixels = np.nonzero((mangle>0)&(mangle>maglim))[0]

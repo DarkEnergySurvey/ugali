@@ -8,7 +8,7 @@ import ugali.preprocess.maglims
 
 from ugali.utils.logger import logger
 
-components = ['pixelize','density','maglims','simple']
+components = ['pixelize','density','maglims','simple','split']
 description="Pipeline script for data pre-processing."
 
 def run(self):
@@ -35,7 +35,7 @@ def run(self):
         x = maglims.run(simple=True,force=self.opts.force)
     if 'split' in self.opts.run:
         logger.info("Running 'split'...")
-        ugali.preprocess.simple_split(self.config,'split',force=self.opts.force)
+        ugali.preprocess.maglims.simple_split(self.config,'split',force=self.opts.force)
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)

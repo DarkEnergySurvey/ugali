@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+import os
 import yaml
 from collections import OrderedDict as odict
 import numpy as np
 import copy
 
 from ugali.analysis.kernel import kernelFactory
-from ugali.analysis.isochrone2 import isochroneFactory
+from ugali.analysis.isochrone import isochroneFactory
 from ugali.analysis.model import Model,Parameter
 
 class Richness(Model):
@@ -16,12 +17,12 @@ class Richness(Model):
     when updated.
     """
     _params = odict([
-        ('richness', Parameter(1.0, [0.0,  np.inf])),
+        ('richness', Parameter(1000.0, [0.0,  np.inf])),
     ])
 
-# Just to be consistent
+# Just to be consistent with other factories
 def richnessFactory(name='Richness',**kwargs):
-    return Richness()
+    return Richness(**kwargs)
 
 class Source(object):
     """ 
@@ -35,12 +36,16 @@ class Source(object):
             ('isochrone',dict(name='Padova')),
             ])
 
-    def __init__(self,name=None,srcmdl=None):
-        self._load(srcmdl)
-        self.name = name
+    def __init__(self,name=None, **kwargs):
+        self.set_model('richness',self.createRichness())
+        self.set_model('kernel',self.createKernel())
+        self.set_model('isochrone',self.createIsochrone())
 
         # Toggle for tracking which models need to be synched
         self._sync = odict([(k,True) for k in self.models.keys()])
+
+        self.name = name
+        self.set_params(**kwargs)
 
     def __str__(self):
         ret = "%s : Name=%s"%(self.__class__.__name__,self.name)
@@ -53,47 +58,102 @@ class Source(object):
         #for key,model in self.models.items():
         #    if name in model.params:
         #        return getattr(model, name)
-        for key,model in self.models.items():
-            try:
-                return model.getp(name).value
-            except KeyError:
-                continue
-        # Raises AttributeError
-        return object.__getattribute__(self,name)
-     
+        #for key,model in self.models.items():
+        #    try:
+        #        return model.getp(name).value
+        #    except KeyError:
+        #        continue
+        ## Raises AttributeError
+        #return object.__getattribute__(self,name)
+        try:
+            return self.getp(name)
+        except AttributeError:
+            return object.__getattribute__(self,name)
+
     def __setattr__(self, name, value):
         #for key,model in self.models.items():
         #    if name in model.params:
         #        self._sync[key] = True
         #        return setattr(model, name, value)
+        #for key,model in self.models.items():
+        #    try:
+        #        ret = model.setp(name, value)
+        #        self._sync[key] = True
+        #        return ret
+        #    except KeyError:
+        #        continue
+        ## Raises AttributeError?
+        #return object.__setattr__(self, name, value)
+        try:
+            return self.setp(name,value)
+        except AttributeError:
+            return object.__setattr__(self, name, value)
+
+    def setp(self, name, *args, **kwargs):
         for key,model in self.models.items():
             try:
-                ret = model.setp(name, value)
+                ret = model.setp(name, *args, **kwargs)
                 self._sync[key] = True
                 return ret
             except KeyError:
                 continue
-        # Raises AttributeError?
-        return object.__setattr__(self, name, value)
+        raise AttributeError
 
-    def _load(self,srcmdl=None):
-        if srcmdl is None: 
-            params = dict()
-        elif isinstance(srcmdl,basestring): 
+    def getp(self, name):
+        for key,model in self.models.items():
+            try:
+                return model.getp(name).value
+            except KeyError:
+                continue
+        raise AttributeError
+
+    @property
+    def params(self):
+        # DANGEROUS: Altering properties directly doesn't call model._cache
+        params = odict([])
+        for key,model in self.models.items():
+            params.update(model.params)
+        return params
+
+
+    def load(self,srcmdl,section=None):
+        if isinstance(srcmdl,basestring): 
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
-        for k,v in copy.deepcopy(self._defaults).items():
-            params.setdefault(k,v)
-            
-        richness  = self.createRichness(**params['richness'])
-        kernel    = self.createKernel(**params['kernel'])
-        isochrone = self.createIsochrone(**params['isochrone'])
+        if section is not None: 
+            params = params[section]
 
-        self.set_model('richness',richness)
-        self.set_model('spatial',kernel)
-        self.set_model('color',isochrone)
-    
+        fill = False
+        if params.get('name'):
+            self.name = params.get('name')
+        if params.get('richness'):
+            richness  = self.createRichness(**params['richness'])
+            self.set_model('richness',richness)
+            fill = True
+        if params.get('kernel'):
+            kernel    = self.createKernel(**params['kernel'])
+            self.set_model('kernel',kernel)
+            fill = True
+        if params.get('isochrone'):
+            isochrone = self.createIsochrone(**params['isochrone'])
+            self.set_model('isochrone',isochrone)
+            fill = True
+
+        if not fill:
+            msg = "Didn't load any source parameters."
+            raise Exception(msg)
+
+    def dump(self):
+        return yaml.dump(self.todict())
+
+    def todict(self):
+        ret = odict()
+        if self.name is not None: ret['name'] = self.name
+        for name,model in self.models.items():
+            ret[name] = model.todict()
+        return ret
+        
     @staticmethod
     def createRichness(**kwargs):
         for k,v in copy.deepcopy(Source._defaults['richness']).items():
@@ -111,40 +171,42 @@ class Source(object):
         for k,v in copy.deepcopy(Source._defaults['isochrone']).items():
             kwargs.setdefault(k,v)
         return isochroneFactory(**kwargs)
-
+    
     # Various derived properties
     @property
     def kernel(self):
-        return self.models['spatial']
+        return self.models['kernel']
 
     @property
     def isochrone(self):
-        return self.models['color']
-
-    @property
-    def params(self):
-        params = odict([])
-        for key,model in self.models.items():
-            params.update(model.params)
-        return params
+        return self.models['isochrone']
 
     def set_model(self, name, model):
         if not hasattr(self,'models'):
             object.__setattr__(self, 'models',odict())
         self.models[name] = model
 
-    def set_kernel(self,kernel): self.set_model('spatial',kernel)
-    def set_isochrone(self,isochrone): self.set_model('color',isochrone)
+    def set_kernel(self,kernel): self.set_model('kernel',kernel)
+    def set_isochrone(self,isochrone): self.set_model('isochrone',isochrone)
 
     def set_params(self,**kwargs):
+        """ Set the parameter values """
         for key,value in kwargs.items():
             setattr(self,key,value)
 
-    def getp(self,name):
-        return self.params['name']
+    def get_params(self):
+        """ Get an odict of the parameter names and values """
+        return odict([(key,param.value) for key,param in self.params.items()])
 
-    def setp(self,name,*args,**kwargs):
-        self.params['name'].setp(*args,**kwargs)
+    def get_free_params(self):
+        """ Get an odict of free parameter names and values """
+        return odict([(key,param.value) for key,param in self.params.items() if param.free])
+
+    def set_free_params(self, names):
+        for name in self.get_params().keys():
+            self.setp(name,free=False)
+        for name in np.array(names,ndmin=1):
+            self.setp(name,free=True)
     
     def get_sync(self,model):
         return self._sync.get(model)
@@ -155,8 +217,12 @@ class Source(object):
     def read(self,filename):
         pass
 
-    def write(self,filename):
-        pass
+    def write(self,filename,force=False):
+        if os.path.exists(filename) and not force:
+            raise Exception("Found %s..."%filename)
+        out = open(filename,'w')
+        out.write(self.dump())
+        out.close()
 
     def stellar_mass(self):
         # ADW: I think it makes more sense for this to be

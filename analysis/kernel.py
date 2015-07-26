@@ -17,7 +17,7 @@ import healpy
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
-from ugali.analysis.model import Model, Parameter, modelFactory
+from ugali.analysis.model import Model, Parameter
 from ugali.utils.healpix import ang2vec, ang2pix, query_disc
 
 from ugali.utils.logger import logger
@@ -33,8 +33,10 @@ class Kernel(Model):
         ('lat',      Parameter(0.0, [-90., 90.   ])),
     ])
     _mapping = odict([])
+    _proj = 'ait'
     
-    def __init__(self, proj='ait',**kwargs):
+    def __init__(self, proj='ait', **kwargs):
+        # This __init__ is probably not necessary...
         self.proj = proj
         super(Kernel,self).__init__(**kwargs)
 
@@ -88,7 +90,7 @@ class ToyKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.0001,5.0]) ), 
+            ('extension',     Parameter(0.1, [0.0001,5.0]) ), 
             ('nside',         Parameter(4096,[4096,4096])),
         ])
 
@@ -120,8 +122,8 @@ class EllipticalKernel(Kernel):
     _params = odict(
         Kernel._params.items() + 
         [
-            ('extension',     Parameter(0.5, [0.0001,0.5]) ),   
-            ('ellipticity',   Parameter(0.0, [0.0, 1.0]) ),    # Default 0 for RadialKernel
+            ('extension',     Parameter(0.1, [0.0001,0.5]) ),   
+            ('ellipticity',   Parameter(0.0, [0.0, 0.8]) ),    # Default 0 for RadialKernel
             ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
             # This is the PA *WEST* of North.
             # to get the conventional PA EAST of North take 90-PA

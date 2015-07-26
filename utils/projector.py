@@ -395,7 +395,7 @@ def hms2dec(hms):
 def dms2dec(dms):
     """
     Convert latitude from degrees,minutes,seconds in string or 3-array
-    format to decimal degrees.
+   format to decimal degrees.
     """
     DEGREE = 360.
     HOUR = 24.
@@ -441,6 +441,55 @@ def distanceModulusToDistance(distance_modulus):
 mod2dist = distanceModulusToDistance
 
 ############################################################
+
+def ang2const(lon,lat,coord='gal'):
+    import ephem
+
+    scalar = np.isscalar(lon)
+    lon = np.array(lon,copy=False,ndmin=1)
+    lat = np.array(lat,copy=False,ndmin=1)
+
+    if coord.lower() == 'cel':
+        ra,dec = lon,lat
+    elif coord.lower() == 'gal':
+        ra,dec = gal2cel(lon,lat)
+    else:
+        msg = "Unrecognized coordinate"
+        raise Exception(msg)
+
+    x,y = np.radians([ra,dec])
+    const = [ephem.constellation(coord) for coord in zip(x,y)]
+    if scalar: return const[0]
+    return const
+
+def ang2iau(lon,lat,coord='gal'):
+    # Default name formatting
+    # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
+    # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
+    fmt = "J%(hour)02i%(hmin)02i%(deg)+03i%(dmin)02i"
+
+    scalar = np.isscalar(lon)
+    lon = np.array(lon,copy=False,ndmin=1)
+    lat = np.array(lat,copy=False,ndmin=1)
+
+    if coord.lower() == 'cel':
+        ra,dec = lon,lat
+    elif coord.lower() == 'gal':
+        ra,dec = gal2cel(lon,lat)
+    else:
+        msg = "Unrecognized coordinate"
+        raise Exception(msg)
+
+    x,y = np.radians([ra,dec])
+    iau = []
+    for _ra,_dec in zip(ra,dec):
+        hms = dec2hms(_ra); dms = dec2dms(_dec)
+        params = dict(hour=hms[0],hmin=hms[1],
+                      deg=dms[0],dmin=dms[1])
+        iau.append(fmt%params)
+    if scalar: return iau[0]
+    return iau
+
     
 def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):
     """

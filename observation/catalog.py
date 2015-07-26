@@ -15,6 +15,8 @@ from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import ang2pix,superpixel
 from ugali.utils.logger import logger
 ############################################################
+### ADW: This needs to be rewritten to use fitsio
+############################################################
 
 class Catalog:
 
@@ -103,44 +105,6 @@ class Catalog:
         hdu = pyfits.BinTableHDU(self.data)
         hdu.writeto(outfile, clobber=True)
 
-    def plotCMD(self, mode='scatter'):
-        """
-        Show the color-magnitude diagram for catalog objects as scatter plot or two-dimensional histogram.
-        """
-        import pylab
-        import ugali.utils.plotting
-
-        if mode == 'scatter':
-            ugali.utils.plotting.twoDimensionalScatter('test', 'color (mag)', 'mag (mag)',
-                                                       self.color, self.mag)
-            y_min, y_max = pylab.axis()[2], pylab.axis()[3]
-            pylab.ylim(y_max, y_min)
-        elif mode == 'histogram':
-            # ROI object needed here
-            pass
-        else:
-            logger.warning('Unrecognized plotting mode %s'%(mode))
-
-    def plotMap(self, mode='scatter'):
-        """
-        Show map of catalog objects in image (projected) coordinates.
-        """
-        import ugali.utils.plotting
-
-        if mode == 'scatter':
-            ugali.utils.plotting.twoDimensionalScatter('test', r'$\Delta$x', '$\Delta$y',
-                                                       self.x, self.y, color=self.color)
-                                                       #lim_x = lim_x
-                                                       #lim_y = lim_y)
-        else:
-            logger.warning('Unrecognized plotting mode %s'%(mode))
-
-    def plotMag(self):
-        """
-
-        """
-        pass
-
     def _parse(self, roi=None):
         """
         Helper function to parse a catalog file and return a pyfits table.
@@ -191,14 +155,14 @@ class Catalog:
         self.lon = self.data.field(self.config['catalog']['lon_field'])
         self.lat = self.data.field(self.config['catalog']['lat_field'])
 
-        if self.config['catalog']['coordsys'].lower() == 'cel' \
-           and self.config['coords']['coordsys'].lower() == 'gal':
-            logger.info('Converting catalog objects from CELESTIAL to GALACTIC cboordinates')
-            self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
-        elif self.config['catalog']['coordsys'].lower() == 'gal' \
-           and self.config['coords']['coordsys'].lower() == 'cel':
-            logger.info('Converting catalog objects from GALACTIC to CELESTIAL coordinates')
-            self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
+        #if self.config['catalog']['coordsys'].lower() == 'cel' \
+        #   and self.config['coords']['coordsys'].lower() == 'gal':
+        #    logger.info('Converting catalog objects from CELESTIAL to GALACTIC cboordinates')
+        #    self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
+        #elif self.config['catalog']['coordsys'].lower() == 'gal' \
+        #   and self.config['coords']['coordsys'].lower() == 'cel':
+        #    logger.info('Converting catalog objects from GALACTIC to CELESTIAL coordinates')
+        #    self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
 
         self.mag_1 = self.data.field(self.config['catalog']['mag_1_field'])
         self.mag_err_1 = self.data.field(self.config['catalog']['mag_err_1_field'])
@@ -269,12 +233,12 @@ def precomputeCoordinates(infile, outfile):
 
     if 'glon' not in names and 'glat' not in names:
         logger.info("Writing 'GLON' and 'GLAT' columns")
-        glon, glat = ugali.utils.projector.celToGal(data['ra'], data['dec'])
+        glon, glat = ugali.utils.projector.celToGal(data['RA'], data['DEC'])
         out = rec.append_fields(data,['GLON','GLAT'],[glon,glat],
                                 usemask=False,asrecarray=True)
     elif 'ra' not in names and 'dec' not in names:
         logger.info("Writing 'RA' and 'DEC' columns")
-        ra, dec = ugali.utils.projector.galToCel(data['glat'], data['glon'])
+        ra, dec = ugali.utils.projector.galToCel(data['GLAT'], data['GLON'])
         out = rec.append_fields(data,['RA','DEC'],[ra,dec],
                                 usemask=False,asrecarray=True)
     

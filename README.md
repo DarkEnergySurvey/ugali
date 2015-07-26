@@ -88,6 +88,7 @@ a, b, c = rank by current importance (a > b)
 * (2b) Restructure and subclass isochrone
 * (2b) Connect isochrone.observableFraction and mask.restrictCatalogToObservableSpace
 * (2b) CMD should be masked array not clipped and pushed
+* (2b) Rewrite catalog to use fitsio
 
 ## DONE
 * (1c) Collector function to find peaks (in 3D)
