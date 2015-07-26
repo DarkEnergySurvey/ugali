@@ -276,6 +276,56 @@ class Isochrone(Model):
         Mv = -2.5*np.log10(richness*flux)
         return Mv
 
+    def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.68):
+        # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
+        # for stars with R-I < 1.15
+        # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
+        # g_des = g_sdss - 0.104(g_sdss - r_sdss) + 0.01
+        # r_des = r_sdss - 0.102(g_sdss - r_sdss) + 0.02
+        if self.survey.lower() != 'des':
+            raise Exception('Only valid for DES')
+        if 'g' not in [self.band_1,self.band_2]:
+            msg = "Need g-band for absolute magnitude"
+            raise Exception(msg)    
+        if 'r' not in [self.band_1,self.band_2]:
+            msg = "Need r-band for absolute magnitude"
+            raise Exception(msg)    
+        
+        def visual(g, r, pdf=None):
+            v = g - 0.487 * (g - r) - 0.0249
+            if pdf is None:
+                flux = np.sum(10**(-v / 2.5))
+            else:
+                flux = np.sum(pdf * 10**(-v / 2.5))
+            abs_mag_v = -2.5 * np.log10(flux)
+            return abs_mag_v
+
+        def sumMag(mag_1, mag_2):
+            flux_1 = 10**(-mag_1 / 2.5)
+            flux_2 = 10**(-mag_2 / 2.5)
+            return -2.5 * np.log10(flux_1 + flux_2)
+
+        # Analytic part
+        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps = steps)
+        g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
+        #cut = numpy.logical_not((g > mag_bright) & (g < mag_faint) & (r > mag_bright) & (r < mag_faint))
+        cut = ((g + self.distance_modulus) > mag_faint) if self.band_1 == 'g' else ((r + self.distance_modulus) > mag_faint)
+        mag_unobs = visual(g[cut], r[cut], richness * mass_pdf[cut])
+
+        # Stochastic part
+        abs_mag_obs_array = numpy.zeros(n_trials)
+        for ii in range(0, n_trials):
+            g, r = self.simulate(richness * self.stellar_mass())
+            #cut = (g > 16.) & (g < 23.) & (r > 16.) & (r < 23.)
+            cut = (g < mag_faint) if self.band_1 == 'g' else (r < mag_faint)
+            mag_obs = visual(g[cut] - self.distance_modulus, r[cut] - self.distance_modulus)
+            abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
+            
+        median = numpy.percentile(abs_mag_obs_array, 0.5)
+        low = numpy.percentile(abs_mag_obs_array, 0.5 - (0.5 * alpha))
+        high = numpy.percentile(abs_mag_obs_array, 0.5 + (0.5 * alpha))
+        return median, high - median, median - low # Median, error high, error low
+
     def simulate(self, stellar_mass, distance_modulus=None):
         """
         Simulate observed magnitudes for satellite of given mass and distance.
