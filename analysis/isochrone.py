@@ -321,10 +321,12 @@ class Isochrone(Model):
             mag_obs = visual(g[cut] - self.distance_modulus, r[cut] - self.distance_modulus)
             abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
             
-        median = numpy.percentile(abs_mag_obs_array, 0.5)
-        low = numpy.percentile(abs_mag_obs_array, 0.5 - (0.5 * alpha))
-        high = numpy.percentile(abs_mag_obs_array, 0.5 + (0.5 * alpha))
-        return median, high - median, median - low # Median, error high, error low
+        abs_mag_obs_array = numpy.sort(abs_mag_obs_array)[::-1]
+
+        median = numpy.percentile(abs_mag_obs_array, 100. * 0.5)
+        bright = numpy.percentile(abs_mag_obs_array, 100. * (0.5 - (0.5 * alpha)))
+        faint = numpy.percentile(abs_mag_obs_array, 100. * (0.5 + (0.5 * alpha)))
+        return median, median - bright, faint - median
 
     def simulate(self, stellar_mass, distance_modulus=None):
         """
