@@ -326,7 +326,7 @@ class Isochrone(Model):
         median = numpy.percentile(abs_mag_obs_array, 100. * 0.5)
         bright = numpy.percentile(abs_mag_obs_array, 100. * (0.5 - (0.5 * alpha)))
         faint = numpy.percentile(abs_mag_obs_array, 100. * (0.5 + (0.5 * alpha)))
-        return median, median - bright, faint - median
+        return median, faint, bright
 
     def simulate(self, stellar_mass, distance_modulus=None):
         """
