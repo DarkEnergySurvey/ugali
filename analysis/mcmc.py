@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Run MCMC follow-up on target parameters.
 
@@ -34,7 +33,7 @@ from ugali.analysis.loglike import createSource, createLoglike
 from ugali.analysis.prior import UniformPrior, InversePrior
 
 from ugali.utils.logger import logger
-from ugali.utils.projector import mod2dist, gal2cel
+from ugali.utils.projector import mod2dist, gal2cel,gal2cel_angle
 
 # Write some class to store priors
 
@@ -69,7 +68,14 @@ class MCMC(object):
 
     def get_mle(self):
         #return self.grid.mle()
-        return self.source.get_params()
+        mle = self.source.get_params()
+        # FIXME: For composite isochrones
+        if 'age' not in mle:
+            mle['age'] = np.average(self.source.isochrone.age)
+        if 'metallicity' not in mle:
+            mle['metallicity'] = np.average(self.source.isochrone.metallicity)
+            
+        return mle
 
     def get_std(self):
         mle = self.get_mle()
@@ -123,6 +129,7 @@ class MCMC(object):
         for k,v in mle.items():
             msg+='\n  %s : %s'%(k,v)
         logger.info(msg)
+        logger.info(str(self.loglike))
 
         self.loglike.set_params(**mle)
         self.loglike.sync_params()
@@ -161,14 +168,23 @@ class MCMC(object):
         if param not in self.source.params.keys() + ['age','metallicity']:
             raise Exception('Unrecognized parameter: %s'%param)
 
+        mle = self.get_mle()
+        errors = [np.nan,np.nan] 
+
+        if param in self.source.params:
+            err = self.source.params[param].errors
+            if err is not None: errors = err
+
+        # For age an metallicity
         if param not in self.params: 
-            mle = self.get_mle()
-            return [float(mle[param]),[np.nan,np.nan]]
+            return [float(mle[param]),errors]
 
         if param not in self.samples.names: 
-            mle = self.get_mle()
-            return [float(mle[param]),[np.nan,np.nan]]
-        
+            return [float(mle[param]),errors]
+
+        if param == 'position_angle':
+            return self.estimate_position_angle(burn=burn,clip=clip,alpha=alpha)
+
         #return self.samples.mean_interval(param,burn=burn,clip=clip,alpha=alpha)
         return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
 
@@ -179,10 +195,37 @@ class MCMC(object):
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
 
+    def estimate_position_angle(self,burn=None,clip=10.0,alpha=0.32):
+        # Transform so peak in the middle of the distribution
+        pa = self.samples.get('position_angle',burn=burn,clip=clip)
+        peak = ugali.utils.stats.kde_peak(pa,samples=1000)
+        pa -= 180.*((pa+90-peak)>180)
+        ret = ugali.utils.stats.peak_interval(pa,alpha,samples=1000)
+        if ret[0] < 0: 
+            ret[0] += 180.; ret[1][0] += 180.; ret[1][1] += 180.;
+        return ret
+
+    def bayes_factor(self,param,burn=None,clip=10.0,bins=50):
+        # CAREFUL: Assumes flat prior...
+        try: 
+            data = self.samples.get(param,burn=burn,clip=clip)
+        except ValueError,msg:
+            logger.warning(msg)
+            return ugali.utils.stats.interval(np.nan)
+
+        bmin,bmax = self.source.params[param].bounds
+        bins = np.linspace(bmin,bmax,bins)
+        n,b = np.histogram(data,bins=bins,normed=True)
+        prior = 1.0/(bmax-bmin)
+        posterior = n[0]
+        # Excluding the null hypothesis
+        bf = prior/posterior
+        return ugali.utils.stats.interval(bf)
+
     def get_results(self,**kwargs):
         import astropy.coordinates
-        
-        estimate = self.estimate_params()
+        kwargs = dict(alpha=self.alpha,burn=self.nburn*self.nwalkers)
+        estimate = self.estimate_params(**kwargs)
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
         
@@ -198,6 +241,13 @@ class MCMC(object):
         results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
         results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
 
+        # Celestial position angle
+        # Break ambiguity in direction with '% 180.'
+        pa,pa_err = results['position_angle']
+        pa_cel = gal2cel_angle(lon,lat,pa) % 180.
+        pa_cel_err = np.array(pa_err) - pa + pa_cel
+        results['position_angle_cel'] = ugali.utils.stats.interval(pa_cel,pa_cel_err[0],pa_cel_err[1])
+        
         mod,mod_err = estimate['distance_modulus']
         dist = mod2dist(mod)
         dist_lo,dist_hi = [mod2dist(mod_err[0]),mod2dist(mod_err[1])]
@@ -205,21 +255,37 @@ class MCMC(object):
         dist,dist_err = results['distance']
 
         ext,ext_err = estimate['extension']
-        results['extarcmin'] = ugali.utils.stats.interval(60*ext,60*ext_err[0],60*ext_err[1])
+        results['extension_arcmin'] = ugali.utils.stats.interval(60*ext,60*ext_err[0],60*ext_err[1])
+
+        # Radially symmetric extension (correct for ellipticity).
+        ell,ell_err = estimate['ellipticity']
+        rext,rext_err = ext*np.sqrt(1-ell),np.array(ext_err)*np.sqrt(1-ell)
+        rext_sigma = np.nan_to_num(np.array(rext_err) - rext)
+        results['extension_radial'] = ugali.utils.stats.interval(rext,rext_err[0],rext_err[1])
+        results['extension_radial_arcmin'] = ugali.utils.stats.interval(60*rext,60*rext_err[0],60*rext_err[1])
+
+        # Bayes factor for ellipticity
+        results['ellipticity_bayes_factor'] = self.bayes_factor('ellipticity',burn=kwargs['burn'])
 
         # Physical Size (should do this with the posteriors)
-        size = np.arctan(np.radians(ext)) * dist
-        ext_sigma = np.nan_to_num(np.array(ext_err) - ext)
+        # Radially symmetric
+        size = np.arctan(np.radians(rext)) * dist
         dist_sigma = np.nan_to_num(np.array(dist_err) - dist)
-        size_sigma = size * np.sqrt((ext_sigma/ext)**2 + (dist_sigma/dist)**2)
+        size_sigma = size * np.sqrt((rext_sigma/rext)**2 + (dist_sigma/dist)**2)
         size_err = [size-size_sigma[0],size+size_sigma[1]]
         results['physical_size'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
 
         rich,rich_err = estimate['richness']
 
-        nobs = self.loglike.f*rich
-        nobs_lo,nobs_hi = rich_err[0]*self.loglike.f,rich_err[1]*self.loglike.f
+        # Number of observed stars (sum of p-values)
+        nobs = self.loglike.p.sum()
+        nobs_lo,nobs_hi = nobs + np.sqrt(nobs)*np.array([-1,1])
         results['nobs'] = ugali.utils.stats.interval(nobs,nobs_lo,nobs_hi)
+
+        # Number of predicted stars (pixelization effects?)
+        npred = self.loglike.f*rich
+        npred_lo,npred_hi = rich_err[0]*self.loglike.f,rich_err[1]*self.loglike.f
+        results['npred'] = ugali.utils.stats.interval(npred,npred_lo,npred_hi)
         
         # Careful, depends on the isochrone...
         stellar_mass = self.source.stellar_mass()
@@ -236,6 +302,17 @@ class MCMC(object):
         Mv_lo = self.source.absolute_magnitude(rich_err[0])
         Mv_hi = self.source.absolute_magnitude(rich_err[1])
         results['Mv'] = ugali.utils.stats.interval(Mv,Mv_lo,Mv_hi)
+
+        # ADW: WARNING this is very fragile.
+        # Also, this is not quite right, should cut on the CMD available space
+        kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,
+                      n_trials=5000,alpha=self.alpha, seed=0)
+        if False:
+            Mv_martin = self.source.isochrone.absolute_magnitude_martin(**kwargs)
+            results['Mv_martin'] = Mv_martin
+        else:
+            logger.warning("Skipping Martin magnitude")
+            results['Mv_martin'] = np.nan
 
         try: 
             results['constellation'] = ugali.utils.projector.ang2const(lon,lat)[1]
@@ -389,15 +466,15 @@ class Samples(np.recarray):
 
     def kde_peak(self, name, **kwargs):
         data = self.get(name,**kwargs)
-        return ugali.utils.stats.kde_peak(data,samples=1000)
+        return ugali.utils.stats.kde_peak(data,samples=250)
 
     def kde(self, name, **kwargs):
         data = self.get(name,**kwargs)
-        return ugali.utils.stats.kde(data,samples=1000)
+        return ugali.utils.stats.kde(data,samples=250)
 
     def peak_interval(self, name, alpha=_alpha, **kwargs):
         data = self.get(name, **kwargs)
-        return ugali.utils.stats.peak_interval(data,alpha,samples=100)
+        return ugali.utils.stats.peak_interval(data,alpha,samples=250)
 
     def min_interval(self,name, alpha=_alpha, **kwargs):
         data = self.get(name, **kwargs)
