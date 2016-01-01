@@ -32,7 +32,7 @@ from ugali.utils.shell import mkdir
 from multiprocessing import Pool
 
 description=__doc__
-components = ['mcmc','membership','results','plot','collect']
+components = ['mcmc','membership','results','plot','collect','scan']
 
 def make_filenames(config,label):
     config = ugali.utils.config.Config(config)
@@ -134,7 +134,11 @@ def run(self):
 
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
-        shutil.copy(self.opts.config,self.outdir)
+        try:
+            shutil.copy(self.opts.config,self.outdir)
+        except m:
+            print m
+
         for config,name,label,coord in args:
             glon,glat,radius = coord
             outfile = make_filenames(self.config,label)['samfile']
@@ -172,13 +176,35 @@ def run(self):
     if 'collect' in self.opts.run:
         logger.info("Running 'collect'...")
         results = odict()
+        srcmdl = odict()
+        params = odict()
         for config,name,label,coord in args:
             srcfile = make_filenames(self.config,name)['srcfile']
             results[name] = yaml.load(open(srcfile))['results']
-        outfile = join(self.outdir,'results.yaml')
-        out = open(outfile,'w')
-        out.write(yaml.dump(results))
-        out.close()
+            srcmdl[name] = yaml.load(open(srcfile))['source']
+            params[name] = yaml.load(open(srcfile))['params']
+
+        for base,output in [('results.yaml',results),('srcmdl.yaml',srcmdl),('params.yaml',params)]:
+            outfile = join(self.outdir,base)
+            out = open(outfile,'w')
+            out.write(yaml.dump(output))
+            out.close()
+
+    if 'scan' in self.opts.run:
+        logger.info("Running 'scan'...")
+        for config,name,label,coord in args:
+            logdir = mkdir('plots/log')
+            logfile=join(logdir,'%s_lnlscan.log')
+
+            cmd = 'python lnlscan.py %s  --name %s --xpar %s --xbins 45 --ypar %s --ybins 45'%(self.opts.config,name,'age','metallicity')
+            self.batch.submit(cmd,logfile=logfile)
+
+            cmd = 'python lnlscan.py %s  --name %s --xpar %s --xbins 45 --ypar %s --ybins 45'%(self.opts.config,name,'metallicity','distance_modulus')
+            self.batch.submit(cmd,logfile=logfile)
+
+            cmd = 'python lnlscan.py %s  --name %s --xpar %s --xbins 45 --ypar %s --ybins 45'%(self.opts.config,name,'age','distance_modulus')
+            self.batch.submit(cmd,logfile=logfile)
+
 
 Pipeline.run = run
 pipeline = Pipeline(description,components)
