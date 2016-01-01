@@ -166,7 +166,7 @@ class Isochrone(Model):
                 n = len(dispersion_array)
             else:
                 dispersion = self.hb_spread
-                spacing = 0.1
+                spacing = 0.025
                 n = int(round(2.0*self.hb_spread/spacing))
                 if n % 2 != 1: n += 1
                 dispersion_array = np.linspace(-dispersion, dispersion, n)
@@ -276,12 +276,18 @@ class Isochrone(Model):
         Mv = -2.5*np.log10(richness*flux)
         return Mv
 
-    def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.68):
+    def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.32, seed=None):
+        # ADW: This function is not quite right. You should be restricting
+        # the catalog to the obsevable space (using the function named as such)
+        # Also, this needs to be applied in each pixel individually
+        
         # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
         # for stars with R-I < 1.15
         # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
         # g_des = g_sdss - 0.104(g_sdss - r_sdss) + 0.01
         # r_des = r_sdss - 0.102(g_sdss - r_sdss) + 0.02
+        np.random.seed(seed)
+
         if self.survey.lower() != 'des':
             raise Exception('Only valid for DES')
         if 'g' not in [self.band_1,self.band_2]:
@@ -315,25 +321,26 @@ class Isochrone(Model):
         # Stochastic part
         abs_mag_obs_array = numpy.zeros(n_trials)
         for ii in range(0, n_trials):
+            if ii%100==0: logger.debug('%i absolute magnitude trials'%ii)
             g, r = self.simulate(richness * self.stellar_mass())
             #cut = (g > 16.) & (g < 23.) & (r > 16.) & (r < 23.)
             cut = (g < mag_faint) if self.band_1 == 'g' else (r < mag_faint)
             mag_obs = visual(g[cut] - self.distance_modulus, r[cut] - self.distance_modulus)
             abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
-            
-        median = numpy.percentile(abs_mag_obs_array, 0.5)
-        low = numpy.percentile(abs_mag_obs_array, 0.5 - (0.5 * alpha))
-        high = numpy.percentile(abs_mag_obs_array, 0.5 + (0.5 * alpha))
-        return median, high - median, median - low # Median, error high, error low
 
-    def simulate(self, stellar_mass, distance_modulus=None):
+        # ADW: Careful, fainter abs mag is larger (less negative) number
+        q = [100*alpha/2., 50, 100*(1-alpha/2.)]
+        hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
+        return ugali.utils.stats.interval(med,lo,hi)
+
+    def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
         """
         Simulate observed magnitudes for satellite of given mass and distance.
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
         n = int(stellar_mass/self.stellar_mass()) 
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample()
+        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(**kwargs)
         
         ## ADW: This assumes that everything is sorted by increasing mass
         #mag_1, mag_2 = mag_1[::-1],mag_2[::-1]
@@ -1176,8 +1183,9 @@ class DotterIsochrone(PadovaIsochrone):
     several useful functions where we would basically be copying code.
     """
 
-    _dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
-    
+    #_dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
+    _dirname = '/u/ki/kadrlica/des/isochrones/dotter/v4'
+
     # KCB: What to do about horizontal branch
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),

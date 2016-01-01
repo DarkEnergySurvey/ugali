@@ -118,12 +118,17 @@ class EllipticalKernel(Kernel):
     axes respectively. The position angle is defined in degrees east of north.
     This definition follows from Martin et al. 2008:
     http://adsabs.harvard.edu/abs/2008ApJ...684.1075M
+
+    ### This is a depricated warning (2015/08/12)
+    ### ADW: WARNING!!! This is actually the PA *WEST* of North!
+    ### to get the conventional PA EAST of North take 90-PA
+    ### Documentation?
     """
     _params = odict(
         Kernel._params.items() + 
         [
             ('extension',     Parameter(0.1, [0.0001,0.5]) ),   
-            ('ellipticity',   Parameter(0.0, [0.0, 0.8]) ),    # Default 0 for RadialKernel
+            ('ellipticity',   Parameter(0.0, [0.0, 0.99]) ),    # Default 0 for RadialKernel
             ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
             # This is the PA *WEST* of North.
             # to get the conventional PA EAST of North take 90-PA
@@ -183,17 +188,21 @@ class EllipticalKernel(Kernel):
         """
         Sample 2D distribution of points in lon, lat
         """
+        # From http://en.wikipedia.org/wiki/Ellipse#General_parametric_form
+        # However, Martin et al. (2009) use PA theta "from North to East"
+        # Definition of phi (position angle) is offset by pi/4
+        # Definition of t (eccentric anamoly) remains the same (x,y-frame usual)
+        # In the end, everything is trouble because we use glon, glat...
+
         radius = self.sample_radius(n)
         a = radius; b = self.jacobian * radius
-        phi = 2. * np.pi * numpy.random.rand(n)
+
+        t = 2. * np.pi * numpy.random.rand(n)
+        cost,sint = np.cos(t),np.sin(t)
+        phi = np.pi/2. - np.deg2rad(self.theta)
         cosphi,sinphi = np.cos(phi),np.sin(phi)
-        costheta,sintheta = np.cos(np.deg2rad(self.theta)),np.sin(np.deg2rad(self.theta))
-        # From http://en.wikipedia.org/wiki/Ellipse#General_parametric_form
-        # However, Martin et al. (2009) use PA theta "from north to east"
-        # Maybe the definitions of phi and theta are both offset by pi/2???
-        # In the end, everything is messed up because we use glon, glat...
-        x = a*cosphi*costheta - b*sinphi*sintheta
-        y = a*cosphi*sintheta + b*sinphi*costheta
+        x = a*cost*cosphi - b*sint*sinphi
+        y = a*cost*sinphi + b*sint*cosphi
         
         if self.projector  is None:
             logger.debug("Creating AITOFF projector for sampling")
@@ -271,7 +280,7 @@ class EllipticalExponential(EllipticalKernel):
         ])
     
     def _kernel(self,radius):
-        return np.exp(-radius/self.r_e)        
+        return np.exp(-radius/self.r_e)
  
     @property
     def norm(self):
@@ -421,7 +430,7 @@ King        = RadialKing
 
 def kernelFactory2(name, **kwargs):
     """
-    Factory for cerating spatial kernels. Arguments
+    Factory for creating spatial kernels. Arguments
     are passed directly to the constructor of the chosen
     kernel.
     """
@@ -439,7 +448,7 @@ def kernelFactory2(name, **kwargs):
 
 def kernelFactory(name, **kwargs):
     """
-    Factory for cerating spatial kernels. Arguments
+    Factory for creating spatial kernels. Arguments
     are passed directly to the constructor of the chosen
     kernel.
     """

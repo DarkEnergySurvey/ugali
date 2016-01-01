@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from collections import OrderedDict as odict
 import copy
+import time
 
 import numpy
 import numpy as np
@@ -327,6 +328,9 @@ class LogLikelihood(object):
     # Methods for fitting and working with the likelihood
     ############################################################################
 
+    def ts(self):
+        return 2*self()
+
     def fit_richness(self, atol=1.e-3, maxiter=50):
         """
         Maximize the log-likelihood as a function of richness.
@@ -395,6 +399,10 @@ class LogLikelihood(object):
         name_mag_err_1 = self.config['catalog']['mag_err_1_field']
         name_mag_err_2 = self.config['catalog']['mag_err_2_field']
 
+        # Angular and isochrone separations
+        sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
+        isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+
         columns = [
             pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
             pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
@@ -406,6 +414,8 @@ class LogLikelihood(object):
             pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
             pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
             pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
+            pyfits.Column(name='ANGSEP',format='E',array=sep),
+            pyfits.Column(name='ISOSEP',format='E',array=isosep),
             pyfits.Column(name='PROB',format='E',array=self.p),
         ]
         hdu = pyfits.new_table(columns)
@@ -413,6 +423,10 @@ class LogLikelihood(object):
             # HIERARCH allows header keywords longer than 8 characters
             name = 'HIERARCH %s'%param.upper()
             hdu.header.set(name,value.value,param)
+        name = 'HIERARCH %s'%'TS'
+        hdu.header.set(name,self.ts())
+        name = 'HIERARCH %s'%'TIMESTAMP'
+        hdu.header.set(name,time.asctime())
         hdu.writeto(filename,clobber=True)
 
 # These should probably be moved into Factory...
