@@ -112,7 +112,7 @@ class Model(object):
         name = self._mapping.get(name,name)
         return self.params[name]
 
-    def setp(self, name, value=None, bounds=None, free=None):
+    def setp(self, name, value=None, bounds=None, free=None, errors=None):
         """ 
         Set the value (and bounds) of the named parameter.
 
@@ -129,7 +129,7 @@ class Model(object):
         None
         """
         name = self._mapping.get(name,name)
-        self.params[name].set(value,bounds,free)
+        self.params[name].set(value,bounds,free,errors)
         self._cache(name)
 
     def set_attributes(self, **kwargs):
@@ -187,9 +187,10 @@ class Parameter(object):
     __value__ = None
     __bounds__ = None
     __free__ = False
+    __errors__ = None
 
-    def __init__(self, value, bounds=None, free=None): 
-        self.set(value,bounds,free)
+    def __init__(self, value, bounds=None, free=None, errors=None): 
+        self.set(value,bounds,free,errors)
 
     # Comparison Methods
     def __eq__(self, x):        return self.__value__ == x
@@ -278,6 +279,10 @@ class Parameter(object):
     def free(self):
         return self.__free__
 
+    @property
+    def errors(self):
+        return self.__errors__
+
     def item(self): 
         """ For asscalar """
         return self.value
@@ -303,14 +308,20 @@ class Parameter(object):
         if free is None: return
         else: self.__free__ = bool(free)
 
-    def set(self, value=None, bounds=None, free=None):
+    def set_errors(self, errors):
+        if errors is None: return
+        self.__errors__ = [asscalar(e) for e in errors]
+
+    def set(self, value=None, bounds=None, free=None, errors=None):
         # Probably want to reset bounds if set fails
         self.set_bounds(bounds)
         self.set_value(value)
         self.set_free(free)
+        self.set_errors(errors)
 
     def todict(self):
-        return odict(value=self.value,bounds=self.bounds,free=self.free)
+        return odict(value=self.value,bounds=self.bounds,
+                     free=self.free,errors=self.errors)
 
     def dump(self):
         return yaml.dump(self)
