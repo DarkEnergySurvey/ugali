@@ -30,34 +30,32 @@ def subpixel(superpix, nside_superpix, nside_subpix):
 
 ############################################################
 
-def pixToAng(nside, pix):
+def pix2ang(nside, pix):
     """
     Return (lon, lat) in degrees instead of (theta, phi) in radians
     """
     theta, phi =  healpy.pix2ang(nside, pix)
-    lon = numpy.degrees(phi)
-    lat = 90. - numpy.degrees(theta)                    
+    lon = np.degrees(phi)
+    lat = 90. - np.degrees(theta)                    
     return lon, lat
 
-pix2ang = pixToAng
-
-def angToPix(nside, lon, lat, coord='GAL'):
+def ang2pix(nside, lon, lat, coord='GAL'):
     """
     Input (lon, lat) in degrees instead of (theta, phi) in radians
     """
-    theta = numpy.radians(90. - lat)
-    phi = numpy.radians(lon)
+    theta = np.radians(90. - lat)
+    phi = np.radians(lon)
     return healpy.ang2pix(nside, theta, phi)
 
-ang2pix = angToPix
-
-def angToVec(lon, lat):
-    theta = numpy.radians(90. - lat)
-    phi = numpy.radians(lon)
+def ang2vec(lon, lat):
+    theta = np.radians(90. - lat)
+    phi = np.radians(lon)
     vec = healpy.ang2vec(theta, phi)
     return vec
 
-ang2vec = angToVec
+pixToAng = pix2ang
+angToPix = ang2pix
+angToVec = ang2vec
 
 ############################################################
 
@@ -130,6 +128,15 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
     except: 
         # Old-style call (healpy 0.10.2)
         return healpy.query_disc(nside, vec, numpy.radians(radius), nest, deg=False)
+
+def ang2disc(nside, lon, lat, radius, inclusive=False, fact=4, nest=False):
+    """
+    Wrap `query_disc` to use lon, lat, and radius in degrees.
+    """
+    vec = ang2vec(lon,lat)
+    return query_disc(nside,vec,radius,inclusive,fact,nest)
+
+angToDisc = ang2disc
 
 ############################################################
 
