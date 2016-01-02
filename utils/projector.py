@@ -120,6 +120,14 @@ class Projector:
 
     image2sphere = imageToSphere
 
+def sphere2image(lon_ref,lat_ref,lon,lat):
+    proj = Projector(lon_ref,lat_ref)
+    return proj.sphere2image(lon,lat)
+
+def image2sphere(lon_ref,lat_ref,x,y):
+    proj = Projector(lon_ref,lat_ref)
+    return proj.image2sphere(x,y)
+
 ############################################################
 
 # ADW: Unteseted dummy projection.
@@ -290,21 +298,49 @@ def celToGal(ra, dec):
 
 cel2gal = celToGal
 
-def gal2cel_angle(glon,glat,angle):
+def estimate_angle(angle, origin, new_frame, offset=1e-7):
     """
-    WARNING: Not vectorized
+    https://github.com/astropy/astropy/issues/3093
     """
-    gal_angle = np.radians(angle)
-    galproj = Projector(glon,glat)
-    x,y = np.sin(gal_angle),np.cos(gal_angle)
-    alon,alat = galproj.imageToSphere(0.1*x,0.1*y)
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    angle_deg = angle*np.pi/180
+    newlat = offset * np.cos(angle_deg) + origin.data.lat.degree
+    newlon = (offset * np.sin(angle_deg) / np.cos(newlat * np.pi/180) + origin.data.lon.degree)
+    sc = SkyCoord(newlon, newlat, unit='degree', frame=origin.frame.name)
+    new_origin = origin.transform_to(new_frame)
+    new_sc = sc.transform_to(new_frame)
+    return new_origin.position_angle(new_sc).deg
 
-    ra,dec = gal2cel(glon,glat)
-    ara,adec = gal2cel(alon,alat)
-    celproj = Projector(ra,dec)
-    cel_x,cel_y = celproj.sphereToImage(ara,adec)
-    cel_angle = np.degrees(np.arctan2(cel_x,cel_y))
-    return cel_angle + 360*(cel_angle<0)
+def gal2cel_angle(glon,glat,angle,offset=1e-7):
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    origin = SkyCoord(glon,glat,unit=u.deg,frame='galactic')
+    return estimate_angle(angle,origin,'fk5',offset)
+
+def cel2gal_angle(ra,dec,angle,offset=1e-7):
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    origin = SkyCoord(ra,dec,unit=u.deg,frame='fk5')
+    return estimate_angle(angle,origin,'galactic',offset)
+
+### ADW: Probably works, remember 90-pa for kernel convention...
+### def gal2cel_angle(glon,glat,angle):
+###     """
+###     WARNING: Not vectorized
+###     """
+###     gal_angle = np.radians(angle)
+###     galproj = Projector(glon,glat)
+###     x,y = np.sin(gal_angle),np.cos(gal_angle)
+###     alon,alat = galproj.imageToSphere(0.1*x,0.1*y)
+###  
+###     ra,dec = gal2cel(glon,glat)
+###     ara,adec = gal2cel(alon,alat)
+###     celproj = Projector(ra,dec)
+###     cel_x,cel_y = celproj.sphereToImage(ara,adec)
+###     cel_angle = np.degrees(np.arctan2(cel_x,cel_y))
+###     return cel_angle + 360*(cel_angle<0)
+
 
 ### ADW: WARNING DOESN'T WORK YET
 ### def cel2gal_angle(ra,dec,angle):
