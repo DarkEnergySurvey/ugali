@@ -94,7 +94,7 @@ if __name__ == "__main__":
     parser.add_argument('--xbins',default=10)
     parser.add_argument('--ypar',default='distance_modulus',help="Slow parameter")
     parser.add_argument('--ybins',default=10)
-    parser.add_argument('--zpar',default='age',help="Slow parameter")
+    parser.add_argument('--zpar',default='age',help="Slowest parameter")
     parser.add_argument('--zbins',default=10)
     parser.add_argument('--alpha',default=0.1)
 
@@ -161,27 +161,19 @@ if __name__ == "__main__":
 
         xx,yy,zz = np.meshgrid(x,y,z)
 
-
         maxlnl = np.max(lnl)
         idx =np.argmax(lnl)
-        xidx,yidx,xidx = np.unravel_index(idx,lnl.shape)
+        zidx,yidx,xidx = np.unravel_index(idx,lnl.shape)
         print zip([xpar,ypar,zpar],[x[xidx],y[yidx],z[zidx]])
 
-        ##richness = np.array(richness).reshape(xx.shape)
-        #like = np.exp(lnl-lnl.max())
-        #maxlike = np.max(like)
-        #idx =np.argmax(like)
-        #yidx,xidx = np.unravel_index(idx,lnl.shape)
-        #print x[xidx],y[yidx]
+        # Probably a better way to do the profile with more variables...
+        #stackoverflow.com/q/30589211
+        #lnlike = np.max(lnl.shape(nz,-1),axis=1)
 
-        #loglike.value(**{xpar:x[xidx],ypar:y[yidx]})
-        #richs = np.logspace(np.log10(richness.flat[idx])-1,np.log10(richness.flat[idx])+1,100)
-        #rich_lnlfn = ProfileLimit(richs,np.array([loglike.value(richness=r) for r in richs]))
-         
-        results =[]
-        for i,v in enumerate([x,y]):
-            #lnlike = np.log(np.sum(like,axis=i))
-            lnlike = np.log(np.max(like,axis=i))
+        results =dict()
+        for i,(p,v) in enumerate(zip([xpar,ypar,zpar],[x,y,z])):
+            # Not great, but clear
+            lnlike = np.max(np.max(np.swapaxes(lnl,i,0),axis=0),axis=0)
             lnlfn = ProfileLimit(v,lnlike)
             lnlfn._mle = v[np.argmax(lnlike)]
             lnlfn._fmax = np.max(lnlike)
@@ -194,7 +186,19 @@ if __name__ == "__main__":
                 hi = lnlfn.getUpperLimit(alpha/2)
             except ValueError:
                 hi = np.nan
-            results.append([mle, [lo,hi]])
+            results[p] = [lnlfn, mle, [lo,hi]]
+
+        ##richness = np.array(richness).reshape(xx.shape)
+        #like = np.exp(lnl-lnl.max())
+        #maxlike = np.max(like)
+        #idx =np.argmax(like)
+        #yidx,xidx = np.unravel_index(idx,lnl.shape)
+        #print x[xidx],y[yidx]
+
+        #loglike.value(**{xpar:x[xidx],ypar:y[yidx]})
+        #richs = np.logspace(np.log10(richness.flat[idx])-1,np.log10(richness.flat[idx])+1,100)
+        #rich_lnlfn = ProfileLimit(richs,np.array([loglike.value(richness=r) for r in richs]))
+         
         """
         # Plotting... lot's of plotting
         lnlmax = np.max(lnl)
