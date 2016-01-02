@@ -6,7 +6,7 @@ import scipy.special
 _alpha = 0.32
 
 
-def interval(best,lo,hi):
+def interval(best,lo=np.nan,hi=np.nan):
     """
     Pythonized interval for easy output to yaml
     """
