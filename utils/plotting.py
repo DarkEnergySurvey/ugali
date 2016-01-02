@@ -3,6 +3,7 @@ Basic plotting tools.
 """
 import os
 import collections
+import copy
 
 import matplotlib
 try:             os.environ['DISPLAY']
@@ -30,6 +31,7 @@ import ugali.analysis.isochrone
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
+from ugali.utils.projector import sphere2image,image2sphere
 
 from ugali.utils.logger import logger
 #pylab.ion()
@@ -528,13 +530,18 @@ def plot_candidates(candidates, config, ts_min=50, outdir='./'):
 ###################################################
 
 
-def draw_slices(hist, **kwargs):
+def draw_slices(hist, func=np.sum, **kwargs):
     """ Draw horizontal and vertical slices through histogram """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     kwargs.setdefault('ls','-')
     ax = plt.gca()
 
     data = hist
+
+    # Slices
+    vslice = func(data,axis=0)
+    hslice = func(data,axis=1)
+
     npix = np.array(data.shape)
     #xlim,ylim = plt.array(zip([0,0],npix-1))
     xlim = ax.get_xlim()
@@ -543,9 +550,6 @@ def draw_slices(hist, **kwargs):
     #xlim =extent[:2]
     #ylim = extent[2:]
 
-    # Slices
-    vslice = data.sum(axis=0)
-    hslice = data.sum(axis=1)
     # Bin centers
     xbin = np.linspace(xlim[0],xlim[1],len(vslice))#+0.5 
     ybin = np.linspace(ylim[0],ylim[1],len(hslice))#+0.5
@@ -569,6 +573,12 @@ def draw_slices(hist, **kwargs):
     vax.set_xlim(*xlim)
 
     return vax,hax
+
+def draw_sum_slices(hist, **kwargs):
+    return draw_slices(hist,func=np.sum, **kwargs)
+
+def draw_max_slices(hist, **kwargs):
+    return draw_slices(hist,func=np.max, **kwargs)
 
 def plotKernel(kernel):
     fig = plt.figure()
@@ -638,7 +648,9 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
 
     config = ugali.utils.config.Config(config)
     if isinstance(data,basestring):
-        data = pyfits.open(data)[1].data
+        hdu = pyfits.open(data)[1]
+        data = hdu.data
+        header = hdu.header
 
     kwargs.setdefault('s',20)
     kwargs.setdefault('edgecolor','none')
@@ -658,6 +670,13 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
         prob = np.zeros(len(data['RA']))+1
 
     lon,lat = data['RA'][sort],data['DEC'][sort]
+    
+    lon0,lat0 = np.median(lon),np.median(lat)
+    x,y = sphere2image(lon0,lat0,lon,lat)
+    lon0,lat0 = image2sphere(lon0,lat0,(x.max()+x.min())/2.,(y.max()+y.min())/2.)
+    #lon0,lat0 = image2sphere(lon0,lat0,np.median(x),np.median(y))
+    print lon0,lat0
+    lon,lat = sphere2image(lon0,lat0,lon,lat)
 
     color = data['COLOR'][sort]
     cut = (prob > 0.01)
@@ -675,21 +694,26 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
 
     axes[0].scatter(lon[~cut],lat[~cut],**bkg_kwargs)
     axes[0].scatter(lon[cut],lat[cut],c=prob[cut],**kwargs)
-    if kernel is not None:
-        plt.sca(axes[0])
-        levels=[0,kernel._pdf(kernel.extension),np.inf]
-        drawKernel(kernel,contour=True,linewidths=2,zorder=0,levels=levels)
-        ra,dec = gal2cel(kernel.lon,kernel.lat)
+    #if kernel is not None:
+    #    plt.sca(axes[0])
+    #    k = copy.deepcopy(kernel)
+    #    levels=[0,k._pdf(k.extension),np.inf]
+    #    k.lon,k.lat = cel2gal(0,0)
+    #    drawKernel(k,contour=True,linewidths=2,zorder=0,levels=levels)
 
-    axes[0].set_xlim(np.median(lon)-0.4,np.median(lon)+0.4)
-    axes[0].set_ylim(np.median(lat)-0.4,np.median(lat)+0.4)
+    #axes[0].set_xlim(lon0-0.4,lon0+0.4)
+    #axes[0].set_ylim(lat0-0.4,lat0+0.4)
+    #axes[0].set_xlabel('RA (deg)')
+    #axes[0].set_ylabel('DEC (deg)')
 
-    #axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
-    #axes[0].set_xlabel(r'$\Delta$ RA (deg)')
-    axes[0].set_xlabel('RA (deg)')
-    axes[0].set_ylabel('DEC (deg)')
+    axes[0].set_xlim(lon.min(),lon.max())
+    axes[0].set_ylim(lat.min(),lat.max())
+    axes[0].set_ylabel(r'$\Delta$ DEC (deg)')
+    axes[0].set_xlabel(r'$\Delta$ RA (deg)')
+
     axes[0].xaxis.set_major_locator(MaxNLocator(4))
     axes[0].yaxis.set_major_locator(MaxNLocator(4))
+    axes[0].invert_xaxis()
 
     axes[1].errorbar(color[cut],mag[cut],yerr=mag_err_1[cut],fmt='.',c='k',zorder=0.5)
     axes[1].scatter(color[~cut],mag[~cut],**bkg_kwargs)
@@ -760,7 +784,10 @@ def drawIsochrone(isochrone, **kwargs):
     #ax.set_xlim(-0.5,1.5)
     #ax.set_ylim(23,18)
 
-def drawKernel(kernel, contour=False, coords='C', proj=None, **kwargs):
+def drawKernel(kernel, contour=False, coords='C', **kwargs):
+    """
+    FIXME: Need to update for projected coordinates.
+    """
     ax = plt.gca()
 
     if 'colors' not in kwargs:
