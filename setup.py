@@ -1,9 +1,13 @@
 import sys
 import os
 try: 
-    from setuptools import setup
+    from setuptools import setup, find_packages
 except ImportError: 
     from distutils.core import setup
+    def find_packages():
+        return ['ugali','ugali.analysis','ugali.config','ugali.observation',
+                'ugali.preprocess','ugali.simulation','ugali.candidate',
+                'ugali.utils']
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -11,7 +15,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 from ugali.version import version as VERSION
 
 def read(filename):
-    return open(os.path.join(here,filename)).read()
+    return open(os.path.join(HERE,filename)).read()
 
 setup(
     name=NAME,
@@ -29,7 +33,7 @@ setup(
         'emcee >= 2.1.0',
         'pyyaml >= 3.10',
     ],
-    packages=['ugali'],
+    packages=find_packages(),
     description="Ultra-faint galaxy likelihood fitting code.",
     long_description=read('README.md'),
     platforms='any',
