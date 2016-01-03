@@ -5,19 +5,20 @@ try:
 except ImportError: 
     from distutils.core import setup
 
-here = os.path.abspath(os.path.dirname(__file__))
+NAME = 'ugali'
+HERE = os.path.abspath(os.path.dirname(__file__))
 
-from ugali.version import get_git_version
+from ugali.version import version as VERSION
 
 def read(filename):
     return open(os.path.join(here,filename)).read()
 
 setup(
-    name='ugali',
-    version=get_git_version(),
+    name=NAME,
+    version=VERSION,
     url='https://bitbucket.org/bechtol/ugali/src',
     author='Keith Bechtol & Alex Drlica-Wagner',
-    author_email='kadrlica@fnal.gov',
+    author_email='bechtol@kicp.uchicago.edu, kadrlica@fnal.gov',
     scripts = [],
     install_requires=[
         'python >= 2.7.0',
