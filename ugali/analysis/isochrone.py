@@ -328,6 +328,9 @@ class Isochrone(Model):
             mag_obs = visual(g[cut] - self.distance_modulus, r[cut] - self.distance_modulus)
             abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
 
+        # ADW: This shouldn't be necessary
+        #abs_mag_obs_array = numpy.sort(abs_mag_obs_array)[::-1]
+
         # ADW: Careful, fainter abs mag is larger (less negative) number
         q = [100*alpha/2., 50, 100*(1-alpha/2.)]
         hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
