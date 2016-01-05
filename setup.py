@@ -11,6 +11,14 @@ except ImportError:
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
+CLASSIFIERS = """\
+Development Status :: 2 - Pre-Alpha
+Intended Audience :: Science/Research
+Intended Audience :: Developers
+Programming Language :: Python
+Natural Language :: English
+Topic :: Scientific/Engineering
+"""
 
 from ugali.version import version as VERSION
 
@@ -34,14 +42,9 @@ setup(
         'pyyaml >= 3.10',
     ],
     packages=find_packages(),
+    package_data={'ugali': ['data/catalog.tgz']}
     description="Ultra-faint galaxy likelihood fitting code.",
     long_description=read('README.md'),
     platforms='any',
-    keywords=[''],
-    classifiers = [
-        'Programming Language :: Python',
-        'Development Status :: 2 - Pre-Alpha',
-        'Natural Language :: English',
-        'Intended Audience :: Science/Research',
-    ]
+    classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
 )
