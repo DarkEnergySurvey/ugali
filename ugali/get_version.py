@@ -12,7 +12,7 @@ from subprocess import CalledProcessError, check_output
 
 __all__ = ['get_version','write_version_py']
 
-ARCHIVE = '$Format:%D$'
+ARCHIVE = '$Format:%H$'
 DEFAULT = 'dev'
 PREFIX  = 'v'
 TEMPLATE = """\
