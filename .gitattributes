@@ -4,3 +4,5 @@ ugali/version.py export-subst
 # These are binary files
 *.gz binary
 *.tgz binary
+
+# Smudge/Clean the version information

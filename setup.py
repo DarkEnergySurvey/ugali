@@ -9,6 +9,8 @@ except ImportError:
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
 
+from ugali.versioning import get_version, write_version_py
+
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
 CLASSIFIERS = """\
@@ -19,8 +21,8 @@ Programming Language :: Python
 Natural Language :: English
 Topic :: Scientific/Engineering
 """
-
-from ugali.version import version as VERSION
+VERSION = get_version()
+write_version_py(version=VERSION)
 
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
@@ -42,7 +44,7 @@ setup(
         'pyyaml >= 3.10',
     ],
     packages=find_packages(),
-    package_data={'ugali': ['data/catalog.tgz']}
+    package_data={'ugali': ['data/catalog.tgz']},
     description="Ultra-faint galaxy likelihood fitting code.",
     long_description=read('README.md'),
     platforms='any',
