@@ -5,5 +5,6 @@
 ### Python
 *.pyc
 
-### Versioning
-version.py
+### ugali files
+ugali/version.py # Temporary version file for pip install
+ugali/data/*/    # Uncompressed data directories

@@ -9,7 +9,7 @@ except ImportError:
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
 
-from ugali.versioning import get_version, write_version_py
+from ugali.get_version import get_version, write_version_py
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
