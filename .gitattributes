@@ -1,5 +1,5 @@
 # Export the versioning string when archiving
-ugali/version.py export-subst
+ugali/get_version.py export-subst
 
 # These are binary files
 *.gz binary
