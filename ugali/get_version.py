@@ -13,7 +13,7 @@ from subprocess import CalledProcessError, check_output
 __all__ = ['get_version','write_version_py']
 
 ARCHIVE = '$Format:%d$'
-DEFAULT = 'dev'
+DEFAULT = 'none'
 PREFIX  = 'v'
 TEMPLATE = """\
 # FILE GENERATED ON GIT COMMIT
