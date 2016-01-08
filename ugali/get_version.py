@@ -22,35 +22,31 @@ __version__ = '%(version)s'
 
 def get_version():
     """
-    Get the version string from git. First tries `git-archive` value
-    and then `git-describe` value.
+    Get the version string from git. First tries `export-subst` value
+    from `git-archive` and then `git-describe` value.
     """
     # Default value
     version = DEFAULT
 
     # Return the version if it has been injected into the file by git-archive
     tag_re = re.compile(r'\btag: %s([0-9][^,]*)\b' % PREFIX)
-    version = tag_re.search(ARCHIVE)
-    if version:
+    if tag_re.search(ARCHIVE):
+        version = tag_re.search(ARCHIVE)
         return version.group(1)
+    elif 'HEAD' in ARCHIVE:
+        version = 'HEAD'
+        return version
 
+    # Return tag if directory is git controlled
+    cmd = 'git describe --tags --match %s[0-9]*' % PREFIX
     try: 
-        out = check_output('git rev-parse'.split())
-        isgit = True
+        version = check_output(cmd.split()).decode().strip()[len(PREFIX):]
+        # PEP 440 compatibility
+        if '-' in version:
+            version = '.dev'.join(version.split('-')[:2])
+        return version
     except CalledProcessError:
-        isgit = False
-
-    if isgit:
-        # Get the version using "git describe".
-        cmd = 'git describe --tags --match %s[0-9]*' % PREFIX
-        try:
-            version = check_output(cmd.split()).decode().strip()[len(PREFIX):]
-        except CalledProcessError:
-            raise RuntimeError('Unable to get version from git tag')
-
-    # PEP 440 compatibility
-    if '-' in version:
-        version = '.dev'.join(version.split('-')[:2])
+        raise RuntimeError('Unable to get version from git tag')
 
     return version
 
