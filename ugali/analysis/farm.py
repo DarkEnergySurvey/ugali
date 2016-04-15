@@ -153,7 +153,7 @@ class Farm:
         local = (queue == 'local')
 
         # Need to develop some way to take command line arguments...
-        self.batch = ugali.utils.batch.batchFactory(queue,**self.config['batch'])
+        self.batch = ugali.utils.batch.batchFactory(queue,**self.config['batch']['opts'])
 
         if numpy.isscalar(pixels): pixels = numpy.array([pixels])
 

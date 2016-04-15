@@ -3,6 +3,7 @@ import subprocess, subprocess as sub
 import getpass
 from collections import OrderedDict as odict
 from itertools import chain
+import copy
 
 from ugali.utils.logger import logger
 
@@ -17,10 +18,11 @@ QUEUES = odict([
     ('local',[]),
     ('lsf',['express','short','medium','long','xlong','xxl','kipac-ibq','bulletmpi']),
     ('slurm',[]),
-    ('condor',['vanilla','universe']),
+    ('condor',['local','vanilla','universe','grid']),
 ])
 
 RUNLIMITS = odict([            #Hard limits
+        (None,'4:00'),         # Default value
         ('express','0:01'),    # 0:01
         ('short','0:30'),      # 0:30
         ('medium','1:00'),     # 4:00
@@ -55,12 +57,13 @@ def batchFactory(queue,**kwargs):
 
 class Batch(object):
     # Default options for batch submission
-    default_opts = odict([])
+    _defaults = odict([])
     # Map between generic and batch specific names
-    map_opts = odict([])
+    _mapping = odict([])
 
     def __init__(self, **kwargs):
         self.username = getpass.getuser()
+        self.default_opts = copy.deepcopy(self._defaults)
         self.default_opts.update(**kwargs)
         self.submit_cmd = "submit %(opts)s %(command)s"
         self.jobs_cmd = "jobs"
@@ -84,10 +87,10 @@ class Batch(object):
         return sub.call(command,shell=True)
 
     def remap_options(self,opts):
-        for k in self.map_opts.keys():
+        for k in self._mapping.keys():
             v = opts.pop(k,None)
             if v is not None:
-                opts[self.map_opts[k]] = v
+                opts[self._mapping[k]] = v
 
     def batch(self, command, jobname=None, logfile=None, **opts):
         if jobname: opts.update(jobname=jobname)
@@ -112,13 +115,13 @@ class Local(Batch):
         return ''
 
 class LSF(Batch):
-    default_opts = odict([
+    _defaults = odict([
         ('R','"scratch > 1 && rhel60"'),
         ('C', 0),
-        ('q', 'long'),
+        #('q', 'long'),
     ])
 
-    map_opts = odict([
+    _mapping = odict([
         ('jobname','J'),
         ('logfile','oo')
     ])
@@ -129,13 +132,13 @@ class LSF(Batch):
         self.jobs_cmd = "bjobs -u %s"%self.username
         self.submit_cmd = "bsub %(opts)s %(command)s"
 
-    def queue2runlimit(self, queue):
+    def runlimit(self, queue=None):
         """
         Translate queue to wallclock runlimit.
         """
         return RUNLIMITS[queue]
         
-    q2w = queue2runlimit
+    q2w = runlimit
 
     def parse_options(self, **opts):
         options = odict(self.default_opts)
@@ -143,11 +146,11 @@ class LSF(Batch):
         if 'n' in options.keys():
             options['a'] = 'mpirun'
             options['R'] += ' -R "span[ptile=4]"'
-        options.setdefault('W',self.q2w(options['q']))
+        options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
 class Slurm(Batch):
-    default_opts = odict([
+    _defaults = odict([
         ('account','kicp'),
         ('partition','kicp-ht'),
         ('mem',10000)
@@ -166,8 +169,6 @@ class Slurm(Batch):
         return ''.join('--%s %s '%(k,v) for k,v in options.items())
 
 class Condor(Batch):
-    default_opts = odict()
-    map_opts = odict()
 
     def __init__(self):
         super(Condor,self).__init__(**kwargs)
@@ -181,4 +182,5 @@ if __name__ == "__main__":
     description = "python script"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('args',nargs=argparse.REMAINDER)
-    opts = parser.parse_args(); args = opts.args
+    args = parser.parse_args()
+

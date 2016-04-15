@@ -4,7 +4,7 @@ A Model object is just a container for a set of Parameter.
 Implements __getattr__ and __setattr__.
 
 The model has a set of default parameters stored in Model._params. 
-Careful, if these are changex, they will be changed for all 
+Careful, if these are changed, they will be changed for all 
 subsequent instances of the Model.
 
 The parameters for a given instance of a model are stored in the
@@ -32,7 +32,7 @@ def asscalar(a):
 
 class Model(object):
     # The _params member is an ordered dictionary
-    # of Parameter objects.
+    # of Parameter objects. (Should be immutable tuple.)
     _params = odict([])
     # The _mapping is an alternative name mapping
     # for the parameters in _params
@@ -182,7 +182,7 @@ class Parameter(object):
     """
     Parameter class for storing a value, bounds, and freedom.
 
-    Adapted from MutableNum from https://gist.github.com/jheiv/6656349
+    Adapted from `MutableNum` from https://gist.github.com/jheiv/6656349
     """
     __value__ = None
     __bounds__ = None
