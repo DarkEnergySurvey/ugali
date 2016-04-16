@@ -6,14 +6,14 @@ References:
 https://github.com/Changaco/version.py
 http://www.mass-communicating.com/code/2013/11/08/python-versions.html
 """
-import sys
+import sys,os
 import re
 from subprocess import CalledProcessError, check_output
 
 __all__ = ['get_version','write_version_py']
 
-ARCHIVE = '$Format:%D$'
-DEFAULT = 'dev'
+ARCHIVE = '$Format:%d$'
+DEFAULT = 'none'
 PREFIX  = 'v'
 TEMPLATE = """\
 # FILE GENERATED ON GIT COMMIT
@@ -22,36 +22,36 @@ __version__ = '%(version)s'
 
 def get_version():
     """
-    Get the version string from git. First tries `git-archive` value
-    and then `git-describe` value.
+    Get the version string from git. First tries `export-subst` value
+    from `git-archive` and then `git-describe` value.
     """
     # Default value
     version = DEFAULT
 
     # Return the version if it has been injected into the file by git-archive
     tag_re = re.compile(r'\btag: %s([0-9][^,]*)\b' % PREFIX)
-    version = tag_re.search(ARCHIVE)
-    if version:
+    if tag_re.search(ARCHIVE):
+        version = tag_re.search(ARCHIVE)
         return version.group(1)
+    elif 'HEAD' in ARCHIVE:
+        version = 'HEAD'
+        return version
 
+    # Return tag if directory is git controlled
+    oldpath = os.getcwd()
+    path = os.path.abspath(os.path.dirname(__file__))
+    os.chdir(path)
+    cmd = 'git describe --tags --match %s[0-9]*' % PREFIX
     try: 
-        out = check_output('git rev-parse'.split())
-        isgit = True
+        version = check_output(cmd.split()).decode().strip()[len(PREFIX):]
+        # PEP 440 compatibility
+        if '-' in version:
+            version = '.dev'.join(version.split('-')[:2])
     except CalledProcessError:
-        isgit = False
-
-    if isgit:
-        # Get the version using "git describe".
-        cmd = 'git describe --tags --match %s[0-9]*' % PREFIX
-        try:
-            version = check_output(cmd.split()).decode().strip()[len(PREFIX):]
-        except CalledProcessError:
-            raise RuntimeError('Unable to get version from git tag')
-
-    # PEP 440 compatibility
-    if '-' in version:
-        version = '.dev'.join(version.split('-')[:2])
-
+        raise RuntimeError('Unable to get version from git tag')
+    finally:
+        os.chdir(oldpath)
+    
     return version
 
 def write_version_py(filename='ugali/version.py',**kwargs):
