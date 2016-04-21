@@ -7,7 +7,6 @@ http://adsabs.harvard.edu/abs/2002A%26A...395.1077C
 
 import numpy
 import numpy as np
-import healpy
 
 ############################################################
 
@@ -205,6 +204,8 @@ def angsep2(lon_1, lat_1, lon_2, lat_2):
     """
     Angular separation (deg) between two sky coordinates.
     """
+    import healpy
+
     v10, v11, v12 = healpy.ang2vec(numpy.radians(90. - lat_1), numpy.radians(lon_1)).transpose()
     v20, v21, v22 = healpy.ang2vec(numpy.radians(90. - lat_2), numpy.radians(lon_2)).transpose()
     val = (v10 * v20) + (v11 * v21) + (v12 * v22)

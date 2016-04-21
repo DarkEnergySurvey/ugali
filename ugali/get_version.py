@@ -6,7 +6,7 @@ References:
 https://github.com/Changaco/version.py
 http://www.mass-communicating.com/code/2013/11/08/python-versions.html
 """
-import sys
+import sys,os
 import re
 from subprocess import CalledProcessError, check_output
 
@@ -38,16 +38,20 @@ def get_version():
         return version
 
     # Return tag if directory is git controlled
+    oldpath = os.getcwd()
+    path = os.path.abspath(os.path.dirname(__file__))
+    os.chdir(path)
     cmd = 'git describe --tags --match %s[0-9]*' % PREFIX
     try: 
         version = check_output(cmd.split()).decode().strip()[len(PREFIX):]
         # PEP 440 compatibility
         if '-' in version:
             version = '.dev'.join(version.split('-')[:2])
-        return version
     except CalledProcessError:
         raise RuntimeError('Unable to get version from git tag')
-
+    finally:
+        os.chdir(oldpath)
+    
     return version
 
 def write_version_py(filename='ugali/version.py',**kwargs):

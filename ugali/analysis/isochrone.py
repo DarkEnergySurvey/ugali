@@ -45,6 +45,7 @@ import scipy.ndimage as ndimage
 import ugali.analysis.imf
 from ugali.analysis.model import Model, Parameter
 from ugali.utils.stats import norm_cdf
+from ugali.utils.shell import get_ugali_dir
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
@@ -905,7 +906,8 @@ class Isochrone(Model):
 class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
-    _dirname = '/u/ki/kadrlica/des/isochrones/v3/'
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
+    _dirname =  os.path.join(get_ugali_dir(),'padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -950,6 +952,9 @@ class PadovaIsochrone(Isochrone):
     def create_grid(self,abins=None,zbins=None):
         if abins is None and zbins is None:
             data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/*.dat')])
+            if not len(data):
+                msg = "No isochrone files found in: %s"%self.dirname
+                raise Exception(msg)
             arange = np.unique(data[:,0])
             zrange = np.unique(data[:,1])
         elif abins is not None and zbins is not None:            
@@ -1038,7 +1043,8 @@ class PadovaIsochrone(Isochrone):
 class Bressan2012(PadovaIsochrone): pass
 
 class Girardi2002(PadovaIsochrone):
-    _dirname = '/u/ki/kadrlica/des/isochrones/v5/'
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
+    _dirname =  os.path.join(get_ugali_dir(),'girardi2002')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1099,7 +1105,8 @@ class Girardi2002(PadovaIsochrone):
         self.color = self.mag_1 - self.mag_2
 
 class Girardi2010(Girardi2002):
-    _dirname = '/u/ki/kadrlica/des/isochrones/v4/'
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
+    _dirname =  os.path.join(get_ugali_dir(),'girardi2010')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1124,7 +1131,8 @@ class Girardi2010(Girardi2002):
 class OldPadovaIsochrone(Girardi2002):
     _prefix = 'isot'
     _basename = '%(prefix)sa%(age)iz%(z)g.dat'
-    _dirname = '/u/ki/kadrlica/des/isochrones/v0/' # won't work for SDSS...
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v0/' # won't work for SDSS...
+    _dirname =  os.path.join(get_ugali_dir(),'old_padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1188,7 +1196,7 @@ class DotterIsochrone(PadovaIsochrone):
     """
 
     #_dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
-    _dirname = '/u/ki/kadrlica/des/isochrones/dotter/v4'
+    _dirname =  os.path.join(get_ugali_dir(),'dotter')
 
     # KCB: What to do about horizontal branch
     defaults = (Isochrone.defaults) + (
