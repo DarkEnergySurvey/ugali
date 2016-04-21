@@ -37,6 +37,22 @@ def which(program):
 
     return None
 
+def get_ugali_dir():
+    """Get the path to the ugali data directory from the environment"""
+
+    ugalidir = os.getenv('UGALIDIR')
+
+    # Get the HOME directory
+    if not ugalidir:
+        ugalidir=os.path.join(os.getenv('HOME'),'.ugali')
+
+    if not os.path.exists(ugalidir):
+        from ugali.utils.logger import logger
+        msg = "Creating UGALIDIR:\n%s"%ugalidir
+        logger.debug(msg)
+
+    return mkdir(ugalidir)
+
 if __name__ == "__main__":
     from optparse import OptionParser
     usage = "Usage: %prog  [options] input"
