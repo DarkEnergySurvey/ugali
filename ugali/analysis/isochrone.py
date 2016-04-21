@@ -342,6 +342,7 @@ class Isochrone(Model):
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
+        # ADW: is this the predicted number or the observed number?
         n = int(stellar_mass/self.stellar_mass()) 
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(**kwargs)
         
