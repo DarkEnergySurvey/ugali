@@ -160,6 +160,9 @@ class EllipticalKernel(Kernel):
     def edge(self):
         return 5.*self.extension
 
+    def angsep(self,lon,lat):
+        return angsep(self.lon,self.lat,lon,lat)
+        
     def radius(self,lon,lat):
         x,y = self.projector.sphereToImage(lon,lat)
         costh = np.cos(np.radians(self.theta))
