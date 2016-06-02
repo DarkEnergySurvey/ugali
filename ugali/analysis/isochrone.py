@@ -46,6 +46,7 @@ import ugali.analysis.imf
 from ugali.analysis.model import Model, Parameter
 from ugali.utils.stats import norm_cdf
 from ugali.utils.shell import get_ugali_dir
+from ugali.utils.projector import mod2dist
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
@@ -115,6 +116,10 @@ class Isochrone(Model):
         # For use with Bressan et al. (2012) and later
         metallicity_solar = 0.0152 
         return np.log10(self.metallicity / metallicity_solar)
+
+    @property
+    def distance(self):
+        return mod2dist(self.distance_modulus)
 
     def sample(self, mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False):
         """
