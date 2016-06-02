@@ -45,6 +45,9 @@ class Catalog:
     def __add__(self, other):
         return mergeCatalogs([self,other])
 
+    def __len__(self):
+        return len(self.objid)
+
     def applyCut(self, cut):
         """
         Return a new catalog which is a subset of objects selected using the input cut array.
@@ -196,6 +199,20 @@ class Catalog:
 
         logger.info('Catalog contains %i objects'%(len(self.data)))
 
+    # This assumes Galactic coordinates
+    @property
+    def ra_dec(self): return gal2cel(self.lon,self.lat)
+    @property
+    def ra(self): return self.ra_dec[0]
+    @property
+    def dec(self): return self.ra_dec[1]
+
+    @property
+    def glon_glat(self): return self.lon,self.lat
+    @property
+    def glon(self): return self.lon
+    @property
+    def glat(self): return self.lat
 
 ############################################################
 

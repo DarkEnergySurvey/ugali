@@ -63,10 +63,10 @@ def run(self):
         for candidate in candidates:
             logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
             params = (self.opts.config,outdir,candidate['name'],candidate['ra'],
-                      candidate['dec'],candidate['modulus'])
-            cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f -m %.2f'
+                      candidate['dec'],0.5,candidate['modulus'])
+            cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f --radius %s -m %.2f'
             cmd = cmd%params
-
+            print cmd
             jobname = candidate['name'].lower().replace(' ','_')
             logfile = os.path.join(logdir,jobname+'.log')
             self.batch.submit(cmd,jobname,logfile)

@@ -33,9 +33,9 @@ from ugali.analysis.loglike import createSource, createLoglike
 from ugali.analysis.prior import UniformPrior, InversePrior
 
 from ugali.utils.logger import logger
-from ugali.utils.projector import mod2dist, gal2cel,gal2cel_angle
+from ugali.utils.projector import dist2mod,mod2dist,gal2cel,gal2cel_angle
 
-# Write some class to store priors
+# Write a class to store priors
 
 class MCMC(object):
     """
@@ -275,6 +275,7 @@ class MCMC(object):
         size_err = [size-size_sigma[0],size+size_sigma[1]]
         results['physical_size'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
 
+        # Richness
         rich,rich_err = estimate['richness']
 
         # Number of observed stars (sum of p-values)
@@ -313,6 +314,18 @@ class MCMC(object):
         else:
             logger.warning("Skipping Martin magnitude")
             results['Mv_martin'] = np.nan
+
+
+        # Surface Brightness
+        def surfaceBrightness(abs_mag, r_physical, distance):
+            r_angle = np.degrees(np.arctan(r_physical / distance))
+            # corrected to use radius
+            c_v = 19.06 # mag/arcsec^2
+            #c_v = 10.17 # mag/arcmin^2
+            #c_v = 1.28  # mag/deg^2
+            return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
+        mu = surfaceBrightness(Mv, size, dist)
+        results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
 
         try: 
             results['constellation'] = ugali.utils.projector.ang2const(lon,lat)[1]
@@ -386,7 +399,11 @@ class Samples(np.recarray):
 
     @property
     def ndarray(self):
-        return self.view((float,len(self.dtype)))
+        # atleast_2d is for 
+        if len(self.dtype) == 1:
+            return np.expand_dims(self.view((float,len(self.dtype))),1)
+        else:
+            return self.view((float,len(self.dtype)))
 
     # ADW: Depricated for Samples.get
     #def data(self, name, burn=None, clip=None):

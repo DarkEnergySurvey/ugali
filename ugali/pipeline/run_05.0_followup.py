@@ -108,9 +108,8 @@ def do_plot(args):
     plt.savefig(outfile,bbox_inches='tight',dpi=60)
     plt.close()
 
-    if exists(memfile):
-        data = pyfits.open(memfile)[1].data
-
+    data = pyfits.open(memfile)[1].data if exists(memfile) else None
+    if data is not None:
         plt.figure()
         kernel,isochrone = source.kernel,source.isochrone
         ugali.utils.plotting.plotMembership(config,data,kernel,isochrone)
@@ -119,6 +118,18 @@ def do_plot(args):
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
         plt.close()
 
+    plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
+    plotter.plot6(data)
+    outfile = samfile.replace('.npy','_6panel.png')
+    logger.info("  Writing %s..."%outfile)
+    plt.savefig(outfile,bbox_inches='tight',dpi=60)
+    plt.close()
+
+    plotter.plot4()
+    outfile = samfile.replace('.npy','_4panel.png')
+    logger.info("  Writing %s..."%outfile)
+    plt.savefig(outfile,bbox_inches='tight',dpi=60)
+    plt.close()
     
 def run(self):
     if self.opts.coords is not None:

@@ -58,6 +58,13 @@ if __name__.endswith('isochrone2'):
     warnings.warn(msg,DeprecationWarning)
     warnings.simplefilter('default', DeprecationWarning)
 
+def get_iso_dir():
+    isodir = os.path.join(get_ugali_dir(),'isochrones')
+    if not os.path.exists(isodir):
+        msg = "Isochrone directory not found:\n%s"%isodir
+        logger.warning(msg)
+    return isodir
+
 class Isochrone(Model):
     _params = odict([
         ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
@@ -907,7 +914,7 @@ class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
     #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
-    _dirname =  os.path.join(get_ugali_dir(),'padova')
+    _dirname =  os.path.join(get_iso_dir(),'padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1044,7 +1051,7 @@ class Bressan2012(PadovaIsochrone): pass
 
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
-    _dirname =  os.path.join(get_ugali_dir(),'girardi2002')
+    _dirname =  os.path.join(get_iso_dir(),'girardi2002')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1106,7 +1113,7 @@ class Girardi2002(PadovaIsochrone):
 
 class Girardi2010(Girardi2002):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
-    _dirname =  os.path.join(get_ugali_dir(),'girardi2010')
+    _dirname =  os.path.join(get_iso_dir(),'girardi2010')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1132,7 +1139,7 @@ class OldPadovaIsochrone(Girardi2002):
     _prefix = 'isot'
     _basename = '%(prefix)sa%(age)iz%(z)g.dat'
     #_dirname = '/u/ki/kadrlica/des/isochrones/v0/' # won't work for SDSS...
-    _dirname =  os.path.join(get_ugali_dir(),'old_padova')
+    _dirname =  os.path.join(get_iso_dir(),'old_padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1196,7 +1203,7 @@ class DotterIsochrone(PadovaIsochrone):
     """
 
     #_dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
-    _dirname =  os.path.join(get_ugali_dir(),'dotter')
+    _dirname =  os.path.join(get_iso_dir(),'dotter')
 
     # KCB: What to do about horizontal branch
     defaults = (Isochrone.defaults) + (
