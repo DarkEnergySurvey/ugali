@@ -4,7 +4,11 @@
 
 ### Python
 *.pyc
+build/
+dist/
+ugali.egg-info/
 
 ### ugali files
 ugali/version.py
 ugali/data/*/
+

@@ -19,9 +19,14 @@ from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
 #from ugali.analysis.model import Model,Parameter
 #import ugali.analysis.source
+#from ugali.observation.observation import Observation
+
 from ugali.utils.config import Config
 from ugali.analysis.source import Source
-from ugali.observation.observation import Observation
+
+class Observation(object):
+    def __init__(self,**kwargs):
+        self.__dict__.update(**kwargs)
 
 class LogLikelihood(object):
     """

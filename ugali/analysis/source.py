@@ -154,6 +154,7 @@ class Source(object):
             ret[name] = model.todict()
         return ret
         
+    # ADW: Should be class methods
     @staticmethod
     def createRichness(**kwargs):
         for k,v in copy.deepcopy(Source._defaults['richness']).items():

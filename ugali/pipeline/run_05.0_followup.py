@@ -93,7 +93,7 @@ def do_plot(args):
         logger.warning("Couldn't find %s; skipping..."%srcfile)
         return
     if not exists(samfile):
-        logger.warning("Couldn't find %s; skipping..."%samples)
+        logger.warning("Couldn't find %s; skipping..."%samfile)
         return
 
     config = ugali.utils.config.Config(config)
@@ -108,16 +108,28 @@ def do_plot(args):
     plt.savefig(outfile,bbox_inches='tight',dpi=60)
     plt.close()
 
-    data = pyfits.open(memfile)[1].data
+    data = pyfits.open(memfile)[1].data if exists(memfile) else None
+    if data is not None:
+        plt.figure()
+        kernel,isochrone = source.kernel,source.isochrone
+        ugali.utils.plotting.plotMembership(config,data,kernel,isochrone)
+        outfile = samfile.replace('.npy','_mem.png')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+        plt.close()
 
-    plt.figure()
-    kernel,isochrone = source.kernel,source.isochrone
-    ugali.utils.plotting.plotMembership(config,data,kernel,isochrone)
-    outfile = samfile.replace('.npy','_mem.png')
+    plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
+    plotter.plot6(data)
+    outfile = samfile.replace('.npy','_6panel.png')
     logger.info("  Writing %s..."%outfile)
     plt.savefig(outfile,bbox_inches='tight',dpi=60)
     plt.close()
 
+    plotter.plot4()
+    outfile = samfile.replace('.npy','_4panel.png')
+    logger.info("  Writing %s..."%outfile)
+    plt.savefig(outfile,bbox_inches='tight',dpi=60)
+    plt.close()
     
 def run(self):
     if self.opts.coords is not None:
@@ -170,8 +182,9 @@ def run(self):
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
-        pool = Pool(maxtasksperchild=1)
-        pool.map(do_plot,args)
+        #pool = Pool(maxtasksperchild=1)
+        #pool.map(do_plot,args)
+        map(do_plot,args)
 
     if 'collect' in self.opts.run:
         logger.info("Running 'collect'...")

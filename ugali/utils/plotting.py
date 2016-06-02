@@ -16,8 +16,10 @@ import pylab
 import pylab as plt
 import healpy
 import pyfits
+import scipy.ndimage as nd
+import scipy.misc
 
-from mpl_toolkits.axes_grid1 import AxesGrid    
+from mpl_toolkits.axes_grid1 import AxesGrid,Grid,ImageGrid, make_axes_locatable
 from matplotlib.ticker import MaxNLocator
 import mpl_toolkits.axes_grid1.axes_divider as axes_divider
 
@@ -34,7 +36,24 @@ from ugali.utils.projector import mod2dist,gal2cel,cel2gal
 from ugali.utils.projector import sphere2image,image2sphere
 
 from ugali.utils.logger import logger
-#pylab.ion()
+
+params = {
+    #'backend': 'eps',
+    'axes.labelsize': 12,
+    #'text.fontsize': 12,           
+    'xtick.labelsize': 10,
+    'ytick.labelsize': 10,
+    'xtick.major.size': 3,      # major tick size in points
+    'xtick.minor.size': 1.5,    # minor tick size in points
+    'xtick.major.size': 3,      # major tick size in points
+    'xtick.minor.size': 1.5,    # minor tick size in points
+    #'text.usetex': True,
+    ##'figure.figsize': fig_size,
+    #'font.family':'serif',
+    #'font.serif':'Computer Modern Roman',
+    #'font.size': 10
+    }
+matplotlib.rcParams.update(params)
 
 ############################################################
 
@@ -127,7 +146,6 @@ def projScatter(lon, lat, **kwargs):
 
 ############################################################
 
-
 def sparseHealpixFiles(title, infiles, field='MAGLIM',**kwargs):
                        
     """
@@ -139,8 +157,60 @@ def sparseHealpixFiles(title, infiles, field='MAGLIM',**kwargs):
     
 ############################################################
 
-def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GMPL'):
+def drawHealpixMap(map, lon, lat, size=1.0, xsize=501, coord='GC', **kwargs):
     """
+    Draw local projection of healpix map.
+    """
+    ax = plt.gca()
+    x = np.linspace(-size,size,xsize)
+    y = np.linspace(-size,size,xsize)
+    xx, yy = np.meshgrid(x,y)
+    
+    coord = coord.upper()
+        
+    if coord == 'GC':
+        #Assumes map and (lon,lat) are Galactic, but plotting celestial
+        llon, llat = image2sphere(*gal2cel(lon,lat),x=xx.flat,y=yy.flat)
+        pix = ang2pix(healpy.get_nside(map),*cel2gal(llon,llat))
+    elif coord == 'CG':
+        #Assumes map and (lon,lat) are celestial, but plotting Galactic
+        llon, llat = image2sphere(*cel2gal(lon,lat),x=xx.flat,y=yy.flat)
+        pix = ang2pix(healpy.get_nside(map),*gal2cel(llon,llat))
+    else:
+        #Assumes plotting the native coordinates
+        llon, llat = image2sphere(lon,lat,xx.flat,yy.flat)
+        pix = ang2pix(healpy.get_nside(map),llon,llat)
+
+    values = map[pix].reshape(xx.shape)
+    zz = np.ma.array(values,mask=(values==healpy.UNSEEN),fill_value=np.nan)
+
+    return drawProjImage(xx,yy,zz,coord=coord,**kwargs)
+
+def drawProjImage(xx, yy, zz=None, coord='C',**kwargs): 
+    ax = plt.gca()
+    coord = coord.upper()
+    if coord[-1] == 'G':
+        ax.set_xlabel(r'$\Delta \ell\,(\deg)}$')
+        ax.set_ylabel(r'$\Delta b\,(\deg)$')
+    elif coord[-1] == 'C':
+        ax.set_xlabel(r'$\Delta \alpha_{2000}\,(\deg)$')
+        ax.set_ylabel(r'$\Delta \delta_{2000}\,(\deg)$')
+    else:
+        msg = "Unrecognized coordinate: %"%coord
+        logger.warning(msg)
+    # Celestial orientation (increasing to the east)
+    ax.set_xlim(xx.max(),xx.min())
+    ax.set_ylim(yy.min(),yy.max())
+
+    if zz is None: return None
+    return ax.pcolormesh(xx,yy,zz,**kwargs)
+    
+
+############################################################
+
+def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GML',**kwargs):
+    """
+    Download Sloan Digital Sky Survey images
     http://skyserver.sdss3.org/dr9/en/tools/chart/chart.asp
 
     radius (degrees)
@@ -164,6 +234,33 @@ def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GMPL'):
     tmp.close()
     return im
 
+
+def getDSSImage(ra,dec,radius=1.0,xsize=800,**kwargs):
+    """
+    Download Digitized Sky Survey images
+
+    https://archive.stsci.edu/cgi-bin/dss_form    
+    https://archive.stsci.edu/cgi-bin/dss_search
+
+    Image is in celestial orientation (RA increases to the right)
+    """
+    import subprocess
+    import tempfile
+
+    url="https://archive.stsci.edu/cgi-bin/dss_search?"
+    scale = 2.0 * radius * 60.
+    params=dict(r='%.3f'%ra,d='%.3f'%dec,w=scale,h=scale,
+                f='gif',v='poss2ukstu_red')
+    query='&'.join("%s=%s"%(k,v) for k,v in params.items())
+    
+    tmp = tempfile.NamedTemporaryFile(suffix='.gif')
+    cmd='wget -O %s "%s"'%(tmp.name,url+query)
+    subprocess.call(cmd,shell=True)
+    im = pylab.imread(tmp.name)
+    tmp.close()
+    if xsize: im = scipy.misc.imresize(im,size=(xsize,xsize))
+    return im
+
 ############################################################
 
 class BasePlotter(object):
@@ -174,27 +271,78 @@ class BasePlotter(object):
         self.roi = ugali.observation.roi.ROI(self.config,self.glon,self.glat)
         self.nside = self.config.params['coords']['nside_pixel']
         self.radius = radius
+        self.coord = 'GC'
         xsize=800
         reso = 60. * 2. * radius / xsize
-        self.image_kwargs = dict(ra=self.ra,dec=self.dec,radius=self.radius,xsize=xsize,opt='GML')
-        self.gnom_kwargs = dict(rot=[self.ra,self.dec],reso=reso,xsize=xsize,coord='GC',return_projected_map=True)
+        self.image_kwargs = dict(ra=self.ra,dec=self.dec,radius=self.radius)
+        self.gnom_kwargs = dict(rot=[self.ra,self.dec],reso=reso,xsize=xsize,coord=self.coord,
+                                return_projected_map=True,hold=True)
         self.label_kwargs = dict(xy=(0.05,0.05),xycoords='axes fraction', xytext=(0, 0), 
                                  textcoords='offset points',ha='left', va='bottom',size=10,
                                  bbox={'boxstyle':"round",'fc':'1'}, zorder=10)
         
     def _create_catalog(self):
         if hasattr(self,'catalog'): return
-        catalog = ugali.observation.catalog.Catalog(self.config,roi=self.roi)
+        self.catalog = self.get_stars()
+
+    def get_objects(self,select=None):
+        config = copy.deepcopy(self.config)
+        config['catalog']['selection'] = select
+        catalog = ugali.observation.catalog.Catalog(config,roi=self.roi)
         sep = ugali.utils.projector.angsep(self.glon, self.glat, catalog.lon, catalog.lat)
         radius = self.radius*np.sqrt(2)
         cut = (sep < radius)
-        self.catalog = catalog.applyCut(cut)
+        return catalog.applyCut(cut)
 
-    def drawROI(self, ax, value=None, pixel=None):
-        roi_map = numpy.array(healpy.UNSEEN * np.ones(healpy.nside2npix(self.nside)))
+    def get_stars(self,select=None):
+        if hasattr(self,'stars'): return self.stars
+        if select is None: select = self.config['catalog']['selection']
+        self.stars = self.get_objects(select)
+        return self.stars
+        
+    def get_galaxies(self,select=None):
+        if hasattr(self,'galaxies'): return self.galaxies
+        if select is not None:
+            self.galaxies = self.get_objects(select)
+        else:
+            catalog = self.get_objects()
+            stars = self.get_stars()
+            cut = ~np.in1d(catalog.objid,stars.objid)
+            self.galaxies = catalog.applyCut(cut)
+        return self.galaxies
+
+    def drawSmoothCatalog(self, catalog, label=None):
+        ax = plt.gca()
+        ra,dec = catalog.ra_dec
+        x, y = sphere2image(self.ra,self.dec,ra,dec)
+
+        delta_x = self.radius/100.
+        smoothing = 2*delta_x
+        bins = numpy.arange(-self.radius, self.radius + 1.e-10, delta_x)
+        h, xbins, ybins = numpy.histogram2d(x, y, bins=[bins, bins])
+        blur = nd.filters.gaussian_filter(h.T, smoothing / delta_x)
+        kwargs = dict(extent=[min(xbins), max(xbins), min(ybins), max(ybins)],
+                      cmap='gray_r', aspect='auto', origin='lower', rasterized=False,
+                      interpolation='none')
+        #ax.imshow(blur, **kwargs)
+        #ax.set_xlim(self.radius, -self.radius)
+        #ax.set_ylim(-self.radius, self.radius)
+        #plt.xlabel(r'$\Delta \alpha_{2000}\,(\deg)$')
+        #plt.ylabel(r'$\Delta \delta_{2000}\,(\deg)$')
+
+        xx,yy = np.meshgrid(xbins,ybins)
+        drawProjImage(xx,yy,blur,coord='C',cmap='gray_r')
+
+        if label:
+            plt.text(0.05, 0.95, label, fontsize=10, ha='left', va='top', 
+                     color='k', transform=pylab.gca().transAxes,
+                     bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
+
+    def drawROI(self, ax=None, value=None, pixel=None):
+        if not ax: ax = plt.gca()
+        roi_map = np.array(healpy.UNSEEN * np.ones(healpy.nside2npix(self.nside)))
         
         if value is None:
-            #roi_map[self.pixels] = ugali.utils.projector.angsep(self.lon, self.lat, self.centers_lon, self.centers_lat)
             roi_map[self.roi.pixels] = 1
             roi_map[self.roi.pixels_annulus] = 0
             roi_map[self.roi.pixels_target] = 2
@@ -204,25 +352,43 @@ class BasePlotter(object):
             roi_map[pixel] = value
         else:
             print 'ERROR: count not parse input'
-        im = healpy.gnomview(roi_map,**self.gnom_kwargs)
+        #im = healpy.gnomview(roi_map,**self.gnom_kwargs)
+        im = drawHealpixMap(roi_map,self.glon,self.glat,self.radius,coord=self.coord)
+        return im
 
-    def drawImage(self,ax,invert=True):
+    def drawImage(self,ax=None,invert=True):
+        if not ax: ax = plt.gca()
+
+        #kwargs = dict(cmap='gray',interpolation='none')
+        kwargs = dict(cmap='gray',coord='C')
         if self.config['data']['survey']=='sdss':
             # Optical Image
             im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
             # Flipping JPEG:
             # https://github.com/matplotlib/matplotlib/issues/101
-            if invert: im =ax.imshow(im[::-1])
-            else:      im =ax.imshow(im)
-            try:
-                ax.cax.axis["right"].toggle(ticks=False, ticklabels=False)
-                ax.cax.axis["top"].toggle(ticks=False, ticklabels=False)
-            except AttributeError: 
-                pass
-        ax.annotate("Image",**self.label_kwargs)
-        return ax
+            im = im[::-1]
+            ax.annotate("SDSS Image",**self.label_kwargs)
+        else: 
+            im = ugali.utils.plotting.getDSSImage(**self.image_kwargs)
+            im = im[::-1,::-1]
+            ax.annotate("DSS Image",**self.label_kwargs)
 
-    def drawStellarDensity(self,ax):
+        size=self.image_kwargs.get('radius',1.0)
+
+        # Celestial coordinates
+        x = np.linspace(-size,size,im.shape[0])
+        y = np.linspace(-size,size,im.shape[1])
+        xx, yy = np.meshgrid(x,y)
+
+        im = drawProjImage(xx,yy,im,**kwargs)
+        
+        try: plt.gcf().delaxes(ax.cax)
+        except AttributeError: pass
+            
+        return im
+
+    def drawStellarDensity(self,ax=None):
+        if not ax: ax = plt.gca()
         # Stellar Catalog
         self._create_catalog()
         catalog = self.catalog
@@ -234,15 +400,19 @@ class BasePlotter(object):
         star_map[pixels] = number
         star_map = numpy.where(star_map == 0, healpy.UNSEEN, star_map)
     
-        im = healpy.gnomview(star_map,**self.gnom_kwargs)
-        healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        pylab.close()
-        im = ax.imshow(im,origin='bottom')
-        try: ax.cax.colorbar(im)
-        except: pylab.colorbar(im)
-        ax.annotate("Stars",**self.label_kwargs)
+        #im = healpy.gnomview(star_map,**self.gnom_kwargs)
+        #healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
+        #pylab.close()
 
-    def drawMask(self,ax, mask=None):
+        im = drawHealpixMap(star_map,self.glon,self.glat,self.radius,coord=self.coord)
+        #im = ax.imshow(im,origin='bottom')
+        try:    ax.cax.colorbar(im)
+        except: pylab.colorbar(im,ax=ax)
+        ax.annotate("Stars",**self.label_kwargs)
+        return im
+
+    def drawMask(self,ax=None, mask=None):
+        if not ax: ax = plt.gca()
         # MAGLIM Mask
         if mask is None:
             filenames = self.config.getFilenames()
@@ -253,15 +423,20 @@ class BasePlotter(object):
             mask_map[mask.roi.pixels] = mask.mask_1.mask_roi_sparse
         mask_map = numpy.where(mask_map == healpy.UNSEEN, 0, mask_map)
          
-        im = healpy.gnomview(mask_map,**self.gnom_kwargs)
-        healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        pylab.close()
-        im = ax.imshow(im,origin='bottom')
+        #im = healpy.gnomview(mask_map,**self.gnom_kwargs)
+        #healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
+        #pylab.close()
+        #im = ax.imshow(im,origin='bottom')
+
+        im = drawHealpixMap(mask_map,self.glon,self.glat,self.radius,coord=self.coord)
+
         try: ax.cax.colorbar(im)
         except: pylab.colorbar(im)
         ax.annotate("Mask",**self.label_kwargs)
+        return im
 
-    def drawTS(self,ax, filename=None, zidx=0):
+    def drawTS(self,ax=None, filename=None, zidx=0):
+        if not ax: ax = plt.gca()
         if not filename:
             #dirname = self.config.params['output2']['searchdir']
             #basename = self.config.params['output2']['mergefile']
@@ -279,21 +454,27 @@ class BasePlotter(object):
 
         ts_map[pixels] = values[:,zidx]
 
-        im = healpy.gnomview(ts_map,**self.gnom_kwargs)
-        healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        pylab.close()
-        im = ax.imshow(im,origin='bottom')
+        #im = healpy.gnomview(ts_map,**self.gnom_kwargs)
+        #healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
+        #pylab.close()
+        #im = ax.imshow(im,origin='bottom')
+
+        im = drawHealpixMap(ts_map,self.glon,self.glat,self.radius,coord=self.coord)
+
         try: ax.cax.colorbar(im)
         except: pylab.colorbar(im)
         ax.annotate("TS",**self.label_kwargs)
+        return im
 
-    def drawCatalog(self, ax):
+    def drawCatalog(self, ax=None):
+        if not ax: ax = plt.gca()
         # Stellar Catalog
         self._create_catalog()
         healpy.projscatter(self.catalog.lon,self.catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
         ax.annotate("Stars",**self.label_kwargs)
 
-    def drawSpatial(self, ax):
+    def drawSpatial(self, ax=None):
+        if not ax: ax = plt.gca()
         # Stellar Catalog
         self._create_catalog()
         cut = (self.catalog.color > 0) & (self.catalog.color < 1)
@@ -305,7 +486,8 @@ class BasePlotter(object):
         ax.set_ylabel('GLAT (deg)')
         #ax.annotate("Stars",**self.label_kwargs)
 
-    def drawCMD(self, ax, radius=None, zidx=None):
+    def drawCMD(self, ax=None, radius=None, zidx=None):
+        if not ax: ax = plt.gca()
         import ugali.analysis.isochrone
 
         if zidx is not None:
@@ -348,7 +530,8 @@ class BasePlotter(object):
         ax.annotate("Stars",**self.label_kwargs)
 
 
-    def drawMembership(self, ax, radius=None, zidx=0, mc_source_id=1):
+    def drawMembership(self, ax=None, radius=None, zidx=0, mc_source_id=1):
+        if not ax: ax = plt.gca()
         import ugali.analysis.scan
 
         #dirname = self.config.params['output2']['searchdir']
@@ -458,18 +641,32 @@ class BasePlotter(object):
 
 
     def plot4(self):
-        fig = pylab.figure()
+        fig = pylab.figure(figsize=(8,8))
         axes = AxesGrid(fig, 111,nrows_ncols = (2, 2),axes_pad=0.25,
                         cbar_mode='each',cbar_pad=0,cbar_size='5%',
-                        share_all=True)
-        for ax in axes:
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+                        share_all=True,aspect=True,
+                        label_mode='L')
 
-        self.drawImage(axes[0])
-        self.drawStellarDensity(axes[1])
-        self.drawMask(axes[2])
-        self.drawTS(axes[3])
+        #fig,axes = plt.subplots(2,2)
+        #axes = axes.flatten()
+
+        #for ax in axes:
+        #    ax.get_xaxis().set_visible(False)
+        #    ax.get_yaxis().set_visible(False)
+
+        #plt.sca(axes[0]); self.drawImage(axes[0])
+        #plt.sca(axes[1]); self.drawStellarDensity(axes[1])
+        #plt.sca(axes[2]); self.drawMask(axes[2])
+        #plt.sca(axes[3]); self.drawTS(axes[3])
+
+        plt.sca(axes[0]); self.drawImage()
+        plt.sca(axes[1]); self.drawStellarDensity()
+        plt.sca(axes[2]); self.drawMask()
+        plt.sca(axes[3]); self.drawTS()
+
+        axes[0].set_xlim(self.radius,-self.radius)
+        axes[0].set_ylim(-self.radius,self.radius)
+
         return fig,axes
 
     plot = plot3
@@ -502,18 +699,260 @@ class ObjectPlotter(BasePlotter):
             msg = "Failed to parse distance index"
             raise Exception(msg)
 
-    def drawTS(self,ax, filename=None, zidx=None):
+    def drawTS(self, filename=None, zidx=None):
+        ax = plt.gca()
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawTS(ax,filename,zidx)
 
-    def drawCMD(self,ax, radius=None, zidx=None):
+    def drawCMD(self, radius=None, zidx=None):
+        ax = plt.gca()
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawCMD(ax,radius,zidx)
 
-    def drawMembership(self, ax, radius=None, zidx=None, mc_source_id=1):
+    def drawMembership(self, radius=None, zidx=None, mc_source_id=1):
+        ax = plt.gca()
         if zidx is None: zidx = self.zidx
         super(ObjectPlotter,self).drawMembership(ax,radius,zidx,mc_source_id)
 
+
+class SourcePlotter(BasePlotter):
+    """ For plotting 'Objects' identified through candidate search. """
+
+    def __init__(self,source,config,radius=1.0):
+        glon,glat = source.lon,source.lat
+        super(SourcePlotter,self).__init__(glon,glat,config,radius)
+        #self.select = self.config['catalog'].pop('selection')
+
+        self.source = source
+        self.isochrone = self.source.isochrone
+        self.kernel = self.source.kernel
+        self.set_zidx()
+
+    def isochrone_selection(self,catalog,dist=0.1):
+        # Cookie cutter
+        #sep = self.source.isochrone.separation(catalog.mag_1,catalog.mag_2)
+        #err = np.sqrt(dist**2 + catalog.mag_err_1**2 + catalog.mag_err_2**2)
+        #sel = (sep < err)
+        #return sel
+
+        return cutIsochronePath(catalog.mag_1, catalog.mag_2, 
+                                catalog.mag_err_1, catalog.mag_err_2, 
+                                self.isochrone, radius=dist)
+        
+    def set_zidx(self):
+        mod = np.array(self.config['scan']['distance_modulus_array'])
+        dist_mod = self.isochrone.distance_modulus
+        self.zidx = np.abs(mod - dist_mod).argmin()
+
+    def drawSmoothStars(self):
+        stars = self.get_stars()
+        sel = self.isochrone_selection(stars,dist=0.1)
+        self.drawSmoothCatalog(stars.applyCut(sel),'Filtered Stars')
+
+    def drawSmoothGalaxies(self):
+        galaxies = self.get_galaxies()
+        sel = self.isochrone_selection(galaxies,dist=0.1)
+        self.drawSmoothCatalog(galaxies.applyCut(sel), 'Filtered Galaxies')
+
+    def drawHessDiagram(self,catalog=None):
+        ax = plt.gca()
+        if not catalog: catalog = self.get_stars()
+
+        r_peak = self.kernel.extension
+        angsep = ugali.utils.projector.angsep(self.ra, self.dec, catalog.ra, catalog.dec)
+        cut_inner = (angsep < r_peak)
+        cut_annulus = (angsep > 0.5) & (angsep < 1.) # deg
+
+        mmin, mmax = 16., 24.
+        cmin, cmax = -0.5, 1.0
+        mbins = np.linspace(mmin, mmax, 150)
+        cbins = np.linspace(cmin, cmax, 150)
+
+        color = catalog.color[cut_annulus]
+        mag = catalog.mag[cut_annulus]
+
+        h, xbins, ybins = numpy.histogram2d(color, mag, bins=[cbins,mbins])
+        blur = nd.filters.gaussian_filter(h.T, 2)
+        kwargs = dict(extent=[np.min(xbins), np.max(xbins), np.min(ybins), np.max(ybins)],
+                      cmap='gray_r', aspect='auto', origin='lower', rasterized=False,
+                      interpolation='none')
+        ax.imshow(blur, **kwargs)
+
+        pylab.scatter(catalog.color[cut_inner], catalog.mag[cut_inner], 
+                      c='red', s=7, edgecolor='none')# label=r'$r < %.2f$ deg'%(r_peak))
+        ugali.utils.plotting.drawIsochrone(self.isochrone, lw=1, c='blue', zorder=10, marker=None)
+        ax.set_xlim(-0.5, 1.)
+        ax.set_ylim(24., 16.)
+        plt.xlabel(r'$g - r$')
+        plt.ylabel(r'$g$')
+        plt.xticks([-0.5, 0., 0.5, 1.])
+        plt.yticks(numpy.arange(mmax - 1., mmin - 1., -1.))
+
+        radius_string = (r'${\rm r}<%.1f$ arcmin'%( 60 * r_peak))
+        pylab.text(0.05, 0.95, radius_string, 
+                   fontsize=10, ha='left', va='top', color='red', 
+                   transform=pylab.gca().transAxes,
+                   bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
+
+
+    def drawMembersSpatial(self,data):
+        ax = plt.gca()
+        if isinstance(data,basestring):
+            filename = data
+            data = pyfits.open(filename)[1].data
+
+        xmin, xmax = -0.25,0.25
+        ymin, ymax = -0.25,0.25
+        xx,yy = np.meshgrid(np.linspace(xmin,xmax),np.linspace(ymin,ymax))
+
+        x_prob, y_prob = sphere2image(self.ra, self.dec, data['RA'], data['DEC'])
+
+        sel = (x_prob > xmin)&(x_prob < xmax) & (y_prob > ymin)&(y_prob < ymax)
+        sel_prob = data['PROB'][sel] > 5.e-2
+        index_sort = numpy.argsort(data['PROB'][sel][sel_prob])
+
+        plt.scatter(x_prob[sel][~sel_prob], y_prob[sel][~sel_prob], 
+                      marker='o', s=2, c='0.75', edgecolor='none')
+        sc = plt.scatter(x_prob[sel][sel_prob][index_sort], 
+                         y_prob[sel][sel_prob][index_sort], 
+                         c=data['PROB'][sel][sel_prob][index_sort], 
+                         marker='o', s=10, edgecolor='none', cmap='jet', vmin=0., vmax=1.) # Spectral_r
+
+        drawProjImage(xx,yy,None,coord='C')
+
+        #ax.set_xlim(xmax, xmin)
+        #ax.set_ylim(ymin, ymax)
+        #plt.xlabel(r'$\Delta \alpha_{2000}\,(\deg)$')
+        #plt.ylabel(r'$\Delta \delta_{2000}\,(\deg)$')
+        plt.xticks([-0.2, 0., 0.2])
+        plt.yticks([-0.2, 0., 0.2])
+
+        divider = make_axes_locatable(ax)
+        ax_cb = divider.new_horizontal(size="7%", pad=0.1)
+        plt.gcf().add_axes(ax_cb)
+        pylab.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
+        ax_cb.yaxis.tick_right()
+
+    def drawMembersCMD(self,data):
+        ax = plt.gca()
+        if isinstance(data,basestring):
+            filename = data
+            data = pyfits.open(filename)[1].data
+
+        xmin, xmax = -0.25,0.25
+        ymin, ymax = -0.25,0.25
+        mmin, mmax = 16., 24.
+        cmin, cmax = -0.5, 1.0
+        mbins = np.linspace(mmin, mmax, 150)
+        cbins = np.linspace(cmin, cmax, 150)
+
+        mag_1 = data[self.config['catalog']['mag_1_field']]
+        mag_2 = data[self.config['catalog']['mag_2_field']]
+
+        x_prob, y_prob = sphere2image(self.ra, self.dec, data['RA'], data['DEC'])
+
+        sel = (x_prob > xmin)&(x_prob < xmax) & (y_prob > ymin)&(y_prob < ymax)
+        sel_prob = data['PROB'][sel] > 5.e-2
+        index_sort = numpy.argsort(data['PROB'][sel][sel_prob])
+
+        plt.scatter(data['COLOR'][sel][~sel_prob], mag_1[sel][~sel_prob],
+              marker='o',s=2,c='0.75',edgecolor='none')
+        sc = pylab.scatter(data['COLOR'][sel][sel_prob][index_sort], mag_1[sel][sel_prob][index_sort], 
+                   c=data['PROB'][sel][sel_prob][index_sort], 
+                   marker='o', s=10, edgecolor='none', cmap='jet', vmin=0., vmax=1) 
+        pylab.xlim(cmin, cmax)
+        pylab.ylim(mmax, mmin)
+        pylab.xlabel(r'$g - r$')
+        pylab.ylabel(r'$g$')
+        #axes[1].yaxis.set_major_locator(MaxNLocator(prune='lower'))
+        pylab.xticks([-0.5, 0., 0.5, 1.])
+        pylab.yticks(numpy.arange(mmax - 1., mmin - 1., -1.))
+
+        ugali.utils.plotting.drawIsochrone(self.isochrone, lw=1, c='k', zorder=10, marker=None)
+
+        pylab.text(0.05, 0.95, r'$\Sigma p_{i} = %i$'%(data['PROB'].sum()),
+                   fontsize=10, horizontalalignment='left', verticalalignment='top', color='k', transform=pylab.gca().transAxes,
+                   bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
+
+        divider = make_axes_locatable(pylab.gca())
+        ax_cb = divider.new_horizontal(size="7%", pad=0.1)
+        plt.gcf().add_axes(ax_cb)
+        pylab.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
+        ax_cb.yaxis.tick_right()
+
+    def drawDensityProfile(self, catalog=None):
+
+        rmax = 24. # arcmin
+        bins = numpy.arange(0, rmax + 1.e-10, 2.)
+        centers = 0.5 * (bins[1:] + bins[0:-1])
+        area = numpy.pi * (bins[1:]**2 - bins[0:-1]**2)
+
+        r_peak = self.kernel.extension 
+
+        stars = self.get_stars()
+        angsep = ugali.utils.projector.angsep(self.ra, self.dec, 
+                                              stars.ra, stars.dec)
+
+        angsep_arcmin = angsep * 60 # arcmin
+        cut_iso = self.isochrone_selection(stars)
+        h = numpy.histogram(angsep_arcmin[(angsep_arcmin < rmax) & cut_iso], bins=bins)[0]
+        h_out = numpy.histogram(angsep_arcmin[(angsep_arcmin < rmax) & (~cut_iso)], bins=bins)[0]
+
+        gals = self.get_galaxies()
+        if len(gals):
+            angsep_gal = ugali.utils.projector.angsep(self.ra, self.dec, 
+                                              gals.ra, gals.dec)
+
+            angsep_gal_arcmin = angsep_gal * 60 # arcmin
+            cut_iso_gal = self.isochrone_selection(gals)
+            h_gal = numpy.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & cut_iso_gal], bins=bins)[0]
+            h_gal_out = numpy.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & (~cut_iso_gal)], bins=bins)[0]
+
+        plt.plot(centers, h / area, c='red', label='Filtered Stars')
+        plt.errorbar(centers, h / area, yerr=(numpy.sqrt(h) / area), ecolor='red', c='red')
+        plt.scatter(centers, h / area, edgecolor='none', c='red', zorder=22)
+
+        plt.plot(centers, h_out / area, c='gray', label='Unfiltered Stars')
+        plt.errorbar(centers, h_out / area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
+        plt.scatter(centers, h_out / area, edgecolor='none', c='gray', zorder=21)
+
+        if len(gals):
+            plt.plot(centers, h_gal/area, c='black', label='Filtered Galaxies')
+            plt.errorbar(centers, h_gal/area, yerr=(numpy.sqrt(h_gal) / area), ecolor='black', c='black')
+            plt.scatter(centers, h_gal/area, edgecolor='none', c='black', zorder=20)
+
+        plt.xlabel('Angular Separation (arcmin)')
+        plt.ylabel(r'Density (arcmin$^{-2}$)')
+        plt.xlim(0., rmax)
+        ymax = pylab.ylim()[1]
+        pylab.ylim(0, ymax)
+        pylab.legend(loc='upper right', frameon=False, fontsize=10)
+
+
+    def plot6(self, filename):
+        fig = plt.figure('summary', figsize=(11, 6))
+        fig.subplots_adjust(wspace=0.4, hspace=0.25)
+        fdg = r'${.}\!^\circ$'
+        coordstring = ('%.2f, %.2f'%(self.ra, self.dec)).replace('.',fdg)
+        plt.suptitle(r'%s; ($\alpha_{2000}$, $\delta_{2000}$, $m - M$) = (%s, %.2f)'%(self.source.name, coordstring, self.isochrone.distance_modulus), fontsize=14)
+
+        plt.subplot(2, 3, 1)
+        self.drawSmoothStars()
+
+        pylab.subplot(2, 3, 2)
+        self.drawDensityProfile()
+
+        pylab.subplot(2, 3, 3)
+        self.drawMembersSpatial(filename)
+
+        plt.subplot(2, 3, 4)
+        self.drawSmoothGalaxies()
+
+        plt.subplot(2,3,5)
+        self.drawHessDiagram()
+
+        pylab.subplot(2, 3, 6)
+        self.drawMembersCMD(filename)
 
 def plot_candidates(candidates, config, ts_min=50, outdir='./'):
     
@@ -1006,6 +1445,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
     import triangle
     import ugali.analysis.source
     import ugali.analysis.mcmc
+    #matplotlib.rcParams.update({'text.usetex': True})
 
     source = ugali.analysis.source.Source()
     source.load(srcfile,section='source')
@@ -1014,26 +1454,112 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
     samples = ugali.analysis.mcmc.Samples(samples)
 
     names = samples.names
+    labels = names 
     truths = [params[n] for n in names]
     chain = samples.get(burn=burn,clip=5)
 
     ### Triangle plot
-    extents = None
     #extents = [[0,15e3],[323.6,323.8],[-59.8,-59.7],[0,0.1],[19.5,20.5]]
-    quantiles = [0.16,0.84]
-    fig = triangle.corner(chain,labels=names,truths=truths,extents=extents,quantiles=quantiles,verbose=False,plot_datapoints=True,plot_contours=True)
+    
+    kwargs.setdefault('extents',None)
+    kwargs.setdefault('plot_contours',True)
+    kwargs.setdefault('plot_datapoints',True)
+    kwargs.setdefault('verbose',False)
+    kwargs.setdefault('quantiles',[0.16,0.84])
 
+    if len(names) > 1:
+        fig = triangle.corner(chain,labels=labels,truths=truths,**kwargs)
+    else:
+        fig = plt.figure()
+        plt.hist(chain,bins=100)
+        plt.xlabel(names[0])
+        
     try:
         text  = 'RA,DEC = (%.2f,%.2f)\n'%(results['ra'][0],results['dec'][0])
         text += '(m-M,D) = (%.1f, %.0f kpc)\n'%(results['distance_modulus'][0],results['distance'][0])
-        text += r'$r_h$ = %.1f arcmin'%(results['extarcmin'][0])+'\n'
+        text += r'$r_h$ = %.1f arcmin'%(results['extension_arcmin'][0])+'\n'
         text += 'TS = %.1f\n'%results['ts'][0]
         text += 'NSamples = %i\n'%(len(chain))
-        plt.figtext(0.65,0.90,text,ha='left',va='top')
-    except KeyError:
+        #plt.figtext(0.65,0.90,text,ha='left',va='top')
+    except KeyError as e:
+        print e
         pass
 
     label = map(str.capitalize,source.name.split('_'))
     label[-1] = label[-1].upper()
     title = '%s'%' '.join(label)
     plt.suptitle(title)
+
+
+############################################################
+
+def makePath(x_path, y_path, epsilon=1.e-10):
+    """
+    Create closed path.
+    """
+    x_path_closed = numpy.concatenate([x_path, x_path[::-1]])
+    y_path_closed = numpy.concatenate([y_path, epsilon + y_path[::-1]])
+    path = matplotlib.path.Path(zip(x_path_closed, y_path_closed))
+    return path
+
+############################################################
+
+def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False):
+    """
+    Cut to identify objects within isochrone cookie-cutter.
+
+    ADW: This should be moved into the isochrone class.
+    """
+    import scipy.interpolate
+
+    if len(g) == 0:
+        return np.array([],dtype=bool)
+
+    if numpy.all(isochrone.stage == 'Main'):
+        # Dotter case
+        index_transition = len(isochrone.stage)
+    else:
+        # Other cases
+        index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1    
+    mag_1_rgb = isochrone.mag_1[0: index_transition] + isochrone.distance_modulus
+    mag_2_rgb = isochrone.mag_2[0: index_transition] + isochrone.distance_modulus
+    mag_1_rgb = mag_1_rgb[::-1]
+    mag_2_rgb = mag_2_rgb[::-1]
+    
+    # Cut one way...
+    f_isochrone = scipy.interpolate.interp1d(mag_2_rgb, mag_1_rgb - mag_2_rgb, bounds_error=False, fill_value = 999.)
+    color_diff = numpy.fabs((g - r) - f_isochrone(r))
+    cut_2 = (color_diff < numpy.sqrt(0.1**2 + r_err**2 + g_err**2))
+
+     # ...and now the other
+    f_isochrone = scipy.interpolate.interp1d(mag_1_rgb, mag_1_rgb - mag_2_rgb, bounds_error=False, fill_value = 999.)
+    color_diff = numpy.fabs((g - r) - f_isochrone(g))
+    cut_1 = (color_diff < numpy.sqrt(0.1**2 + r_err**2 + g_err**2))
+
+    cut = numpy.logical_or(cut_1, cut_2)
+    
+    # If using Padova isochrone, also include horizontal branch
+    if not numpy.all(isochrone.stage == 'Main'):
+        index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1
+        mag_1_hb = isochrone.mag_1[index_transition:] + isochrone.distance_modulus
+        mag_2_hb = isochrone.mag_2[index_transition:] + isochrone.distance_modulus
+        path_hb = makePath(mag_1_hb, mag_2_hb)
+        cut_hb = path_hb.contains_points(zip(g, r), radius=0.1)
+        print 'Applying HB selection'
+        print numpy.sum(cut)
+        cut = numpy.logical_or(cut, cut_hb)
+        print numpy.sum(cut)
+
+    mag_bins = numpy.arange(16., 24.1, 0.1)
+    mag_centers = 0.5 * (mag_bins[1:] + mag_bins[0:-1])
+    magerr = numpy.tile(0., len(mag_centers))
+    for ii in range(0, len(mag_bins) - 1):
+        cut_mag_bin = (g > mag_bins[ii]) & (g < mag_bins[ii + 1])
+        magerr[ii] = numpy.median(numpy.sqrt(0.1**2 + r_err[cut_mag_bin]**2 + g_err[cut_mag_bin]**2))
+
+    if return_all:
+        return cut, mag_centers[f_isochrone(mag_centers) < 100], (f_isochrone(mag_centers) + magerr)[f_isochrone(mag_centers) < 100], (f_isochrone(mag_centers) - magerr)[f_isochrone(mag_centers) < 100]
+    else:
+        return cut
+
+############################################################

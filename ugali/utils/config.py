@@ -55,6 +55,8 @@ class Config(dict):
             self.filename = input
             ext = os.path.splitext(input)[1]
             if ext == '.py':
+                # ADW: This is dangerous and terrible!!!
+                # THIS SHOULD BE DEPRICATED!!!
                 reader = open(input)
                 params = eval(''.join(reader.readlines()))
                 reader.close()
