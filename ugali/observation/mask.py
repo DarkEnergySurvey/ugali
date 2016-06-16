@@ -232,7 +232,7 @@ class Mask:
                 width = 0.2 
                 # This should be the halfway point in the curve
                 return (e/2.0)*(1/np.sqrt(2*width))*(np.sqrt(2*width)-scipy.special.erf(-delta))
-        elif method = 'flemming':
+        elif method == 'flemming':
             # Functional form taken from Fleming et al. AJ 109, 1044 (1995)
             # http://adsabs.harvard.edu/abs/1995AJ....109.1044F
             # f = 1/2 [1 - alpha(V - Vlim)/sqrt(1 + alpha^2 (V - Vlim)^2)]
