@@ -262,7 +262,11 @@ class Parameter(object):
     # Represenation
     # ADW: This should probably be __str__ not __repr__
     def __repr__(self):         
-        return "%s(%s, [%s, %s], %s)"%(self.__class__.__name__, self.value,self.bounds[0],self.bounds[1],self.free)
+        if self.bounds:
+            # if bounds is None this breaks
+            return "%s(%s, [%s, %s], %s)"%(self.__class__.__name__, self.value,self.bounds[0],self.bounds[1],self.free)
+        else:
+            return "%s(%s, [%s, %s], %s)"%(self.__class__.__name__, self.value,self.bounds,self.bounds,self.free)
 
     # Return the type of the inner value
     def innertype(self):  return type(self.__value__)
