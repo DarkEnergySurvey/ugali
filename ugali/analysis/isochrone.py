@@ -1054,6 +1054,22 @@ class PadovaIsochrone(Isochrone):
 
 class Bressan2012(PadovaIsochrone): pass
 
+class EmpiricalPadova(PadovaIsochrone):
+    _prefix = 'iso'
+    _basename = '%(prefix)s_a13.7_z0.00007.dat'
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
+    _dirname =  os.path.join(get_iso_dir(),'empirical')
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage',4,'Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+class M92(EmpiricalPadova):
+    _prefix = 'm92'
+
+
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
     _dirname =  os.path.join(get_iso_dir(),'girardi2002')
@@ -1199,6 +1215,10 @@ class OldPadovaIsochrone(Girardi2002):
         age = 10**(log_age) / 1e9 # Gyr
         return age, metallicity
     
+
+
+
+
 ############################################################
 
 class DotterIsochrone(PadovaIsochrone):
