@@ -963,7 +963,7 @@ class PadovaIsochrone(Isochrone):
 
     def create_grid(self,abins=None,zbins=None):
         if abins is None and zbins is None:
-            data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/*.dat')])
+            data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/%s_*.dat'%(self._prefix))])
             if not len(data):
                 msg = "No isochrone files found in: %s"%self.dirname
                 raise Exception(msg)
@@ -1057,7 +1057,6 @@ class Bressan2012(PadovaIsochrone): pass
 class EmpiricalPadova(PadovaIsochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a13.7_z0.00007.dat'
-    #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
     _dirname =  os.path.join(get_iso_dir(),'empirical')
 
     defaults = (Isochrone.defaults) + (
@@ -1068,6 +1067,11 @@ class EmpiricalPadova(PadovaIsochrone):
 
 class M92(EmpiricalPadova):
     _prefix = 'm92'
+    _basename = '%(prefix)s_a13.7_z0.00007.dat'
+
+class DESDwarfs(EmpiricalPadova):
+    _prefix = 'dsph'
+    _basename = '%(prefix)s_a12.5_z0.00010.dat'
 
 
 class Girardi2002(PadovaIsochrone):
