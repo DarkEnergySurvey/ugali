@@ -963,7 +963,7 @@ class PadovaIsochrone(Isochrone):
 
     def create_grid(self,abins=None,zbins=None):
         if abins is None and zbins is None:
-            data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/*.dat')])
+            data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/%s_*.dat'%(self._prefix))])
             if not len(data):
                 msg = "No isochrone files found in: %s"%self.dirname
                 raise Exception(msg)
@@ -1053,6 +1053,26 @@ class PadovaIsochrone(Isochrone):
         self.color = self.mag_1 - self.mag_2
 
 class Bressan2012(PadovaIsochrone): pass
+
+class EmpiricalPadova(PadovaIsochrone):
+    _prefix = 'iso'
+    _basename = '%(prefix)s_a13.7_z0.00007.dat'
+    _dirname =  os.path.join(get_iso_dir(),'empirical')
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage',4,'Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+class M92(EmpiricalPadova):
+    _prefix = 'm92'
+    _basename = '%(prefix)s_a13.7_z0.00007.dat'
+
+class DESDwarfs(EmpiricalPadova):
+    _prefix = 'dsph'
+    _basename = '%(prefix)s_a12.5_z0.00010.dat'
+
 
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
@@ -1199,6 +1219,10 @@ class OldPadovaIsochrone(Girardi2002):
         age = 10**(log_age) / 1e9 # Gyr
         return age, metallicity
     
+
+
+
+
 ############################################################
 
 class DotterIsochrone(PadovaIsochrone):
