@@ -5,9 +5,9 @@ classes and functions used to search for ultra-faint satellite
 galaxies of the Milky Way using the stellar object samples 
 derived from optical photometric surveys.
 
-Keith Bechtol \<bechtol (at) kicp (dot) uchicago (dot) edu\>
+Keith Bechtol &lt;bechtol (at) kicp (dot) uchicago (dot) edu&gt;
 
-Alex Drlica-Wagner \<kadrlica (at) fnal (dot) gov\>
+Alex Drlica-Wagner &lt;kadrlica (at) fnal (dot) gov&gt;
 
 USAGE EXAMPLES
 --------------
