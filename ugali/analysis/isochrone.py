@@ -173,11 +173,12 @@ class Isochrone(Model):
             mass_init_min = self.mass_init[self.stage==self.hb_stage].min()
             mass_init_max = self.mass_init[self.stage==self.hb_stage].max()
             cut = (mass_init_array>mass_init_min)&(mass_init_array<mass_init_max)
-
             if isinstance(self.hb_spread,collections.Iterable):
+                # Explicit dispersion spacing
                 dispersion_array = self.hb_spread
                 n = len(dispersion_array)
             else:
+                # Default dispersion spacing
                 dispersion = self.hb_spread
                 spacing = 0.025
                 n = int(round(2.0*self.hb_spread/spacing))
@@ -187,16 +188,24 @@ class Isochrone(Model):
             # Reset original values
             mass_pdf_array[cut] = mass_pdf_array[cut] / float(n)
 
+            # Isochrone values for points on the HB
+            mass_init_hb = mass_init_array[cut]
+            mass_pdf_hb = mass_pdf_array[cut]
+            mass_act_hb = mass_act_array[cut]
+            mag_1_hb = mag_1_array[cut]
+            mag_2_hb = mag_2_array[cut]
+
             # Add dispersed values
             for dispersion in dispersion_array:
                 if dispersion == 0.: continue
-                msg = '%-6g%-6g%-6g'%(dispersion,cut.sum(),len(mass_init_array))
+                msg = 'Dispersion=%-.4g, HB Points=%i, Iso Points=%i'%(dispersion,cut.sum(),len(mass_init_array))
                 logger.debug(msg)
-                mass_init_array = np.append(mass_init_array, mass_init_array[cut]) 
-                mass_pdf_array = np.append(mass_pdf_array, mass_pdf_array[cut])
-                mass_act_array = np.append(mass_act_array, mass_act_array[cut]) 
-                mag_1_array = np.append(mag_1_array, mag_1_array[cut] + dispersion)
-                mag_2_array = np.append(mag_2_array, mag_2_array[cut] + dispersion)
+
+                mass_init_array = np.append(mass_init_array, mass_init_hb) 
+                mass_pdf_array = np.append(mass_pdf_array, mass_pdf_hb)
+                mass_act_array = np.append(mass_act_array, mass_act_hb) 
+                mag_1_array = np.append(mag_1_array, mag_1_hb + dispersion)
+                mag_2_array = np.append(mag_2_array, mag_2_hb + dispersion)
 
         # Note that the mass_pdf_array is not generally normalized to unity
         # since the isochrone data range typically covers a different range

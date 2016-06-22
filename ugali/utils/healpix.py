@@ -30,13 +30,19 @@ def subpixel(superpix, nside_superpix, nside_subpix):
 
 ############################################################
 
+def phi2lon(phi): return np.degrees(phi)
+def lon2phi(lon): return np.radians(lon)
+
+def theta2lat(theta): return 90. - np.degrees(theta)
+def lat2theta(lat): return np.radians(90. - lat)
+
 def pix2ang(nside, pix):
     """
     Return (lon, lat) in degrees instead of (theta, phi) in radians
     """
     theta, phi =  healpy.pix2ang(nside, pix)
-    lon = np.degrees(phi)
-    lat = 90. - np.degrees(theta)                    
+    lon = phi2lon(phi)
+    lat = theta2lat(theta)
     return lon, lat
 
 def ang2pix(nside, lon, lat, coord='GAL'):
@@ -48,8 +54,8 @@ def ang2pix(nside, lon, lat, coord='GAL'):
     return healpy.ang2pix(nside, theta, phi)
 
 def ang2vec(lon, lat):
-    theta = np.radians(90. - lat)
-    phi = np.radians(lon)
+    theta = lat2theta(lat)
+    phi = lon2phi(lon)
     vec = healpy.ang2vec(theta, phi)
     return vec
 
@@ -137,6 +143,9 @@ def ang2disc(nside, lon, lat, radius, inclusive=False, fact=4, nest=False):
     return query_disc(nside,vec,radius,inclusive,fact,nest)
 
 angToDisc = ang2disc
+
+def get_interp_val(m, lon, lat, *args, **kwargs):
+    return healpy.get_interp_val(m, lat2theta(lat), lon2phi(lon), *args, **kwargs)
 
 ############################################################
 
