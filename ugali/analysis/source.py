@@ -225,17 +225,26 @@ class Source(object):
         out.write(self.dump())
         out.close()
 
+    def set_stellar_mass(self, stellar_mass):
+        """ Set the richness to match an input stellar mass.
+        """
+        self.richness = stellar_mass/self.isochrone.stellar_mass()
+
+    #@property
     def stellar_mass(self):
         # ADW: I think it makes more sense for this to be
         #return self.richness * self.isochrone.stellarMass()
         return self.isochrone.stellarMass()
 
+    #@property
     def stellar_luminosity(self):
         # ADW: I think it makes more sense for this to be
         #return self.richness * self.isochrone.stellarLuminosity()
         return self.isochrone.stellarLuminosity()
 
+    #@property
     def absolute_magnitude(self, richness):
+        #ADW:  Should take self.richness
         return self.isochrone.absolute_magnitude(richness)
 
 if __name__ == "__main__":
