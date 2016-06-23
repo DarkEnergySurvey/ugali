@@ -5,9 +5,7 @@ classes and functions used to search for ultra-faint satellite
 galaxies of the Milky Way using the stellar object samples 
 derived from optical photometric surveys.
 
-Keith Bechtol &lt;bechtol (at) kicp (dot) uchicago (dot) edu&gt;
-
-Alex Drlica-Wagner &lt;kadrlica (at) fnal (dot) gov&gt;
+[Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
 
 USAGE EXAMPLES
 --------------
@@ -31,7 +29,7 @@ DEPENDENCIES
 * [emcee](http://dan.iel.fm/emcee/current/)
 * [pyyaml](http://pyyaml.org/)
 
-## Mangle:
+### Mangle:
 Not a strict dependency. Used to interface with masks produced by
 the Dark Energy Survey Data Mangement group. Download and documentation 
 available at http://space.mit.edu/~molly/mangle/
