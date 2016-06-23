@@ -1,9 +1,7 @@
-# Export the versioning string when archiving
-ugali/get_version.py export-subst
-
 # These are binary files
 *.gz binary
 *.tgz binary
+*.tar binary
 
 # Smudge/Clean the version information
 ugali/_version.py export-subst

@@ -8,7 +8,6 @@ build/
 dist/
 ugali.egg-info/
 
-### ugali files
-ugali/version.py
+### ugali data files
 ugali/data/*/
-
+*.tar.gz
