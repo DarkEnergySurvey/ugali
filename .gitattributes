@@ -6,3 +6,4 @@ ugali/get_version.py export-subst
 *.tgz binary
 
 # Smudge/Clean the version information
+ugali/_version.py export-subst

@@ -9,7 +9,12 @@ except ImportError:
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
 
-from ugali.get_version import get_version, write_version_py
+#from ugali.get_version import get_version, write_version_py
+#VERSION = get_version()
+#write_version_py(version=VERSION)
+
+import versioneer
+VERSION = versioneer.get_version()
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -21,8 +26,6 @@ Programming Language :: Python
 Natural Language :: English
 Topic :: Scientific/Engineering
 """
-VERSION = get_version()
-write_version_py(version=VERSION)
 
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
@@ -30,7 +33,8 @@ def read(filename):
 setup(
     name=NAME,
     version=VERSION,
-    url='https://bitbucket.org/bechtol/ugali/src',
+    cmdclass = versioneer.get_cmdclass(),
+    url='https://github.com/kadrlica/ugali',
     author='Keith Bechtol & Alex Drlica-Wagner',
     author_email='bechtol@kicp.uchicago.edu, kadrlica@fnal.gov',
     scripts = [],
@@ -45,7 +49,7 @@ setup(
     ],
     packages=find_packages(),
     package_data={'ugali': ['data/catalog.tgz']},
-    description="Ultra-faint galaxy likelihood fitting code.",
+    description="Ultra-faint galaxy likelihood toolkit.",
     long_description=read('README.md'),
     platforms='any',
     classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
