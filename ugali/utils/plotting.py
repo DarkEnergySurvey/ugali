@@ -1511,16 +1511,24 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
     ADW: This should be moved into the isochrone class.
     """
     import scipy.interpolate
+    from ugali.analysis.isochrone import CompositeIsochrone
+
+    if isinstance(isochrone, CompositeIsochrone):
+        isochrone = isochrone.isochrones[0]
 
     if len(g) == 0:
         return np.array([],dtype=bool)
 
-    if numpy.all(isochrone.stage == 'Main'):
-        # Dotter case
-        index_transition = len(isochrone.stage)
-    else:
-        # Other cases
-        index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1    
+    try:
+        if numpy.all(isochrone.stage == 'Main'):
+            # Dotter case
+            index_transition = len(isochrone.stage)
+        else:
+            # Other cases
+            index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1    
+    except AttributeError:
+        index_transition = 1
+
     mag_1_rgb = isochrone.mag_1[0: index_transition] + isochrone.distance_modulus
     mag_2_rgb = isochrone.mag_2[0: index_transition] + isochrone.distance_modulus
     mag_1_rgb = mag_1_rgb[::-1]

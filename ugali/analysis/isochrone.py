@@ -924,6 +924,50 @@ class Isochrone(Model):
         
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
+    def separation(self, mag_1, mag_2):
+        """ Could speed this up..."""
+
+        iso_mag_1 = self.mag_1 + self.distance_modulus
+        iso_mag_2 = self.mag_2 + self.distance_modulus
+        
+        # First do the RGB
+        if isinstance(self, DotterIsochrone):
+            rgb_mag_1 = iso_mag_1
+            rgb_mag_2 = iso_mag_2
+        else:
+            sel = self.stage <= 3
+            rgb_mag_1 = iso_mag_1[sel]
+            rgb_mag_2 = iso_mag_2[sel]
+
+        def interp_iso(iso_mag_1,iso_mag_2,mag_1,mag_2):
+            interp_1 = scipy.interpolate.interp1d(iso_mag_1,iso_mag_2,bounds_error=False)
+            interp_2 = scipy.interpolate.interp1d(iso_mag_2,iso_mag_1,bounds_error=False)
+
+            dy = interp_1(mag_1) - mag_2
+            dx = interp_2(mag_2) - mag_1
+
+            dmag_1 = np.fabs(dx*dy) / (dx**2 + dy**2) * dy
+            dmag_2 = np.fabs(dx*dy) / (dx**2 + dy**2) * dx
+
+            return dmag_1, dmag_2
+
+        dmag_1,dmag_2 = interp_iso(rgb_mag_1,rgb_mag_2,mag_1,mag_2)
+
+        # Then do the HB
+        if not isinstance(self, DotterIsochrone):
+            sel = self.stage > 3
+            hb_mag_1 = iso_mag_1[sel]
+            hb_mag_2 = iso_mag_2[sel]
+
+            hb_dmag_1,hb_dmag_2 = interp_iso(hb_mag_1,hb_mag_2,mag_1,mag_2)
+
+            dmag_1 = np.nanmin([dmag_1,hb_dmag_1],axis=0)
+            dmag_2 = np.nanmin([dmag_2,hb_dmag_2],axis=0)
+
+        #return dmag_1,dmag_2
+        return np.sqrt(dmag_1**2 + dmag_2**2)
+
+
 class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
@@ -1075,10 +1119,28 @@ class EmpiricalPadova(PadovaIsochrone):
         )
 
 class M92(EmpiricalPadova):
+    """ Empirical isochrone derived from the M92 ridgeline dereddened
+    and transformed to the DES system.
+    """
+    _params = odict([
+        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
+        ('age',              Parameter(13.7, [13.7, 13.7]) ),  # Gyr
+        ('metallicity',      Parameter(7e-5,[7e-5,7e-5]) ),
+    ])
+
     _prefix = 'm92'
     _basename = '%(prefix)s_a13.7_z0.00007.dat'
 
 class DESDwarfs(EmpiricalPadova):
+    """ Empirical isochrone derived from spectroscopic members of the
+    DES dwarfs.
+    """
+    _params = odict([
+        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
+        ('age',              Parameter(12.5, [12.5, 12.5]) ),  # Gyr
+        ('metallicity',      Parameter(1e-4, [1e-4,1e-4]) ),
+    ])
+
     _prefix = 'dsph'
     _basename = '%(prefix)s_a12.5_z0.00010.dat'
 
@@ -1379,6 +1441,10 @@ class CompositeIsochrone(Isochrone):
 
         return np.hstack(samples)
 
+    def separation(self, *args, **kwargs):
+        separations = [iso.separation(*args,**kwargs) for iso in self.isochrones]
+        return np.nanmin(separations,axis=0)
+    
     def todict(self):
         ret = super(CompositeIsochrone,self).todict()
         ret['isochrones'] = [iso.todict() for iso in self.isochrones]

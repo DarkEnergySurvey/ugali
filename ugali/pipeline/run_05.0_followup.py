@@ -108,6 +108,8 @@ def do_plot(args):
     plt.savefig(outfile,bbox_inches='tight',dpi=60)
     plt.close()
 
+    plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
+
     data = pyfits.open(memfile)[1].data if exists(memfile) else None
     if data is not None:
         plt.figure()
@@ -118,12 +120,11 @@ def do_plot(args):
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
         plt.close()
 
-    plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
-    plotter.plot6(data)
-    outfile = samfile.replace('.npy','_6panel.png')
-    logger.info("  Writing %s..."%outfile)
-    plt.savefig(outfile,bbox_inches='tight',dpi=60)
-    plt.close()
+        plotter.plot6(data)
+        outfile = samfile.replace('.npy','_6panel.png')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+        plt.close()
 
     plotter.plot4()
     outfile = samfile.replace('.npy','_4panel.png')
@@ -177,14 +178,20 @@ def run(self):
 
     if 'membership' in self.opts.run:
         logger.info("Running 'membership'...")
-        pool = Pool(maxtasksperchild=1)
-        pool.map(do_membership,args)
+        if len(args) > 1:
+            pool = Pool(maxtasksperchild=1)
+            pool.map(do_membership,args)
+        else:
+            do_membership(*args)
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
-        #pool = Pool(maxtasksperchild=1)
-        #pool.map(do_plot,args)
-        map(do_plot,args)
+        if len(args) > 1:
+            #pool = Pool(maxtasksperchild=1)
+            #pool.map(do_plot,args)
+            map(do_plot,args)
+        else:
+            do_plot(*args)
 
     if 'collect' in self.opts.run:
         logger.info("Running 'collect'...")
