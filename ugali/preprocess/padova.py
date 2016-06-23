@@ -19,7 +19,7 @@ from collections import OrderedDict as odict
 import numpy as np
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-from ugali.analysis.isochrone2 import PadovaIsochrone,OldPadovaIsochrone
+from ugali.analysis.isochrone import PadovaIsochrone,OldPadovaIsochrone
 
 # Commented options may need to be restored for older
 # version/isochrones.
