@@ -28,10 +28,9 @@ class Pipeline(object):
         self.parser.add_debug()
         self.parser.add_force()
         self.parser.add_queue()
-        self.parser.add_argument('-r','--run', default=[],
-                                 action='append',choices=self.components,
-                                 help="Analysis component(s) to run.")
+        self.parser.add_run(choices=self.components) 
         self.parser.add_verbose()
+        self.parser.add_version()
 
     def parse_args(self):
         self.opts = self.parser.parse_args()

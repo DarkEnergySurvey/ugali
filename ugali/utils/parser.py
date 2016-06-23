@@ -62,11 +62,21 @@ class Parser(argparse.ArgumentParser):
 
     def add_force(self,**kwargs):
         self.add_argument('-f','--force',action='store_true',
-                          help='Force the overwrite of files')
+                          help='Force the overwrite of files',**kwargs)
 
     def add_seed(self,**kwargs):
         self.add_argument('--seed',default=None,type=int,
-                          help='Random seed.')
+                          help='Random seed.',**kwargs)
+
+    def add_version(self,**kwargs):
+        from ugali import __version__
+        self.add_argument('-V','--version',action='version',
+                          version='ugali '+__version__,
+                          help='Print version.',**kwargs)
+
+    def add_run(self,**kwargs):
+        self.add_argument('-r','--run', default=[], action='append',
+                          help="Analysis component(s) to run.", **kwargs)
 
     def _parse_verbose(self,opts):
         if vars(opts).get('verbose'): 
@@ -157,6 +167,7 @@ if __name__ == "__main__":
     parser = Parser(description=description)
     parser.add_debug()
     parser.add_verbose()
+    parser.add_version()
     parser.add_coords()
     opts = parser.parse_args()
     print opts
