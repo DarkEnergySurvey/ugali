@@ -25,7 +25,7 @@ install:
   - source activate travis-env
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py install
-  - python setup.py isochrone --isochrone-path $UGALIDIR
+  - python setup.py isochrones --isochrone-path $UGALIDIR
 
 # command to run tests
 script: 
