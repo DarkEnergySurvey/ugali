@@ -1,6 +1,6 @@
 
-[![Build](https://img.shields.io/travis/DarkEnergySurvey/ugali.svg)](https://travis-ci.org/DarkEnergySurvey/ugali)
-[![Release](https://img.shields.io/github/tag/DarkEnergySurvey/ugali.svg)](../../releases)
+[![Build](https://img.shields.io/travis/kadrlica/ugali.svg)](https://travis-ci.org/kadrlica/ugali)
+[![Release](https://img.shields.io/github/tag/kadrlica/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
 
 OVERVIEW
