@@ -1,5 +1,11 @@
+
+[![Build](https://img.shields.io/travis/kadrlica/ugali.svg)](https://travis-ci.org/kadrlica/ugali)
+[![Release](https://img.shields.io/github/tag/kadrlica/ugali.svg)](../../releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
+
 OVERVIEW
 --------
+
 The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python classes and functions developed for maximum-likelihood-based studies of Milky Way satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys.
 
 [Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
