@@ -1,23 +1,23 @@
 import sys
 import os
+import urllib
 try: 
     from setuptools import setup, find_packages
+    from setuptools.command.build_ext import build_ext as _build_ext
 except ImportError: 
     from distutils.core import setup
+    from distutils.command.build_ext import build_ext as _build_ext
     def find_packages():
         return ['ugali','ugali.analysis','ugali.config','ugali.observation',
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
-
-#from ugali.get_version import get_version, write_version_py
-#VERSION = get_version()
-#write_version_py(version=VERSION)
 
 import versioneer
 VERSION = versioneer.get_version()
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
+URL = 'https://github.com/DarkEnergySurvey/ugali'
 CLASSIFIERS = """\
 Development Status :: 2 - Pre-Alpha
 Intended Audience :: Science/Research
@@ -30,11 +30,13 @@ Topic :: Scientific/Engineering
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
 
+CMDCLASS = versioneer.get_cmdclass()
+        
 setup(
     name=NAME,
     version=VERSION,
-    cmdclass = versioneer.get_cmdclass(),
-    url='https://github.com/kadrlica/ugali',
+    cmdclass=CMDCLASS,
+    url=URL,
     author='Keith Bechtol & Alex Drlica-Wagner',
     author_email='bechtol@kicp.uchicago.edu, kadrlica@fnal.gov',
     scripts = [],

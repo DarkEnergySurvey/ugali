@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 """
-Generic python script.
+Generic python test script.
 """
-__author__ = "Alex Drlica-Wagner"
 
 import numpy as np
 import scipy
+
+import ugali
+import ugali.analysis.isochrone
+import ugali.analysis.kernel
+import ugali.analysis.source
