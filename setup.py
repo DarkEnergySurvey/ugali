@@ -3,14 +3,14 @@ import os
 import urllib
 try: 
     from setuptools import setup, find_packages
-    from setuptools.command.build_ext import build_ext as _build_ext
 except ImportError: 
     from distutils.core import setup
-    from distutils.command.build_ext import build_ext as _build_ext
     def find_packages():
         return ['ugali','ugali.analysis','ugali.config','ugali.observation',
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
+
+import distutils.cmd
 
 import versioneer
 VERSION = versioneer.get_version()
@@ -26,12 +26,68 @@ Programming Language :: Python
 Natural Language :: English
 Topic :: Scientific/Engineering
 """
+ISOCHRONES = URL+'/releases/download/v1.5.2/ugali-isochrones-v1.5.2.tar.gz'
 
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
 
+class IsochroneCommand(distutils.cmd.Command):
+    """ Command for downloading isochrone files """
+    description = "install isochrone files"
+    user_options = [
+        ('isochrone-path=',None,
+         'path to install isochrones (default: $HOME/.ugali)'),
+        ('no-isochrone',None,
+         'do not download and install isochrones (default: False)')
+        ]
+    boolean_options = ['no-isochrone']
+
+    def initialize_options(self):
+        self.isochrone_path = os.path.expandvars('$HOME/.ugali')
+        self.no_isochrone = False
+
+    def finalize_options(self):
+        pass
+
+    def install_isochrones(self):
+        import urllib2
+        import tarfile
+
+        print("installing isochrones")
+        print("creating %s"%self.isochrone_path)
+        if not os.path.exists(self.isochrone_path):
+            os.makedirs(self.isochrone_path)
+
+        url = ISOCHRONES
+        basename = os.path.basename(url)
+        tarball = os.path.join(self.isochrone_path,basename)
+
+        print("downloading %s"%url)
+        response = urllib2.urlopen(url)
+        with open(tarball,'wb') as output:
+            output.write(response.read())
+
+        print("extracting %s"%tarball)
+        with tarfile.open(tarball,'r:gz') as tar:
+            tar.extractall()
+
+        print("removing %s"%tarball)
+        os.remove(tarball)
+
+    def run(self):
+        if self.no_isochrone:
+            print("skipping isochrone download")
+            return
+
+        if os.path.exists(os.path.join(self.isochrone_path,'isochrones')):
+            print("isochrone directory found; skipping")
+            return
+
+        self.install_isochrones()
+
 CMDCLASS = versioneer.get_cmdclass()
-        
+CMDCLASS['isochrones'] = IsochroneCommand
+
 setup(
     name=NAME,
     version=VERSION,
