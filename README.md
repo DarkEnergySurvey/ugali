@@ -10,6 +10,29 @@ The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python class
 
 [Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
 
+INSTALLATION
+------------
+
+The ugali codebase can be installed by downloading from github and
+using the `setup.py` script.
+```
+git clone https://github.com/DarkEnergySurvey/ugali.git
+cd ugali
+python setup.py install
+```
+In addition to the code, if you plan on working with isochrones you probably want to install the ancillary isochrone information:
+```
+python setup.py isochrones
+```
+By default, the isochrone files (~100MB) will be installed in `$HOME/.ugali/isochrones`; however, this can be changed on the command line:
+```
+python setup.py isochrones --isochrone-path <INSTALL_PATH>
+```
+If you place the isochrones in a different directory be sure that ugali knows where to find them:
+```
+export UGALIDIR=$<INSTALL_PATH>/isochrones
+```
+
 USAGE EXAMPLES
 --------------
 Examples go here.
