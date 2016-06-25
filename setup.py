@@ -80,17 +80,19 @@ class IsochroneCommand(distutils.cmd.Command):
         if not os.path.exists(self.isochrone_path):
             os.makedirs(self.isochrone_path)
 
+        os.chdir(self.isochrone_path)
+
         url = ISOCHRONES
-        basename = os.path.basename(url)
-        tarball = os.path.join(self.isochrone_path,basename)
+        tarball = os.path.basename(url)
 
         print("downloading %s"%url)
         urllib.urlretrieve(url, tarball, reporthook=progress_bar)
         print('')
 
-        print("extracting %s"%basename)
+        print("extracting %s"%tarball)
         with tarfile.open(fileobj=ProgressFileObject(tarball),mode='r:gz') as tar:
             tar.extractall()
+            tar.close()
             print('')
 
         print("removing %s"%tarball)
