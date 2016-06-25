@@ -33,10 +33,15 @@ def read(filename):
     return open(os.path.join(HERE,filename)).read()
 
 def progress_bar(count, block_size, total_size):
-    percent = int(100*count*block_size/total_size)
-    msg = '[{:51}] ({:d}%)\r'.format(percent//2*'='+'>',percent)
-    sys.stdout.write(msg)
-    sys.stdout.flush()
+    block = 100*block_size/float(total_size)
+    progress = count*block
+    if progress % 1 < 1.01*block:
+        msg = '[{:51}] ({:d}%)\r'.format(int(progress//2)*'='+'>',int(progress))
+        #msg = '({:d}%)\r'.format(int(progress))
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+    #percent = int(100*count*block_size/total_size)
+    
 
 class ProgressFileObject(io.FileIO):
     def __init__(self, path, *args, **kwargs):
