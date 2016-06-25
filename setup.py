@@ -1,7 +1,7 @@
 import sys
 import os
 import io
-import urllib
+
 try: 
     from setuptools import setup, find_packages
 except ImportError: 
@@ -136,73 +136,3 @@ setup(
     platforms='any',
     classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
 )
-
-
-"""
-import tarfile
-import io
-import os
-
-def get_file_progress_file_object_class(on_progress):
-    class FileProgressFileObject(tarfile.ExFileObject):
-        def read(self, size, *args):
-          on_progress(self.name, self.position, self.size)
-          return tarfile.ExFileObject.read(self, size, *args)
-    return FileProgressFileObject
-
-class TestFileProgressFileObject(tarfile.ExFileObject):
-    def read(self, size, *args):
-      on_progress(self.name, self.position, self.size)
-      return tarfile.ExFileObject.read(self, size, *args)
-
-class ProgressFileObject(io.FileIO):
-    def __init__(self, path, *args, **kwargs):
-        self._total_size = os.path.getsize(path)
-        io.FileIO.__init__(self, path, *args, **kwargs)
-
-    def read(self, size):
-        print("Overall process: %d of %d" %(self.tell(), self._total_size))
-        return io.FileIO.read(self, size)
-
-def on_progress(filename, position, total_size):
-    print("%s: %d of %s" %(filename, position, total_size))
-
-tarfile.TarFile.fileobject = get_file_progress_file_object_class(on_progress)
-tar = tarfile.open(fileobj=ProgressFileObject("a.tgz"))
-tar.extractall()
-tar.close()
-"""
-
-"""
-import urllib2, sys
-
-def chunk_report(bytes_so_far, chunk_size, total_size):
-   percent = float(bytes_so_far) / total_size
-   percent = round(percent*100, 2)
-   sys.stdout.write("Downloaded %d of %d bytes (%0.2f%%)\r" % 
-       (bytes_so_far, total_size, percent))
-
-   if bytes_so_far >= total_size:
-      sys.stdout.write('\n')
-
-def chunk_read(response, chunk_size=8192, report_hook=None):
-   total_size = response.info().getheader('Content-Length').strip()
-   total_size = int(total_size)
-   bytes_so_far = 0
-
-   while 1:
-      chunk = response.read(chunk_size)
-      bytes_so_far += len(chunk)
-
-      if not chunk:
-         break
-
-      if report_hook:
-         report_hook(bytes_so_far, chunk_size, total_size)
-
-   return bytes_so_far
-
-if __name__ == '__main__':
-   response = urllib2.urlopen('http://www.ebay.com');
-   chunk_read(response, report_hook=chunk_report)
-"""
