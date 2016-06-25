@@ -26,8 +26,6 @@ install:
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py install
   - python setup.py isochrones --isochrone-path $UGALIDIR
-  - ls $UGALIDIR
-  - ls $UGALIDIR/isochrones
 
 # command to run tests
 script: 
