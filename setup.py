@@ -72,7 +72,7 @@ class IsochroneCommand(distutils.cmd.Command):
         pass
 
     def install_isochrones(self):
-        import urllib2
+        import urllib
         import tarfile
 
         print("installing isochrones")
