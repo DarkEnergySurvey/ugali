@@ -10,6 +10,8 @@ http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
 
 Another simple solution is to create a plain method linked to a static method.
 http://stackoverflow.com/questions/21111106/cant-pickle-static-method-multiprocessing-python
+
+We choose the second option here.
 """
 
 import os
