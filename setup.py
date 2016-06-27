@@ -117,6 +117,7 @@ class IsochroneCommand(distutils.cmd.Command):
         import tarfile
 
         question = "Install isochrone files (~100MB)?"
+        print(question)
         self.isochrones = query_yes_no(question,default='no')
 
         print("installing isochrones")
