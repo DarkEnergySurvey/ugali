@@ -1,2 +1,4 @@
 include versioneer.py
 include ugali/_version.py
+include README.md
+include LICENSE
