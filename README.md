@@ -1,16 +1,15 @@
-
 [![Build](https://img.shields.io/travis/DarkEnergySurvey/ugali.svg)](https://travis-ci.org/DarkEnergySurvey/ugali)
 [![Release](https://img.shields.io/github/tag/DarkEnergySurvey/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
 
-OVERVIEW
+Overview
 --------
 
 The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python classes and functions developed for maximum-likelihood-based studies of Milky Way satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys.
 
 [Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
 
-INSTALLATION
+Installation
 ------------
 
 There are several ways to install `ugali` and it's complimentary isochrone library.
@@ -49,17 +48,18 @@ If you place the isochrones in a different directory be sure that `ugali` knows 
 export UGALIDIR=$<INSTALL_PATH>/isochrones
 ```
 
-USAGE EXAMPLES
+Usage Examples
 --------------
 Examples go here.
 
-CODE REPOSITORY
+Code Repository
 ---------------
 * https://bitbucket.org/bechtol/ugali/
 * https://github.com/kadrlica/ugali/
 
-DEPENDENCIES
+Dependencies
 ------------
+These should mostly be taken care of by PyPi with a `pip install`.
 
 ### Python packages:
 * [numpy](http://www.numpy.org/)
@@ -81,7 +81,7 @@ The ugali tools make use of a large library of stellar isochrones. These isochro
 * Padova isochrones (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
 
-CONVENTIONS
+Conventions
 -----------
 
 ### Indexing:
