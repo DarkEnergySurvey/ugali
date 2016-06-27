@@ -61,15 +61,18 @@ def query_yes_no(question, default="yes"):
     else: raise ValueError("invalid default answer: '%s'" % default)
 
     while True:
-        sys.stdout.write(question + prompt)
+        #sys.stdout.write(question + prompt)
+        print(question + prompt)
         choice = raw_input().lower()
         if default is not None and choice == '':
             return valid[default]
         elif choice in valid:
             return valid[choice]
         else:
-            sys.stdout.write("Please respond with 'yes' or 'no' "
-                             "(or 'y' or 'n').\n")
+            print("Please respond with 'yes' or 'no' "
+                  "(or 'y' or 'n').\n")
+            #sys.stdout.write("Please respond with 'yes' or 'no' "
+            #                 "(or 'y' or 'n').\n")
 
 class ProgressFileIO(io.FileIO):
     def __init__(self, path, *args, **kwargs):
@@ -86,10 +89,10 @@ class ProgressFileIO(io.FileIO):
         block = 100*block_size/float(total_size)
         progress = count*block
         if progress % 1 < 1.01*block:
-            msg = '[{:51}] ({:d}%)\r'.format(int(progress//2)*'='+'>',int(progress))
+            msg = '\r[{:51}] ({:d}%)'.format(int(progress//2)*'='+'>',int(progress))
             print(msg)
-            sys.stdout.write(msg)
-            sys.stdout.flush()
+            #sys.stdout.write(msg)
+            #sys.stdout.flush()
 
 class IsochroneCommand(distutils.cmd.Command):
     """ Command for downloading isochrone files """
