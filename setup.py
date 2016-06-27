@@ -35,6 +35,7 @@ UGALIDIR = "$HOME/.ugali"
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
 
+# Interactive setup.py is not supported by pip
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
     
@@ -60,8 +61,7 @@ def query_yes_no(question, default="yes"):
     else: raise ValueError("invalid default answer: '%s'" % default)
 
     while True:
-        #sys.stdout.write(question + prompt)
-        print(question + prompt)
+        sys.stdout.write(question + prompt)
         choice = raw_input().lower()
         if default is not None and choice == '':
             return valid[default]
@@ -171,17 +171,19 @@ class install(_install):
         # run superclass install
         _install.run(self)
 
-        # Ask the user about isochrone installation
         # ADW: consider moving to 'finalize_options'
-        if self.isochrones is None:
-            question = "Install isochrone files (~100MB)?"
-            self.isochrones = query_yes_no(question,default='no')
-
-            if self.isochrones and not self.isochrones_path:
-                question = "Isochrone install path (default: %s): "%UGALIDIR
-                sys.stdout.write(question)
-                path = raw_input()
-                self.isochrone_path = path if path else None
+        # ADW: pip filters sys.stdout, so the prompt never gets sent:
+        # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
+        # Ask the user about isochrone installation
+        ### if self.isochrones is None:
+        ###     question = "Install isochrone files (~100MB)?"
+        ###     self.isochrones = query_yes_no(question,default='no')
+        ###  
+        ###     if self.isochrones and not self.isochrones_path:
+        ###         question = "Isochrone install path (default: %s): "%UGALIDIR
+        ###         sys.stdout.write(question)
+        ###         path = raw_input()
+        ###         self.isochrone_path = path if path else None
 
         if self.isochrones: 
             self.install_isochrones()
