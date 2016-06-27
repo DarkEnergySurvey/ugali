@@ -119,11 +119,11 @@ class IsochroneCommand(distutils.cmd.Command):
         url = ISOCHRONES
         tarball = os.path.basename(url)
 
-        print("downloading %s"%url)
+        print("downloading %s..."%url)
         urllib.urlretrieve(url, tarball, reporthook=ProgressFileIO.progress_bar)
         print('')
 
-        print("extracting %s"%tarball)
+        print("extracting %s..."%tarball)
         with tarfile.open(fileobj=ProgressFileIO(tarball),mode='r:gz') as tar:
             tar.extractall()
             tar.close()
