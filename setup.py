@@ -87,6 +87,7 @@ class ProgressFileIO(io.FileIO):
         progress = count*block
         if progress % 1 < 1.01*block:
             msg = '[{:51}] ({:d}%)\r'.format(int(progress//2)*'='+'>',int(progress))
+            print(msg)
             sys.stdout.write(msg)
             sys.stdout.flush()
 
