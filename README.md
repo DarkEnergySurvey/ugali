@@ -14,38 +14,38 @@ Installation
 
 There are several ways to install `ugali` and it's complimentary isochrone library.
 
-The easiest way is through PyPi using `pip`. To install just the `ugali` code base:
+The easiest way is through [PyPi](https://pypi.python.org/pypi) using `pip`:
 ```
 # To install just the source code
 pip install ugali
 
 # To also install the isochrone library
 pip install ugali --install-option "--isochrones"
-```
 
-By default, the isochrone library is installed into `$HOME/.ugali`; however you can modify this on the command line with:
+# To install the isochrone library in a specified path
+pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH>
 ```
-pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH-TO-ISOCHRONES>
-```
+The isochrone library is a ~100 MB tarball. The default installation location is `$HOME/.ugali`. Depending on the speed of your connection and processor, the download and unpacking of the isochrone files may cause a delay in your `pip` installation (unfortunately, `pip` [will not](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) display a progress bar during this delay).
 
-To get the most up-to-date version of `ugali`, you can download the source code from github and install with `setup.py`:
+To get the most up-to-date version of `ugali`, you can download the source code from github and install it with a call to `setup.py`:
 ```
+# Clone the parent
 git clone https://github.com/DarkEnergySurvey/ugali.git
 cd ugali
 
 # Install the python source code
 python setup.py install
 
-# To also install the isochrone library
+# Also install the isochrone library
 python setup.py install --isochrones
 
 # To specify the isochrone install path
 python setup.py install --isochrones --isochrones-path=<PATH>
 ```
 
-If you place the isochrones in a different directory be sure that `ugali` knows where to find them:
+If you place the isochrones in a non-default directory be sure that `ugali` knows where to find them:
 ```
-export UGALIDIR=$<INSTALL_PATH>/isochrones
+export UGALIDIR=$<PATH>/isochrones
 ```
 
 Usage Examples
