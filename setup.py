@@ -1,6 +1,9 @@
+from __future__ import print_function
+
 import sys
 import os
 import io
+
 
 try: 
     from setuptools import setup, find_packages
@@ -90,9 +93,9 @@ class ProgressFileIO(io.FileIO):
         progress = count*block
         if progress % 1 < 1.01*block:
             msg = '\r[{:51}] ({:d}%)'.format(int(progress//2)*'='+'>',int(progress))
-            print(msg)
-            #sys.stdout.write(msg)
-            #sys.stdout.flush()
+            #print(msg,end='')
+            sys.stdout.write(msg)
+            sys.stdout.flush()
 
 class IsochroneCommand(distutils.cmd.Command):
     """ Command for downloading isochrone files """
@@ -179,15 +182,15 @@ class install(_install):
         # ADW: pip filters sys.stdout, so the prompt never gets sent:
         # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
         # Ask the user about isochrone installation
-        ### if self.isochrones is None:
-        ###     question = "Install isochrone files (~100MB)?"
-        ###     self.isochrones = query_yes_no(question,default='no')
-        ###  
-        ###     if self.isochrones and not self.isochrones_path:
-        ###         question = "Isochrone install path (default: %s): "%UGALIDIR
-        ###         sys.stdout.write(question)
-        ###         path = raw_input()
-        ###         self.isochrone_path = path if path else None
+        if self.isochrones is None:
+            question = "Install isochrone files (~100MB)?"
+            self.isochrones = query_yes_no(question,default='no')
+         
+            if self.isochrones and not self.isochrones_path:
+                question = "Isochrone install path (default: %s): "%UGALIDIR
+                sys.stdout.write(question)
+                path = raw_input()
+                self.isochrone_path = path if path else None
 
         if self.isochrones: 
             self.install_isochrones()
