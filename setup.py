@@ -228,7 +228,7 @@ setup(
     packages=find_packages(),
     package_data={'ugali': ['data/catalog.tgz']},
     description="Ultra-faint galaxy likelihood toolkit.",
-    long_description=read('README.md'),
+    long_description="See README on %s"%URL,
     platforms='any',
     classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
 )
