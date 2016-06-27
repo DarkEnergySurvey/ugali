@@ -116,6 +116,9 @@ class IsochroneCommand(distutils.cmd.Command):
         import urllib
         import tarfile
 
+        question = "Install isochrone files (~100MB)?"
+        self.isochrones = query_yes_no(question,default='no')
+
         print("installing isochrones")
         if not os.path.exists(self.isochrones_path):
             print("creating %s"%self.isochrones_path)
@@ -149,9 +152,7 @@ class IsochroneCommand(distutils.cmd.Command):
             print("isochrone directory found; skipping installation")
             return
 
-        question = "Install isochrone files (~100MB)?"
-        self.isochrones = query_yes_no(question,default='no')
-        
+       
         self.install_isochrones()
 
 class install(_install):
