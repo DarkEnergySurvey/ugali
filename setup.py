@@ -64,18 +64,15 @@ def query_yes_no(question, default="yes"):
     else: raise ValueError("invalid default answer: '%s'" % default)
 
     while True:
-        #sys.stdout.write(question + prompt)
-        print(question + prompt)
+        sys.stdout.write(question + prompt)
         choice = raw_input().lower()
         if default is not None and choice == '':
             return valid[default]
         elif choice in valid:
             return valid[choice]
         else:
-            print("Please respond with 'yes' or 'no' "
-                  "(or 'y' or 'n').\n")
-            #sys.stdout.write("Please respond with 'yes' or 'no' "
-            #                 "(or 'y' or 'n').\n")
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
 
 class ProgressFileIO(io.FileIO):
     def __init__(self, path, *args, **kwargs):
@@ -93,7 +90,6 @@ class ProgressFileIO(io.FileIO):
         progress = count*block
         if progress % 1 < 1.01*block:
             msg = '\r[{:51}] ({:d}%)'.format(int(progress//2)*'='+'>',int(progress))
-            #print(msg,end='')
             sys.stdout.write(msg)
             sys.stdout.flush()
 
@@ -115,10 +111,6 @@ class IsochroneCommand(distutils.cmd.Command):
     def install_isochrones(self):
         import urllib
         import tarfile
-
-        question = "Install isochrone files (~100MB)?"
-        print(question)
-        self.isochrones = query_yes_no(question,default='no')
 
         print("installing isochrones")
         if not os.path.exists(self.isochrones_path):
