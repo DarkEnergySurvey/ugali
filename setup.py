@@ -149,6 +149,9 @@ class IsochroneCommand(distutils.cmd.Command):
             print("isochrone directory found; skipping installation")
             return
 
+        question = "Install isochrone files (~100MB)?"
+        self.isochrones = query_yes_no(question,default='no')
+        
         self.install_isochrones()
 
 class install(_install):
@@ -178,19 +181,19 @@ class install(_install):
         # run superclass install
         _install.run(self)
 
-        # ADW: consider moving to 'finalize_options'
-        # ADW: pip filters sys.stdout, so the prompt never gets sent:
-        # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
-        # Ask the user about isochrone installation
-        if self.isochrones is None:
-            question = "Install isochrone files (~100MB)?"
-            self.isochrones = query_yes_no(question,default='no')
-         
-            if self.isochrones and not self.isochrones_path:
-                question = "Isochrone install path (default: %s): "%UGALIDIR
-                sys.stdout.write(question)
-                path = raw_input()
-                self.isochrone_path = path if path else None
+        ### # ADW: consider moving to 'finalize_options'
+        ### # ADW: pip filters sys.stdout, so the prompt never gets sent:
+        ### # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
+        ### # Ask the user about isochrone installation
+        ### if self.isochrones is None:
+        ###     question = "Install isochrone files (~100MB)?"
+        ###     self.isochrones = query_yes_no(question,default='no')
+        ###  
+        ###     if self.isochrones and not self.isochrones_path:
+        ###         question = "Isochrone install path (default: %s): "%UGALIDIR
+        ###         sys.stdout.write(question)
+        ###         path = raw_input()
+        ###         self.isochrone_path = path if path else None
 
         if self.isochrones: 
             self.install_isochrones()
