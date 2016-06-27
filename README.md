@@ -13,22 +13,38 @@ The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python class
 INSTALLATION
 ------------
 
-The ugali codebase can be installed by downloading from github and
-using the `setup.py` script.
+There are several ways to install `ugali` and it's complimentary isochrone library.
+
+The easiest way is through PyPi using `pip`. To install just the `ugali` code base:
+```
+# To install just the source code
+pip install ugali
+
+# To also install the isochrone library
+pip install ugali --install-option "--isochrones"
+```
+
+By default, the isochrone library is installed into `$HOME/.ugali`; however you can modify this on the command line with:
+```
+pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH-TO-ISOCHRONES>
+```
+
+To get the most up-to-date version of `ugali`, you can download the source code from github and install with `setup.py`:
 ```
 git clone https://github.com/DarkEnergySurvey/ugali.git
 cd ugali
+
+# Install the python source code
 python setup.py install
+
+# To also install the isochrone library
+python setup.py install --isochrones
+
+# To specify the isochrone install path
+python setup.py install --isochrones --isochrones-path=<PATH>
 ```
-In addition to the code, if you plan on working with isochrones you probably want to install the ancillary isochrone information:
-```
-python setup.py isochrones
-```
-By default, the isochrone files (~100MB) will be installed in `$HOME/.ugali/isochrones`; however, this can be changed on the command line:
-```
-python setup.py isochrones --isochrone-path <INSTALL_PATH>
-```
-If you place the isochrones in a different directory be sure that ugali knows where to find them:
+
+If you place the isochrones in a different directory be sure that `ugali` knows where to find them:
 ```
 export UGALIDIR=$<INSTALL_PATH>/isochrones
 ```
