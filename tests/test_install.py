@@ -29,8 +29,8 @@ def call_setup_py():
     path,env = setup_env()
     cmd = env +' python setup.py -q install -f --prefix=.'
     call_cmd(cmd)
-    call_cmd(cmd + ' --isochrones')
-    call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
+    #call_cmd(cmd + ' --isochrones')
+    #call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
 
 def call_pip():
     path,env = setup_env()
