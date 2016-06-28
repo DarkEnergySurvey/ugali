@@ -40,23 +40,23 @@ def call_pip():
     #call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
     #call_cmd('pip uninstall ugali')
 
-def test_git_install():
-    tempdir = tempfile.mkdtemp()
-    call_chdir(tempdir)
-    call_cmd('git clone %s.git'%GITURL)
-    call_chdir('ugali')
-    call_setup_py()
-    call_cmd('rm -rf %s'%tempdir)
-
-def test_zip_install():
-    tempdir = tempfile.mkdtemp()
-    call_chdir(tempdir)
-    call_cmd('wget %s/archive/master.zip'%GITURL)
-    call_cmd('unzip -q master.zip')
-    call_chdir('ugali-master')
-    call_setup_py()
-    call_cmd('rm -rf %s'%tempdir)
-    
+#def test_git_install():
+#    tempdir = tempfile.mkdtemp()
+#    call_chdir(tempdir)
+#    call_cmd('git clone %s.git'%GITURL)
+#    call_chdir('ugali')
+#    call_setup_py()
+#    call_cmd('rm -rf %s'%tempdir)
+# 
+#def test_zip_install():
+#    tempdir = tempfile.mkdtemp()
+#    call_chdir(tempdir)
+#    call_cmd('wget %s/archive/master.zip'%GITURL)
+#    call_cmd('unzip -q master.zip')
+#    call_chdir('ugali-master')
+#    call_setup_py()
+#    call_cmd('rm -rf %s'%tempdir)
+#    
 #def test_pip_install():
 #    tempdir = tempfile.mkdtemp()
 #    call_chdir(tempdir)
