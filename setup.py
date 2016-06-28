@@ -23,7 +23,6 @@ VERSION = versioneer.get_version()
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
-URL = 'https://github.com/DarkEnergySurvey/ugali'
 CLASSIFIERS = """\
 Development Status :: 2 - Pre-Alpha
 Intended Audience :: Science/Research
@@ -32,12 +31,18 @@ Programming Language :: Python
 Natural Language :: English
 Topic :: Scientific/Engineering
 """
+URL = 'https://github.com/DarkEnergySurvey/ugali'
 ISOCHRONES = URL+'/releases/download/v1.5.2/ugali-isochrones-v1.5.2.tar.gz'
-UGALIDIR = "$HOME/.ugali"
+ISOSIZE = "~100MB" 
+# Could do this dynamically, but it's a bit slow...
+# int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
+UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 
+# ADW: Deprecated since long_description points to github
 def read(filename):
     return open(os.path.join(HERE,filename)).read()
 
+# ADW: Deprecated since pip doesn't support stdin...
 # Interactive setup.py is not supported by pip
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
@@ -99,11 +104,15 @@ class IsochroneCommand(distutils.cmd.Command):
     user_options = [
         ('isochrones-path=',None,
          'path to install isochrones (default: %s)'%UGALIDIR),
+        ('force','f',
+         'force installation (overwrite any existing files)')
         ]
     # Should the default path be set by install 'prefix'?
+    boolean_options = ['force']
 
     def initialize_options(self):
         self.isochrones_path = os.path.expandvars(UGALIDIR)
+        self.force = False
 
     def finalize_options(self):
         pass
@@ -137,14 +146,15 @@ class IsochroneCommand(distutils.cmd.Command):
 
     def run(self):
         if self.dry_run:
-            print("skipping isochrone download")
+            print("skipping isochrone install")
             return
 
-        if os.path.exists(os.path.join(self.isochrones_path,'isochrones')) \
-           and not self.force:
-            print("isochrone directory found; skipping installation")
-            return
-
+        if os.path.exists(os.path.join(self.isochrones_path,'isochrones')):
+            if self.force:
+                print("overwriting isochrone directory")
+            else:
+                print("isochrone directory found; skipping installation")
+                return
        
         self.install_isochrones()
 
@@ -154,9 +164,9 @@ class install(_install):
     """
 
     user_options = _install.user_options + [
-        ('isochrones',None,"download and install isochrone files"),
-        ('no-isochrones',None,"don't install isochrone files"),
-        ('isochrones-path=',None,"isochrone installation path")
+        ('isochrones',None,"install isochrone files (%s)"%ISOSIZE),
+        ('no-isochrones',None,"don't install isochrone files [default]"),
+        ('isochrones-path=',None,"isochrone installation path [default: %s]"%UGALIDIR)
     ]
     boolean_options = _install.boolean_options + ['isochrones','no-isochrones']
 
@@ -180,7 +190,7 @@ class install(_install):
         ### # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
         ### # Ask the user about isochrone installation
         ### if self.isochrones is None:
-        ###     question = "Install isochrone files (~100MB)?"
+        ###     question = "Install isochrone files (%s)?"%ISOSIZE
         ###     self.isochrones = query_yes_no(question,default='no')
         ###  
         ###     if self.isochrones and not self.isochrones_path:
@@ -196,12 +206,16 @@ class install(_install):
             
     def install_isochrones(self):
         """
-        Call to isochrone install command.
+        Call to isochrone install command:
         http://stackoverflow.com/a/24353921/4075339
         """
         if self.isochrones_path:
             cmd_obj = self.distribution.get_command_obj('isochrones')
             cmd_obj.isochrones_path = self.isochrones_path
+
+        cmd_obj = self.distribution.get_command_obj('isochrones')
+        cmd_obj.force = self.force
+
         self.run_command('isochrones')
             
 CMDCLASS = versioneer.get_cmdclass()

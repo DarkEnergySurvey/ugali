@@ -14,22 +14,22 @@ Installation
 
 There are several ways to install `ugali` and it's complimentary isochrone library.
 
-The easiest way is through [PyPi](https://pypi.python.org/pypi) using `pip`:
+The easiest way to install `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
 ```
 # To install just the source code
 pip install ugali
 
-# To also install the isochrone library
+# To install source code and isochrone library
 pip install ugali --install-option "--isochrones"
 
-# To install the isochrone library in a specified path
-pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH>
+# To specify a path for the isochrone library
+pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH>"
 ```
-The isochrone library is a ~100 MB tarball. The default installation location is `$HOME/.ugali`. Depending on the speed of your connection and processor, the download and unpacking of the isochrone files may cause a delay in your `pip` installation (unfortunately, `pip` [will not](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) display a progress bar during this delay).
+The isochrone library is a ~100 MB tarball. The default isochrone installation location is set by the `UGALIDIR` environment variable and defaults to `$HOME/.ugali`. The download and unpacking of the isochrone files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [will not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
 
-To get the most up-to-date version of `ugali`, you can download the source code from github and install it with a call to `setup.py`:
+To get the most up-to-date version of `ugali`, you can download the source code from github and install it using `setup.py`:
 ```
-# Clone the parent
+# Clone source code from the parent repository
 git clone https://github.com/DarkEnergySurvey/ugali.git
 cd ugali
 
@@ -39,23 +39,18 @@ python setup.py install
 # Also install the isochrone library
 python setup.py install --isochrones
 
-# To specify the isochrone install path
+# Specify the isochrone install path
 python setup.py install --isochrones --isochrones-path=<PATH>
 ```
 
-If you place the isochrones in a non-default directory be sure that `ugali` knows where to find them:
+The code uses the `UGALIDIR` environment variable to find the isochrones (defaults to `$HOME/.ugali`). If you install the isochrones in a non-standard location be sure to set `UGALIDIR` so `ugali` can find them:
 ```
 export UGALIDIR=$<PATH>/isochrones
 ```
 
 Usage Examples
 --------------
-Examples go here.
-
-Code Repository
----------------
-* https://bitbucket.org/bechtol/ugali/
-* https://github.com/kadrlica/ugali/
+Examples go here...
 
 Dependencies
 ------------
@@ -77,7 +72,7 @@ the Dark Energy Survey Data Mangement group. Download and documentation
 available at http://space.mit.edu/~molly/mangle/
 
 ### Isochrones:
-The ugali tools make use of a large library of stellar isochrones. These isochrones are derived from two different groups and are distributed as binary tarballs with releases of ugali.
+The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from two different groups:
 * Padova isochrones (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
 
