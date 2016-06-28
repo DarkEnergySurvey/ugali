@@ -27,45 +27,44 @@ def setup_env():
 
 def call_setup_py():
     path,env = setup_env()
-    cmd = env +' python setup.py -v install -f --prefix=.'
+    cmd = env +' python setup.py -q install -f --prefix=.'
     call_cmd(cmd)
     #call_cmd(cmd + ' --isochrones')
     #call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
 
 def call_pip():
     path,env = setup_env()
-    cmd = env + 'pip install --user --no-deps -I ugali'
+    cmd = env + 'pip install --no-deps -I ugali --install-option "--prefix="'
     call_cmd(cmd)
     #call_cmd(cmd +' --install-option "--isochrones"')
     #call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
     #call_cmd('pip uninstall ugali')
 
 def test_git_install():
-    cwd = os.getcwd()
     tempdir = tempfile.mkdtemp()
     call_chdir(tempdir)
     call_cmd('git clone %s.git'%GITURL)
     call_chdir('ugali')
     call_setup_py()
-    call_chdir(cwd)
+    call_chdir(os.path.expandvars('$HOME')
     call_cmd('rm -rf %s'%tempdir)
-    call_cmd('echo $HOME')
-    call_cmd('echo $PYTHONPATH')
 
-#def test_zip_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_cmd('wget %s/archive/master.zip'%GITURL)
-#    call_cmd('unzip -q master.zip')
-#    call_chdir('ugali-master')
-#    call_setup_py()
-#    call_cmd('rm -rf %s'%tempdir)
-#    
-#def test_pip_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_pip()
-#    call_cmd('rm -rf %s'%tempdir)
+def test_zip_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_cmd('wget %s/archive/master.zip'%GITURL)
+    call_cmd('unzip -q master.zip')
+    call_chdir('ugali-master')
+    call_setup_py()
+    call_chdir(os.path.expandvars('$HOME')
+    call_cmd('rm -rf %s'%tempdir)
+    
+def test_pip_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_pip()
+    call_chdir(os.path.expandvars('$HOME')
+    call_cmd('rm -rf %s'%tempdir)
 
 if __name__ == "__main__":
     import argparse
