@@ -6,8 +6,13 @@ import os
 import subprocess
 import tempfile
 
-GITURL = "https://github.com/DarkEnergySurvey/ugali"
-GITURL = "https://github.com/kadrlica/ugali"
+# Not all that robust...
+try:
+    GITBASE = os.path.dirname(subprocess.check_output('git config --get remote.origin.url',shell=True).split(':')[1])
+except:
+    GITBASE = 'DarkEnergySurvey'
+
+GITURL = "https://github.com/%s/ugali"%GITBASE
 
 def call_cmd(cmd):
     print(cmd)
