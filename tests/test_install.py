@@ -49,7 +49,7 @@ def test_git_install():
     #call_chdir('ugali')
     #call_setup_py()
     call_cmd('rm -rf %s'%tempdir)
-    #call_chdir(cwd)
+    call_chdir(cwd)
 
 #def test_zip_install():
 #    tempdir = tempfile.mkdtemp()
