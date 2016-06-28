@@ -32,7 +32,7 @@ Natural Language :: English
 Topic :: Scientific/Engineering
 """
 URL = 'https://github.com/DarkEnergySurvey/ugali'
-ISOCHRONES = URL+'/releases/download/v1.5.2/ugali-isochrones-v1.5.2.tar.gz'
+ISOCHRONES = URL+'/releases/download/v1.6.3/ugali-isochrones-v1.6.3.tar.gz'
 ISOSIZE = "~100MB" 
 # Could do this dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
