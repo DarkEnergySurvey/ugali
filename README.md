@@ -45,7 +45,7 @@ python setup.py install --isochrones --isochrones-path=<PATH>
 
 The code uses the `UGALIDIR` environment variable to find the isochrones (defaults to `$HOME/.ugali`). If you install the isochrones in a non-standard location be sure to set `UGALIDIR` so `ugali` can find them:
 ```
-export UGALIDIR=$<PATH>
+export UGALIDIR=<PATH>
 ```
 
 Usage Examples
