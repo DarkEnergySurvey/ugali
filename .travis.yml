@@ -25,4 +25,5 @@ install:
 
 # command to run tests
 script: 
-  - nosetests -v --nocapture
+  #- nosetests -v --nocapture
+  - nosetests -v
