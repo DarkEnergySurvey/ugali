@@ -1,5 +1,5 @@
 [![Build](https://img.shields.io/travis/DarkEnergySurvey/ugali.svg)](https://travis-ci.org/DarkEnergySurvey/ugali)
-[![Release](https://img.shields.io/github/tag/DarkEnergySurvey/ugali.svg)](../../releases)
+[![Release](https://img.shields.io/github/release/DarkEnergySurvey/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
 
 Overview
@@ -45,7 +45,7 @@ python setup.py install --isochrones --isochrones-path=<PATH>
 
 The code uses the `UGALIDIR` environment variable to find the isochrones (defaults to `$HOME/.ugali`). If you install the isochrones in a non-standard location be sure to set `UGALIDIR` so `ugali` can find them:
 ```
-export UGALIDIR=$<PATH>/isochrones
+export UGALIDIR=$<PATH>
 ```
 
 Usage Examples

@@ -185,9 +185,10 @@ class install(_install):
         # run superclass install
         _install.run(self)
 
-        ### # ADW: consider moving to 'finalize_options'
+        ### # ADW: Deprecated...
         ### # ADW: pip filters sys.stdout, so the prompt never gets sent:
         ### # https://github.com/pypa/pip/issues/2732#issuecomment-97119093
+        ### # ADW: consider moving to 'finalize_options'
         ### # Ask the user about isochrone installation
         ### if self.isochrones is None:
         ###     question = "Install isochrone files (%s)?"%ISOSIZE
@@ -242,7 +243,7 @@ setup(
     packages=find_packages(),
     package_data={'ugali': ['data/catalog.tgz']},
     description="Ultra-faint galaxy likelihood toolkit.",
-    long_description="See README on %s"%URL,
+    long_description="See github README at %s"%URL,
     platforms='any',
     classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
 )
