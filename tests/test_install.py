@@ -45,9 +45,9 @@ def test_git_install():
     cwd = os.getcwd()
     tempdir = tempfile.mkdtemp()
     call_chdir(tempdir)
-    #call_cmd('git clone %s.git'%GITURL)
-    #call_chdir('ugali')
-    #call_setup_py()
+    call_cmd('git clone %s.git'%GITURL)
+    call_chdir('ugali')
+    call_setup_py()
     call_cmd('rm -rf %s'%tempdir)
     call_chdir(cwd)
 
