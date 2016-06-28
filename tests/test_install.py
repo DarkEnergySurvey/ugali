@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test installation
+Test the installation process.
 """
 import os
 import subprocess
@@ -30,35 +30,36 @@ def call_setup_py():
     path,env = setup_env()
     cmd = env + 'python setup.py -q install -f --prefix=$CWD'
     call_cmd(cmd)
-    #call_cmd(cmd + ' --isochrones')
-    #call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
+    call_cmd(cmd + ' --isochrones')
+    call_cmd(cmd + ' --isochrones --isochrones-path=$CWD/tmp')
 
 def call_pip():
     path,env = setup_env()
-    cmd = env + 'pip install --no-deps -I -t $CWD ugali'
-    #cmd = env + 'pip install --no-deps -I ugali --install-option "--prefix=$CWD"'
+    # This should work, but doesn't
+    #cmd = env + 'pip install --no-deps -I -t $CWD ugali'
+    cmd = env + 'pip install --no-deps -I ugali --install-option "--prefix=$CWD"'
     call_cmd(cmd)
-    #call_cmd(cmd +' --install-option "--isochrones"')
-    #call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
+    call_cmd(cmd +' --install-option "--isochrones"')
+    call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=$CWD/tmp" ')
 
-#def test_git_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_cmd('git clone %s.git'%GITURL)
-#    call_chdir('ugali')
-#    call_setup_py()
-#    call_chdir(os.path.expandvars('$HOME'))
-#    call_cmd('rm -rf %s'%tempdir)
-# 
-#def test_zip_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_cmd('wget %s/archive/master.zip'%GITURL)
-#    call_cmd('unzip -q master.zip')
-#    call_chdir('ugali-master')
-#    call_setup_py()
-#    call_chdir(os.path.expandvars('$HOME'))
-#    call_cmd('rm -rf %s'%tempdir)
+def test_git_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_cmd('git clone %s.git'%GITURL)
+    call_chdir('ugali')
+    call_setup_py()
+    call_chdir(os.path.expandvars('$HOME'))
+    call_cmd('rm -rf %s'%tempdir)
+ 
+def test_zip_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_cmd('wget %s/archive/master.zip'%GITURL)
+    call_cmd('unzip -q master.zip')
+    call_chdir('ugali-master')
+    call_setup_py()
+    call_chdir(os.path.expandvars('$HOME'))
+    call_cmd('rm -rf %s'%tempdir)
     
 def test_pip_install():
     tempdir = tempfile.mkdtemp()
@@ -72,6 +73,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     args = parser.parse_args()
 
-    #test_git_install()
-    #test_zip_install()
-    #test_pip_install()
+    test_git_install()
+    test_zip_install()
+    test_pip_install()
