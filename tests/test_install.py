@@ -28,7 +28,8 @@ def setup_env():
 def call_setup_py():
     path,env = setup_env()
     #cmd = env +' python setup.py -q install -f --prefix=.'
-    cmd = env +' python setup.py -v install -f --user'
+    #cmd = env +' python setup.py -v install -f --user'
+    cmd = env
     call_cmd(cmd)
     #call_cmd(cmd + ' --isochrones')
     #call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
