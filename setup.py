@@ -4,7 +4,6 @@ import sys
 import os
 import io
 
-
 try: 
     from setuptools import setup, find_packages
     from setuptools.command.install import install as _install
@@ -23,6 +22,7 @@ VERSION = versioneer.get_version()
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
+URL = 'https://github.com/DarkEnergySurvey/ugali'
 CLASSIFIERS = """\
 Development Status :: 2 - Pre-Alpha
 Intended Audience :: Science/Research
@@ -246,5 +246,3 @@ setup(
     platforms='any',
     classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f]
 )
-
-
