@@ -23,21 +23,22 @@ def setup_env():
     path='./lib/python2.7/site-packages/'
     call_cmd("mkdir -p %s"%path)
     env = 'HOME=.; PYTHONPATH=$PYTHONPATH:%s;'%path
-    return env
+    return path, env
 
 def call_setup_py():
-    env = setup_env()
+    path,env = setup_env()
     cmd = env +' python setup.py -q install -f --prefix=.'
     call_cmd(cmd)
     call_cmd(cmd + ' --isochrones')
     call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
 
 def call_pip():
-    env = setup_env()
-    cmd = env + 'pip install ugali --no-deps -I'
+    path,env = setup_env()
+    cmd = env + 'pip install --user --no-deps -I  ugali'
     call_cmd(cmd)
-    call_cmd(cmd +' --install-option "--isochrones"')
-    call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
+    #call_cmd(cmd +' --install-option "--isochrones"')
+    #call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
+    #call_cmd('pip uninstall ugali')
 
 def test_git_install():
     tempdir = tempfile.mkdtemp()
@@ -51,7 +52,7 @@ def test_zip_install():
     tempdir = tempfile.mkdtemp()
     call_chdir(tempdir)
     call_cmd('wget %s/archive/master.zip'%GITURL)
-    call_cmd('unzip master.zip')
+    call_cmd('unzip -q master.zip')
     call_chdir('ugali-master')
     call_setup_py()
     call_cmd('rm -rf %s'%tempdir)
