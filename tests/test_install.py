@@ -27,7 +27,8 @@ def setup_env():
 
 def call_setup_py():
     path,env = setup_env()
-    cmd = env +' python setup.py -q install -f --prefix=.'
+    #cmd = env +' python setup.py -q install -f --prefix=.'
+    cmd = env +' python setup.py -q install -f --user'
     call_cmd(cmd)
     #call_cmd(cmd + ' --isochrones')
     #call_cmd(cmd + ' --isochrones --isochrones-path=./tmp')
@@ -40,14 +41,14 @@ def call_pip():
     #call_cmd(cmd +' --install-option "--isochrones" --install-option="--isochrones-path=./tmp" ')
     #call_cmd('pip uninstall ugali')
 
-#def test_git_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_cmd('git clone %s.git'%GITURL)
-#    call_chdir('ugali')
-#    call_setup_py()
-#    call_cmd('rm -rf %s'%tempdir)
-# 
+def test_git_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_cmd('git clone %s.git'%GITURL)
+    call_chdir('ugali')
+    call_setup_py()
+    call_cmd('rm -rf %s'%tempdir)
+ 
 #def test_zip_install():
 #    tempdir = tempfile.mkdtemp()
 #    call_chdir(tempdir)
