@@ -3,12 +3,13 @@
 Test the installation process.
 """
 import os
+from os.path import basename, dirname
 import subprocess
 import tempfile
 
 # Not all that robust...
 try:
-    GITBASE = os.path.dirname(subprocess.check_output('git config --get remote.origin.url',shell=True).split(':')[1])
+    GITBASE = basename(dirname(subprocess.check_output('git config --get remote.origin.url',shell=True).split(':')[1]))
 except:
     GITBASE = 'DarkEnergySurvey'
 
