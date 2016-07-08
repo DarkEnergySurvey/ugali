@@ -111,7 +111,7 @@ class Local(Batch):
         self.submit_cmd = "%(command)s %(opts)s"
 
     def parse_options(self,**opts):
-        if opts.get('logfile'): return ' | tee %(logfile)s'%opts
+        if opts.get('logfile'): return ' 2>&1 | tee %(logfile)s'%opts
         return ''
 
 class LSF(Batch):
@@ -145,7 +145,8 @@ class LSF(Batch):
         options.update(opts)
         if 'n' in options.keys():
             options['a'] = 'mpirun'
-            options['R'] += ' -R "span[ptile=4]"'
+            #options['R'] += ' -R "span[ptile=4]"'
+            options['R'] += ' -R "span[ptile=8]"'
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
