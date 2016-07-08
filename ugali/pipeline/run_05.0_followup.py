@@ -126,11 +126,14 @@ def do_plot(args):
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
         plt.close()
 
-    plotter.plot4()
-    outfile = samfile.replace('.npy','_4panel.png')
-    logger.info("  Writing %s..."%outfile)
-    plt.savefig(outfile,bbox_inches='tight',dpi=60)
-    plt.close()
+    try:
+        plotter.plot4()
+        outfile = samfile.replace('.npy','_4panel.png')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+        plt.close()
+    except:
+        logger.warning("  Failed to create plotter.plot4()")
     
 def run(self):
     if self.opts.coords is not None:
