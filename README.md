@@ -48,6 +48,8 @@ The code uses the `UGALIDIR` environment variable to find the isochrones (defaul
 export UGALIDIR=<PATH>
 ```
 
+If all else fails, check out the automated build installation procedure using `conda` in [.travis.yml](.travis.yml).
+
 Usage Examples
 --------------
 Examples go here...
