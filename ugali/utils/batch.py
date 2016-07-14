@@ -45,7 +45,7 @@ MPIOPTS = odict([
         ('bulletmpi',' -R "span[ptile=16]"'),
         ])
 
-def batchFactory(queue,**kwargs):
+def factory(queue,**kwargs):
     if queue is None: queue = 'local'
 
     name = queue.lower()
@@ -66,6 +66,8 @@ def batchFactory(queue,**kwargs):
         raise TypeError('Unexpected queue name: %s'%name)
 
     return batch
+
+batchFactory = factory
 
 class Batch(object):
     # Default options for batch submission
@@ -189,7 +191,7 @@ class Slurm(Batch):
         return ''.join('--%s %s '%(k,v) for k,v in options.items())
 
 class Condor(Batch):
-
+    """ Not implemented yet... """
     def __init__(self):
         super(Condor,self).__init__(**kwargs)
         logger.warning('Condor cluster is untested')

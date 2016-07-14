@@ -4,7 +4,7 @@ a, b, c = rank by current importance (a > b)
 1, 2, 3 = rank by difficulty (1 > 2)
 
 ## Code:
-* (3b) Move this TODO list to git issue tracker
+* (3c) Move this TODO list to git issue tracker
 * (3a) Make mag_1_field more consistent (propogate 'g','r','i' throughout)
 * (2a) Switch to astropy for coordinate conversion, etc.
 * (2c) Change name of ugali.utils.projector to ugali.utils.coords (obsolete with astropy)
@@ -18,15 +18,14 @@ a, b, c = rank by current importance (a > b)
 * (2c) Compute the absolute visual magnitude in addition to bolometric luminosity
 * (3b) FNAL, Midway, SLAC config files (better to make batch-system independent)
 * (2b) Merge config file with default config or store defaults in objects (probably the latter)
-* (2b) Switch to compressed full healpix maps (so that default healpy can be used)
-* (1b) Create true composite isochrone (subclassing isochrone) rather than container of isochrones
-* (2b) Examine gzipped standard healpix files instead of sparse healpix maps
+* (2b) Revist healpix map format; is this really what we want?
 * (1c) Precompute HEALPix pixel for each object and avoid creating full HEALPix maps
 * (2b) Consider updating DES isochrones
-* (2b) Restructure and subclass isochrone
 * (2b) Connect isochrone.observableFraction and mask.restrictCatalogToObservableSpace
 * (2b) CMD should be masked array not clipped and pushed
-* (2b) Rewrite catalog to use fitsio
+* (2b) Rewrite catalog reader to use fitsio
+* (2b) Compress isochrone data to easy distribution and allow for more extensive isochrone set
+* (1b) Fully incorporate completeness in isochrone fitting and simulation
 
 ## DONE
 * (1c) Collector function to find peaks (in 3D)
@@ -49,3 +48,5 @@ a, b, c = rank by current importance (a > b)
 * (2b) Automated data processing to get mangle masks and catalogs from DESDM
 * (2b) Separate analysis from plotting
 * (2b) SVA1 data products
+* (2b) Restructure and subclass isochrone
+* (1b) Create true composite isochrone (subclassing isochrone) rather than container of isochrones

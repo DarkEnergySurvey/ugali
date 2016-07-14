@@ -443,9 +443,7 @@ def write_membership(filename,config,srcfile,section=None):
     loglike = createLoglike(config,source)
     loglike.write_membership(filename)
 
-
-# These should probably be moved into Factory...
-
+# This should probably be moved into ugali.analysis.source...
 def createSource(config, section=None, **kwargs):
     config = Config(config)    
     source = Source()
@@ -468,13 +466,13 @@ def createKernel(config, **kwargs):
 def createIsochrone(config, **kwargs):
     return createSource(config,**kwargs).isochrone
 
+### probably move these to observation ###
 def createObservation(config,lon,lat):
     roi = createROI(config,lon,lat)
     catalog = createCatalog(config,roi)
     mask = createMask(config,roi)
     return Observation(roi=roi,mask=mask,catalog=catalog)
 
-### probably move these to observation ###
 def createROI(config,lon,lat):
     import ugali.observation.roi
     roi = ugali.observation.roi.ROI(config, lon, lat)        

@@ -16,7 +16,7 @@ from ugali.utils.projector import cel2gal, gal2cel
 import ugali.utils.plotting
 from ugali.utils.config import Config
 from ugali.analysis.kernel import Disk
-from ugali.analysis.isochrone2 import Padova
+from ugali.analysis.isochrone import Padova
 import ugali.analysis.source
 
 from dsphs.like.lnlfn import ProfileLimit

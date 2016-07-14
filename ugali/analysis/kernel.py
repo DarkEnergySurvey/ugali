@@ -431,40 +431,48 @@ Exponential = RadialExponential
 Plummer     = RadialPlummer
 King        = RadialKing
 
-def kernelFactory2(name, **kwargs):
-    """
-    Factory for creating spatial kernels. Arguments
-    are passed directly to the constructor of the chosen
-    kernel.
-    """
-    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
-    kernels = odict(inspect.getmembers(sys.modules[__name__], fn))
+### def kernelFactory2(name, **kwargs):
+###     """
+###     Factory for creating spatial kernels. Arguments
+###     are passed directly to the constructor of the chosen
+###     kernel.
+###     """
+###     fn = lambda member: inspect.isclass(member) and member.__module__==__name__
+###     kernels = odict(inspect.getmembers(sys.modules[__name__], fn))
+###  
+###     if name not in kernels.keys():
+###         msg = "%s not found in kernels:\n %s"%(name,kernels.keys())
+###         logger.error(msg)
+###         msg = "Unrecognized kernel: %s"%name
+###         raise Exception(msg)
+###  
+###     return kernels[name](**kwargs)
+###  
+###  
+### def kernelFactory(name, **kwargs):
+###     """
+###     Factory for creating spatial kernels. Arguments
+###     are passed directly to the constructor of the chosen
+###     kernel.
+###     """
+###     fn = lambda member: inspect.isclass(member) and member.__module__==__name__
+###     kernels = odict(inspect.getmembers(sys.modules[__name__], fn))
+###  
+###     if name not in kernels.keys():
+###         msg = "%s not found in kernels:\n %s"%(name,kernels.keys())
+###         logger.error(msg)
+###         msg = "Unrecognized kernel: %s"%name
+###         raise Exception(msg)
+###  
+###     return kernels[name](**kwargs)
 
-    if name not in kernels.keys():
-        msg = "%s not found in kernels:\n %s"%(name,kernels.keys())
-        logger.error(msg)
-        msg = "Unrecognized kernel: %s"%name
-        raise Exception(msg)
+#ADW: Should change 'name' to 'type' (but lots of legacy to deal with)
+def factory(name, **kwargs):
+    from ugali.utils.factory import factory
+    return factory(name, module=__name__, **kwargs)
 
-    return kernels[name](**kwargs)
+kernelFactory = factory
 
-
-def kernelFactory(name, **kwargs):
-    """
-    Factory for creating spatial kernels. Arguments
-    are passed directly to the constructor of the chosen
-    kernel.
-    """
-    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
-    kernels = odict(inspect.getmembers(sys.modules[__name__], fn))
- 
-    if name not in kernels.keys():
-        msg = "%s not found in kernels:\n %s"%(name,kernels.keys())
-        logger.error(msg)
-        msg = "Unrecognized kernel: %s"%name
-        raise Exception(msg)
- 
-    return kernels[name](**kwargs)
 
 if __name__ == "__main__":
     import argparse
