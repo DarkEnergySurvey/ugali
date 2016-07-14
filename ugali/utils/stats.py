@@ -134,6 +134,159 @@ def sky(lon=None,lat=None,size=1):
     theta = np.arcsin(np.random.uniform(vmin,vmax,size=size))
     return np.degrees(phi),np.degrees(theta)
 
+
+class Samples(np.recarray):
+    """
+    Wrapper class for recarray to deal with MCMC samples.
+    
+    A nice summary of various bayesian credible intervals can be found here:
+    http://www.sumsar.net/blog/2014/10/probable-points-and-credible-intervals-part-one/
+    """
+    _alpha = 0.10
+    _nbins = 300
+
+    def __new__(cls, input, names=None):
+        # Load the array from file
+        if not isinstance(input,np.ndarray):
+            obj = np.load(input).view(cls)
+        else:
+            obj = np.asarray(input).view(cls)
+            
+        # (re)set the column names
+        if names is not None:
+            if obj.dtype.names is None:
+                obj = np.rec.fromarrays(obj,names=names).view(cls)
+            else:
+                obj.dtype.names = names
+
+        return obj
+
+    def __array_wrap__(self, out_arr, context=None):
+        return np.ndarray.__array_wrap__(self,out_arr,context)
+
+    @property
+    def names(self):
+        return self.dtype.names
+
+    @property
+    def ndarray(self):
+        # atleast_2d is for 
+        if len(self.dtype) == 1:
+            return np.expand_dims(self.view((float,len(self.dtype))),1)
+        else:
+            return self.view((float,len(self.dtype)))
+
+    def get(self, names=None, burn=None, clip=None):
+        if names is None: names = list(self.dtype.names)
+        names = np.array(names,ndmin=1)
+
+        missing = names[~np.in1d(names,self.dtype.names)]
+        if len(missing):
+            msg = "field(s) named %s not found"%(missing)
+            print msg
+            raise ValueError(msg)
+        idx = np.where(np.in1d(self.dtype.names,names))[0]
+
+        # Remove zero entries
+        zsel = ~np.all(self.ndarray==0,axis=1)
+        # Remove burn entries
+        bsel = np.zeros(len(self),dtype=bool)
+        bsel[slice(burn,None)] = 1
+
+        data = self.ndarray[:,idx][bsel&zsel]
+        if clip is not None:
+            from astropy.stats import sigma_clip
+            mask = sigma_clip(data,sig=clip,copy=False,axis=0).mask
+            data = data[np.where(~mask.any(axis=1))]
+
+        return data
+
+
+    @classmethod
+    def _interval(cls,best,lo,hi):
+        """
+        Pythonized interval for easy output to yaml
+        """
+        #return ugali.utils.stats.interval(best,lo,hi)
+        return interval(best,lo,hi)
+
+    def mean(self, name, **kwargs):
+        """
+        Mean of the distribution.
+        """
+        return np.mean(self.get(name,**kwargs))
+
+    def mean_interval(self, name, alpha=_alpha, **kwargs):
+        """
+        Interval assuming gaussian posterior.
+        """
+        data = self.get(name,**kwargs)
+        #return ugali.utils.stats.mean_interval(data,alpha)
+        return mean_interval(data,alpha)
+
+    def median(self, name, **kwargs):
+        """
+        Median of the distribution.
+        """
+        data = self.get(name,**kwargs)
+        return np.percentile(data,[50])
+
+    def median_interval(self,name,alpha=_alpha, **kwargs):
+        """
+        Median including bayesian credible interval.
+        """
+        data = self.get(name,**kwargs)
+        #return ugali.utils.stats.median_interval(data,alpha)
+        return median_interval(data,alpha)
+
+    def peak(self, name, **kwargs):
+        data = self.get(name,**kwargs)
+        #return ugali.utils.stats.peak(data,bins=self._nbins)
+        return peak(data,bins=self._nbins)
+
+    def kde_peak(self, name, **kwargs):
+        """ 
+        Calculate peak of kernel density estimator
+        """
+        data = self.get(name,**kwargs)
+        #return ugali.utils.stats.kde_peak(data,samples=250)
+        return kde_peak(data,samples=250)
+
+    def kde(self, name, **kwargs):
+        """ 
+        Calculate kernel density estimator for parameter
+        """
+        data = self.get(name,**kwargs)
+        #return ugali.utils.stats.kde(data,samples=250)
+        return kde(data,samples=250)
+
+    def peak_interval(self, name, alpha=_alpha, **kwargs):
+        """ 
+        Calculate peak interval for parameter.
+        """
+        data = self.get(name, **kwargs)
+        #return ugali.utils.stats.peak_interval(data,alpha,samples=250)
+        return peak_interval(data,alpha,samples=250)
+
+    def min_interval(self,name, alpha=_alpha, **kwargs):
+        """ 
+        Calculate minimum interval for parameter.
+        """
+        data = self.get(name, **kwargs)
+        #return ugali.utils.min_interval(data,alpha)
+        return min_interval(data,alpha)
+
+    def results(self, names=None, alpha=_alpha, mode='peak', **kwargs):
+        """
+        Calculate the results for a set of parameters.
+        """
+        if names is None: names = self.names
+        ret = odict()
+        for n in names:
+            ret[n] = getattr(self,'%s_interval'%mode)(n, **kwargs)
+        return ret
+
+
 if __name__ == "__main__":
     import argparse
     description = "python script"
