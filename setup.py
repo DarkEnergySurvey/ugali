@@ -9,10 +9,6 @@ except ImportError:
                 'ugali.preprocess','ugali.simulation','ugali.candidate',
                 'ugali.utils']
 
-#from ugali.get_version import get_version, write_version_py
-#VERSION = get_version()
-#write_version_py(version=VERSION)
-
 import versioneer
 VERSION = versioneer.get_version()
 
