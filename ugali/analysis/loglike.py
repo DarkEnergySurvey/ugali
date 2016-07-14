@@ -434,6 +434,16 @@ class LogLikelihood(object):
         hdu.header.set(name,time.asctime())
         hdu.writeto(filename,clobber=True)
 
+def write_membership(filename,config,srcfile,section=None):
+    """
+    Top level interface to write the membership from a config and source model.
+    """
+    source = Source()
+    source.load(srcfile,section=section)
+    loglike = createLoglike(config,source)
+    loglike.write_membership(filename)
+
+
 # These should probably be moved into Factory...
 
 def createSource(config, section=None, **kwargs):
