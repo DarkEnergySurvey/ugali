@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Cross-platform batch computing interface.
+"""
+
 import subprocess, subprocess as sub
 import getpass
 from collections import OrderedDict as odict
@@ -8,29 +12,37 @@ import copy
 from ugali.utils.logger import logger
 
 CLUSTERS = odict([
-    ('local',['local']),
-    ('lsf',['lsf','slac','kipac']),
-    ('slurm',['slurm','midway','kicp']),
+    ('local' ,['local']),
+    ('lsf'   ,['lsf','slac','kipac']),
+    ('slurm' ,['slurm','midway','kicp']),
     ('condor',['condor','fnal']),
 ])
 
 QUEUES = odict([
-    ('local',[]),
-    ('lsf',['express','short','medium','long','xlong','xxl','kipac-ibq','bulletmpi']),
-    ('slurm',[]),
+    ('local' ,[]),
+    ('lsf'   ,['express','short','medium','long','xlong','xxl',
+               'kipac-ibq','bulletmpi']),
+    ('slurm' ,[]),
     ('condor',['local','vanilla','universe','grid']),
 ])
 
-RUNLIMITS = odict([            #Hard limits
-        (None,'4:00'),         # Default value
-        ('express','0:01'),    # 0:01
-        ('short','0:30'),      # 0:30
-        ('medium','1:00'),     # 4:00
-        ('long','4:00'),       # 32:00
-        ('xlong','72:00'),     # 72:00
-        ('xxl','168:00'),
-        ('kipac-ibq','24:00'),
+RUNLIMITS = odict([              #Hard limits
+        (None       ,'4:00'),    # Default value
+        ('express'  ,'0:01'),    # 0:01
+        ('short'    ,'0:30'),    # 0:30
+        ('medium'   ,'1:00'),    # 4:00
+        ('long'     ,'4:00'),    # 32:00
+        ('xlong'    ,'72:00'),   # 72:00
+        ('xxl'      ,'168:00'),
+        ('kipac-ibq','24:00'),   # MPI queues
         ('bulletmpi','48:00'),
+        ])
+
+MPIOPTS = odict([
+        (None       ,' -R "span[ptile=4]"'),
+        ('local'    ,''),
+        ('kipac-ibq',' -R "span[ptile=8]"'),
+        ('bulletmpi',' -R "span[ptile=16]"'),
         ])
 
 def batchFactory(queue,**kwargs):
@@ -49,7 +61,7 @@ def batchFactory(queue,**kwargs):
     elif name in CLUSTERS['condor']+QUEUES['condor']:
         # Need to learn how to use condor first...
         batch = Condor(**kwargs)
-        raise Exception("FNAL cluster not implemented")
+        raise Exception("Condor cluster not implemented")
     else:
         raise TypeError('Unexpected queue name: %s'%name)
 
@@ -136,17 +148,24 @@ class LSF(Batch):
         """
         Translate queue to wallclock runlimit.
         """
-        return RUNLIMITS[queue]
-        
+        try:             return RUNLIMITS[queue]
+        except KeyError: return RUNLIMITS[None]
     q2w = runlimit
+
+    def mpiopts(self, queue=None):
+        """
+        Translate queue into MPI options.
+        """
+        try:             return MPIOPTS[queue]
+        except KeyError: return MPIOPTS[None]
+    q2mpi = mpiopts
 
     def parse_options(self, **opts):
         options = odict(self.default_opts)
         options.update(opts)
-        if 'n' in options.keys():
+        if 'n' in options.keys(): 
             options['a'] = 'mpirun'
-            #options['R'] += ' -R "span[ptile=4]"'
-            options['R'] += ' -R "span[ptile=8]"'
+            options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
@@ -180,8 +199,7 @@ class Condor(Batch):
 
 if __name__ == "__main__":
     import argparse
-    description = "python script"
+    description = __doc__
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('args',nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
