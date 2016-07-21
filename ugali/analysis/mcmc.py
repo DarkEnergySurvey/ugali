@@ -36,9 +36,21 @@ from ugali.analysis.prior import UniformPrior, InversePrior
 from ugali.utils.logger import logger
 from ugali.utils.projector import dist2mod,mod2dist,gal2cel,gal2cel_angle
 
+try:
+    from mpi4py import rc
+    rc.initialize = False
+except ImportError:
+    pass
+
 import emcee
 
-# Write a class to store priors
+global mcmc,niter
+
+niter = 0
+mcmc = None
+
+def lnprob(theta):
+    return mcmc.lnprob(theta)
 
 class MCMC(object):
     """
@@ -54,7 +66,6 @@ class MCMC(object):
         self.nchunk = self.config['mcmc'].get('nchunk',25)
         self.nwalkers = self.config['mcmc'].get('nwalkers',50)
         self.nburn = self.config['mcmc'].get('nburn',10)
-        self.alpha = self.config['mcmc'].get('alpha',0.10)
 
         self.loglike = loglike
         self.source = self.loglike.source
@@ -64,11 +75,16 @@ class MCMC(object):
         self.priors = odict(zip(self.params,len(self.params)*[UniformPrior()]))
         self.priors['extension'] = InversePrior()
 
+        self.pool = None
+
     def __str__(self):
         ret = "%s:\n"%self.__class__.__name__
         ret += str(self.loglike)
         return ret
- 
+
+    def __call__(self, theta):
+        self.lnprob(theta)
+
     def get_mle(self):
         """
         Get the values of the source parameters.
@@ -114,24 +130,48 @@ class MCMC(object):
  
     def lnlike(self, theta):
         """ Logarithm of the likelihood """
-        kwargs = dict(zip(self.params,theta))
+        params,loglike = self.params,self.loglike
+        kwargs = dict(zip(params,theta))
         try:
-            lnlike = self.loglike.value(**kwargs)
+            lnlike = loglike.value(**kwargs)
         except ValueError,AssertionError:
             lnlike = -np.inf
         return lnlike
  
     def lnprior(self,theta):
         """ Logarithm of the prior """
-        kwargs = dict(zip(self.params,theta))
+        params,priors = self.params,self.priors
+        kwargs = dict(zip(params,theta))
         err = np.seterr(invalid='raise')
         try:
-            lnprior = np.sum(np.log([self.priors[k](v) for k,v in kwargs.items()]))
+            lnprior = np.sum(np.log([priors[k](v) for k,v in kwargs.items()]))
         except FloatingPointError,ValueError:
             lnprior = -np.inf
         np.seterr(**err)
         return lnprior
- 
+
+    def lnprob(self,theta):
+        """ Logarithm of the probability """
+        global niter
+        params,priors,loglike = self.params,self.priors,self.loglike
+        # Avoid extra likelihood calls with bad priors
+        _lnprior = self.lnprior(theta)
+        if np.isfinite(_lnprior):
+            _lnlike = self.lnlike(theta)
+        else:
+            _lnprior = -np.inf
+            _lnlike = -np.inf
+
+        _lnprob = _lnprior + _lnlike
+     
+        if (niter%100==0):
+            msg = "%i function calls ...\n"%niter
+            msg+= ', '.join('%s: %.3f'%(k,v) for k,v in zip(params,theta))
+            msg+= '\nlog(like): %.3f, log(prior): %.3f'%(_lnprior,_lnlike)
+            logger.debug(msg)
+        niter+=1
+        return _lnprob
+
     def run(self, params=None, outfile=None):
         # Initailize the likelihood to maximal value
         mle =self.get_mle()
@@ -139,26 +179,37 @@ class MCMC(object):
         for k,v in mle.items():
             msg+='\n  %s : %s'%(k,v)
         logger.info(msg)
-        logger.info(str(self.loglike))
  
         self.loglike.set_params(**mle)
         self.loglike.sync_params()
+
+        logger.info(str(self.loglike))
  
         if params is not None: self.params = params
- 
+            
+        params   = self.params
         nwalkers = self.nwalkers
         nsamples = self.nsamples
         nthreads = self.nthreads
-        ndim = len(params)
+        nburn    = self.nburn
+        ndim = len(self.params)
         
         logger.info("Running MCMC chain...")
-        p0 = self.get_ball(params,nwalkers)
-        self.sampler = emcee.EnsembleSampler(nwalkers,ndim,lnprob,threads=nthreads)
-        #self.sampler.run_mcmc(p0,nsamples)
- 
+
+        p0 = self.get_ball(self.params,nwalkers)
+
+        kwargs = dict(threads=nthreads,pool=self.pool)
+        self.sampler = emcee.EnsembleSampler(nwalkers,ndim,lnprob,**kwargs)
+
+        # Burn the requested number of entries
+        logger.info("Burning %i steps..."%nburn)
+        pos,prob,state = self.sampler.run_mcmc(p0,nburn)
+        self.sampler.reset() 
+
         # Chain is shape (nwalkers,nsteps,nparams)
         # Samples is shape (nwalkers*nsteps,nparams):
-        for i,result in enumerate(self.sampler.sample(p0,iterations=nsamples)):
+        #for i,result in enumerate(self.sampler.sample(p0,iterations=nsamples)):
+        for i,result in enumerate(self.sampler.sample(pos,prob,state,iterations=nsamples)):
             steps = i+1
             if steps%10 == 0: logger.info("%i steps ..."%steps)
             self.chain = self.sampler.chain
@@ -171,6 +222,7 @@ class MCMC(object):
  
         samples = self.chain.reshape(-1,len(self.params),order='F')
         self.samples = Samples(samples.T,names=self.params)
+
         if outfile is not None: self.write_samples(outfile)
  
     def write_samples(self,filename):
@@ -189,6 +241,19 @@ class MCMC(object):
         out = open(filename,'w')
         out.write(yaml.dump(source))
         out.close()
+
+    def __getstate__(self):
+        # Remove the pool from the pickeled object
+        #http://stackoverflow.com/a/25385582/4075339
+        self_dict = self.__dict__.copy()
+
+        if 'pool' in self_dict:    del self_dict['pool']
+        if 'sampler' in self_dict: del self_dict['sampler']
+            
+        return self_dict
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
 # Move to factory?
 def createMCMC(config,srcfile,section='source',samples=None):
@@ -222,6 +287,21 @@ if __name__ == "__main__":
 
     if opts.coords is not None and len(opts.coords) != 1: 
         raise Exception('Must specify exactly one coordinate.')
+    
+    #try:
+    #    # Initialize the MPI-based pool used for parallelization.
+    #    from emcee.utils import MPIPool
+    #    pool = MPIPool(loadbalance=True)
+    #except (ImportError,ValueError) as e:
+    #    logger.warn(e.message)
+    #    pool = None
+    # 
+    #if pool and not pool.is_master():
+    #    # Wait for instructions from the master process.
+    #    #logger.setLevel(logger.CRITICAL)
+    #    pool.wait()
+    #    sys.exit(0)
+    #pool = None
 
     config = Config(opts.config)
 
@@ -243,44 +323,22 @@ if __name__ == "__main__":
         params = config['mcmc'].get('params')
         source.set_free_params(params)
 
-    loglike = ugali.analysis.loglike.createLoglike(config,source)
+    like = ugali.analysis.loglike.createLoglike(config,source)
 
     if opts.grid:
-        grid = ugali.analysis.scan.GridSearch(config,loglike)
+        grid = ugali.analysis.scan.GridSearch(config,like)
         grid.search()
         source.set_params(**grid.mle())
 
-    mcmc = MCMC(config,loglike)
+    params = source.get_free_params().keys()
 
-    #resfile = opts.outfile.replace('.npy','.dat')
+    mcmc = MCMC(config,like)
 
     logger.info("Writing %s..."%srcfile)
     mcmc.write_srcmdl(srcfile)
 
-    niter = 0
-    def lnprob(theta):
-        global niter
-        # Avoid extra likelihood calls with bad priors
-        lnprior = mcmc.lnprior(theta)
-        if not np.isfinite(lnprior):
-            lnprior = -np.inf
-            lnlike = -np.inf
-        else:
-            lnlike = mcmc.lnlike(theta)
-        lnprob = lnprior + lnlike
-
-        if (niter%100==0):
-            msg = "%i function calls ...\n"%niter
-            msg+= ', '.join('%s: %.3f'%(k,v) for k,v in zip(mcmc.params,theta))
-            msg+= '\nlog(like): %.3f, log(prior): %.3f'%(lnprior,lnlike)
-            logger.debug(msg)
-        niter+=1
-        return lnprob
-    mcmc.lnprob = lnprob
-
-    #params = mcmc.config['mcmc']['params']
-    params = source.get_free_params().keys()
     mcmc.run(params,samfile)
+    #MCMC.run(mcmc,params,samfile)
 
     logger.info("Writing %s..."%srcfile)
     from ugali.analysis.results import write_results

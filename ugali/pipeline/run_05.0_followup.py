@@ -58,7 +58,7 @@ def do_results(args):
 
     logger.info("Writing %s..."%srcfile)
     from ugali.analysis.results import write_results
-    write_results(config,srcfile,samples,srcfile)
+    write_results(srcfile,config,srcfile,samples)
 
 def do_membership(args):
     """ Write the membership output file """
@@ -117,9 +117,15 @@ def do_plot(args):
         plt.close()
 
         plotter.plot6(data)
+
         outfile = samfile.replace('.npy','_6panel.png')
         logger.info("  Writing %s..."%outfile)
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
+
+        outfile = samfile.replace('.npy','_6panel.pdf')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+
         plt.close()
 
     try:

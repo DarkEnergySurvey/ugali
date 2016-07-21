@@ -119,7 +119,11 @@ class Source(object):
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
+
         if section is not None: 
+            params = params[section]
+        elif len(params) == 1:
+            section = params.keys()[0]
             params = params[section]
 
         fill = False

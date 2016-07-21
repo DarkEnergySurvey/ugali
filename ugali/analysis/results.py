@@ -28,9 +28,9 @@ class Results(object):
     """
     def __init__(self, config, loglike, samples=None):
         self.config = Config(config)
-        self.alpha = self.config['mcmc'].get('alpha',0.10)
+        self.alpha = self.config['results'].get('alpha',0.10)
         self.nwalkers = self.config['mcmc'].get('nwalkers',50)
-        self.nburn = self.config['mcmc'].get('nburn',10)
+        self.nburn = self.config['results'].get('nburn',10)
 
         self.loglike = loglike
         self.source = self.loglike.source
@@ -166,7 +166,7 @@ class Results(object):
         dist_sigma = np.nan_to_num(np.array(dist_err) - dist)
         size_sigma = size * np.sqrt((rext_sigma/rext)**2 + (dist_sigma/dist)**2)
         size_err = [size-size_sigma[0],size+size_sigma[1]]
-        results['physical_size'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
+        results['physical_size_radial'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
  
         # Richness
         rich,rich_err = estimate['richness']
@@ -201,10 +201,10 @@ class Results(object):
         # Also, this is not quite right, should cut on the CMD available space
         kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,
                       n_trials=5000,alpha=self.alpha, seed=0)
-        martin = self.config['mcmc'].get('martin')
+        martin = self.config['results'].get('martin')
         if martin:
             logger.info("Calculating Martin magnitude...")
-            if isinstance(martin,int): kwargs['n_trials'] = martin
+            if martin > 1: kwargs['n_trials'] = martin
             Mv_martin = self.source.isochrone.absolute_magnitude_martin(**kwargs)
             results['Mv_martin'] = Mv_martin
         else:
