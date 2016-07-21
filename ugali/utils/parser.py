@@ -79,7 +79,7 @@ class Parser(argparse.ArgumentParser):
                           help="Analysis component(s) to run.", **kwargs)
 
     def _parse_verbose(self,opts):
-        if vars(opts).get('verbose'): 
+        if vars(opts).get('verbose') or vars(opts).get('debug'): 
             logger.setLevel(logger.DEBUG)
 
     def _parse_coords(self,opts):

@@ -662,7 +662,10 @@ class BasePlotter(object):
         plt.sca(axes[0]); self.drawImage()
         plt.sca(axes[1]); self.drawStellarDensity()
         plt.sca(axes[2]); self.drawMask()
-        plt.sca(axes[3]); self.drawTS()
+        try:
+            plt.sca(axes[3]); self.drawTS()
+        except IOError as e:
+            logger.warn(str(e))
 
         axes[0].set_xlim(self.radius,-self.radius)
         axes[0].set_ylim(-self.radius,self.radius)
