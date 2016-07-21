@@ -26,6 +26,7 @@ a, b, c = rank by current importance (a > b)
 * (2b) Rewrite catalog reader to use fitsio
 * (2b) Compress isochrone data to easy distribution and allow for more extensive isochrone set
 * (1b) Fully incorporate completeness in isochrone fitting and simulation
+* (2b) Create 'bin' directory for command-line tools (also move pipeline to bin)
 
 ## DONE
 * (1c) Collector function to find peaks (in 3D)
