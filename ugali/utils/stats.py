@@ -185,7 +185,8 @@ class Samples(np.recarray):
             msg = "field(s) named %s not found"%(missing)
             print msg
             raise ValueError(msg)
-        idx = np.where(np.in1d(self.dtype.names,names))[0]
+        #idx = np.where(np.in1d(self.dtype.names,names))[0]
+        idx = np.array([self.dtype.names.index(n) for n in names])
 
         # Remove zero entries
         zsel = ~np.all(self.ndarray==0,axis=1)
