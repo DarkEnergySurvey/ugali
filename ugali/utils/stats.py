@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Module for various statistics utilities.
+"""
+
 import copy
 
 import numpy
@@ -6,8 +10,9 @@ import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import scipy.special
 
-_alpha = 0.32
-
+_alpha   = 0.32
+_nbins   = 300
+_npoints = 500
 
 def interval(best,lo=np.nan,hi=np.nan):
     """
@@ -24,7 +29,6 @@ def mean_interval(data, alpha=_alpha):
     scale = scipy.stats.norm.ppf(1-alpha/2.)
     return interval(mean,mean-scale*sigma,mean+scale*sigma)
 
-
 def median_interval(data, alpha=_alpha):
     """
     Median including bayesian credible interval.
@@ -33,20 +37,25 @@ def median_interval(data, alpha=_alpha):
     lo,med,hi = numpy.percentile(data,q)
     return interval(med,lo,hi)
     
-def peak(data, bins=100):
+def peak(data, bins=_nbins):
     num,edges = np.histogram(data,bins=bins)
     centers = (edges[1:]+edges[:-1])/2.
     return centers[np.argmax(num)]
 
-def kde_peak(data, samples=1000):
+def kde_peak(data, npoints=_npoints):
     """
     Identify peak using Gaussian kernel density estimator.
     """
-    return kde(data,samples)[0]
+    return kde(data,_npoints)[0]
 
-def kde(data, samples=1000):
+def kde(data, npoints=_npoints):
     """
     Identify peak using Gaussian kernel density estimator.
+    
+    Parameters:
+    -----------
+    data   : The 1d data sample
+    npoints : The number of kde points to evaluate
     """
     # Clipping of severe outliers to concentrate more KDE samples in the parameter range of interest
     mad = np.median(np.fabs(np.median(data) - data))
@@ -54,13 +63,12 @@ def kde(data, samples=1000):
     x = data[cut]
     kde = scipy.stats.gaussian_kde(x)
     # No penalty for using a finer sampling for KDE evaluation except computation time
-    values = np.linspace(np.min(x), np.max(x), samples) 
+    values = np.linspace(np.min(x), np.max(x), _npoints) 
     kde_values = kde.evaluate(values)
     peak = values[np.argmax(kde_values)]
     return values[np.argmax(kde_values)], kde.evaluate(peak)
 
-
-def peak_interval(data, alpha=_alpha, samples=1000):
+def peak_interval(data, alpha=_alpha, npoints=_npoints):
     """
     Identify interval using Gaussian kernel density estimator.
     """
@@ -95,7 +103,6 @@ def min_interval(data, alpha=_alpha):
     hi = x[min_idx+window]
     mean = (hi+lo)/2.
     return interval(mean,lo,hi)
-
 
 def norm_cdf(x):
     # Faster than scipy.stats.norm.cdf
@@ -145,8 +152,9 @@ class Samples(np.recarray):
     A nice summary of various bayesian credible intervals can be found here:
     http://www.sumsar.net/blog/2014/10/probable-points-and-credible-intervals-part-one/
     """
-    _alpha = 0.10
-    _nbins = 300
+    _alpha   = 0.10
+    _nbins   = 300
+    _npoints = 250
 
     def __new__(cls, input, names=None):
         # Load the array from file
@@ -253,49 +261,43 @@ class Samples(np.recarray):
         data = self.get(name,**kwargs)
         return np.percentile(data,[50])
 
-    def median_interval(self,name,alpha=_alpha, **kwargs):
+    def median_interval(self, name, alpha=_alpha, **kwargs):
         """
         Median including bayesian credible interval.
         """
         data = self.get(name,**kwargs)
-        #return ugali.utils.stats.median_interval(data,alpha)
         return median_interval(data,alpha)
 
-    def peak(self, name, **kwargs):
+    def peak(self, name, bins=_nbins, **kwargs):
         data = self.get(name,**kwargs)
-        #return ugali.utils.stats.peak(data,bins=self._nbins)
-        return peak(data,bins=self._nbins)
+        return peak(data,bins=bins)
 
-    def kde_peak(self, name, **kwargs):
+    def kde_peak(self, name, npoints=_npoints, **kwargs):
         """ 
         Calculate peak of kernel density estimator
         """
         data = self.get(name,**kwargs)
-        #return ugali.utils.stats.kde_peak(data,samples=250)
-        return kde_peak(data,samples=250)
+        return kde_peak(data,npoints)
 
-    def kde(self, name, **kwargs):
+    def kde(self, name, npoints=_npoints, **kwargs):
         """ 
         Calculate kernel density estimator for parameter
         """
         data = self.get(name,**kwargs)
-        #return ugali.utils.stats.kde(data,samples=250)
-        return kde(data,samples=250)
+        return kde(data,npoints)
 
-    def peak_interval(self, name, alpha=_alpha, **kwargs):
+    def peak_interval(self, name, alpha=_alpha, npoints=_npoints, **kwargs):
         """ 
         Calculate peak interval for parameter.
         """
         data = self.get(name, **kwargs)
-        #return ugali.utils.stats.peak_interval(data,alpha,samples=250)
-        return peak_interval(data,alpha,samples=250)
+        return peak_interval(data,alpha,npoints)
 
     def min_interval(self,name, alpha=_alpha, **kwargs):
         """ 
         Calculate minimum interval for parameter.
         """
         data = self.get(name, **kwargs)
-        #return ugali.utils.min_interval(data,alpha)
         return min_interval(data,alpha)
 
     def results(self, names=None, alpha=_alpha, mode='peak', **kwargs):
