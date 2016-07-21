@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+import copy
+
 import numpy
 import numpy as np
+import numpy.lib.recfunctions as recfuncs
 import scipy.special
 
 _alpha = 0.32
@@ -175,6 +178,24 @@ class Samples(np.recarray):
             return np.expand_dims(self.view((float,len(self.dtype))),1)
         else:
             return self.view((float,len(self.dtype)))
+
+    def supplement(self):
+        """ Add some supplemental columns """
+        from ugali.utils.projector import gal2cel, gal2cel_angle
+
+        kwargs = dict(usemask=False, asrecarray=True)
+        out = copy.deepcopy(self)
+
+        if ('lon' in out.names) and ('lat' in out.names):
+            ra,dec = gal2cel(out.lon,out.lat)
+            out = recfuncs.append_fields(out,['ra','dec'],[ra,dec],**kwargs).view(Samples)
+
+            if 'position_angle' in out.names:
+                pa = gal2cel_angle(out.lon,out.lat,out.position_angle)
+                pa = pa - 180.*(pa > 180.)
+                out = recfuncs.append_fields(out,['position_angle_cel'],[pa],**kwargs).view(Samples)
+        
+        return out
 
     def get(self, names=None, burn=None, clip=None):
         if names is None: names = list(self.dtype.names)

@@ -7,6 +7,7 @@ from collections import OrderedDict as odict
 
 import numpy as np
 import yaml
+import numpy.lib.recfunctions as recfuncs
 
 import astropy.coordinates
 from astropy.coordinates import SkyCoord
@@ -38,7 +39,9 @@ class Results(object):
         self.samples = samples
 
     def load_samples(self,filename):
-        self.samples = Samples(filename)
+        samples = Samples(filename)
+        self.samples = samples.supplement()
+
 
     def get_mle(self):
         mle = self.source.get_params()
@@ -51,51 +54,68 @@ class Results(object):
         return mle
 
     def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
-        # FIXME: Need to add age and metallicity to composite isochrone
-        if param not in self.source.params.keys() + ['age','metallicity']:
-            raise Exception('Unrecognized parameter: %s'%param)
+        """ Estimate parameter value and uncertainties """
+        # FIXME: Need to add age and metallicity to composite isochrone params (currently properties)
+        if param not in list(self.samples.names) + list(self.source.params) + ['age','metallicity']:
+            msg = 'Unrecognized parameter: %s'%param
+            raise KeyError(msg)
+
+        # If the parameter is in the samples
+        if param in self.samples.names:
+
+            if param.startswith('position_angle'):
+                return self.estimate_position_angle(param,burn=burn,
+                                                    clip=clip,alpha=alpha)
+
+            return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
  
         mle = self.get_mle()
         errors = [np.nan,np.nan] 
 
-        # Default to mle value
+        # Set default value to the MLE value
         if param in self.source.params:
             err = self.source.params[param].errors
             if err is not None: errors = err
- 
-        # For age and metallicity
-        if param not in self.params: 
-            return [float(mle[param]),errors]
- 
-        if param not in self.samples.names: 
-            return [float(mle[param]),errors]
- 
-        if param == 'position_angle':
-            return self.estimate_position_angle(burn=burn,clip=clip,alpha=alpha)
- 
-        # Over-ride from samples
-        #return self.samples.mean_interval(param,burn=burn,clip=clip,alpha=alpha)
-        return self.samples.peak_interval(param,burn=burn,clip=clip,alpha=alpha)
+
+        # For age and metallicity from composite isochrone
+        return [float(mle[param]),errors]
+
+        ### if (param not in self.params) or (param not in : 
+        ###     return [float(mle[param]),errors]
+        ###  
+        ### if param not in self.samples.names: 
+        ###     return [float(mle[param]),errors]
+        ###  
+        ### msg = "Unrecognized parameter: %s"%param
+        ### raise KeyError(msg)
  
     def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
+        """ Estimate all source parameters """
         mle = self.get_mle()
         out = odict()
         for param in mle.keys():
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
  
-    def estimate_position_angle(self,burn=None,clip=10.0,alpha=0.32):
+    def estimate_position_angle(self,param='position_angle',burn=None,clip=10.0,alpha=0.32):
+        """ Estimate the position angle from the posterior dealing
+        with periodicity.
+        """
         # Transform so peak in the middle of the distribution
-        pa = self.samples.get('position_angle',burn=burn,clip=clip)
+        pa = self.samples.get(param,burn=burn,clip=clip)
         peak = ugali.utils.stats.kde_peak(pa,samples=1000)
-        pa -= 180.*((pa+90-peak)>180)
+        shift = 180.*((pa+90-peak)>180)
+        pa -= shift
+        print shift
         ret = ugali.utils.stats.peak_interval(pa,alpha,samples=1000)
+        print ret
         if ret[0] < 0: 
             ret[0] += 180.; ret[1][0] += 180.; ret[1][1] += 180.;
+        print ret
         return ret
  
     def bayes_factor(self,param,burn=None,clip=10.0,bins=50):
-        # CAREFUL: Assumes flat prior...
+        # CAREFUL: Assumes a flat prior...
         try: 
             data = self.samples.get(param,burn=burn,clip=clip)
         except ValueError,msg:
@@ -120,19 +140,31 @@ class Results(object):
         estimate = self.estimate_params(**kwargs)
         params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
-        
+
+        # Extra parameters from the MCMC chain
+        logger.debug('Estimating auxiliary parameters...')
+        results['ra']  = self.estimate('ra',**kwargs)
+        results['dec'] = self.estimate('dec',**kwargs)
+
+        ra,dec = results['ra'][0],results['dec'][0]
+        glon,glat = lon,lat = results['lon'][0],results['lat'][0]
+        results.update(gal=[float(glon),float(glat)])
+        results.update(cel=[float(ra),float(dec)])
+
+        results['position_angle_cel']  = self.estimate('position_angle_cel',**kwargs)
+
         # Update the loglike to the best-fit parameters from the chain
         logger.debug('Calculating TS...')
         ts = 2*self.loglike.value(**params)
         results['ts'] = ugali.utils.stats.interval(ts,np.nan,np.nan)
  
-        lon,lat = estimate['lon'][0],estimate['lat'][0]
- 
-        results.update(gal=[float(lon),float(lat)])
-        ra,dec = gal2cel(lon,lat)
-        results.update(cel=[float(ra),float(dec)])
-        results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
-        results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
+        #lon,lat = estimate['lon'][0],estimate['lat'][0]
+        # 
+        #results.update(gal=[float(lon),float(lat)])
+        #ra,dec = gal2cel(lon,lat)
+        #results.update(cel=[float(ra),float(dec)])
+        #results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
+        #results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
  
         # Celestial position angle
         # Break ambiguity in direction with '% 180.'
@@ -300,4 +332,7 @@ if __name__ == "__main__":
                         
     args = parser.parse_args()
 
-    write_results(args.config,args.srcmdl,args.samples,args.outfile)
+    #write_results(args.outfile,args.config,args.srcmdl,args.samples)
+    results = createResults(args.config,args.srcmdl,samples=args.samples)
+    results.write(args.outfile)
+
