@@ -30,7 +30,7 @@ class Results(object):
     def __init__(self, config, loglike, samples=None):
         self.config = Config(config)
         self.alpha = self.config['results'].get('alpha',0.10)
-        self.nwalkers = self.config['mcmc'].get('nwalkers',50)
+        self.nwalkers = self.config['mcmc'].get('nwalkers',100)
         self.nburn = self.config['results'].get('nburn',10)
 
         self.loglike = loglike
@@ -103,15 +103,13 @@ class Results(object):
         """
         # Transform so peak in the middle of the distribution
         pa = self.samples.get(param,burn=burn,clip=clip)
-        peak = ugali.utils.stats.kde_peak(pa,samples=1000)
+        peak = ugali.utils.stats.kde_peak(pa)
         shift = 180.*((pa+90-peak)>180)
         pa -= shift
-        print shift
-        ret = ugali.utils.stats.peak_interval(pa,alpha,samples=1000)
-        print ret
+        # Get the kde interval
+        ret = ugali.utils.stats.peak_interval(pa,alpha)
         if ret[0] < 0: 
             ret[0] += 180.; ret[1][0] += 180.; ret[1][1] += 180.;
-        print ret
         return ret
  
     def bayes_factor(self,param,burn=None,clip=10.0,bins=50):
@@ -180,6 +178,7 @@ class Results(object):
         dist,dist_err = results['distance']
  
         ext,ext_err = estimate['extension']
+        ext_sigma = np.nan_to_num(np.array(ext_err) - ext)
         results['extension_arcmin'] = ugali.utils.stats.interval(60*ext,60*ext_err[0],60*ext_err[1])
  
         # Radially symmetric extension (correct for ellipticity).
@@ -194,11 +193,17 @@ class Results(object):
  
         # Physical Size (should do this with the posteriors)
         # Radially symmetric
-        size = np.arctan(np.radians(rext)) * dist
         dist_sigma = np.nan_to_num(np.array(dist_err) - dist)
-        size_sigma = size * np.sqrt((rext_sigma/rext)**2 + (dist_sigma/dist)**2)
+
+        size = np.arctan(np.radians(ext)) * dist
+        size_sigma = size * np.sqrt((ext_sigma/ext)**2 + (dist_sigma/dist)**2)
         size_err = [size-size_sigma[0],size+size_sigma[1]]
-        results['physical_size_radial'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
+        results['physical_size'] = ugali.utils.stats.interval(size,size_err[0],size_err[1])
+
+        rsize = np.arctan(np.radians(rext)) * dist
+        rsize_sigma = rsize * np.sqrt((rext_sigma/rext)**2 + (dist_sigma/dist)**2)
+        rsize_err = [rsize-rsize_sigma[0],rsize+rsize_sigma[1]]
+        results['physical_size_radial'] = ugali.utils.stats.interval(rsize,rsize_err[0],rsize_err[1])
  
         # Richness
         rich,rich_err = estimate['richness']
@@ -269,12 +274,17 @@ class Results(object):
         LMC = SkyCoord(80.8939*u.deg,-69.7561*u.deg,distance=49.89*u.kpc)
         #NED coordinates with de Grisj distance
         SMC = SkyCoord(13.1866*u.deg,-72.8286*u.deg,distance=61.94*u.kpc)
-        # From astropy?
+        # GC from astropy?
         GC = SkyCoord(266.4168262*u.deg,-29.0077969*u.deg,distance=8.0*u.kpc)
          
         results['d_gc'] = coord.separation_3d(GC).value
         results['d_lmc'] = coord.separation_3d(LMC).value
         results['d_smc'] = coord.separation_3d(SMC).value
+
+        try:
+            results['feh'] = float(self.source.isochrone.feh)
+        except:
+            results['feh'] = np.nan
         
         output = dict()
         output['params'] = params

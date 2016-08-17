@@ -2,6 +2,9 @@
 """
 For pixelizing catalogs and masks.
 """
+
+#FIXME: ADW This needs to be updated to use fitsio
+
 import os
 from os.path import join
 

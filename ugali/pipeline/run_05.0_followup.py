@@ -239,5 +239,6 @@ def run(self):
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parser.add_coords(radius=True,targets=True)
+pipeline.parser.add_ncores()
 pipeline.parse_args()
 pipeline.execute()

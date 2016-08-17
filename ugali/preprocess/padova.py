@@ -66,6 +66,8 @@ defaults_27 =  {#'binary_frac': 0.3,
                 #'photsys_version': 'yang',
                 'submit_form': 'Submit'}
 
+defaults_28 = dict(defaults_27,cmd_version='2.8')
+
 class Padova(object):
     defaults = dict(defaults_27)
 
@@ -181,6 +183,9 @@ class Bressan2012(Padova):
     defaults = dict(defaults_27)
     defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
+def factory(name, **kwargs):
+    from ugali.utils.factory import factory
+    return factory(name, module=__name__, **kwargs)
 
 if __name__ == "__main__":
     import ugali.utils.parser
@@ -192,6 +197,7 @@ if __name__ == "__main__":
     parser.add_force()
     parser.add_argument('-a','--age',default=None,type=float)
     parser.add_argument('-z','--metallicity',default=None,type=float)
+    parser.add_argument('-k','--kind',default='Bressan2012')
     opts = parser.parse_args()
 
     from ugali.utils.config import Config
@@ -202,25 +208,26 @@ if __name__ == "__main__":
     #outdir = '/u/ki/kadrlica/des/isochrones/v2'
     #outdir = '/u/ki/kadrlica/des/isochrones/v3'
     #outdir = '/u/ki/kadrlica/des/isochrones/v4'
-    outdir = '/u/ki/kadrlica/des/isochrones/v5'
+    #outdir = '/u/ki/kadrlica/des/isochrones/v5'
     #outdir = '/u/ki/kadrlica/des/isochrones/v6'
+    #outdir = './padova'
+    outdir = './'
     survey = config['data']['survey']
 
-    #p = Padova(survey=survey)
-    p = Girardi2010a(survey=survey)
-    #p = Girardi2010b(survey=survey)
-    #p = Marigo2008(survey=survey)
-    p = Girardi2002(survey=survey)
+    p = factory(opts.kind,survey=survey)
 
     # Binning from config
     #abins = config['binning']['age']
     #zbins = config['binning']['z']
     #abins = np.arange(1,13.6,0.1)
     #zbins = np.arange(1e-4,1e-3,1e-5)
-    abins = np.arange(10,14,1)
-    zbins = np.arange(1e-4,2e-4,1e-4)
+    #abins = np.arange(10,14,1)
+    #zbins = np.arange(1e-4,2e-4,1e-4)
     #abins = np.arange(10,10.1,0.1)
     #zbins = np.arange(1e-4,1.1e-4,1e-5)
+
+    abins = np.linspace(1, 13.5, 126)
+    zbins = np.logspace(np.log10(0.001), np.log10(0.01), 25)
 
 
     if opts.age is not None: abins = [opts.age]
