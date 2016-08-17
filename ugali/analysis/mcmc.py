@@ -41,6 +41,7 @@ try:
     rc.initialize = False
 except ImportError:
     pass
+#import multiprocessing
 
 import emcee
 
@@ -63,6 +64,7 @@ class MCMC(object):
         self.config = Config(config)
         self.nsamples = self.config['mcmc'].get('nsamples',100)
         self.nthreads = self.config['mcmc'].get('nthreads',16)
+        #self.nthreads = multiprocessing.cpu_count()
         self.nchunk = self.config['mcmc'].get('nchunk',25)
         self.nwalkers = self.config['mcmc'].get('nwalkers',50)
         self.nburn = self.config['mcmc'].get('nburn',10)

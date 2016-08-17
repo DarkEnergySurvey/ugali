@@ -54,6 +54,9 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('-q','--queue',
                           help="Batch queue for execution.",**kwargs)
                           
+    def add_ncores(self,**kwargs):
+        self.add_argument('--ncores',
+                          help="Number of cores to use.",**kwargs)
 
     def add_config(self,**kwargs):
         self.add_argument('config',metavar='config.yaml',

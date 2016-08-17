@@ -72,7 +72,7 @@ def peak_interval(data, alpha=_alpha, npoints=_npoints):
     """
     Identify interval using Gaussian kernel density estimator.
     """
-    peak = kde_peak(data,samples)
+    peak = kde_peak(data,npoints)
     x = np.sort(data.flat); n = len(x)
     # The number of entries in the interval
     window = int(np.rint((1.0-alpha)*n))
@@ -195,12 +195,17 @@ class Samples(np.recarray):
         out = copy.deepcopy(self)
 
         if ('lon' in out.names) and ('lat' in out.names):
+            # Ignore entries that are all zero
+            zeros = np.all(self.ndarray==0,axis=1)
+
             ra,dec = gal2cel(out.lon,out.lat)
+            ra[zeros] = 0; dec[zeros] = 0
             out = recfuncs.append_fields(out,['ra','dec'],[ra,dec],**kwargs).view(Samples)
 
             if 'position_angle' in out.names:
                 pa = gal2cel_angle(out.lon,out.lat,out.position_angle)
                 pa = pa - 180.*(pa > 180.)
+                pa[zeros] = 0
                 out = recfuncs.append_fields(out,['position_angle_cel'],[pa],**kwargs).view(Samples)
         
         return out
