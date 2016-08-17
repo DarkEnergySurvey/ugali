@@ -9,6 +9,7 @@ import numpy
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import scipy.special
+import scipy.stats
 
 _alpha   = 0.32
 _nbins   = 300
