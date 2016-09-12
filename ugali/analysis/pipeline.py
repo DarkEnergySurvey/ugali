@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Base functionality for pipeline script instances
+Base functionality for pipeline scripts
 """
-import argparse
 
 import ugali.utils.batch
+#from ugali.utils.batch import factory as batchFactory
 
 from ugali.utils.parser import Parser
 from ugali.utils.logger import logger

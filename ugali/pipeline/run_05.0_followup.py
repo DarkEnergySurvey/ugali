@@ -8,6 +8,7 @@ import os
 from os.path import join,exists,basename,splitext
 import shutil
 from collections import OrderedDict as odict
+from multiprocessing import Pool
 
 import matplotlib
 try:             os.environ['DISPLAY']
@@ -18,18 +19,15 @@ import numpy as np
 import yaml
 import pyfits
 
-from ugali.analysis.mcmc import MCMC
 from ugali.analysis.pipeline import Pipeline
 from ugali.analysis.scan import Scan
 import ugali.analysis.source
 import ugali.analysis.loglike
-import ugali.analysis.mcmc
+import ugali.analysis.results
 
 import ugali.utils.config
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-
-from multiprocessing import Pool
 
 description=__doc__
 components = ['mcmc','membership','results','plot','collect','scan']
@@ -59,7 +57,8 @@ def do_results(args):
         return
 
     logger.info("Writing %s..."%srcfile)
-    ugali.analysis.mcmc.write_results(config,srcfile,samples,srcfile)
+    from ugali.analysis.results import write_results
+    write_results(srcfile,config,srcfile,samples)
 
 def do_membership(args):
     """ Write the membership output file """
@@ -69,17 +68,14 @@ def do_membership(args):
     srcfile = filenames['srcfile']
     memfile = filenames['memfile']
 
-    source = ugali.analysis.source.Source()
-    source.load(srcfile,'source')
-
-    loglike = ugali.analysis.loglike.createLoglike(config,source)
     logger.info("Writing %s..."%memfile)
-    loglike.write_membership(memfile)
-
+    from ugali.analysis.loglike import write_membership
+    write_membership(memfile,config,srcfile,section='source')
+    
 def do_plot(args):
+    """ Create plots of mcmc output """
     import ugali.utils.plotting
     import pylab as plt
-    import triangle
 
     config,name,label,coord = args
     print args
@@ -121,16 +117,25 @@ def do_plot(args):
         plt.close()
 
         plotter.plot6(data)
+
         outfile = samfile.replace('.npy','_6panel.png')
         logger.info("  Writing %s..."%outfile)
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
+
+        outfile = samfile.replace('.npy','_6panel.pdf')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+
         plt.close()
 
-    plotter.plot4()
-    outfile = samfile.replace('.npy','_4panel.png')
-    logger.info("  Writing %s..."%outfile)
-    plt.savefig(outfile,bbox_inches='tight',dpi=60)
-    plt.close()
+    try:
+        plotter.plot4()
+        outfile = samfile.replace('.npy','_4panel.png')
+        logger.info("  Writing %s..."%outfile)
+        plt.savefig(outfile,bbox_inches='tight',dpi=60)
+        plt.close()
+    except:
+        logger.warning("  Failed to create plotter.plot4()")
     
 def run(self):
     if self.opts.coords is not None:
@@ -147,10 +152,8 @@ def run(self):
 
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
-        try:
-            shutil.copy(self.opts.config,self.outdir)
-        except m:
-            print m
+        try:      shutil.copy(self.opts.config,self.outdir)
+        except Exception as e: logger.warn(e.message)
 
         for config,name,label,coord in args:
             glon,glat,radius = coord
@@ -163,18 +166,25 @@ def run(self):
             srcmdl = self.config['mcmc'].get('srcmdl')
 
             if srcmdl is not None:
-                print name, srcmdl
-                cmd='%s %s --name %s --srcmdl %s %s'%(script,self.opts.config,name,srcmdl,outfile)
+                try:      shutil.copy(srcmdl,self.outdir)
+                except Exception as e: logger.warn(e.message)
+                logger.info('%s (%s)'%(name,srcmdl))
+                cmd='%s %s --name %s --srcmdl %s %s' % (
+                    script,self.opts.config,name,srcmdl,outfile)
             else:
-                print name,'(%.4f,%.4f)'%(glon,glat)
-                cmd='%s %s --name %s --gal %.4f %.4f --grid %s'%(script,self.opts.config,name,glon,glat,outfile)
-            print cmd
+                logger.info('%s (%.4f,%.4f)'%(name,glon,glat))
+                cmd='%s %s --name %s --gal %.4f %.4f --grid %s'% (
+                    script,self.opts.config,name,glon,glat,outfile)
+            logger.info(cmd)
             self.batch.submit(cmd,jobname,logfile,n=nthreads)
 
     if 'results' in self.opts.run:
         logger.info("Running 'results'...")
-        pool = Pool(maxtasksperchild=1)
-        pool.map(do_results,args)
+        if len(args) > 1:
+            pool = Pool(maxtasksperchild=1)
+            pool.map(do_results,args)
+        else:
+            do_results(*args)
 
     if 'membership' in self.opts.run:
         logger.info("Running 'membership'...")
@@ -186,10 +196,10 @@ def run(self):
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
-        if len(args) > 1:
-            #pool = Pool(maxtasksperchild=1)
-            #pool.map(do_plot,args)
-            map(do_plot,args)
+        if len(args) > 0:
+            pool = Pool(maxtasksperchild=1)
+            pool.map(do_plot,args)
+            #map(do_plot,args)
         else:
             do_plot(*args)
 
@@ -229,5 +239,6 @@ def run(self):
 Pipeline.run = run
 pipeline = Pipeline(description,components)
 pipeline.parser.add_coords(radius=True,targets=True)
+pipeline.parser.add_ncores()
 pipeline.parse_args()
 pipeline.execute()

@@ -50,14 +50,16 @@ from ugali.utils.projector import mod2dist
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
+
 ############################################################
 
-if __name__.endswith('isochrone2'):
-    import warnings
-    warnings.simplefilter('module', DeprecationWarning)
-    msg = "isochrone2 is deprecated"
-    warnings.warn(msg,DeprecationWarning)
-    warnings.simplefilter('default', DeprecationWarning)
+# ADW: Depricated (2016-06-25)
+###if __name__.endswith('isochrone2'):
+###    import warnings
+###    warnings.simplefilter('module', DeprecationWarning)
+###    msg = "isochrone2 is deprecated"
+###    warnings.warn(msg,DeprecationWarning)
+###    warnings.simplefilter('default', DeprecationWarning)
 
 def get_iso_dir():
     isodir = os.path.join(get_ugali_dir(),'isochrones')
@@ -74,13 +76,14 @@ class Isochrone(Model):
     ])
 
     _mapping = odict([
-            ('mod','distance_modulus'),
-            ('a','age'),                 
-            ('z','metallicity'),
-            ])
+        ('mod','distance_modulus'),
+        ('a','age'),                 
+        ('z','metallicity'),
+    ])
 
-    # ADW: Careful, there are weird things going on with adding defaults
-    # to subclasses...
+    # ADW: Careful, there are weird things going on with adding
+    # defaults to subclasses...  When converted to a dict, the
+    # last duplicate entry is filled.
     defaults = (
         ('survey','des','Name of survey filter system'),
         ('band_1','g','Field name for magnitude one'),
@@ -126,11 +129,12 @@ class Isochrone(Model):
 
     @property
     def distance(self):
+        """ Convert to physical distance (kpc) """
         return mod2dist(self.distance_modulus)
 
     def sample(self, mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False):
-        """
-        Documentation here.
+        """Sample the isochrone in steps of mass interpolating between the
+        originally defined isochrone points.
         """
 
         if full_data_range:
@@ -1105,18 +1109,15 @@ class PadovaIsochrone(Isochrone):
         self.mag = self.mag_1 if self.band_1_detection else self.mag_2
         self.color = self.mag_1 - self.mag_2
 
-class Bressan2012(PadovaIsochrone): pass
 
 class EmpiricalPadova(PadovaIsochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a13.7_z0.00007.dat'
     _dirname =  os.path.join(get_iso_dir(),'empirical')
 
-    defaults = (Isochrone.defaults) + (
+    defaults = (PadovaIsochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
-        ('hb_stage',4,'Horizontal branch stage name'),
-        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
-        )
+    )
 
 class M92(EmpiricalPadova):
     """ Empirical isochrone derived from the M92 ridgeline dereddened
@@ -1143,7 +1144,6 @@ class DESDwarfs(EmpiricalPadova):
 
     _prefix = 'dsph'
     _basename = '%(prefix)s_a12.5_z0.00010.dat'
-
 
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
@@ -1289,10 +1289,6 @@ class OldPadovaIsochrone(Girardi2002):
         metallicity = 1.e-3 * float(infile.split('z')[1].split('.dat')[0])
         age = 10**(log_age) / 1e9 # Gyr
         return age, metallicity
-    
-
-
-
 
 ############################################################
 
@@ -1301,11 +1297,9 @@ class DotterIsochrone(PadovaIsochrone):
     KCB: currently inheriting from PadovaIsochrone because there are 
     several useful functions where we would basically be copying code.
     """
-
-    #_dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/dotter_v3/'
     _dirname =  os.path.join(get_iso_dir(),'dotter')
 
-    # KCB: What to do about horizontal branch
+    # KCB: What to do about horizontal branch?
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
         ('hb_stage','BHeb','Horizontal branch stage name'),
@@ -1341,7 +1335,8 @@ class DotterIsochrone(PadovaIsochrone):
         kwargs = dict(delimiter='',comments='#',usecols=columns.keys(),dtype=columns.values())
         data = np.genfromtxt(filename,**kwargs)
 
-        # KCB: Not sure whether the mass in Dotter isochrone output files is initial mass or current mass
+        # KCB: Not sure whether the mass in Dotter isochrone output
+        # files is initial mass or current mass
         self.mass_init = data['mass']
         self.mass_act  = data['mass']
         self.luminosity = 10**data['log_lum']
@@ -1387,6 +1382,7 @@ class CompositeIsochrone(Isochrone):
                 iso = i
             else:
                 name = i.pop('name',self.type)
+                #iso = isochroneFactory(name=name,**i)
                 iso = isochroneFactory(name=name,**i)
             # Tie the distance modulus
             iso.params['distance_modulus'] = self.params['distance_modulus']
@@ -1420,7 +1416,7 @@ class CompositeIsochrone(Isochrone):
 
     def composite_decorator(func):
         """
-        Decorator for wrapping functions that just calculate weighted sum
+        Decorator for wrapping functions that calculate a weighted sum
         """
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -1432,9 +1428,6 @@ class CompositeIsochrone(Isochrone):
         return wrapper
 
     def sample(self, **kwargs):
-        """
-        Documentation here.
-        """
         samples = [iso.sample(**kwargs) for iso in self.isochrones]
         for weight,sample in zip(self.weights,samples):
             sample[1] *= weight
@@ -1493,39 +1486,29 @@ Padova = PadovaIsochrone
 OldPadova = OldPadovaIsochrone
 Composite = CompositeIsochrone
 Dotter = DotterIsochrone
+Bressan2012 = PadovaIsochrone
 
-def isochroneFactory2(name, **kwargs):
-    """
-    Factory for cerating isochrones. Arguments are 
-    passed directly to the constructor of the isochrone.
-    """
-    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
-    isochrones = odict(inspect.getmembers(sys.modules[__name__], fn))
+def factory(name, **kwargs):
+    from ugali.utils.factory import factory
+    return factory(name, module=__name__, **kwargs)
 
-    if name not in isochrones.keys():
-        msg = "%s not found in isochrones:\n %s"%(name,isochrones.keys())
-        logger.error(msg)
-        msg = "Unrecognized isochrone: %s"%name
-        raise Exception(msg)
+isochroneFactory = factory
 
-    return isochrones[name](**kwargs)
-
-def isochroneFactory(name, **kwargs):
-    """
-    Factory for cerating isochrones. Arguments are 
-    passed directly to the constructor of the isochrone.
-    """
-    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
-    isochrones = odict(inspect.getmembers(sys.modules[__name__], fn))
-
-    if name not in isochrones.keys():
-        msg = "%s not found in isochrones:\n %s"%(name,isochrones.keys())
-        logger.error(msg)
-        msg = "Unrecognized isochrone: %s"%name
-        raise Exception(msg)
-
-    return isochrones[name](**kwargs)
-
+#def factory(name, **kwargs):
+#    """
+#    Factory for creating isochrones. Arguments are 
+#    passed directly to the constructor of the isochrone.
+#    """
+#    fn = lambda member: inspect.isclass(member) and member.__module__==__name__
+#    classes = odict(inspect.getmembers(sys.modules[__name__], fn))
+# 
+#    if name not in classes.keys():
+#        msg = "%s not found in isochrones:\n %s"%(name,isochrones.keys())
+#        logger.error(msg)
+#        msg = "Unrecognized class: %s"%name
+#        raise Exception(msg)
+# 
+#    return isochrones[name](**kwargs)
 
 def absolute_magnitude(distance_modulus,g,r,prob=None):
     """ Calculate the absolute magnitude from a set of bands """

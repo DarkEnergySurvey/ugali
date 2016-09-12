@@ -5,23 +5,21 @@ from collections import OrderedDict as odict
 import numpy as np
 import copy
 
-from ugali.analysis.kernel import kernelFactory
-from ugali.analysis.isochrone import isochroneFactory
-from ugali.analysis.model import Model,Parameter
+from ugali.analysis.model import Model, Parameter
+from ugali.analysis.kernel import factory as kernelFactory
+from ugali.analysis.isochrone import factory as isochroneFactory
 
 class Richness(Model):
-    """
-    Dummy model to hold the richness, which is not
-    directly connected to either the spatial or 
-    color information and doesn't require a sync
-    when updated.
+    """Dummy model to hold the richness, which is not directly connected
+    to either the spatial or color information and doesn't require a
+    sync when updated.
     """
     _params = odict([
         ('richness', Parameter(1000.0, [0.0,  np.inf])),
     ])
 
 # Just to be consistent with other factories
-def richnessFactory(name='Richness',**kwargs):
+def richnessFactory(type='Richness',**kwargs):
     return Richness(**kwargs)
 
 class Source(object):
@@ -121,7 +119,11 @@ class Source(object):
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
+
         if section is not None: 
+            params = params[section]
+        elif len(params) == 1:
+            section = params.keys()[0]
             params = params[section]
 
         fill = False
@@ -183,12 +185,16 @@ class Source(object):
         return self.models['isochrone']
 
     def set_model(self, name, model):
+        """ Set a model """
         if not hasattr(self,'models'):
             object.__setattr__(self, 'models',odict())
         self.models[name] = model
 
-    def set_kernel(self,kernel): self.set_model('kernel',kernel)
-    def set_isochrone(self,isochrone): self.set_model('isochrone',isochrone)
+    def set_kernel(self,kernel): 
+        self.set_model('kernel',kernel)
+
+    def set_isochrone(self,isochrone): 
+        self.set_model('isochrone',isochrone)
 
     def set_params(self,**kwargs):
         """ Set the parameter values """
@@ -226,8 +232,7 @@ class Source(object):
         out.close()
 
     def set_stellar_mass(self, stellar_mass):
-        """ Set the richness to match an input stellar mass.
-        """
+        """ Set the richness to match an input stellar mass. """
         self.richness = stellar_mass/self.isochrone.stellar_mass()
 
     #@property
