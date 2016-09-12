@@ -5,6 +5,12 @@ import scipy.special
 
 _alpha = 0.32
 
+def mad_clip(data,mad=None,mad_lower=None,mad_upper=None):
+    med = np.median(data)
+    mad = np.median(np.fabs(med - data))
+    if mad is not None:
+        mad_lower = mad_upper = mad
+    return 
 
 def interval(best,lo=np.nan,hi=np.nan):
     """
