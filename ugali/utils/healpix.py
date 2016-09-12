@@ -131,7 +131,8 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
     try: 
         # New-style call (healpy 1.6.3)
         return healpy.query_disc(nside, vec, numpy.radians(radius), inclusive, fact, nest)
-    except: 
+    except Exception as e: 
+        print e
         # Old-style call (healpy 0.10.2)
         return healpy.query_disc(nside, vec, numpy.radians(radius), nest, deg=False)
 
