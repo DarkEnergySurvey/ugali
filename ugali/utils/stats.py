@@ -11,6 +11,8 @@ import numpy.lib.recfunctions as recfuncs
 import scipy.special
 import scipy.stats
 
+from ugali.utils.bayesian_efficiency import bayesianInterval, binomialInterval
+
 _alpha   = 0.32
 _nbins   = 300
 _npoints = 500

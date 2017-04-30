@@ -20,7 +20,11 @@ def confidenceInterval(n, k, alpha = 0.68, errorbar=False):
     """
     Given n tests and k successes, return efficiency and confidence interval.
     """
-    e = float(k) / float(n)
+    try:
+        e = float(k) / float(n)
+    except ZeroDivisionError:
+        return numpy.nan, [numpy.nan, numpy.nan]
+
     bins = 1000001
     dx = 1. / bins
 
