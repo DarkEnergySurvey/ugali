@@ -45,7 +45,7 @@ def pix2ang(nside, pix):
     lat = theta2lat(theta)
     return lon, lat
 
-def ang2pix(nside, lon, lat, coord='GAL'):
+def ang2pix(nside, lon, lat):
     """
     Input (lon, lat) in degrees instead of (theta, phi) in radians
     """
@@ -115,7 +115,7 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
     vec : float, sequence of 3 elements
       The coordinates of unit vector defining the disk center.
     radius : float
-      The radius (in degrees) of the disk
+      The radius (in degrees) of the disc
     inclusive : bool, optional
       If False, return the exact set of pixels whose pixel centers lie 
       within the disk; if True, return all pixels that overlap with the disk,
