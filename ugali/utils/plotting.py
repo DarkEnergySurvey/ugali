@@ -199,7 +199,8 @@ def drawProjImage(xx, yy, zz=None, coord='C',**kwargs):
         msg = "Unrecognized coordinate: %"%coord
         logger.warning(msg)
     # Celestial orientation (increasing to the east)
-    ax.set_xlim(xx.max(),xx.min())
+    #ax.set_xlim(xx.max(),xx.min())
+    ax.set_xlim(xx.min(),xx.max())
     ax.set_ylim(yy.min(),yy.max())
 
     if zz is None: return None
@@ -899,7 +900,8 @@ class SourcePlotter(BasePlotter):
         plt.ylabel(r'Density (arcmin$^{-2}$)')
         plt.xlim(0., rmax)
         ymax = pylab.ylim()[1]
-        pylab.ylim(0, ymax)
+        #pylab.ylim(0, ymax)
+        pylab.ylim(0, 12)
         pylab.legend(loc='upper right', frameon=False, fontsize=10)
 
 
@@ -910,7 +912,7 @@ class SourcePlotter(BasePlotter):
         coordstring = ('%.2f, %.2f'%(self.ra, self.dec)).replace('.',fdg)
         if title is None:
             #title = r'%s; ($\alpha_{2000}$, $\delta_{2000}$, $m-M$) = (%s, %.2f)'%(self.source.name, coordstring, self.isochrone.distance_modulus)
-            title = r'$(\alpha_{2000}, \delta_{2000}, m-M) = (%s, %.2f)$'%(coordstring, self.isochrone.distance_modulus)
+            title = r'$(\alpha_{2000}, \delta_{2000}, m-M) = (%s, %.1f)$'%(coordstring, self.isochrone.distance_modulus)
 
         if title: 
             plt.suptitle(title, fontsize=14)

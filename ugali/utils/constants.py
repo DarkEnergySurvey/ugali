@@ -78,8 +78,8 @@ MAGLIMS = dict(
         'r': 24.0, # Truncate at 23.5
         },
     y2q1 = {
-        'g': 23.0, # Truncate at 23.5
-        'r': 23.0, # Truncate at 23.5
+        'g': 23.5, # Truncate at 23.5
+        'r': 23.5, # Truncate at 23.5
         },
 
 )

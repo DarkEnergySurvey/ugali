@@ -35,7 +35,7 @@ RUNLIMITS = odict([              #Hard limits
         ('xlong'    ,'72:00'),   # 72:00
         ('xxl'      ,'168:00'),
         ('kipac-ibq','24:00'),   # MPI queues
-        ('bulletmpi','48:00'),
+        ('bulletmpi','72:00'),
         ])
 
 MPIOPTS = odict([

@@ -141,15 +141,24 @@ class Results(object):
 
         # Extra parameters from the MCMC chain
         logger.debug('Estimating auxiliary parameters...')
-        results['ra']  = self.estimate('ra',**kwargs)
-        results['dec'] = self.estimate('dec',**kwargs)
+        try: 
+            results['ra']  = self.estimate('ra',**kwargs)
+            results['dec'] = self.estimate('dec',**kwargs)
+        except KeyError:
+            logger.warn("Didn't find 'ra' or 'dec'")
+            ra,dec = gal2cel(results['lon'][0],results['lat'][0])
+            results['ra'] = ugali.utils.stats.interval(ra)
+            results['dec'] = ugali.utils.stats.interval(dec)
 
         ra,dec = results['ra'][0],results['dec'][0]
         glon,glat = lon,lat = results['lon'][0],results['lat'][0]
         results.update(gal=[float(glon),float(glat)])
         results.update(cel=[float(ra),float(dec)])
 
-        results['position_angle_cel']  = self.estimate('position_angle_cel',**kwargs)
+        try:
+            results['position_angle_cel']  = self.estimate('position_angle_cel',**kwargs)
+        except KeyError:
+            results['position_angle_cel'] = ugali.utils.stats.interval(np.nan)
 
         # Update the loglike to the best-fit parameters from the chain
         logger.debug('Calculating TS...')
