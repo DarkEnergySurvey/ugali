@@ -1,12 +1,10 @@
 """
 Classes which manage object catalogs live here.
 """
-
-import numpy
 import numpy as np
-import pyfits
-import healpy
+import fitsio
 import copy
+from matplotlib import mlab
 
 import ugali.utils.projector
 
@@ -14,29 +12,31 @@ from ugali.utils.config import Config
 from ugali.utils.projector import gal2cel,cel2gal
 from ugali.utils.healpix import ang2pix,superpixel
 from ugali.utils.logger import logger
-############################################################
-### ADW: This needs to be rewritten to use fitsio
-############################################################
+from ugali.utils.fileio import load_infiles
 
 class Catalog:
 
-    def __init__(self, config, roi=None, data=None):
+    def __init__(self, config, roi=None, data=None, filenames=None):
         """
-        Class to store information about detected objects.
+        Class to store information about detected objects. This class
+        augments the raw data array with several aliases and derived
+        quantities.
 
-        The raw data from the fits file is stored. lon and lat are derived quantities
-        based on chosen coordinate system.
+        Parameters:
+        -----------
+        config    : Configuration object
+        roi       : Region of Interest to load catalog data for
+        data      : Data array object
+        filenames : FITS filenames to read catalog from
 
-        INPUTS:
-            config: Config object
-            roi[None] : Region of Interest to load catalog data for
-            data[None]: pyfits table data (fitsrec) object.
+        Returns:
+        --------
+        catalog   : The Catalog object
         """
-        #self = config.merge(config_merge) # Maybe you would want to update parameters??
         self.config = Config(config)
 
         if data is None:
-            self._parse(roi)
+            self._parse(roi,filenames)
         else:
             self.data = data
 
@@ -50,7 +50,10 @@ class Catalog:
 
     def applyCut(self, cut):
         """
-        Return a new catalog which is a subset of objects selected using the input cut array.
+        Return a new catalog which is a subset of objects selected
+        using the input cut array.
+
+        NOTE: This should really be a selection.
         """
         return Catalog(self.config, data=self.data[cut])
 
@@ -58,9 +61,9 @@ class Catalog:
         """
         Return a random catalog by boostrapping the colors of the objects in the current catalog.
         """
-        if seed is not None: numpy.random.seed(seed)
+        if seed is not None: np.random.seed(seed)
         data = copy.deepcopy(self.data)
-        idx = numpy.random.randint(0,len(data),len(data))
+        idx = np.random.randint(0,len(data),len(data))
         data[self.config['catalog']['mag_1_field']][:] = self.mag_1[idx]
         data[self.config['catalog']['mag_err_1_field']][:] = self.mag_err_1[idx]
         data[self.config['catalog']['mag_2_field']][:] = self.mag_2[idx]
@@ -78,7 +81,7 @@ class Catalog:
                                                                  self.config['coords']['reference'][1])
             except KeyError:
                 logger.warning('Projection reference point is median (lon, lat) of catalog objects')
-                self.projector = ugali.utils.projector.Projector(numpy.median(self.lon), numpy.median(self.lat))
+                self.projector = ugali.utils.projector.Projector(np.median(self.lon), np.median(self.lat))
         else:
             self.projector = projector
 
@@ -97,48 +100,68 @@ class Catalog:
         self.pixel = ang2pix(self.config['coords']['nside_pixel'],self.lon,self.lat)
         self.pixel_roi_index = roi.indexROI(self.lon,self.lat)
 
-        if numpy.any(self.pixel_roi_index < 0):
+        if np.any(self.pixel_roi_index < 0):
             logger.warning("Objects found outside ROI")
 
-    def write(self, outfile):
+    def write(self, outfile, clobber=True, **kwargs):
         """
-        Write the current object catalog to fits file.
+        Write the current object catalog to FITS file.
+
+        Parameters:
+        -----------
+        filename : the FITS file to write.
+        clobber  : remove existing file
+        kwargs   : passed to fitsio.write
+
+        Returns:
+        --------
+        None
         """
-            
-        hdu = pyfits.BinTableHDU(self.data)
-        hdu.writeto(outfile, clobber=True)
+        fitsio.write(outfile,self.data,clobber=True,**kwargs)
 
-    def _parse(self, roi=None):
+    def _parse(self, roi=None, filenames=None):
+        """        
+        Parse catalog FITS files into recarray.
+
+        Parameters:
+        -----------
+        roi : The region of interest; if 'roi=None', read all catalog files
+
+        Returns:
+        --------
+        None
         """
-        Helper function to parse a catalog file and return a pyfits table.
+        if (roi is not None) and (filenames is not None):
+            msg = "Cannot take both roi and filenames"
+            raise Exception(msg)
 
-        CSV format not yet validated.
-
-        !!! Careful, reading a large catalog is memory intensive !!!
-        """
-        
-        filenames = self.config.getFilenames()
-
-        if len(filenames['catalog'].compressed()) == 0:
-            raise Exception("No catalog file found")
-        elif roi is not None:
+        if roi is not None:
             pixels = roi.getCatalogPixels()
-            self.data = readCatalogData(filenames['catalog'][pixels])
-        elif len(filenames['catalog'].compressed()) == 1:
-            file_type = filenames[0].split('.')[-1].strip().lower()
-            if file_type == 'csv':
-                self.data = numpy.recfromcsv(filenames[0], delimiter = ',')
-            elif file_type in ['fit', 'fits']:
-                self.data = pyfits.open(filenames[0])[1].data
-            else:
-                logger.warning('Unrecognized catalog file extension %s'%(file_type))
+            filenames = self.config.getFilenames()['catalog'][pixels]
+        elif filenames is None:
+            filenames = self.config.getFilenames()['catalog'].compressed()
         else:
-            self.data = readCatalogData(filenames['catalog'].compressed())
+            filenames = np.atleast_1d(filenames)
 
+        if len(filenames) == 0:
+            msg = "No catalog files found."
+            raise Exception(msg)
 
-        # ADW: This is horrible and should never be done...
-        selection = self.config['catalog'].get('selection')
-        if not selection:
+        # Load the data
+        self.data = load_infiles(filenames)
+
+        # Apply a selection cut
+        self._applySelection()
+
+        # Cast data to recarray (historical reasons)
+        self.data = self.data.view(np.recarray)
+
+    def _applySelection(self,selection=None):
+        # ADW: This is a hack (eval is unsafe!)
+        if selection is None:
+            selection = self.config['catalog'].get('selection')
+
+        if not selection: 
             pass
         elif 'self.data' not in selection:
             msg = "Selection does not contain 'data'"
@@ -147,57 +170,58 @@ class Catalog:
             logger.warning('Evaluating selection: \n"%s"'%selection)
             sel = eval(selection)
             self.data = self.data[sel]
-
-        #print 'Found %i objects'%(len(self.data))
-
+        
     def _defineVariables(self):
         """
         Helper funtion to define pertinent variables from catalog data.
+
+        ADW (20170627): This has largely been replaced by properties.
         """
-        self.objid = self.data.field(self.config['catalog']['objid_field'])
-        self.lon = self.data.field(self.config['catalog']['lon_field'])
-        self.lat = self.data.field(self.config['catalog']['lat_field'])
-
-        #if self.config['catalog']['coordsys'].lower() == 'cel' \
-        #   and self.config['coords']['coordsys'].lower() == 'gal':
-        #    logger.info('Converting catalog objects from CELESTIAL to GALACTIC cboordinates')
-        #    self.lon, self.lat = ugali.utils.projector.celToGal(self.lon, self.lat)
-        #elif self.config['catalog']['coordsys'].lower() == 'gal' \
-        #   and self.config['coords']['coordsys'].lower() == 'cel':
-        #    logger.info('Converting catalog objects from GALACTIC to CELESTIAL coordinates')
-        #    self.lon, self.lat = ugali.utils.projector.galToCel(self.lon, self.lat)
-
-        self.mag_1 = self.data.field(self.config['catalog']['mag_1_field'])
-        self.mag_err_1 = self.data.field(self.config['catalog']['mag_err_1_field'])
-        self.mag_2 = self.data.field(self.config['catalog']['mag_2_field'])
-        self.mag_err_2 = self.data.field(self.config['catalog']['mag_err_2_field'])
-
-        if self.config['catalog']['mc_source_id_field'] is not None:
-            if self.config['catalog']['mc_source_id_field'] in self.data.names:
-                self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
-                logger.info('Found %i MC source objects'%(numpy.sum(self.mc_source_id > 0)))
-            else:
-                #ADW: This is pretty kludgy, please fix... (FIXME)
-                columns_array = [pyfits.Column(name = self.config['catalog']['mc_source_id_field'],
-                                               format = 'I',
-                                               array = numpy.zeros(len(self.data)))]
-                hdu = pyfits.new_table(columns_array)
-                self.data = pyfits.new_table(pyfits.new_table(self.data.view(np.recarray)).columns + hdu.columns).data
-                self.mc_source_id = self.data.field(self.config['catalog']['mc_source_id_field'])
-
-        # should be @property
-        if self.config['catalog']['band_1_detection']:
-            self.mag = self.mag_1
-            self.mag_err = self.mag_err_1
-        else:
-            self.mag = self.mag_2
-            self.mag_err = self.mag_err_2
-            
-        # should be @property
-        self.color = self.mag_1 - self.mag_2
-        self.color_err = numpy.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
-
         logger.info('Catalog contains %i objects'%(len(self.data)))
+
+        mc_source_id_field = self.config['catalog']['mc_source_id_field']
+        if mc_source_id_field is not None:
+            if mc_source_id_field not in self.data.dtype.names:
+                array = np.zeros(len(self.data),dtype=int)
+                self.data = mlab.rec_append_fields(self.data,
+                                                   names=mc_source_id_field,
+                                                   arrs=array)
+            logger.info('Found %i simulated objects'%(np.sum(self.mc_source_id>0)))
+
+    # Use properties to avoid duplicating the data
+    @property
+    def objid(self): return self.data[self.config['catalog']['objid_field']]
+    @property
+    def lon(self): return self.data[self.config['catalog']['lon_field']]
+    @property 
+    def lat(self): return self.data[self.config['catalog']['lat_field']]
+
+    @property
+    def mag_1(self): return self.data[self.config['catalog']['mag_1_field']]
+    @property
+    def mag_err_1(self):
+        return self.data[self.config['catalog']['mag_err_1_field']]
+    @property
+    def mag_2(self):
+        return self.data[self.config['catalog']['mag_2_field']]
+    @property
+    def mag_err_2(self):
+        return self.data[self.config['catalog']['mag_err_2_field']]
+    @property 
+    def mag(self):
+        if self.config['catalog']['band_1_detection']: return self.mag_1
+        else: return self.mag_2
+    @property
+    def mag_err(self):
+        if self.config['catalog']['band_1_detection']: return self.mag_err_1
+        else: return self.mag_err_2
+    @property
+    def color(self): return self.mag_1 - self.mag_2
+    @property
+    def color_err(self): return np.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
+    @property
+    def mc_source_id(self):
+        return self.data.field(self.config['catalog']['mc_source_id_field'])
 
     # This assumes Galactic coordinates
     @property
@@ -216,107 +240,23 @@ class Catalog:
 
 ############################################################
 
-def mergeCatalogs(catalog_array):
+def mergeCatalogs(catalog_list):
     """
-    Input is an array of Catalog objects. Output is a merged catalog object.
-    Column names are derived from first Catalog in the input array.
+    Merge a list of Catalogs.
+
+    Parameters:
+    -----------
+    catalog_list : List of Catalog objects.
+
+    Returns:
+    --------
+    catalog      : Combined Catalog object 
     """
-    len_array = []
-    for ii in range(0, len(catalog_array)):
-        len_array.append(len(catalog_array[ii].data))
-    cumulative_len_array = numpy.cumsum(len_array)
-    cumulative_len_array = numpy.insert(cumulative_len_array, 0, 0)
-
-    columns = pyfits.new_table(catalog_array[0].data).columns
-    hdu = pyfits.new_table(columns, nrows=cumulative_len_array[-1])
-    for name in columns.names:
-        for ii in range(0, len(catalog_array)):
-            if name not in catalog_array[ii].data.names:
-                continue
-            hdu.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = catalog_array[ii].data.field(name)
-
-    catalog_merged = Catalog(catalog_array[0].config, data=hdu.data)
-    return catalog_merged
-
-
-############################################################
-
-def precomputeCoordinates(infile, outfile):
-    import numpy.lib.recfunctions as rec
-    hdu = pyfits.open(infile)
-    data = hdu[1].data
-    columns = hdu[1].columns
-    names = [n.lower() for n in hdu[1].data.names]
-
-    if 'glon' not in names and 'glat' not in names:
-        logger.info("Writing 'GLON' and 'GLAT' columns")
-        glon, glat = ugali.utils.projector.celToGal(data['RA'], data['DEC'])
-        out = rec.append_fields(data,['GLON','GLAT'],[glon,glat],
-                                usemask=False,asrecarray=True)
-    elif 'ra' not in names and 'dec' not in names:
-        logger.info("Writing 'RA' and 'DEC' columns")
-        ra, dec = ugali.utils.projector.galToCel(data['GLAT'], data['GLON'])
-        out = rec.append_fields(data,['RA','DEC'],[ra,dec],
-                                usemask=False,asrecarray=True)
-    
-    hdu_out = pyfits.BinTableHDU(out)
-    hdu_out.writeto(outfile, clobber=True)
-
-############################################################
-
-def readCatalogData(infiles):
-    """ Read a set of catalog FITS files into a single recarray. """
-    if isinstance(infiles,basestring): infiles = [infiles]
-    data, len_data = [],[]
-    for f in infiles:
-        data.append(pyfits.open(f)[1].data)
-        len_data.append(len(data[-1]))
-
-    cumulative_len_array = numpy.cumsum(len_data)
-    cumulative_len_array = numpy.insert(cumulative_len_array, 0, 0)
-    columns = data[0].columns
-    table = pyfits.new_table(columns, nrows=cumulative_len_array[-1])
-
-    for name in columns.names:
-        for ii in range(0, len(data)):
-            if name not in data[ii].names:
-                raise Exception("Column %s not found in %"(name,infiles[ii]))
-            table.data.field(name)[cumulative_len_array[ii]: cumulative_len_array[ii + 1]] = data[ii].field(name)
-        
-    return table.data
-
-def makeHDU(config,mag_1,mag_err_1,mag_2,mag_err_2,lon,lat,mc_source_id):
-    """
-    Create a catalog fits file object based on input data.
-
-    ADW: This should be combined with the write_membership function of loglike.
-    """
-
-    if config['catalog']['coordsys'].lower() == 'cel' \
-       and config['coords']['coordsys'].lower() == 'gal':
-        lon, lat = ugali.utils.projector.gal2cel(lon, lat)
-    elif config['catalog']['coordsys'].lower() == 'gal' \
-       and config['coords']['coordsys'].lower() == 'cel':
-        lon, lat = ugali.utils.projector.cel2gal(lon, lat)
-
-    columns = [
-        pyfits.Column(name=config['catalog']['objid_field'],
-                      format = 'D',array = np.arange(len(lon))),
-        pyfits.Column(name=config['catalog']['lon_field'],
-                      format = 'D',array = lon),
-        pyfits.Column(name = config['catalog']['lat_field'],          
-                      format = 'D',array = lat), 
-        pyfits.Column(name = config['catalog']['mag_1_field'],        
-                      format = 'E',array = mag_1),
-        pyfits.Column(name = config['catalog']['mag_err_1_field'],    
-                      format = 'E',array = mag_err_1),
-        pyfits.Column(name = config['catalog']['mag_2_field'],        
-                      format = 'E',array = mag_2),
-        pyfits.Column(name = config['catalog']['mag_err_2_field'],    
-                      format = 'E',array = mag_err_2),
-        pyfits.Column(name = config['catalog']['mc_source_id_field'], 
-                      format = 'I',array = mc_source_id),
-    ]
-
-    hdu = pyfits.new_table(columns)
-    return hdu
+    config = catalog_list[0]
+    # Check the columns
+    for c in catalog_list:
+        if c.data.dtype.names != catalog_list[0].data.dtype.names:
+            msg = "Catalog data columns not the same."
+            raise Exception(msg)
+    data = np.concatenate([c.data for c in catalog_list])
+    return Catalog(config,data=data)
