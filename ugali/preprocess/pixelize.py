@@ -9,18 +9,26 @@ import os
 from os.path import join
 
 import pyfits
+import fitsio
 import numpy
+import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import collections
 import healpy
+import healpy as hp
+import glob
+from matplotlib import mlab
 
 import ugali.utils.binning
 import ugali.utils.skymap
 from ugali.utils.projector import cel2gal, gal2cel
+import ugali.utils.healpix
 from ugali.utils.healpix import ang2pix, pix2ang, superpixel
+
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
+import ugali.utils.fileio
 
 def pixelizeCatalog(infiles, config, force=False):
     """
@@ -39,14 +47,14 @@ def pixelizeCatalog(infiles, config, force=False):
         logger.info("%i objects found"%len(data))
         if not len(data): continue
         glon,glat = cel2gal(data['RA'],data['DEC'])
-        catalog_pix = ang2pix(nside_catalog,glon,glat,coord='GAL')
-        pixel_pix = ang2pix(nside_pixel,glon,glat,coord='GAL')
+        catalog_pix = ang2pix(nside_catalog,glon,glat)
+        pixel_pix = ang2pix(nside_pixel,glon,glat)
         names = [n.upper() for n in data.columns.names]
         ra_idx = names.index('RA'); dec_idx = names.index('DEC')
         idx = ra_idx if ra_idx > dec_idx else dec_idx
         catalog_pix_name = 'PIX%i'%nside_catalog
         pixel_pix_name = 'PIX%i'%nside_pixel
-
+ 
         coldefs = pyfits.ColDefs(
             [pyfits.Column(name='GLON',format='1D',array=glon),
              pyfits.Column(name='GLAT',format='1D',array=glat),
@@ -55,7 +63,7 @@ def pixelizeCatalog(infiles, config, force=False):
         )
         hdu = pyfits.new_table(data.columns[:idx+1]+coldefs+data.columns[idx+1:])
         table = hdu.data
-
+ 
         for pix in numpy.unique(catalog_pix):
             logger.debug("Processing pixel %s"%pix)
             outfile = filenames.data['catalog'][pix]
@@ -83,6 +91,65 @@ def pixelizeCatalog(infiles, config, force=False):
             hdulist.flush()
             hdulist.close()
 
+
+def pixelizeCatalog(infiles, config, force=False):
+    """
+    Break catalog into chunks by healpix pixel.
+    
+    Parameters:
+    -----------
+    infiles : List of input files
+    config  : Configuration file
+    force   : Overwrite existing files (depricated)
+    
+    Returns:
+    --------
+    None
+    """
+    nside_catalog = config['coords']['nside_catalog']
+    nside_pixel = config['coords']['nside_pixel']
+    outdir = mkdir(config['catalog']['dirname'])
+    filenames = config.getFilenames()
+    
+    for i,filename in enumerate(infiles):
+        logger.info('(%i/%i) %s'%(i+1, len(infiles), filename))
+        data = fitsio.read(filename)
+        logger.info("%i objects found"%len(data))
+        if not len(data): continue
+
+        glon,glat = cel2gal(data['RA'],data['DEC'])
+        cat_pix = ang2pix(nside_catalog,glon,glat)
+        pix_pix = ang2pix(nside_pixel,glon,glat)
+        cat_pix_name = 'PIX%i'%nside_catalog
+        pix_pix_name = 'PIX%i'%nside_pixel
+
+        data=mlab.rec_append_fields(data,
+                                    names=['GLON','GLAT',cat_pix_name,pix_pix_name],
+                                    arrs=[glon,glat,cat_pix,pix_pix],
+                                    dtypes=['f4','f4',int,int])
+                               
+                               
+        for pix in np.unique(cat_pix):
+            logger.debug("Processing pixel %s"%pix)
+
+            arr = data[cat_pix == pix]
+            outfile = filenames.data['catalog'][pix]
+
+            if not os.path.exists(outfile):
+                logger.debug("Creating %s"%outfile)
+                out=fitsio.FITS(outfile,mode='rw')
+                out.write(arr)
+                hdr = ugali.utils.healpix.header_odict(nside=nside_catalog,coord='G')
+                for key in ['PIXTYPE','ORDERING','NSIDE','COORDSYS']:
+                    out[1].write_key(*hdr[key].values())
+                out[1].write_key('PIX',pix,comment='HEALPIX pixel for this file')
+            else:
+                out=fitsio.FITS(outfile,mode='rw')
+                out[1].append(arr)
+
+            logger.debug("Writing %s"%outfile)
+            out.close()
+
 def pixelizeDensity(config, nside=None, force=False):
     if nside is None: 
         nside = config['coords']['nside_likelihood']
@@ -101,22 +168,20 @@ def pixelizeDensity(config, nside=None, force=False):
             
         outdir = mkdir(os.path.dirname(outfile))
         pixels, density = stellarDensity(infile,nside)
-        data_dict = dict( DENSITY=density )
         logger.info("Writing %s..."%outfile)
-        ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,nside,outfile)
+        data = dict(PIXEL=pixels,DENSITY=density)
+        ugali.utils.healpix.write_partial_map(outfile,data,nside=nside)
 
 def stellarDensity(infile, nside=2**8): 
     area = healpy.nside2pixarea(nside,degrees=True)
-    f = pyfits.open(infile)
-    data = f[1].data
     logger.debug("Reading %s"%infile)
-    
+    data = fitsio.read(infile,columns=['GLON','GLAT'])
+
     glon,glat = data['GLON'],data['GLAT']
-    pix = ang2pix(nside,glon,glat,coord='GAL')
+    pix = ang2pix(nside,glon,glat)
     counts = collections.Counter(pix)
     pixels, number = numpy.array(sorted(counts.items())).T
     density = number/area
-    f.close()
 
     return pixels, density
 
