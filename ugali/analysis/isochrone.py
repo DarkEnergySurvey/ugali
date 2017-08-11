@@ -86,6 +86,7 @@ class Isochrone(Model):
     # last duplicate entry is filled.
     defaults = (
         ('survey','des','Name of survey filter system'),
+        ('dirname',get_iso_dir(),'Directory name for isochrone files'),
         ('band_1','g','Field name for magnitude one'),
         ('band_2','r','Field name for magnitude two'),
         ('band_1_detection',True,'Band one is detection band'),
@@ -111,6 +112,9 @@ class Isochrone(Model):
     def _parse(self,filename):
         msg = "Not implemented for base class"
         raise Exception(msg)
+
+    def get_dirname(self):
+        return self.dirname.format(survey=self.survey)
 
     def todict(self):
         ret = super(Isochrone,self).todict()
@@ -976,12 +980,37 @@ class PadovaIsochrone(Isochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
     #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
-    _dirname =  os.path.join(get_iso_dir(),'padova')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
         ('hb_stage',4,'Horizontal branch stage name'),
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+        des = odict([
+                (3, ('mass_init',float)),
+                (4, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (10, ('g',float)),
+                (11, ('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (14,('Y',float)),
+                (16,('stage',int)),
+                ]),
+        sdss = odict([
+                (3, ('mass_init',float)),
+                (4, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (9, ('u',float)),
+                (10, ('g',float)),
+                (11,('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (16,('stage',int)),
+                ])
         )
 
     def __init__(self,**kwargs):
@@ -1020,9 +1049,10 @@ class PadovaIsochrone(Isochrone):
 
     def create_grid(self,abins=None,zbins=None):
         if abins is None and zbins is None:
-            data = np.array([self.filename2params(f) for f in glob.glob(self.dirname+'/%s_*.dat'%(self._prefix))])
+            filenames = glob.glob(self.get_dirname()+'/%s_*.dat'%(self._prefix))
+            data = np.array([self.filename2params(f) for f in filenames])
             if not len(data):
-                msg = "No isochrone files found in: %s"%self.dirname
+                msg = "No isochrone files found in: %s"%self.get_dirname()
                 raise Exception(msg)
             arange = np.unique(data[:,0])
             zrange = np.unique(data[:,1])
@@ -1042,7 +1072,7 @@ class PadovaIsochrone(Isochrone):
         return scipy.spatial.cKDTree(np.vstack(grid).T)
 
     def get_filename(self):
-        dirname = self.dirname
+        dirname = self.get_dirname()
         p = [self.age,self.metallicity]
         dist,idx = self.tree.query(p)
         age = self.grid[0][idx]
@@ -1060,40 +1090,20 @@ class PadovaIsochrone(Isochrone):
             self._parse(self.filename)
 
     def _parse(self,filename):
+        """Reads an isochrone file in the Padova (Bressan et al. 2012)
+        format. Creates arrays with the initial stellar mass and
+        corresponding magnitudes for each step along the isochrone.
         """
-        Reads an isochrone file in the Padova (Marigo 2008) format and determines
-        the age (log10 yrs and Gyr), metallicity (Z and [Fe/H]), and creates arrays with
-        the initial stellar mass and corresponding magnitudes for each step along the isochrone.
-        http://stev.oapd.inaf.it/cgi-bin/cmd
-        """
-        if self.survey.lower() == 'des':
-            columns = odict([
-                    (3, ('mass_init',float)),
-                    (4, ('mass_act',float)),
-                    (5, ('log_lum',float)),
-                    (10, ('g',float)),
-                    (11, ('r',float)),
-                    (12,('i',float)),
-                    (13,('z',float)),
-                    (14,('Y',float)),
-                    (16,('stage',int)),
-                    ])
-        elif self.survey.lower() == 'sdss':
-            columns = odict([
-                    (3, ('mass_init',float)),
-                    (4, ('mass_act',float)),
-                    (5, ('log_lum',float)),
-                    (9, ('u',float)),
-                    (10, ('g',float)),
-                    (11,('r',float)),
-                    (12,('i',float)),
-                    (13,('z',float)),
-                    (16,('stage',int)),
-                    ])
-        else:
-            logger.warning('did not recognize survey %s'%(survey))
+        #http://stev.oapd.inaf.it/cgi-bin/cmd_2.7
+        try:
+            columns = self.columns[self.survey.lower()]
+        except KeyError as e:
+            logger.warning('Did not recognize survey %s'%(survey))
+            raise(e)
 
-        kwargs = dict(delimiter='\t',usecols=columns.keys(),dtype=columns.values())
+        # delimiter='\t' is used to be compatible with OldPadova...
+        kwargs = dict(delimiter='\t',usecols=columns.keys(),
+                      dtype=columns.values())
         data = np.genfromtxt(filename,**kwargs)
 
         self.mass_init = data['mass_init']
@@ -1113,7 +1123,7 @@ class PadovaIsochrone(Isochrone):
 class EmpiricalPadova(PadovaIsochrone):
     _prefix = 'iso'
     _basename = '%(prefix)s_a13.7_z0.00007.dat'
-    _dirname =  os.path.join(get_iso_dir(),'empirical')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','empirical')
 
     defaults = (PadovaIsochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1147,7 +1157,7 @@ class DESDwarfs(EmpiricalPadova):
 
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
-    _dirname =  os.path.join(get_iso_dir(),'girardi2002')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','girardi2002')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1156,7 +1166,7 @@ class Girardi2002(PadovaIsochrone):
         )
 
     columns = dict(
-            des = odict([
+        des = odict([
                 (2, ('mass_init',float)),
                 (3, ('mass_act',float)),
                 (4, ('log_lum',float)),
@@ -1167,7 +1177,7 @@ class Girardi2002(PadovaIsochrone):
                 (13,('Y',float)),
                 (15,('stage',object))
                 ]),
-            )
+        )
     
     def _parse(self,filename):
         """
@@ -1209,7 +1219,7 @@ class Girardi2002(PadovaIsochrone):
 
 class Girardi2010(Girardi2002):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
-    _dirname =  os.path.join(get_iso_dir(),'girardi2010')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','girardi2010')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1218,24 +1228,25 @@ class Girardi2010(Girardi2002):
         )
 
     columns = dict(
-            des = odict([
+        des = odict([
                 (2, ('mass_init',float)),
                 (3, ('mass_act',float)),
                 (4, ('log_lum',float)),
                 (9, ('g',float)),
-                (10, ('r',float)),
+                (10,('r',float)),
                 (11,('i',float)),
                 (12,('z',float)),
                 (13,('Y',float)),
                 (19,('stage',object))
                 ]),
-            )
+        )
 
 class OldPadovaIsochrone(Girardi2002):
+    """ Old Padova isochrones that were post-processed by Eduardo."""
     _prefix = 'isot'
     _basename = '%(prefix)sa%(age)iz%(z)g.dat'
     #_dirname = '/u/ki/kadrlica/des/isochrones/v0/' # won't work for SDSS...
-    _dirname =  os.path.join(get_iso_dir(),'old_padova')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','old_padova')
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1290,6 +1301,92 @@ class OldPadovaIsochrone(Girardi2002):
         age = 10**(log_age) / 1e9 # Gyr
         return age, metallicity
 
+class Bressan2012(PadovaIsochrone):
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','bressan2012')
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage',4,'Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+class Marigo2017(PadovaIsochrone):
+    #http://stev.oapd.inaf.it/cgi-bin/cmd_30
+    #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','marigo2017')
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage','BHeb','Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+        des = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (7, ('stage',int)),
+                (24,('g',float)),
+                (25,('r',float)),
+                (26,('i',float)),
+                (27,('z',float)),
+                (28,('Y',float)),
+                ]),
+        sdss = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (7, ('stage',int)),
+                (24,('u',float)),
+                (25,('g',float)),
+                (26,('r',float)),
+                (27,('i',float)),
+                (28,('z',float)),
+                ]),
+        ps1 = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (7, ('stage',int)),
+                (24,('g',float)),
+                (25,('r',float)),
+                (26,('i',float)),
+                (27,('z',float)),
+                (28,('y',float)),
+                (29,('w',float)),
+                ]),
+        )
+    
+    def _parse(self,filename):
+        """Reads an isochrone file in the Padova (Marigo et al. 2017)
+        format. Creates arrays with the initial stellar mass and
+        corresponding magnitudes for each step along the isochrone.
+        """
+        try:
+            columns = self.columns[self.survey.lower()]
+        except KeyError as e:
+            logger.warning('Did not recognize survey %s'%(survey))
+            raise(e)
+
+        kwargs = dict(delimiter=' ',usecols=columns.keys(),
+                      dtype=columns.values())
+        data = np.genfromtxt(filename,**kwargs)
+
+        self.mass_init = data['mass_init']
+        self.mass_act  = data['mass_act']
+        self.luminosity = 10**data['log_lum']
+        self.mag_1 = data[self.band_1]
+        self.mag_2 = data[self.band_2]
+        self.stage = data['stage']
+
+        self.mass_init_upper_bound = np.max(self.mass_init)
+        self.index = len(self.mass_init)
+
+        self.mag = self.mag_1 if self.band_1_detection else self.mag_2
+        self.color = self.mag_1 - self.mag_2
+
+
 ############################################################
 
 class DotterIsochrone(PadovaIsochrone):
@@ -1297,7 +1394,7 @@ class DotterIsochrone(PadovaIsochrone):
     KCB: currently inheriting from PadovaIsochrone because there are 
     several useful functions where we would basically be copying code.
     """
-    _dirname =  os.path.join(get_iso_dir(),'dotter')
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','dotter')
 
     # KCB: What to do about horizontal branch?
     defaults = (Isochrone.defaults) + (
@@ -1313,8 +1410,8 @@ class DotterIsochrone(PadovaIsochrone):
                 (5, ('u',float)),
                 (6, ('g',float)),
                 (7, ('r',float)),
-                (8,('i',float)),
-                (9,('z',float))
+                (8, ('i',float)),
+                (9, ('z',float))
                 ]),
             )
 
@@ -1482,11 +1579,11 @@ class CompositeIsochrone(Isochrone):
 ###             msg = 'Length of isochrone and weight arrays must be equal'
 ###             raise ValueError(msg)
 
-Padova = PadovaIsochrone
+# Class Aliases
 OldPadova = OldPadovaIsochrone
 Composite = CompositeIsochrone
 Dotter = DotterIsochrone
-Bressan2012 = PadovaIsochrone
+Padova = Bressan2012
 
 def factory(name, **kwargs):
     from ugali.utils.factory import factory

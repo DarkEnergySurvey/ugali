@@ -14,6 +14,7 @@ from StringIO import StringIO
 import zlib
 import re
 import subprocess
+from multiprocessing import Pool
 from collections import OrderedDict as odict
 
 import numpy as np
@@ -21,9 +22,12 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 from ugali.analysis.isochrone import PadovaIsochrone,OldPadovaIsochrone
 
-# Commented options may need to be restored for older
-# version/isochrones.
-defaults_27 =  {#'binary_frac': 0.3,
+# Commented options may need to be restored for older version/isochrones.
+# The parameters were tracked down by:
+# Chrome -> View -> Developer -> Developer Tools
+# Network -> Headers -> Request Payload
+
+defaults_cmd=  {#'binary_frac': 0.3,
                 #'binary_kind': 1,
                 #'binary_mrinf': 0.7,
                 #'binary_mrsup': 1,
@@ -66,7 +70,18 @@ defaults_27 =  {#'binary_frac': 0.3,
                 #'photsys_version': 'yang',
                 'submit_form': 'Submit'}
 
-defaults_28 = dict(defaults_27,cmd_version='2.8')
+defaults_27 = dict(defaults_cmd,cmd_version='2.7')
+defaults_28 = dict(defaults_cmd,cmd_version='2.8')
+defaults_29 = dict(defaults_cmd,cmd_version='2.9')
+defaults_30 = dict(defaults_cmd,cmd_version='3.0')
+
+# survey system
+odict([
+        ('des',dict(photosys_file='tab_mag_odfnew/tab_mag_decam.dat')),
+        ('sdss',dict(photosys_file='')),
+        ('pan-starrs',dict(photosys_file='')),
+        ])
+
 
 class Padova(object):
     defaults = dict(defaults_27)
@@ -83,11 +98,8 @@ class Padova(object):
         aa,zz = np.meshgrid(arange,zrange)
         return aa.flatten(),zz.flatten()
 
-    def run(self,grid=None,outdir=None,force=False):
-        if grid is None:
-            aa,zz = self.create_grid()
-        else:
-            aa,zz = grid
+    def run(self,grid,outdir=None,force=False):
+        aa,zz = grid
         for a,z in zip(aa,zz):
             try: 
                 self.download(a,z,outdir,force)
@@ -116,6 +128,8 @@ class Padova(object):
             photsys_file='tab_mag_odfnew/tab_mag_decam.dat'
         elif survey=='sdss':
             photsys_file='tab_mag_odfnew/tab_mag_sloan.dat'
+        elif survey=='ps1':
+            photsys_file='tab_mag_odfnew/tab_mag_panstarrs1.dat'
         else:
             msg = 'Unrecognized survey: %s'%survey
             raise RuntimeError(msg)
@@ -153,8 +167,7 @@ class Padova(object):
             stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)
             logger.debug(stdout)
         else:
-            #print(c)
-            raise RuntimeError('Server Response is incorrect')
+            raise RuntimeError('Server response is incorrect')
 
 class OldPadova(Padova):
     defaults = dict(defaults_27)
@@ -183,6 +196,10 @@ class Bressan2012(Padova):
     defaults = dict(defaults_27)
     defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
+class Marigo2017(Padova):
+    defaults = dict(defaults_30)
+    defaults['isoc_kind'] = 'parsec_CAF09_v1.2S_NOV13'
+
 def factory(name, **kwargs):
     from ugali.utils.factory import factory
     return factory(name, module=__name__, **kwargs)
@@ -191,17 +208,48 @@ if __name__ == "__main__":
     import ugali.utils.parser
     description = "Download isochrones"
     parser = ugali.utils.parser.Parser(description=description)
-    parser.add_config()
-    parser.add_debug()
     parser.add_verbose()
     parser.add_force()
     parser.add_argument('-a','--age',default=None,type=float)
     parser.add_argument('-z','--metallicity',default=None,type=float)
     parser.add_argument('-k','--kind',default='Bressan2012')
-    opts = parser.parse_args()
+    parser.add_argument('-s','--survey',default='des')
+    parser.add_argument('-o','--outdir',default=None)
+    parser.add_argument('-n','--njobs',default=10,type=int)
+    args = parser.parse_args()
 
-    from ugali.utils.config import Config
-    config = Config(opts.config)
+    # Defaults
+    abins = np.linspace(1, 13.5, 126)
+    zbins = np.linspace(0.0001,0.0010,91)
+    abins = [args.age] if args.age else abins
+    zbins = [args.metallicity] if args.metallicity else zbins
+    grid = [g.flatten() for g in np.meshgrid(abins,zbins)]
+    logger.info("Ages:\n  %s"%np.unique(grid[0]))
+    logger.info("Metallicities:\n  %s"%np.unique(grid[1]))
+
+    if args.outdir is None: args.outdir = args.kind.lower()
+    logger.info("Creating output directory: %s"%args.outdir)
+
+    p = factory(args.kind,survey=args.survey)
+
+    def run(args):
+        try:  
+            p.download(*args)
+        except RuntimeError as e: 
+            logger.warn(str(e))
+
+    arguments = [(a,z,args.outdir,args.force) for a,z in zip(*grid)]
+    if args.njobs > 0:
+        pool = Pool(processes=args.njobs, maxtasksperchild=100)
+        results = pool.map(run,arguments)
+    else:
+        results = map(run,arguments)
+        
+#####################################################################3
+
+    #from ugali.utils.config import Config
+    #config = Config(args.config)
+    #survey = config['data']['survey']
 
     #outdir = '/u/ki/kadrlica/des/isochrones/v1'
     #outdir = '/u/ki/kadrlica/sdss/isochrones/v2'
@@ -210,12 +258,8 @@ if __name__ == "__main__":
     #outdir = '/u/ki/kadrlica/des/isochrones/v4'
     #outdir = '/u/ki/kadrlica/des/isochrones/v5'
     #outdir = '/u/ki/kadrlica/des/isochrones/v6'
-    #outdir = './padova'
-    outdir = './'
-    survey = config['data']['survey']
-
-    p = factory(opts.kind,survey=survey)
-
+    #outdir = './iso'
+    #outdir = args.outdir
     # Binning from config
     #abins = config['binning']['age']
     #zbins = config['binning']['z']
@@ -225,24 +269,15 @@ if __name__ == "__main__":
     #zbins = np.arange(1e-4,2e-4,1e-4)
     #abins = np.arange(10,10.1,0.1)
     #zbins = np.arange(1e-4,1.1e-4,1e-5)
+    #zbins = np.logspace(np.log10(0.001), np.log10(0.01), 50)
+    #zbins = np.arange(0.00010,0.00100,0.00001)
 
-    abins = np.linspace(1, 13.5, 126)
-    zbins = np.logspace(np.log10(0.001), np.log10(0.01), 25)
-
-
-    if opts.age is not None: abins = [opts.age]
-    if opts.metallicity is not None: zbins = [opts.metallicity]
-    grid = [g.flatten() for g in np.meshgrid(abins,zbins)]
-        
     #grid = p.create_grid(abins,zbins)
     #grid = OldPadovaIsochrone.create_grid()
     #grid = np.meshgrid((10**np.arange(9.9,10.15,0.05))/1e9,np.array([0.12,0.15,0.19,0.24,0.30,0.38,0.48,0.6])*1e-3)
     #cut = (grid[0] > 0.5)
     #grid = (grid[0][cut],grid[1][cut])
     #grid = np.meshgrid(np.arange(1,13.5),np.arange(1e-4,1e-3,5e-5)
-
-    print "Ages:"
-    print np.unique(grid[0])
-    print "Metallicities:"
-    print np.unique(grid[1])
-    p.run(grid=grid,outdir=outdir,force=opts.force)
+    #p.run(grid=grid,outdir=args.outdir,force=args.force)
+    #parser.add_config()
+    #parser.add_debug()

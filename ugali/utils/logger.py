@@ -18,10 +18,11 @@ class SpecialFormatter(logging.Formatter):
         self._fmt = self.FORMATS.get(record.levelno, self.FORMATS['DEFAULT'])
         return logging.Formatter.format(self, record)
 
-logger = logging.getLogger('resample')
+logger = logging.getLogger('ugali')
 handler = logging.StreamHandler()
 handler.setFormatter(SpecialFormatter())
-logger.addHandler(handler)
+if not len(logger.handlers):
+    logger.addHandler(handler)
 
 logger.DEBUG    = logging.DEBUG
 logger.INFO     = logging.INFO
