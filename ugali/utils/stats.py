@@ -56,7 +56,7 @@ def kde_peak(data, npoints=_npoints):
     """
     Identify peak using Gaussian kernel density estimator.
     """
-    return kde(data,_npoints)[0]
+    return kde(data,npoints)[0]
 
 def kde(data, npoints=_npoints):
     """
@@ -73,7 +73,7 @@ def kde(data, npoints=_npoints):
     x = data[cut]
     kde = scipy.stats.gaussian_kde(x)
     # No penalty for using a finer sampling for KDE evaluation except computation time
-    values = np.linspace(np.min(x), np.max(x), _npoints) 
+    values = np.linspace(np.min(x), np.max(x), npoints)
     kde_values = kde.evaluate(values)
     peak = values[np.argmax(kde_values)]
     return values[np.argmax(kde_values)], kde.evaluate(peak)
