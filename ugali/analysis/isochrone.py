@@ -74,7 +74,6 @@ class Isochrone(Model):
         ('age',              Parameter(10.0, [0.1, 15.0]) ),  # Gyr
         ('metallicity',      Parameter(0.0002, [0.0,0.02]) ),
     ])
-
     _mapping = odict([
         ('mod','distance_modulus'),
         ('a','age'),                 
@@ -123,13 +122,38 @@ class Isochrone(Model):
             if getattr(self,k) != v: ret[k] = getattr(self,k)
         return ret
 
+    @classmethod
+    def z2feh(cls, z):
+        msg = "Must be implemented by subclass"
+        raise Exception(msg)
+
+    @classmethod
+    def feh2z(cls, feh):
+        msg = "Must be implemented by subclass"
+        raise Exception(msg)
+
     @property
     def feh(self):
-        #### For use with Marigo et al. (2008) and earlier
-        ###metallicity_solar = 0.019 # Anders & Grevesse 1989
-        # For use with Bressan et al. (2012) and later
-        metallicity_solar = 0.0152 
-        return np.log10(self.metallicity / metallicity_solar)
+        """
+        Calculate [Fe/H] from the (initial) metallicity, Z.
+
+        Section 3.1 of https://arxiv.org/abs/1604.08592 describes how
+        this is done for the MESA isochrones and serves as a good
+        template in general. The metallicity is computed as:
+           [Fe/H] = log10( (Z_init/X_init) / (Z_solar/X_solar)
+                  = log10( (Z_init/Z_solar) / (X_solar/X_init)
+        where,
+          Z_init = Initial metal abundance (user provided)
+          Y_init = Y_p + c*Z_init = Initial He abundance
+          X_init = 1 - Y_init - Z_init = Primordial H-abundance
+          X_solar and Z_solar = Solar abundances taken from references
+        
+        Thus, to properly calculate [Fe/H] requires the definition of
+        several quantities: Z_init, Y_init, X_solar, and
+        Z_solar. Genereally, Y_init is assumed to scale linearly
+        between the primordial and solar abundances (scale factor c).
+        """
+        return self.z2feh(self.metallicity)
 
     @property
     def distance(self):
@@ -981,6 +1005,7 @@ class PadovaIsochrone(Isochrone):
     _basename = '%(prefix)s_a%(age)04.1f_z%(z)0.5f.dat'
     #_dirname = '/u/ki/kadrlica/des/isochrones/v3/'
     _dirname =  os.path.join(get_iso_dir(),'{survey}','padova')
+    _zsolar = 0.01524
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1029,6 +1054,36 @@ class PadovaIsochrone(Isochrone):
         filename = 'Filename: %s'%self.filename
         ret += '\n{0:>{2}}{1}'.format('',filename,indent+2)
         return ret
+
+    @classmethod
+    def z2feh(cls, z):
+        # Taken from Table 3 and Section 3 of Bressan et al. 2012
+        # Confirmed in Section 2.1 of Marigo et al. 2017
+        Z_init  = z                # Initial metal abundance
+        Y_p     = 0.2485           # Primordial He abundance (Komatsu 2011)
+        c       = 1.78             # He enrichment ratio 
+
+        Y_init = Y_p + c * Z_init 
+        X_init = 1 - Y_init - Z_init
+
+        Z_solar = 0.01524          # Solar metal abundance
+        Y_solar = 0.2485           # Solar He abundance (Caffau 2011)
+        X_solar = 1 - Y_solar - Z_solar
+
+        return np.log10( Z_init/Z_solar * X_solar/X_init)
+        
+    @classmethod
+    def feh2z(cls, feh):
+        # Taken from Table 3 and Section 3 of Bressan et al. 2012
+        # Confirmed in Section 2.1 of Marigo et al. 2017
+        Y_p     = 0.2485           # Primordial He abundance
+        c       = 1.78             # He enrichment ratio
+
+        Z_solar = 0.01524          # Solar metal abundance
+        Y_solar = 0.2485           # Solar He abundance
+        X_solar = 1 - Y_solar - Z_solar
+
+        return (1 - Y_p)/( (1 + c) + X_solar/Z_solar * 10**(-feh))
 
     @classmethod
     def params2filename(cls,age,metallicity):
@@ -1158,6 +1213,8 @@ class DESDwarfs(EmpiricalPadova):
 class Girardi2002(PadovaIsochrone):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
     _dirname =  os.path.join(get_iso_dir(),'{survey}','girardi2002')
+    # For use with Marigo et al. (2008) and earlier use Anders & Grevesse 1989
+    _zsolar = 0.019
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1220,6 +1277,7 @@ class Girardi2002(PadovaIsochrone):
 class Girardi2010(Girardi2002):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
     _dirname =  os.path.join(get_iso_dir(),'{survey}','girardi2010')
+    _zsolar = 0.019
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
@@ -1279,12 +1337,6 @@ class OldPadovaIsochrone(Girardi2002):
                 ]),
         )
 
-    @property
-    def feh(self):
-        # Anders & Grevesse 1989
-        metallicity_solar = 0.019 
-        feh = np.log10(self.metallicity / metallicity_solar)
-
     @classmethod
     def params2filename(cls,age,metallicity):
         z = 1e3 * metallicity
@@ -1317,7 +1369,7 @@ class Marigo2017(PadovaIsochrone):
 
     defaults = (Isochrone.defaults) + (
         ('dirname',_dirname,'Directory name for isochrone files'),
-        ('hb_stage','BHeb','Horizontal branch stage name'),
+        ('hb_stage',4,'Horizontal branch stage name'),
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
@@ -1395,6 +1447,8 @@ class DotterIsochrone(PadovaIsochrone):
     several useful functions where we would basically be copying code.
     """
     _dirname =  os.path.join(get_iso_dir(),'{survey}','dotter')
+    #_zsolar = 0.0163 
+    _zsolar = 0.0180 # Grevesse & Sauval, 1998
 
     # KCB: What to do about horizontal branch?
     defaults = (Isochrone.defaults) + (
@@ -1429,7 +1483,7 @@ class DotterIsochrone(PadovaIsochrone):
             logger.warning('did not recognize survey %s'%(survey))
             raise(e)
 
-        kwargs = dict(delimiter='',comments='#',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
         data = np.genfromtxt(filename,**kwargs)
 
         # KCB: Not sure whether the mass in Dotter isochrone output
@@ -1447,11 +1501,144 @@ class DotterIsochrone(PadovaIsochrone):
         self.mag = self.mag_1 if self.band_1_detection else self.mag_2
         self.color = self.mag_1 - self.mag_2
 
-    @property
-    def feh(self):
-        # Dotter convention
-        metallicity_solar = 0.02
-        feh = np.log10(self.metallicity / metallicity_solar)
+    @classmethod
+    def z2feh(cls, z):
+        # Section 3 of Dotter et al. 2008
+        # Section 2 of Dotter et al. 2007 (0706.0847)
+        Z_init  = z                # Initial metal abundance
+        Y_p     = 0.245            # Primordial He abundance (WMAP, 2003)
+        c       = 1.54             # He enrichment ratio 
+
+        Y_init = Y_p + c * Z_init 
+        X_init = 1 - Y_init - Z_init
+
+        # This is not well defined...
+        #Z_solar/X_solar = 0.0229  # Solar metal fraction (Grevesse 1998)
+        ZX_solar = 0.0229
+        return np.log10( Z_init/X_init * 1/ZX_solar)
+
+    @classmethod
+    def feh2z(cls, feh):
+        # Section 3 of Dotter et al. 2008
+        Y_p     = 0.245            # Primordial He abundance (WMAP, 2003)
+        c       = 1.54             # He enrichment ratio 
+
+        # This is not well defined...
+        #Z_solar/X_solar = 0.0229  # Solar metal fraction (Grevesse 1998)
+        ZX_solar = 0.0229
+        return (1 - Y_p)/( (1 + c) + (1/ZX_solar) * 10**(-feh))
+
+
+
+Dotter2008 = DotterIsochrone
+
+class Dotter2016(PadovaIsochrone):
+    """ MESA isochrones from Dotter 2016:
+    http://waps.cfa.harvard.edu/MIST/interp_isos.html
+    """
+    _dirname =  os.path.join(get_iso_dir(),'{survey}','dotter2016')
+
+    defaults = (Isochrone.defaults) + (
+        ('dirname',_dirname,'Directory name for isochrone files'),
+        ('hb_stage',3,'Horizontal branch stage name'),
+        ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
+        )
+
+    columns = dict(
+            des = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (8, ('log_lum',float)),
+                (9,('u',float)),
+                (10,('g',float)),
+                (11,('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (14,('Y',float)),
+                (15,('stage',float))
+                ]),
+            sdss = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (6, ('log_lum',float)),
+                (9, ('u',float)),
+                (10,('g',float)),
+                (11,('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (14,('stage',float))
+                ]),
+            ps1 = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (6, ('log_lum',float)),
+                (9, ('g',float)),
+                (10,('r',float)),
+                (11,('i',float)),
+                (12,('z',float)),
+                (13,('y',float)),
+                (16,('stage',float))
+                ]),
+            )
+
+    def _parse(self,filename):
+        """
+        Reads an isochrone in the Dotter 2016 format and determines
+        the age (Gyr), metallicity (Z), and creates arrays with the
+        initial stellar mass and corresponding magnitudes for each
+        step along the isochrone.
+        """
+        try:
+            columns = self.columns[self.survey.lower()]
+        except KeyError, e:
+            logger.warning('did not recognize survey %s'%(survey))
+            raise(e)
+
+        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
+        data = np.genfromtxt(filename,**kwargs)
+
+        self.mass_init = data['mass_init']
+        self.mass_act  = data['mass_act']
+        self.luminosity = 10**data['log_lum']
+        self.mag_1 = data[self.band_1]
+        self.mag_2 = data[self.band_2]
+        self.stage = data['stage']
+        
+        # Check where post-AGB isochrone data points begin
+        self.mass_init_upper_bound = np.max(self.mass_init)
+        self.index = np.nonzero(self.stage >= 4)[0][0]
+
+        self.mag = self.mag_1 if self.band_1_detection else self.mag_2
+        self.color = self.mag_1 - self.mag_2
+
+
+    @classmethod
+    def z2feh(cls, z):
+        # Section 3.1 of Choi et al. 2016 (https://arxiv.org/abs/1604.08592)
+        Z_init  = z                # Initial metal abundance
+        Y_p     = 0.249            # Primordial He abundance (Planck 2015)
+        c       = 1.5              # He enrichment ratio 
+
+        Y_init = Y_p + c * Z_init 
+        X_init = 1 - Y_init - Z_init
+
+        Z_solar = 0.0142           # Solar metal abundance
+        Y_solar = 0.2703           # Solar He abundance (Asplund 2009)
+        X_solar = 1 - Y_solar - Z_solar
+
+        return np.log10( Z_init/Z_solar * X_solar/X_init)
+
+    @classmethod
+    def feh2z(cls, feh):
+        # Section 3.1 of Choi et al. 2016 (https://arxiv.org/abs/1604.08592)
+        Y_p     = 0.249            # Primordial He abundance (Planck 2015)
+        c       = 1.5              # He enrichment ratio 
+
+        Z_solar = 0.0142           # Solar metal abundance
+        Y_solar = 0.2703           # Solar He abundance (Asplund 2009)
+        X_solar = 1 - Y_solar - Z_solar
+
+        return (1 - Y_p)/( (1 + c) + (X_solar/Z_solar) * 10**(-feh))
 
 ############################################################
 

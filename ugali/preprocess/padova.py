@@ -10,12 +10,11 @@ https://github.com/mfouesneau/ezpadova
 import os
 from urllib import urlencode
 from urllib2 import urlopen
-from StringIO import StringIO
-import zlib
 import re
 import subprocess
 from multiprocessing import Pool
 from collections import OrderedDict as odict
+import copy
 
 import numpy as np
 from ugali.utils.logger import logger
@@ -76,22 +75,17 @@ defaults_29 = dict(defaults_cmd,cmd_version='2.9')
 defaults_30 = dict(defaults_cmd,cmd_version='3.0')
 
 # survey system
-odict([
+photosys_dict = odict([
         ('des',dict(photosys_file='tab_mag_odfnew/tab_mag_decam.dat')),
-        ('sdss',dict(photosys_file='')),
-        ('pan-starrs',dict(photosys_file='')),
-        ])
+        ('sdss',dict(photosys_file='tab_mag_odfnew/tab_mag_sloan.dat')),
+        ('ps1',dict(photosys_file='tab_mag_odfnew/tab_mag_panstarrs1.dat')),
+])
 
-
-class Padova(object):
-    defaults = dict(defaults_27)
-
-    params2filename = PadovaIsochrone.params2filename
-    filename2params = PadovaIsochrone.filename2params
-
+class Download(object):
     def __init__(self,survey='des',**kwargs):
-        self.survey=survey
+        self.survey=survey.lower()
 
+    
     def create_grid(self,abins,zbins):
         arange = np.linspace(abins[0],abins[1],abins[2]+1)
         zrange = np.logspace(np.log10(zbins[0]),np.log10(zbins[1]),zbins[2]+1)
@@ -105,6 +99,15 @@ class Padova(object):
                 self.download(a,z,outdir,force)
             except RuntimeError, msg:
                 logger.warning(msg)
+
+class Padova(Download):
+    defaults = copy.deepcopy(defaults_27)
+
+    params2filename = PadovaIsochrone.params2filename
+    filename2params = PadovaIsochrone.filename2params
+    
+    abins = np.arange(1.0, 13.5 + 0.1, 0.1)
+    zbins = np.arange(1e-4,1e-3 + 1e-5,1e-5)
 
     def download(self,age,metallicity,outdir=None,force=False):
         """
@@ -123,17 +126,6 @@ class Padova(object):
             msg = 'Metallicity outside of valid range: %g [%g < z < %g]'%(metallicity,z_min,z_max)
             raise RuntimeError(msg)
 
-        survey=self.survey.lower()
-        if survey=='des':
-            photsys_file='tab_mag_odfnew/tab_mag_decam.dat'
-        elif survey=='sdss':
-            photsys_file='tab_mag_odfnew/tab_mag_sloan.dat'
-        elif survey=='ps1':
-            photsys_file='tab_mag_odfnew/tab_mag_panstarrs1.dat'
-        else:
-            msg = 'Unrecognized survey: %s'%survey
-            raise RuntimeError(msg)
-
         if outdir is None: outdir = './'
         mkdir(outdir)
 
@@ -144,10 +136,10 @@ class Padova(object):
             logger.warning("Found %s; skipping..."%(outfile))
             return
 
-        logger.info("Downloading isochrone: %s (age=%.2fGyr, metallicity=%g)"%(basename,age,metallicity))
+        logger.info("Downloading isochrone: %s (age=%.1fGyr, metallicity=%.5f)"%(self.__class__.__name__,age,metallicity))
 
         d = dict(self.defaults)
-        d['photsys_file'] = photsys_file
+        d['photsys_file'] = photsys_dict[self.survey]
         d['isoc_age']     = age * 1e9
         d['isoc_zeta']    = metallicity
 
@@ -218,19 +210,19 @@ if __name__ == "__main__":
     parser.add_argument('-n','--njobs',default=10,type=int)
     args = parser.parse_args()
 
+    if args.outdir is None: 
+        args.outdir = os.path.join(args.survey.lower(),args.kind.lower())
+    logger.info("Creating output directory: %s"%args.outdir)
+
+    p = factory(args.kind,survey=args.survey)
+
     # Defaults
-    abins = np.linspace(1, 13.5, 126)
-    zbins = np.linspace(0.0001,0.0010,91)
-    abins = [args.age] if args.age else abins
-    zbins = [args.metallicity] if args.metallicity else zbins
+    abins = [args.age] if args.age else p.abins
+    zbins = [args.metallicity] if args.metallicity else p.zbins
     grid = [g.flatten() for g in np.meshgrid(abins,zbins)]
     logger.info("Ages:\n  %s"%np.unique(grid[0]))
     logger.info("Metallicities:\n  %s"%np.unique(grid[1]))
 
-    if args.outdir is None: args.outdir = args.kind.lower()
-    logger.info("Creating output directory: %s"%args.outdir)
-
-    p = factory(args.kind,survey=args.survey)
 
     def run(args):
         try:  
@@ -244,40 +236,4 @@ if __name__ == "__main__":
         results = pool.map(run,arguments)
     else:
         results = map(run,arguments)
-        
-#####################################################################3
-
-    #from ugali.utils.config import Config
-    #config = Config(args.config)
-    #survey = config['data']['survey']
-
-    #outdir = '/u/ki/kadrlica/des/isochrones/v1'
-    #outdir = '/u/ki/kadrlica/sdss/isochrones/v2'
-    #outdir = '/u/ki/kadrlica/des/isochrones/v2'
-    #outdir = '/u/ki/kadrlica/des/isochrones/v3'
-    #outdir = '/u/ki/kadrlica/des/isochrones/v4'
-    #outdir = '/u/ki/kadrlica/des/isochrones/v5'
-    #outdir = '/u/ki/kadrlica/des/isochrones/v6'
-    #outdir = './iso'
-    #outdir = args.outdir
-    # Binning from config
-    #abins = config['binning']['age']
-    #zbins = config['binning']['z']
-    #abins = np.arange(1,13.6,0.1)
-    #zbins = np.arange(1e-4,1e-3,1e-5)
-    #abins = np.arange(10,14,1)
-    #zbins = np.arange(1e-4,2e-4,1e-4)
-    #abins = np.arange(10,10.1,0.1)
-    #zbins = np.arange(1e-4,1.1e-4,1e-5)
-    #zbins = np.logspace(np.log10(0.001), np.log10(0.01), 50)
-    #zbins = np.arange(0.00010,0.00100,0.00001)
-
-    #grid = p.create_grid(abins,zbins)
-    #grid = OldPadovaIsochrone.create_grid()
-    #grid = np.meshgrid((10**np.arange(9.9,10.15,0.05))/1e9,np.array([0.12,0.15,0.19,0.24,0.30,0.38,0.48,0.6])*1e-3)
-    #cut = (grid[0] > 0.5)
-    #grid = (grid[0][cut],grid[1][cut])
-    #grid = np.meshgrid(np.arange(1,13.5),np.arange(1e-4,1e-3,5e-5)
-    #p.run(grid=grid,outdir=args.outdir,force=args.force)
-    #parser.add_config()
-    #parser.add_debug()
+    
