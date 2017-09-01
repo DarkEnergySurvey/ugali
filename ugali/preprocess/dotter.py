@@ -32,7 +32,6 @@ import ugali.utils.shell
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 import ugali.analysis.isochrone as iso
-from ugali.analysis.isochrone import DotterIsochrone
 from ugali.preprocess.padova import Download
 
 """
@@ -52,10 +51,21 @@ these data, plus the empirical fact that the mean metallicities of
 the ultra-faint dwarfs are almost universally [Fe/H] < -2, I guess
 I would say [a/Fe] = 0.3 is probably the best compromise.
 
-From ADW: In order to makea comparison with other isochrones (which
-don't provide a knob for [a/Fe], I suggest that we stick to [a/Fe] = 0
-for the Dotter2008 isochrones.
+From ADW: Other isochrone sets impose [a/Fe] = 0. For an accurate
+comparison between isochrones, I suggest that we stick to [a/Fe] = 0
+for the Dotter2008 isochrones as well.
+
+ADW: The Dotter 2008 isochrones are interpolated from a relative
+sparse grid of metallicities [-2.5, -2.0, -1.5, -1.0, -0.5, 0.0]. This
+can lead to rather large differences between the input and output Z ->
+[Fe/H] conversions. We were initially taking the output Zeff value,
+but we now use the input Z value for internal consistency.
 """
+
+
+###########################################################
+# Dartmouth Isochrones
+# http://stellar.dartmouth.edu/models/isolf_new.php
 
 dict_clr = {'des' : 14,
             'sdss': 11,
@@ -73,20 +83,11 @@ dict_afe = {'-0.2'            : 1,
             '+0.6'            : 5,
             '+0.8'            : 6}
 
-# survey system
-dict_output = odict([
-        ('des','DECam'),
-        ('sdss','SDSSugriz'),
-        ('ps1','PanSTARRS'),
-])
-
-# Dartmouth Isochrones
-# http://stellar.dartmouth.edu/models/isolf_new.php
 dartmouth_defaults = {
-    'int':'2', # interpolation: cubic=1, linear=2
+    'int':'1', # interpolation: cubic=1, linear=2 (ADW: cubic more accurate)
     'out':'1', # outpur: iso=1, iso+LF=2
     'age':10, # age [Gyr]
-    'feh':-3.0, # feh
+    'feh':-2.0, # feh [-2.5 to 0.0]
     'hel': dict_hel['Y=0.245+1.5*Z'], # initial helium abundance
     'afe': dict_afe['0 (scaled-solar)'], # alpha enhancement
     'clr': dict_clr['des'], # photometric system
@@ -98,9 +99,17 @@ dartmouth_defaults = {
     'lns':'', 
     }
 
-
-# MESA Isochrones from
+###########################################################
+# MESA Isochrones
 # http://waps.cfa.harvard.edu/MIST/iso_form.php
+
+# survey system
+dict_output = odict([
+        ('des','DECam'),
+        ('sdss','SDSSugriz'),
+        ('ps1','PanSTARRS'),
+])
+
 mesa_defaults = {
         'version':'1.0',
         'v_div_vcrit':'vvcrit0.4',
@@ -120,26 +129,23 @@ mesa_defaults = {
 
 mesa_defaults_10 = dict(mesa_defaults,version='1.0')
 
-class Dotter(Download):
+class Dotter2008(Download):
+    """ Dartmouth isochrones from Dotter et al. 2008:
+    http://stellar.dartmouth.edu/models/isolf_new.html
+    """
     defaults = copy.deepcopy(dartmouth_defaults)
-
-    params2filename = iso.Dotter2008.params2filename
-    filename2params = iso.Dotter2008.filename2params
+    isochrone=iso.Dotter2008
 
     abins = np.arange(1., 13.5 + 0.1, 0.1)
     zbins = np.arange(7e-5,1e-3 + 1e-5,1e-5)
 
-    def download(self,age,metallicity,outdir=None,force=False):
-
-        tmpfile = tempfile.NamedTemporaryFile().name
-
+    def query_server(self, outfile, age, metallicity):
         z = metallicity
-        logger.info('Downloading isochrone: %s (age=%.1fGyr, metallicity=%.5f)'%(self.__class__.__name__, age, z))
-        feh = iso.Dotter2008.z2feh(z)
-
+        feh = self.isochrone.z2feh(z)
+        
         params = dict(self.defaults)
         params['age']=age
-        params['feh']=feh
+        params['feh']='%.6f'%feh
         params['clr']=dict_clr[self.survey]
 
         url = 'http://stellar.dartmouth.edu/models/isolf_new.php'
@@ -147,63 +153,73 @@ class Dotter(Download):
         logger.debug(query)
         response = urlopen(query)
         page_source = response.read()
-        isochrone_id = page_source.split('tmp/tmp')[-1].split('.iso')[0]
+        try:
+            file_id = int(page_source.split('tmp/tmp')[-1].split('.iso')[0])
+        except Exception as e:
+            logger.debug(str(e))
+            msg = 'Output filename not found'
+            raise RuntimeError(msg)
 
-        infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(isochrone_id)
-        command = 'wget -q %s -O %s'%(infile, tmpfile)
-        subprocess.call(command,shell=True)
-        
-        if outdir is None: outdir = './'
+        infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(file_id)
+        command = 'wget -q %s -O %s'%(infile, outfile)
+        subprocess.call(command,shell=True)        
 
-        ## Rename the output file based on Z effective ([a/Fe] corrected)
+        ## ADW: Old code to rename the output file based on Zeff ([a/Fe] corrected)
+        #tmpfile = tempfile.NamedTemporaryFile().name
         #tmp = open(tmpfile,'r')
         #lines = [tmp.readline() for i in range(4)]
         #z_eff = float(lines[3].split()[4])
         #basename = self.params2filename(age,z_eff)
+     
+        #logger.info("Writing %s..."%outfile)
+        #mkdir(outdir)
+        #shutil.move(tmpfile,outfile)
 
-        basename = self.params2filename(age,z)
-        outfile = os.path.join(outdir,basename)
+    @classmethod
+    def verify(cls, filename, survey, age, metallicity):
+        nlines=8
+        with open(filename,'r') as f:
+            lines = [f.readline() for i in range(nlines)]
 
-        if os.path.exists(outfile) and not force:
-            logger.warning("Found %s; skipping..."%(outfile))
-            return
+            if len(lines) < nlines:
+                msg = "Incorrect file size"
+                raise Exception(msg)
 
-        logger.info("Writing %s..."%outfile)
-        mkdir(outdir)
-        shutil.move(tmpfile,outfile)
+            try:
+                z = lines[3].split()[4]
+                assert np.allclose(metallicity,float(z),atol=1e-3)
+            except:
+                msg = "Metallicity does not match:\n"+lines[3]
+                raise Exception(msg)
 
-class Dotter2008(Dotter):
-    """ Dartmouth isochrones from Dotter et al. 2008:
-    http://stellar.dartmouth.edu/models/isolf_new.html
-    """
+            try:
+                s = lines[5].split()[2]
+                assert dict_output[survey][:4] in s
+            except:
+                msg = "Incorrect survey:\n"+lines[5]
+                raise Exception(msg)
+
+            try:
+                a = lines[7].split('=')[1].strip().split()[0]
+                assert np.allclose(age,float(a),atol=1e-5)
+            except:
+                msg = "Age does not match:\n"+lines[7]
+                raise Exception(msg)
 
 class Dotter2016(Download):
     """ MESA isochrones from Dotter 2016:
     http://waps.cfa.harvard.edu/MIST/iso_form.php
     """
     defaults = copy.deepcopy(mesa_defaults_10)
-
-    params2filename = DotterIsochrone.params2filename
-    filename2params = DotterIsochrone.filename2params
+    isochrone = iso.Dotter2016
 
     abins = np.arange(1., 13.5 + 0.1, 0.1)
     zbins = np.arange(1e-5,1e-3 + 1e-5,1e-5)
 
-    def download(self,age,metallicity,outdir=None,force=False):
+    def query_server(self, outfile, age, metallicity):
         z = metallicity
-
-        if outdir is None: outdir = './'
-        basename = self.params2filename(age,z)
-        outfile = os.path.join(outdir,basename)
-
-        if os.path.exists(outfile) and not force:
-            logger.warning("Found %s; skipping..."%(outfile))
-            return
-        mkdir(outdir)
-
-        logger.info('Downloading isochrone: %s (age=%.1fGyr, metallicity=%.5f)'%(self.__class__.__name__, age, z))
-
-        feh = iso.Dotter2016.z2feh(z)
+        feh = self.isochrone.z2feh(z)
+        
         params = dict(self.defaults)
         params['output'] = dict_output[self.survey]
         params['FeH_value'] = feh
@@ -213,23 +229,25 @@ class Dotter2016(Download):
 
         server = 'http://waps.cfa.harvard.edu/MIST'
         url = server + '/iso_form.php'
-        logger.info("Accessing %s..."%url)
+        logger.debug("Accessing %s..."%url)
         response = requests.post(url,data=params)
 
-        fname = os.path.basename(response.text.split('"')[1])
+        try:
+            fname = os.path.basename(response.text.split('"')[1])
+        except Exception as e:
+            logger.debug(str(e))
+            msg = 'Output filename not found'
+            raise RuntimeError(msg)
+            
         tmpdir = os.path.dirname(tempfile.NamedTemporaryFile().name)
         tmpfile = os.path.join(tmpdir,fname)
 
-        if len(fname) > 0:
-            out = '{0}/tmp/{1}'.format(server, fname)
-            cmd = 'wget %s -P %s'%(out,tmpdir)
-            logger.debug(cmd)
-            stdout = subprocess.check_output(cmd,shell=True,
-                                             stderr=subprocess.STDOUT)
-            logger.debug(stdout)
-
-        else:
-            raise RuntimeError('Server response is incorrect')
+        out = '{0}/tmp/{1}'.format(server, fname)
+        cmd = 'wget %s -P %s'%(out,tmpdir)
+        logger.debug(cmd)
+        stdout = subprocess.check_output(cmd,shell=True,
+                                         stderr=subprocess.STDOUT)
+        logger.debug(stdout)
 
         cmd = 'unzip %s -d %s'%(tmpfile,tmpdir)
         logger.debug(cmd)
@@ -237,9 +255,42 @@ class Dotter2016(Download):
                                          stderr=subprocess.STDOUT)
         logger.debug(stdout)
 
-        logger.info("Creating %s..."%outfile)
+        logger.debug("Creating %s..."%outfile)
         shutil.move(tmpfile.replace('.zip','.cmd'),outfile)
         os.remove(tmpfile)
+
+        return outfile
+
+    @classmethod
+    def verify(cls, filename, survey, age, metallicity):
+        age = age*1e9
+        nlines=14
+        with open(filename,'r') as f:
+            lines = [f.readline() for i in range(nlines)]
+            if len(lines) < nlines:
+                msg = "Incorrect file size"
+                raise Exception(msg)
+                
+            try:
+                s = lines[2].split()[-2]
+                assert dict_output[survey][:4] in s
+            except:
+                msg = "Incorrect survey:\n"+lines[2]
+                raise Exception(msg)
+
+            try:
+                z = lines[5].split()[2]
+                assert np.allclose(metallicity,float(z),atol=1e-3)
+            except:
+                msg = "Metallicity does not match:\n"+lines[5]
+                raise Exception(msg)
+
+            try:
+                a = lines[13].split()[1]
+                assert np.allclose(age,float(a),atol=1e-5)
+            except:
+                msg = "Age does not match:\n"+lines[13]
+                raise Exception(msg)
 
 def factory(name, **kwargs):
     from ugali.utils.factory import factory
@@ -265,6 +316,7 @@ if __name__ == "__main__":
 
     if args.outdir is None: 
         args.outdir = os.path.join(args.survey.lower(),args.kind.lower())
+    logger.info("Writing to output directory: %s"%args.outdir)
 
     p = factory(args.kind,survey=args.survey)
 
@@ -277,12 +329,13 @@ if __name__ == "__main__":
     def run(args):
         try:  
             p.download(*args)
-        except RuntimeError as e: 
+        except Exception as e:
+            # power through any exceptions...
             logger.warn(str(e))
 
     arguments = [(a,z,args.outdir,args.force) for a,z in zip(*grid)]
     if args.njobs > 1:
-        msg = "Multiprocessing does not work for Dotter2008 download."
+        msg = "Multiprocessing does not work for %s download."%args.kind
         raise Exception(msg)
     #elif args.njobs > 1:
     #    pool = Pool(processes=args.njobs, maxtasksperchild=100)
