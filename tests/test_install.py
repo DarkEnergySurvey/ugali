@@ -7,6 +7,9 @@ from os.path import basename, dirname
 import subprocess
 import tempfile
 
+# ADW: Is there any reason to do this in CI?
+__test__ = False
+
 # Not all that robust...
 try:
     GITBASE = basename(dirname(subprocess.check_output('git config --get remote.origin.url',shell=True).split(':')[1]))
@@ -67,13 +70,12 @@ def test_zip_install():
     call_chdir(os.path.expandvars('$HOME'))
     call_cmd('rm -rf %s'%tempdir)
 
-# Is there any reason to do this in CI?
-#def test_pip_install():
-#    tempdir = tempfile.mkdtemp()
-#    call_chdir(tempdir)
-#    call_pip()
-#    call_chdir(os.path.expandvars('$HOME'))
-#    call_cmd('rm -rf %s'%tempdir)
+def test_pip_install():
+    tempdir = tempfile.mkdtemp()
+    call_chdir(tempdir)
+    call_pip()
+    call_chdir(os.path.expandvars('$HOME'))
+    call_cmd('rm -rf %s'%tempdir)
 
 if __name__ == "__main__":
     import argparse
