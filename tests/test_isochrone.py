@@ -6,7 +6,7 @@ installed with the '--isochrones' option.
 import os
 import numpy as np
 
-import ugali.analysis.isochrone as isochrone
+from ugali import isochrone
 
 
 # Default parameters

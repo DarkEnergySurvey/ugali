@@ -19,7 +19,7 @@ import scipy.spatial
 
 import ugali.utils.healpix
 import ugali.utils.projector
-import ugali.analysis.isochrone
+import ugali.isochrone
 import ugali.utils.plotting
 import ugali.candidate.associate
 
@@ -159,9 +159,9 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
     #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/v2/' # KCB
     #dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    #iso = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
+    #iso = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
     dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/dotter/dotter_v4/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = 12.
     iso.metallicity = 0.0001
     #iso.distance_modulus = 21.3 # Col I
@@ -328,15 +328,15 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_modulus, age=12., metallicity=0.0001, savedir=None):
     #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/v2/' # KCB
     #dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    #iso = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
+    #iso = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
     dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/dotter/dotter_v4/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = age
     iso.metallicity = metallicity
     iso.distance_modulus = distance_modulus
 
     dirname_alt = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    iso_alt = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
+    iso_alt = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
     iso_alt.age = age
     iso_alt.metallicity = metallicity
     iso_alt.distance_modulus = distance_modulus
