@@ -16,10 +16,8 @@ def factory(type, module=None, **kwargs):
     fn = lambda member: inspect.isclass(member) and member.__module__==module
     classes = odict(inspect.getmembers(sys.modules[module], fn))
     members = odict([(k.lower(),v) for k,v in classes.items()])
-    
     lower = cls.lower()
     if lower not in members.keys():
         msg = "Unrecognized class: %s.%s"%(module,cls)
         raise KeyError(msg)
- 
     return members[lower](**kwargs)

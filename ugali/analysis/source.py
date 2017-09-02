@@ -7,7 +7,7 @@ import copy
 
 from ugali.analysis.model import Model, Parameter
 from ugali.analysis.kernel import factory as kernelFactory
-from ugali.analysis.isochrone import factory as isochroneFactory
+from ugali.isochrone import factory as isochroneFactory
 
 class Richness(Model):
     """Dummy model to hold the richness, which is not directly connected
