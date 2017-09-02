@@ -7,13 +7,15 @@ import os
 import sys
 import glob
 import copy
-import requests
 import tempfile
 import subprocess
 import shutil
 from collections import OrderedDict as odict
 
+import urllib, urllib2
+#import requests
 import numpy as np
+
 
 from ugali.utils.logger import logger
 
@@ -177,10 +179,13 @@ class Dotter2016(Isochrone):
         server = 'http://waps.cfa.harvard.edu/MIST'
         url = server + '/iso_form.php'
         logger.debug("Accessing %s..."%url)
-        response = requests.post(url,data=params)
-
+        #response = requests.post(url,data=params)
+        q = urllib.urlencode(params)
+        request = urllib2.Request(url,data=q)
+        response = urllib2.urlopen(req)
         try:
-            fname = os.path.basename(response.text.split('"')[1])
+            #fname = os.path.basename(response.text.split('"')[1])
+            fname = os.path.basename(response.read().split('"')[1])
         except Exception as e:
             logger.debug(str(e))
             msg = 'Output filename not found'

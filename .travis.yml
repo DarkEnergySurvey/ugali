@@ -19,7 +19,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose requests pyfits fitsio -c conda-forge -c jochym -c kadrlica
+  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
   - source activate travis-env
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py -q install --isochrones --isochrones-path $UGALIDIR
