@@ -8,7 +8,6 @@ import numpy as np
 
 from ugali import isochrone
 
-
 # Default parameters
 default_kwargs = dict(age=12,metallicity=0.0002, distance_modulus=18)
 # Alternate parameters

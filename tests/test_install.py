@@ -66,13 +66,14 @@ def test_zip_install():
     call_setup_py()
     call_chdir(os.path.expandvars('$HOME'))
     call_cmd('rm -rf %s'%tempdir)
-    
-def test_pip_install():
-    tempdir = tempfile.mkdtemp()
-    call_chdir(tempdir)
-    call_pip()
-    call_chdir(os.path.expandvars('$HOME'))
-    call_cmd('rm -rf %s'%tempdir)
+
+# Is there any reason to do this in CI?
+#def test_pip_install():
+#    tempdir = tempfile.mkdtemp()
+#    call_chdir(tempdir)
+#    call_pip()
+#    call_chdir(os.path.expandvars('$HOME'))
+#    call_cmd('rm -rf %s'%tempdir)
 
 if __name__ == "__main__":
     import argparse
