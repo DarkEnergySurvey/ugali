@@ -8,7 +8,7 @@ from collections import OrderedDict as odict
 import re
 from urllib import urlencode
 from urllib2 import urlopen
-import requests
+#import requests
 import tempfile
 import subprocess
 from collections import OrderedDict as odict
