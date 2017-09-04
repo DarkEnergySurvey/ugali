@@ -11,9 +11,9 @@ from ugali import isochrone
 # Default parameters
 default_kwargs = dict(age=12,metallicity=0.0002, distance_modulus=18)
 # Alternate parameters
-alt_kwargs = dict(age=13, metallicity=0.0008, distance_modulus=16)
+alt_kwargs = dict(age=10, metallicity=0.0001, distance_modulus=16)
 # Parameter abbreviations
-abbr_kwargs = dict(a=12.5, z=0.0004, mod=17)
+abbr_kwargs = dict(a=10, z=0.0001, mod=17)
 
 padova = ['Padova','Bressan2012','Marigo2017']
 dotter = ['Dotter','Dotter2008','Dotter2016']

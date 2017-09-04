@@ -1102,11 +1102,14 @@ class Isochrone(IsochroneModel):
         logger.error(msg)
         raise RuntimeError(msg)
 
-    def download(self,age,metallicity,outdir=None,force=False):
+    def download(self,age=None,metallicity=None,outdir=None,force=False):
         """
         Check valid parameter range and download isochrones from:
         http://stev.oapd.inaf.it/cgi-bin/cmd
         """
+        if age is None: age = float(self.age)
+        if metallicity is None: metallicity = float(self.metallicity)
+
         if outdir is None: outdir = './'
         basename = self.params2filename(age,metallicity)
         outfile = os.path.join(outdir,basename)
@@ -1139,7 +1142,8 @@ class Isochrone(IsochroneModel):
         except Exception as e:
             msg = "Output file is corrupted."
             logger.error(msg)
-            #os.remove(outfile)
+            msg = "Removing %s."%outfile
+            os.remove(outfile)
             raise(e)
 
         return outfile
