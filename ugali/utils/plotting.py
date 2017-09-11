@@ -1318,14 +1318,15 @@ def plotChernoff(ts,bands='smooth',pdf=False):
 
 
 def plot_chain(chain,burn=None,clip=None):
-    import triangle
+    #import triangle
+    import corner
     from ugali.analysis.mcmc import Samples 
     samples = Samples(chain)
     names = samples.names
     results = samples.results(clip=clip,burn=burn)
     truths = [results[n][0] for n in names]
     data = samples[burn:].view((float,len(names)))
-    fig = triangle.corner(data, labels=names, truths=truths)
+    fig = corner.corner(data, labels=names, truths=truths)
     return fig
 
 ###################################################
