@@ -9,6 +9,10 @@ __version__ = get_versions()['version']
 del get_versions
 
 # ADW: Is this a good idea?
-import ugali.analysis.isochrone as isochrone
+#import ugali.analysis.isochrone as isochrone
+#from ugali import isochrone
 import ugali.analysis.kernel as kernel
 import ugali.analysis.source as source
+
+# Hack for backward compatibitility with: ugali.analysis.isochrone
+#sys.modules['ugali.analysis.isochrone'] = __import__('ugali.isochrone')
