@@ -23,7 +23,7 @@ class Parser(argparse.ArgumentParser):
 
 
     def add_coords(self,required=False,radius=False,targets=False):
-        group = self.add_argument_group(title="Target Coordinates")
+        group = self.add_argument_group(title="target coordinates")
         exclusive = group.add_mutually_exclusive_group(required=required)
         if targets:
             exclusive.add_argument('-t','--targets',default=None,metavar='targets.txt',
