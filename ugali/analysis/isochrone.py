@@ -676,10 +676,10 @@ class Isochrone(Model):
 
         bins_mag_1 = np.arange(self.mod+mag_1.min() - (0.5*delta_mag),
                                self.mod+mag_1.max() + (0.5*delta_mag),
-                               delta_mag)
+                               delta_mag,dtype=np.float32)
         bins_mag_2 = np.arange(self.mod+mag_2.min() - (0.5*delta_mag),
                                self.mod+mag_2.max() + (0.5*delta_mag),
-                               delta_mag)        
+                               delta_mag,dtype=np.float32)
  
         # ADW: Completeness needs to go in mass_pdf here
         histo_isochrone_pdf = np.histogram2d(self.mod + mag_1,
@@ -720,13 +720,29 @@ class Isochrone(Model):
  
         return u_color
  
+    #from memory_profiler import profile
+    #@profile
     def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus, delta_mag=0.03, mass_steps=10000):
         """
-        Compute isochrone probability for each catalog object.
+        Compute the photometric signal probability for each catalog object from the isochrone.
  
-        ADW: Still a little speed to be gained here (broadcasting)
- 
-        Units 
+        ADW: Still a little speed to be gained here (broadcasting or np.add.at).
+        ADW: Also, this is a memory guzzler
+        ADW: Clarify units?
+
+        Parameters:
+        -----------
+        mag_1 : stellar magnitude in the first band
+        mag_2 : stellar magnitude in the second band
+        mag_err_1 : stellar magnitude error in the first band
+        mag_err_2 : stellar magnitude error in the second band
+        distance_modulus : distance modulus of isochrone
+        delta_mag : numerical precision on binning
+        mass_steps : numerical precision on isochrone sampling
+
+        Returns:
+        --------
+        u_color : the signal color probability        
         """
         nsigma = 5.0
 
@@ -759,10 +775,10 @@ class Isochrone(Model):
         n_isochrone_bins = len(index_mag_1)
         ones = np.ones([n_catalog, n_isochrone_bins])
  
-        mag_1_reshape = mag_1.reshape([n_catalog, 1])
-        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
-        mag_2_reshape = mag_2.reshape([n_catalog, 1])
-        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
+        mag_1_reshape = mag_1.reshape([n_catalog, 1]).astype(np.float32)
+        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1]).astype(np.float32)
+        mag_2_reshape = mag_2.reshape([n_catalog, 1]).astype(np.float32)
+        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1]).astype(np.float32)
  
         # Calculate distance between each catalog object and isochrone bin
         # Assume normally distributed photometry uncertainties
