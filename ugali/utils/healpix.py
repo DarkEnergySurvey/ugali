@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-toolkit for working with healpix
+Toolkit for working with healpix
 """
 
 from collections import OrderedDict as odict
@@ -10,6 +10,9 @@ import numpy as np
 import healpy as hp
 import healpy
 import fitsio
+
+import ugali.utils.fileio
+from ugali.utils.logger import logger
 
 ############################################################
 
@@ -200,11 +203,10 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
 
     Parameters:
     -----------
-    filename  : output file name
-    pix       : healpix pixels
-    data      : dictionary or recarray of data to write
-    nside     : healpix nside of data
-    coord : 'G'alactic, 'C'elestial, 'E'cliptic
+    filename : output file name
+    data     : dictionary or recarray of data to write (must contain 'PIXEL')
+    nside    : healpix nside of data
+    coord    : 'G'alactic, 'C'elestial, 'E'cliptic
     ordering : 'RING' or 'NEST'
     kwargs   : Passed to fitsio.write
 
@@ -212,34 +214,16 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
     --------
     None
     """
-    # First, convert data to records array
+    # ADW: Do we want to make everything uppercase?
+
     if isinstance(data,dict):
-        if 'PIXEL' not in data.keys():
-            msg = "'PIXEL' column not found"
-            raise ValueError(msg)
+        names = data.keys()
+    else:
+        names = data.dtype.names
 
-        pix = data.pop('PIXEL')
-        names = ['PIXEL']
-        arrays= [pix]
-
-        for key,column in data.items():
-            if column.shape[0] != len(pix):
-                msg = "Length of '%s' (%i) does not match 'PIXEL' (%i)."%(key,column.shape[0],len(pix))
-                logger.warning(msg)
-             
-            if len(column.shape) > 2:
-                msg = "Unexpected shape for column '%s'."%(key)
-                logger.warning()
-
-            names.append(key)
-            arrays.append(column.astype(dtype,copy=False))
-
-        #data = np.rec.fromarrays(arrays,names=names)
-        data = np.rec.array(arrays,names=names,copy=False)
-
-        if 'PIXEL' not in data.dtype.names:
-            msg = "'PIXEL' column not found"
-            raise ValueError(msg)
+    if 'PIXEL' not in names:
+        msg = "'PIXEL' column not found."
+        raise ValueError(msg)
 
     hdr = header_odict(nside=nside,coord=coord,ordering=ordering)
     fitshdr = fitsio.FITSHDR(hdr.values())
@@ -247,26 +231,123 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
         for k,v in header.items():
             fitshdr.add_record({'name':k,'value':v})
 
+    logger.info("Writing %s"%filename)
     fitsio.write(filename,data,extname='PIX_DATA',header=fitshdr,clobber=True)
 
+def read_partial_map(filename, column, fullsky=True, **kwargs):
     """
-    # Distance modulus extension
-    if distance_modulus_array is not None:
-        distance_modulus_array = np.array(distance_modulus_array,[('DISTANCE_MODULUS',np.float32)])
-        fitsio.write(filename, distance_modulus_array, extname='DISTANCE_MODULUS')
+    Read a partial HEALPix file and return pixels and values/map. Can
+    handle 3D healpix maps (pix, value, zdim). Returned array has
+    shape (dimz,npix).
+
+    Parameters:
+    -----------
+    filenames     : list of input filenames
+    column        : column of interest
+    fullsky       : partial or fullsky map
+    kwargs        : passed to fitsio.read
+
+    Returns:
+    --------
+    (nside,pix,map) : pixel array and healpix map (partial or fullsky)
     """
+    # Make sure that PIXEL is in columns
+    kwargs['columns'] = ['PIXEL',column]
 
-def write_hdu(filename,data,**kwargs):
-    if distance_modulus_array is not None:
-        distance_modulus_array = np.array(distance_modulus_array,[('DISTANCE_MODULUS',np.float32)])
-        fitsio.write(filename, distance_modulus_array, extname='DISTANCE_MODULUS')
+    filenames = np.atleast_1d(filename)
+    header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
+    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    #data,header = fitsio.read(filename,**kwargs)
 
-    distance_modulus_array = None,
+    pix = data['PIXEL']
+    value = data[column]
+    nside = header['NSIDE']
+    npix = hp.nside2npix(nside)
+
+    ndupes = len(pix) - len(np.unique(pix))
+    if ndupes > 0:
+        msg = '%i duplicate pixels during load.'%(ndupes)
+        raise Exception(msg)
+
+    if fullsky:
+        shape = list(value.shape)
+        shape[0] = npix
+        hpxmap = hp.UNSEEN * np.ones(shape,dtype=value.dtype)
+        hpxmap[pix] = value
+        return (nside,pix,hpxmap.T)
+    else:
+        return (nside,pix,value.T)
+
+def merge_partial_maps(filenames,outfile,**kwargs):
+    filenames = np.atleast_1d(filenames)
+
+    header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
+    nside = header['NSIDE']
+    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    pix = data['PIXEL']
+
+    ndupes = len(pix) - len(np.unique(pix))
+    if ndupes > 0:
+        msg = '%i duplicate pixels during load.'%(ndupes)
+        raise Exception(msg)
+
+    extname = 'DISTANCE_MODULUS'
+    distance = ugali.utils.fileio.load_files(filenames,ext=extname)[extname]
+    unique_distance = np.unique(distance)
+    # Check if distance moduli are the same...
+    if np.any(distance[:len(unique_distance)] != unique_distance):
+        msg = "Non-matching distance modulus:"
+        msg += '\n'+str(distance[:len(unique_distance)])
+        msg += '\n'+str(unique_distance)
+        raise Exception(msg)
+
+    write_partial_map(outfile,data=data,nside=nside,clobber=True)
+    fitsio.write(outfile,{extname:unique_distance},extname=extname)
+
+def merge_likelihood_headers(filenames, outfile):
+    """
+    Merge header information from likelihood files.
+
+    Parameters:
+    -----------
+    filenames : input filenames
+    oufile    : the merged file to write
     
+    Returns:
+    --------
+    data      : the data being written
+    """
+
+    filenames = np.atleast_1d(filenames)
+
+    ext='PIX_DATA'
+    nside = fitsio.read_header(filenames[0],ext=ext)['LKDNSIDE']
+    
+    keys=['STELLAR','NINSIDE','NANNULUS']
+    data_dict = odict(PIXEL=[])
+    for k in keys:
+        data_dict[k] = []
+
+    for i,filename in enumerate(filenames):
+        logger.debug('(%i/%i) %s'%(i+1, len(filenames), filename))
+        header = fitsio.read_header(filename,ext=ext)
+        data_dict['PIXEL'].append(header['LKDPIX'])
+        for key in keys:
+            data_dict[key].append(header[key])
+
+        del header
+        
+    data_dict['PIXEL'] = np.array(data_dict['PIXEL'],dtype=int)
+    for key in keys:
+        data_dict[key] = np.array(data_dict[key],dtype='f4')
+
+    #import pdb; pdb.set_trace()
+    write_partial_map(outfile, data_dict, nside)
+    return data_dict
 
 if __name__ == "__main__":
     import argparse
-    description = "python script"
+    description = __doc__
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('args',nargs=argparse.REMAINDER)
     opts = parser.parse_args(); args = opts.args
