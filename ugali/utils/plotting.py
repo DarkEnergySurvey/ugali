@@ -29,7 +29,7 @@ import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
-import ugali.analysis.isochrone
+import ugali.isochrone
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
@@ -503,7 +503,7 @@ class BasePlotter(object):
 
     def drawCMD(self, ax=None, radius=None, zidx=None):
         if not ax: ax = plt.gca()
-        import ugali.analysis.isochrone
+        import ugali.isochrone
 
         if zidx is not None:
             filename = self.config.mergefile
@@ -511,7 +511,7 @@ class BasePlotter(object):
             f = pyfits.open(filename)
             distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
 
-            iso = ugali.analysis.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
+            iso = ugali.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
             #drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
             drawIsochrone(iso)
 
@@ -546,7 +546,7 @@ class BasePlotter(object):
 
         for ii, name in enumerate(self.config.params['isochrone']['infiles']):
             logger.info('%s %s'%(ii, name))
-            isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+            isochrone = ugali.isochrone.Isochrone(self.config, name)
             mag = isochrone.mag + distance_modulus
             ax.scatter(isochrone.color,mag, color='0.5', s=800, zorder=0)
 
@@ -1461,7 +1461,7 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
     ADW: This should be moved into the isochrone class.
     """
     import scipy.interpolate
-    from ugali.analysis.isochrone import CompositeIsochrone
+    from ugali.isochrone import CompositeIsochrone
 
     if isinstance(isochrone, CompositeIsochrone):
         isochrone = isochrone.isochrones[0]

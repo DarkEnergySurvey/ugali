@@ -44,22 +44,22 @@ def lon2phi(lon): return np.radians(lon)
 def theta2lat(theta): return 90. - np.degrees(theta)
 def lat2theta(lat): return np.radians(90. - lat)
 
-def pix2ang(nside, pix):
+def pix2ang(nside, pix, nest=False):
     """
     Return (lon, lat) in degrees instead of (theta, phi) in radians
     """
-    theta, phi =  hp.pix2ang(nside, pix)
+    theta, phi =  hp.pix2ang(nside, pix, nest=nest)
     lon = phi2lon(phi)
     lat = theta2lat(theta)
     return lon, lat
 
-def ang2pix(nside, lon, lat):
+def ang2pix(nside, lon, lat, nest=False):
     """
     Input (lon, lat) in degrees instead of (theta, phi) in radians
     """
     theta = np.radians(90. - lat)
     phi = np.radians(lon)
-    return hp.ang2pix(nside, theta, phi)
+    return healpy.ang2pix(nside, theta, phi, nest=nest)
 
 def ang2vec(lon, lat):
     theta = lat2theta(lat)

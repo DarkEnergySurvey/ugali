@@ -9,8 +9,8 @@ import scipy
 import ugali
 
 def test_isochrone():
-    import ugali.analysis.isochrone
-    iso = ugali.analysis.isochrone.Padova()
+    import ugali.isochrone
+    iso = ugali.isochrone.Padova()
     print iso
 
 def test_kernel():
@@ -24,6 +24,6 @@ def test_source():
     print source
 
 def test_factory():
-    import ugali.analysis.isochrone as isochrone
+    import ugali.isochrone as isochrone
     import ugali.analysis.kernel as kernel
     pass

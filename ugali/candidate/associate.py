@@ -14,6 +14,7 @@ import ugali.utils.projector
 from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
 from ugali.utils.healpix import ang2pix
+from ugali.utils.shell import get_ugali_dir
 
 #class Catalog(numpy.recarray):
 # 
@@ -56,9 +57,17 @@ from ugali.utils.healpix import ang2pix
 #            glon,glat = lon, lat
 #        return ugali.utils.projector.match(glon,glat,self.data['glon'],self.data['glat'],tol)
 
+def get_cat_dir():
+    catdir = os.path.join(get_ugali_dir(),'catalogs')
+    if not os.path.exists(catdir):
+        msg = "Catalog directory not found:\n%s"%catdir
+        logger.warning(msg)
+    return catdir
+
+
 class SourceCatalog(object):
- 
-    DATADIR=join(split(abspath(__file__))[0],"../data/catalogs/")
+    #join(split(abspath(__file__))[0],"../data/catalogs/") 
+    DATADIR=get_cat_dir()
  
     def __init__(self, filename=None):
         columns = [('name',object),
@@ -115,6 +124,7 @@ class McConnachie12(SourceCatalog):
     def _load(self,filename):
         if filename is None: 
             filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
+        self.filename = filename
  
         raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=34)
  
@@ -139,6 +149,7 @@ class Rykoff14(SourceCatalog):
     def _load(self, filename):
         if filename is None: 
             filename = os.path.join(self.DATADIR,"dr8_run_redmapper_v5.10_lgt20_catalog.fit")
+        self.filename = filename
 
         raw = pyfits.open(filename)[1].data
 
@@ -163,6 +174,8 @@ class Harris96(SourceCatalog):
     def _load(self,filename):
         if filename is None: 
             filename = os.path.join(self.DATADIR,"VII_202/mwgc.dat")
+        self.filename = filename
+
         kwargs = dict(delimiter=[12,12,3,3,6,5,3,6,8,8,6],dtype=2*['S12']+7*[float],skip_header=72,skip_footer=363)
         raw = numpy.genfromtxt(filename,**kwargs)
 
@@ -192,6 +205,7 @@ class Corwen04(SourceCatalog):
             raw = numpy.concatenate(raw)
         else:
             raw = numpy.genfromtxt(filename,**kwargs)
+        self.filename = filename
 
         # Some entries are missing...
         raw['f4'] = numpy.where(numpy.isnan(raw['f4']),0,raw['f4'])
@@ -244,6 +258,7 @@ class Nilson73(SourceCatalog):
     def _load(self,filename):
         if filename is None: 
             filename = os.path.join(self.DATADIR,"VII_26D/catalog.dat")
+        self.filename = filename
         raw = np.genfromtxt(filename,delimiter=[3,7,2,4,3,2],dtype=['S3']+['S7']+4*[float])
         
         self.data.resize(len(raw))
@@ -280,6 +295,7 @@ class Webbink85(SourceCatalog):
             raw = numpy.concatenate(raw)
         else:
             raw = np.genfromtxt(filename,**kwargs)
+        self.filename = filename
         
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])
@@ -308,6 +324,7 @@ class Kharchenko13(SourceCatalog):
         kwargs = dict(delimiter=[4,18,20,8,8],usecols=[1,3,4],dtype=['S18',float,float])
         if filename is None: 
             filename = os.path.join(self.DATADIR,"J_AA_558_A53/catalog.dat")
+        self.filename = filename
         raw = np.genfromtxt(filename,**kwargs)
         
         self.data.resize(len(raw))
@@ -330,6 +347,7 @@ class Bica08(SourceCatalog):
         kwargs = dict(delimiter=[32,2,3,3,5,3,3],dtype=['S32']+6*[float])
         if filename is None: 
             filename = os.path.join(self.DATADIR,"J_MNRAS_389_678/table3.dat")
+        self.filename = filename
         raw = np.genfromtxt(filename,**kwargs)
 
         self.data.resize(len(raw))
@@ -353,6 +371,7 @@ class WEBDA14(SourceCatalog):
         kwargs = dict(delimiter='\t',usecols=[0,1,2],dtype=['S18',float,float])
         if filename is None: 
             filename = os.path.join(self.DATADIR,"WEBDA/webda.tsv")
+        self.filename = filename
         raw = np.genfromtxt(filename,**kwargs)
         
         self.data.resize(len(raw))
@@ -372,6 +391,7 @@ class ExtraDwarfs(SourceCatalog):
         kwargs = dict(delimiter=',')
         if filename is None: 
             filename = os.path.join(self.DATADIR,"extras/extra_dwarfs.csv")
+        self.filename = filename
         raw = np.recfromcsv(filename,**kwargs)
         
         self.data.resize(len(raw))
@@ -391,6 +411,7 @@ class ExtraClusters(SourceCatalog):
         kwargs = dict(delimiter=',')
         if filename is None: 
             filename = os.path.join(self.DATADIR,"extras/extra_clusters.csv")
+        self.filename = filename
         raw = np.recfromcsv(filename,**kwargs)
         
         self.data.resize(len(raw))
