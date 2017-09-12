@@ -10,6 +10,7 @@ from collections import OrderedDict as odict
 
 import healpy
 import pyfits
+import fitsio
 import numpy as np
 import numpy
 import numpy.lib.recfunctions as recfuncs
@@ -56,11 +57,17 @@ class CandidateSearch(object):
 
     def loadLikelihood(self,filename=None):
         if filename is None: filename = self.mergefile
-        f = pyfits.open(self.mergefile)
-        self.pixels = f[1].data['PIX']
-        self.values = 2*f[1].data['LOG_LIKELIHOOD']
-        self.distances = f[2].data['DISTANCE_MODULUS']
-        self.richness = f[1].data['RICHNESS']
+        #f = pyfits.open(self.mergefile)
+        #self.pixels = f[1].data['PIX']
+        #self.values = 2*f[1].data['LOG_LIKELIHOOD']
+        #self.distances = f[2].data['DISTANCE_MODULUS']
+        #self.richness = f[1].data['RICHNESS']
+        f = fitsio.FITS(self.mergefile)
+        data = f[1].read()
+        self.pixels = data['PIXEL'] if 'PIXEL' in data.dtype.names else data['PIX']
+        self.values = 2*data['LOG_LIKELIHOOD']
+        self.distances = f[2].read()['DISTANCE_MODULUS']
+        self.richness = data['RICHNESS']
 
     def loadROI(self,filename=None):
         if filename is None: filename = self.roifile
@@ -99,13 +106,14 @@ class CandidateSearch(object):
 
     def loadLabels(self,filename=None):
         if filename is None: filename = self.labelfile
-        f = pyfits.open(filename)
-        if not (self.pixels == f[1].data['PIX']).all(): 
+        #f = pyfits.open(filename)
+        data = fitsio.read(filename)
+        if not (self.pixels == data['PIXEL']).all(): 
             raise Exception("...")
-        if not (self.distances == f[2].data['DISTANCE_MODULUS']).all():
+        if not (self.distances == data['DISTANCE_MODULUS']).all():
             raise Exception("...")            
 
-        self.labels = f[1].data['LABEL'].astype(int)
+        self.labels = data['LABEL'].astype(int)
         self.nlabels = self.labels.max()
         if self.nlabels != (len(np.unique(self.labels)) - 1):
             raise Exception("Incorrect number of labels found.")
@@ -129,9 +137,12 @@ class CandidateSearch(object):
 
     def writeObjects(self,filename=None):
         if filename is None: filename = self.objectfile
-        hdu = pyfits.new_table(self.objects.view(np.recarray))
+        #hdu = pyfits.new_table(self.objects.view(np.recarray))
+        #logger.info("Writing %s..."%filename)
+        #hdu.writeto(filename,clobber=True)
         logger.info("Writing %s..."%filename)
-        hdu.writeto(filename,clobber=True)
+        fitsio.write(filename,self.objects.view(np.recarray),clobber=True)
+
 
     @staticmethod
     def labelHealpix(pixels, values, nside, threshold=0, xsize=1000):
