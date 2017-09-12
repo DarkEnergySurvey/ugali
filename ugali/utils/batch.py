@@ -132,6 +132,7 @@ class LSF(Batch):
     _defaults = odict([
         ('R','"scratch > 1 && rhel60"'),
         ('C', 0),
+        #('M','8G'),
         #('q', 'long'),
     ])
 
@@ -163,7 +164,11 @@ class LSF(Batch):
     q2mpi = mpiopts
 
     def parse_options(self, **opts):
+        # Default options for the cluster
         options = odict(self.default_opts)
+        # Default options for the queue
+        #options.update(OPTIONS[options.get('q')])
+        # User specified options
         options.update(opts)
         if 'n' in options.keys(): 
             options['a'] = 'mpirun'
