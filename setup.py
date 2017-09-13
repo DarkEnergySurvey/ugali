@@ -40,8 +40,10 @@ ISOCHRONES = RELEASE + '/ugali-isochrones-tiny.tar.gz'
 ISOSIZE = "~1MB" 
 # Could find file size dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
+
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISODIR = UGALIDIR+'/isochrones'
+CATDIR = UGALIDIR+'/catalogs'
 
 class ProgressFileIO(io.FileIO):
     def __init__(self, path, *args, **kwargs):
@@ -67,7 +69,7 @@ class IsochroneCommand(distutils.cmd.Command):
     description = "install isochrone files"
     user_options = [
         ('isochrones-path=',None,
-         'path to install isochrones (default: %s)'%UGALIDIR),
+         'path to install isochrones (default: %s)'%ISODIR),
         ('force','f',
          'force installation (overwrite any existing files)')
         ]
@@ -75,7 +77,7 @@ class IsochroneCommand(distutils.cmd.Command):
     boolean_options = ['force']
 
     def initialize_options(self):
-        self.isochrones_path = os.path.expandvars(UGALIDIR)
+        self.isochrones_path = os.path.expandvars(ISODIR)
         self.force = False
 
     def finalize_options(self):
@@ -114,7 +116,7 @@ class IsochroneCommand(distutils.cmd.Command):
             print("skipping isochrone install")
             return
 
-        if os.path.exists(os.path.join(self.isochrones_path,'isochrones')):
+        if os.path.exists(self.isochrones_path):
             if self.force:
                 print("overwriting isochrone directory")
             else:
@@ -131,7 +133,7 @@ class install(_install):
     user_options = _install.user_options + [
         ('isochrones',None,"install isochrone files (%s)"%ISOSIZE),
         ('no-isochrones',None,"don't install isochrone files [default]"),
-        ('isochrones-path=',None,"isochrone installation path [default: %s]"%UGALIDIR)
+        ('isochrones-path=',None,"isochrone installation path [default: %s]"%ISODIR)
     ]
     boolean_options = _install.boolean_options + ['isochrones','no-isochrones']
 
