@@ -15,7 +15,19 @@ Installation
 
 There are several ways to install `ugali`.
 
-The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation uses `conda` to install the necessary dependencies.
+The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies.
+```bash
+# Create and activate conda environment
+conda create -q -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
+source activate travis-env
+
+# Clone source code from the parent repository
+git clone https://github.com/DarkEnergySurvey/ugali.git
+cd ugali
+
+# Install the python source code
+python setup.py install --isochrones --catalogs
+```
 
 In theory, the easiest way to install `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
 ```bash
@@ -26,17 +38,7 @@ pip install ugali
 pip install ugali --install-option "--isochrones" --install-option "--catalogs"
 ```
 
-By default, the minimal isochrone and catalog libraries are installed into the directory specified by the `UGALIDIR` environment variable (default: `$HOME/.ugali`). The download and unpacking of the isochrone and catalog files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [will not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
-
-To get the most up-to-date version of `ugali`, you can download the source code from github and install it using `setup.py`:
-```bash
-# Clone source code from the parent repository
-git clone https://github.com/DarkEnergySurvey/ugali.git
-cd ugali
-
-# Install the python source code
-python setup.py install
-```
+By default, the minimal isochrone and catalog libraries are installed into the directory specified by the `UGALIDIR` environment variable (default: `$HOME/.ugali`). The download and unpacking of the isochrone and catalog files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [may not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
 
 Auxiliary Libraries
 -------------------
