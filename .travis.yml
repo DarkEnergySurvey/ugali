@@ -22,7 +22,7 @@ install:
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
   - source activate travis-env
   - export UGALIDIR="$HOME/.ugali"
-  - python setup.py -q install --isochrones --isochrones-path $UGALIDIR
+  - python setup.py -q install --isochrones
 
 # command to run tests
 script: 
