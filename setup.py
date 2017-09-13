@@ -23,6 +23,7 @@ VERSION = versioneer.get_version()
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
 URL = 'https://github.com/DarkEnergySurvey/ugali'
+URL = 'https://github.com/kadrlica/ugali'
 DESC = "Ultra-faint galaxy likelihood toolkit."
 LONG_DESC = "See %s"%URL
 CLASSIFIERS = """\
@@ -34,11 +35,13 @@ Natural Language :: English
 Topic :: Scientific/Engineering
 """
 
-ISOCHRONES = URL+'/releases/download/v1.6.3/ugali-isochrones-v1.6.3.tar.gz'
-ISOSIZE = "~100MB" 
+RELEASE = URL+'/releases/download/v1.7.0rc0'
+ISOCHRONES = RELEASE + '/ugali-isochrones-tiny.tar.gz'
+ISOSIZE = "~1MB" 
 # Could find file size dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
+ISODIR = UGALIDIR+'/isochrones'
 
 class ProgressFileIO(io.FileIO):
     def __init__(self, path, *args, **kwargs):
