@@ -15,30 +15,32 @@ Installation
 
 There are several ways to install `ugali`.
 
-The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies.
+The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
 ```bash
 # Create and activate conda environment
-conda create -q -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
-source activate travis-env
+conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
+source activate ugali-env
 
 # Clone source code from the parent repository
-git clone https://github.com/DarkEnergySurvey/ugali.git
-cd ugali
+git clone https://github.com/DarkEnergySurvey/ugali.git && cd ugali
 
-# Install the python source code
+# Install just the python source code
+python setup.py install 
+
+# Install source code with a minimal set of isochrone and catalog libraries
 python setup.py install --isochrones --catalogs
 ```
 
-In theory, the easiest way to install `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
+In theory, the easiest way to get a stable release of `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
 ```bash
-# To install just the source code
+# Install just the source code
 pip install ugali
 
-# To install source code with a minimal set of isochrone and catalog libraries
+# Install source code with a minimal set of isochrone and catalog libraries
 pip install ugali --install-option "--isochrones" --install-option "--catalogs"
 ```
 
-By default, the minimal isochrone and catalog libraries are installed into the directory specified by the `UGALIDIR` environment variable (default: `$HOME/.ugali`). The download and unpacking of the isochrone and catalog files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [may not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
+By default, the minimal isochrone and catalog libraries are installed into the directory specified by the `$UGALIDIR` environment variable (default: `$HOME/.ugali`). The download and unpacking of the isochrone and catalog files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [may not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
 
 Auxiliary Libraries
 -------------------
@@ -90,15 +92,11 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [emcee](http://dan.iel.fm/emcee/current/)
 * [pyyaml](http://pyyaml.org/)
 
-### Mangle:
-Not a strict dependency. Used to interface with masks produced by
-the Dark Energy Survey Data Mangement group. Download and documentation 
-available at http://space.mit.edu/~molly/mangle/
-
 ### Isochrones:
 The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from two different groups:
 * Padova isochrones (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
+* MESA isochrones (http://waps.cfa.harvard.edu/MIST/interp_isos.html)
 
 Conventions
 -----------
