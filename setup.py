@@ -138,7 +138,7 @@ class TarballCommand(distutils.cmd.Command,object):
             if self.force:
                 print("overwriting directory")
             else:
-                print("skipping data install")
+                print("use '--force' to overwrite")
                 return
        
         self.install_tarball(self.tarball)

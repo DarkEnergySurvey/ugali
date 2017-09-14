@@ -64,6 +64,9 @@ An experimental interface for downloading the isochrone and catalog libraries al
 # To install the Bressan+ 2012 isochrones for the DES survey
 python setup.py isochrones --survey des --model bressan2012
 
+# If you have isochrones already installed, you may need to force
+python setup.py isochrones --survey des --model bressan2012 --force
+
 # To install all available DES isochrones
 python setup.py isochrones --survey des
 
