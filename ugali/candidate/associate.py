@@ -148,7 +148,7 @@ class Rykoff14(SourceCatalog):
 
     def _load(self, filename):
         if filename is None: 
-            filename = os.path.join(self.DATADIR,"dr8_run_redmapper_v5.10_lgt20_catalog.fit")
+            filename = os.path.join(self.DATADIR,"redmapper/dr8_run_redmapper_v5.10_lgt20_catalog.fit")
         self.filename = filename
 
         raw = pyfits.open(filename)[1].data
