@@ -34,6 +34,36 @@ def add_column(filename,column,formula,force=False):
     insert_columns(filename,col,force=force)
     return True
 
+def load_file(kwargs):
+    """ Load a FITS file with kwargs. """
+    logger.debug("Loading %s..."%kwargs['filename'])
+    return fitsio.read(**kwargs)
+
+def load_files(filenames,multiproc=False,**kwargs):
+    """ Load a set of FITS files with kwargs. """
+    filenames = np.atleast_1d(filenames)
+    logger.debug("Loading %s files..."%len(filenames))
+
+    kwargs = [dict(filename=f,**kwargs) for f in filenames]
+
+    if multiproc:
+        from multiprocessing import Pool
+        processes = multiproc if multiproc > 0 else None
+        p = Pool(processes,maxtasksperchild=1)
+        out = p.map(load_file,kwargs)
+    else:
+        out = [load_file(kw) for kw in kwargs]
+
+    dtype = out[0].dtype
+    for i,d in enumerate(out):
+        if d.dtype != dtype: 
+            # ADW: Not really safe...
+            logger.warn("Casting input data to same type.")
+            out[i] = d.astype(dtype,copy=False)
+
+    logger.debug('Concatenating arrays...')
+    return np.concatenate(out)
+
 def load(args):
     infile,columns = args
     logger.debug("Loading %s..."%infile)

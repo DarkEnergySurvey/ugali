@@ -30,10 +30,11 @@ from ugali.utils.shell import mkdir
 
 class Farm:
 
-    def __init__(self, configfile):
+    def __init__(self, configfile, verbose=False):
         self.configfile = configfile
         self.config = ugali.utils.config.Config(configfile)
         self._setup()
+        self.verbose = verbose
 
     def _setup(self):
         self.nside_catalog    = self.config['coords']['nside_catalog']
@@ -53,8 +54,9 @@ class Farm:
         """
         params = dict(script=self.config['scan']['script'],
                       config=configfile, outfile=outfile, 
-                      nside=self.nside_likelihood, pix=pix)
-        cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i'%params
+                      nside=self.nside_likelihood, pix=pix,
+                      verbose='-v' if self.verbose else '')
+        cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i %(verbose)s'%params
         return cmd
 
     # ADW: Should probably be in a utility
@@ -257,5 +259,5 @@ if __name__ == "__main__":
     parser.add_coords(required=True,radius=True,targets=True)
     opts = parser.parse_args()
 
-    farm = Farm(opts.config)
+    farm = Farm(opts.config,verbose=opts.verbose)
     x = farm.submit_all(coords=opts.coords,queue=opts.queue,debug=opts.debug)

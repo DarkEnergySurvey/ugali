@@ -229,7 +229,7 @@ def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GML',**kwargs):
     query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.jpeg')
-    cmd='wget -O %s "%s"'%(tmp.name,url+query)
+    cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
     im = pylab.imread(tmp.name)
     tmp.close()
@@ -244,18 +244,38 @@ def getDSSImage(ra,dec,radius=1.0,xsize=800,**kwargs):
     https://archive.stsci.edu/cgi-bin/dss_search
 
     Image is in celestial orientation (RA increases to the right)
+    https://archive.stsci.edu/dss/script_usage.html
+
+    ra (r) - right ascension
+    dec (d) - declination
+    equinox (e) - equinox (B1950 or J2000; default: J2000)
+    height (h) - height of image (arcminutes; default: 15.0)
+    width (w) - width of image (arcminutes; default: 15.0)
+    format (f) - image format (FITS or GIF; default: FITS)
+    compression (c) - compression (UNIX, GZIP, or NONE; default: NONE; compression 
+         applies to FITS only)
+    version (v)  - Which version of the survey to use:
+         1  - First Generation survey (garden variety)
+         2  - Second generation survey (incomplete)
+         3  - Check the 2nd generation; if no image is available,
+              then go to the 1st generation.
+         4  - The Quick V survey (whence came the Guide Stars Catalog;
+              used mostly for Phase II proposal submission)
+    save (s)  - Save the file to disk instead of trying to display.
+         (ON (or anything) or not defined; default: not defined.)
     """
     import subprocess
     import tempfile
 
     url="https://archive.stsci.edu/cgi-bin/dss_search?"
     scale = 2.0 * radius * 60.
-    params=dict(r='%.3f'%ra,d='%.3f'%dec,w=scale,h=scale,
-                f='gif',v='poss2ukstu_red')
+    params=dict(ra='%.3f'%ra,dec='%.3f'%dec,width=scale,height=scale,
+                format='gif',version=1)
+    #v='poss2ukstu_red'
     query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.gif')
-    cmd='wget -O %s "%s"'%(tmp.name,url+query)
+    cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
     im = pylab.imread(tmp.name)
     tmp.close()
@@ -440,8 +460,8 @@ class BasePlotter(object):
             filename = self.config.mergefile
 
         results=pyfits.open(filename)[1]
-
-        pixels,values = results.data['pix'],2*results.data['log_likelihood']
+        pixels = results.data['PIXEL']
+        values = 2*results.data['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
         ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
         # Sum through all distance_moduli
@@ -562,7 +582,7 @@ class BasePlotter(object):
         filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
-        pixels,values = f[1].data['pix'],2*f[1].data['LOG_LIKELIHOOD']
+        pixels,values = f[1].data['PIXEL'],2*f[1].data['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
         distances = f[2].data['DISTANCE_MODULUS']
         if distances.ndim == 1: distances = distances.reshape(-1,1)
@@ -637,8 +657,9 @@ class BasePlotter(object):
         #plt.sca(axes[1]); self.drawStellarDensity(axes[1])
         #plt.sca(axes[2]); self.drawMask(axes[2])
         #plt.sca(axes[3]); self.drawTS(axes[3])
-
-        plt.sca(axes[0]); self.drawImage()
+        try: plt.sca(axes[0]); self.drawImage()
+        except IOError as e: logger.warn(str(e))
+            
         plt.sca(axes[1]); self.drawStellarDensity()
         plt.sca(axes[2]); self.drawMask()
         try: plt.sca(axes[3]); self.drawTS()
@@ -1318,14 +1339,15 @@ def plotChernoff(ts,bands='smooth',pdf=False):
 
 
 def plot_chain(chain,burn=None,clip=None):
-    import triangle
+    #import triangle
+    import corner
     from ugali.analysis.mcmc import Samples 
     samples = Samples(chain)
     names = samples.names
     results = samples.results(clip=clip,burn=burn)
     truths = [results[n][0] for n in names]
     data = samples[burn:].view((float,len(names)))
-    fig = triangle.corner(data, labels=names, truths=truths)
+    fig =corner.corner(data, labels=names, truths=truths)
     return fig
 
 ###################################################
@@ -1369,7 +1391,8 @@ def plotSkymap(skymap, proj='mol', **kwargs):
     return im
 
 def plotTriangle(srcfile,samples,burn=0,**kwargs):
-    import triangle
+    #import triangle
+    import corner
     import ugali.analysis.source
     import ugali.analysis.mcmc
     #matplotlib.rcParams.update({'text.usetex': True})
@@ -1395,7 +1418,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
     kwargs.setdefault('quantiles',[0.16,0.84])
 
     if len(names) > 1:
-        fig = triangle.corner(chain,labels=labels,truths=truths,**kwargs)
+        fig = corner.corner(chain,labels=labels,truths=truths,**kwargs)
     else:
         fig = plt.figure()
         plt.hist(chain,bins=100)

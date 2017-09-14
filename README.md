@@ -6,50 +6,73 @@
 Overview
 --------
 
-The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python classes and functions developed for maximum-likelihood-based studies of Milky Way satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys.
+The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python modules developed for maximum-likelihood-based studies of Milky Way satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys. In addition, ugali ships with a set of synthetic isochrone libraries and catalogs of known resolved stellar systems.
 
 [Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
 
 Installation
 ------------
 
-There are several ways to install `ugali` and it's complimentary isochrone library.
+There are several ways to install `ugali`.
 
-The easiest way to install `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
+The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
+```bash
+# Create and activate conda environment
+conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
+source activate ugali-env
+
+# Clone source code from the parent repository
+git clone https://github.com/DarkEnergySurvey/ugali.git && cd ugali
+
+# Install just the python source code
+python setup.py install 
+
+# Install source code with a minimal set of isochrone and catalog libraries
+python setup.py install --isochrones --catalogs
 ```
-# To install just the source code
+
+In theory, the easiest way to get a stable release of `ugali` is through [PyPi](https://pypi.python.org/pypi) using `pip`:
+```bash
+# Install just the source code
 pip install ugali
 
-# To install source code and isochrone library
-pip install ugali --install-option "--isochrones"
-
-# To specify a path for the isochrone library
-pip install ugali --install-option "--isochrones" --install-option "--isochrones-path <PATH>"
-```
-The isochrone library is a ~100 MB tarball. The default isochrone installation location is set by the `UGALIDIR` environment variable and defaults to `$HOME/.ugali`. The download and unpacking of the isochrone files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [will not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
-
-To get the most up-to-date version of `ugali`, you can download the source code from github and install it using `setup.py`:
-```
-# Clone source code from the parent repository
-git clone https://github.com/DarkEnergySurvey/ugali.git
-cd ugali
-
-# Install the python source code
-python setup.py install
-
-# Also install the isochrone library
-python setup.py install --isochrones
-
-# Specify the isochrone install path
-python setup.py install --isochrones --isochrones-path=<PATH>
+# Install source code with a minimal set of isochrone and catalog libraries
+pip install ugali --install-option "--isochrones" --install-option "--catalogs"
 ```
 
-The code uses the `UGALIDIR` environment variable to find the isochrones (defaults to `$HOME/.ugali`). If you install the isochrones in a non-standard location be sure to set `UGALIDIR` so `ugali` can find them:
+By default, the minimal isochrone and catalog libraries are installed into the directory specified by the `$UGALIDIR` environment variable (default: `$HOME/.ugali`). The download and unpacking of the isochrone and catalog files might make it appear that your `pip` installation has stalled. Unfortunately, `pip` [may not display a progress bar](https://github.com/pypa/pip/issues/2732#issuecomment-97119093) during this delay.
+
+Auxiliary Libraries
+-------------------
+
+The `ugali` source code is distributed with several auxiliary libraries for isochrone generation and catalog matching. These libraries can be downloaded directly from the [releases](../../releases) page, and unpacked in your `$UGALIDIR`. For example, to install the Bressan+ 2012 isochrones for the DES survey:
+
+```
+cd $UGALIDIR
+wget https://github.com/kadrlica/ugali/releases/download/v1.7.0rc0/ugali-des-bressan2012.tar.gz
+tar -xzf ugali-des-bressan2012.tar.gz
+```
+
+The `UGALIDIR` environment variable is used to point to the isochrone and catalog libraries. If you install the isochrones in a non-standard location be sure to set `UGALIDIR` so `ugali` can find them:
+
 ```
 export UGALIDIR=<PATH>
 ```
 
-If all else fails, check out the automated build installation procedure using `conda` in [.travis.yml](.travis.yml).
+An experimental interface for downloading the isochrone and catalog libraries also exists through `setup.py`:
+```
+# To install the Bressan+ 2012 isochrones for the DES survey
+python setup.py isochrones --survey des --model bressan2012
+
+# To install all available DES isochrones
+python setup.py isochrones --survey des
+
+# To install all available Bressan+ 2012 isochrones
+python setup.py isochrones --model bressan2012
+
+# To install the catalog libraries
+python setup.py catalogs
+```
 
 Usage Examples
 --------------
@@ -69,15 +92,11 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [emcee](http://dan.iel.fm/emcee/current/)
 * [pyyaml](http://pyyaml.org/)
 
-### Mangle:
-Not a strict dependency. Used to interface with masks produced by
-the Dark Energy Survey Data Mangement group. Download and documentation 
-available at http://space.mit.edu/~molly/mangle/
-
 ### Isochrones:
 The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from two different groups:
 * Padova isochrones (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
+* MESA isochrones (http://waps.cfa.harvard.edu/MIST/interp_isos.html)
 
 Conventions
 -----------
