@@ -8,7 +8,7 @@ Functions to create and use a look-up table for the signal color probability dis
 import time
 import numpy
 import scipy.signal
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.config
 import ugali.utils.binning

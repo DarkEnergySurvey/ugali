@@ -16,7 +16,6 @@ except KeyError: matplotlib.use('Agg')
 import numpy
 import numpy as np
 import yaml
-#import pyfits
 import fitsio
 
 from ugali.analysis.pipeline import Pipeline
@@ -106,7 +105,6 @@ def do_plot(args):
 
     plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
 
-    #data = pyfits.open(memfile)[1].data if exists(memfile) else None
     data = fitsio.read(memfile) if exists(memfile) else None
     if data is not None:
         plt.figure()

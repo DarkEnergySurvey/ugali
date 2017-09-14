@@ -22,7 +22,6 @@ import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import scipy.stats
 
-import pyfits
 import yaml
 
 import ugali.utils.stats

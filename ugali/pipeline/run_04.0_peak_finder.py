@@ -50,14 +50,14 @@ def run(self):
             search.writeCandidates()
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
-        import pyfits
+        import fitsio
 
         threshold = self.config['search']['cand_threshold']
         outdir = mkdir(self.config['output']['plotdir'])
         logdir = mkdir(os.path.join(outdir,'log'))
 
         # Eventually move this into 'plotting' module
-        candidates = pyfits.open(self.config.candfile)[1].data
+        candidates = fitsio.read(self.config.candfile)
         candidates = candidates[candidates['TS'] >= threshold]
 
         for candidate in candidates:
