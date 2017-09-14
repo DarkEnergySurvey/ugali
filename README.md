@@ -81,11 +81,11 @@ Usage Examples
 --------------
 Examples go here...
 
-Dependencies
-------------
-These should mostly be taken care of by PyPi with a `pip install`.
+Additional Information
+----------------------
 
-### Python packages:
+## Dependencies
+These should mostly be taken care of by PyPi with a `pip install`.
 * [numpy](http://www.numpy.org/)
 * [scipy](https://www.scipy.org/)
 * [matplotlib](http://matplotlib.org/)
@@ -94,31 +94,18 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [astropy](http://www.astropy.org/)
 * [emcee](http://dan.iel.fm/emcee/current/)
 * [pyyaml](http://pyyaml.org/)
+* [fitsio](https://github.com/esheldon/fitsio)
 
-### Isochrones:
-The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from two different groups:
-* Padova isochrones (http://stev.oapd.inaf.it/cgi-bin/cmd)
+## Isochrones
+The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from:
+* PARSEC isochrones from the Padova group (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
 * MESA isochrones (http://waps.cfa.harvard.edu/MIST/interp_isos.html)
 
-Conventions
------------
-
-### Indexing:
-array[index_z][index_y][index_x]
-
-### Naming:
-* package_name
-* module_name.py
-* ClassName
-* functionName
-* variable_name
-
-ABBREVIATIONS
--------------
-* IMF: initial mass function
+## Abbreviations
 * CMD: color-magnitude diagram
 * ROI: region of interest
 * PDF: probability distribution function
-* LUT: look-up table
 * LKHD: likelihood
+* IMF: initial mass function
+* LUT: look-up table
