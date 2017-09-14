@@ -97,10 +97,12 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [fitsio](https://github.com/esheldon/fitsio)
 
 #### Isochrones
-The `ugali` uses a library of stellar isochrones packaged with `ugali` releases. These isochrones come dominantly from:
+The isochrones used by `ugali` come dominantly from:
 * PARSEC isochrones from the Padova group (http://stev.oapd.inaf.it/cgi-bin/cmd)
 * Dartmouth isochrones (http://stellar.dartmouth.edu/models/isolf_new.html)
 * MESA isochrones (http://waps.cfa.harvard.edu/MIST/interp_isos.html)
+
+More information can be found in the [isochrone](ugali/isochrone) module.
 
 #### Abbreviations
 * CMD: color-magnitude diagram
