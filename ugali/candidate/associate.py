@@ -15,6 +15,7 @@ from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
 from ugali.utils.healpix import ang2pix
 from ugali.utils.shell import get_ugali_dir
+from ugali.utils.logger import logger
 
 #class Catalog(numpy.recarray):
 # 
