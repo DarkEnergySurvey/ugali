@@ -1347,7 +1347,7 @@ def plot_chain(chain,burn=None,clip=None):
     results = samples.results(clip=clip,burn=burn)
     truths = [results[n][0] for n in names]
     data = samples[burn:].view((float,len(names)))
-    fig =corner.corner(data, labels=names, truths=truths)
+    fig = corner.corner(data, labels=names, truths=truths)
     return fig
 
 ###################################################

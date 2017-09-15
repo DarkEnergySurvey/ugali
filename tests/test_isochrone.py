@@ -86,7 +86,15 @@ def test_surveys():
     for s in survey:
         for name in ['Dotter2016']:
             iso = isochrone.factory(name,survey=s)
-            
+
+def test_import():
+    """ Test various import strategies """
+    import ugali.analysis.isochrone
+    from ugali.analysis.isochrone import Bressan2012, CompositeIsochrone
+
+    import ugali.isochrone
+    from ugali.isochrone import Bressan2012, CompositeIsochrone
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)

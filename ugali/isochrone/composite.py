@@ -136,8 +136,8 @@ def factory(name, **kwargs):
 
     module = 'ugali.isochrone'
     # First try this module
-    try:    return factory(name, module=__name__, **kwargs)
-    except KeyError: pass
+    #try:    return factory(name, module=__name__, **kwargs)
+    #except KeyError: pass
     try:    return factory(name, module=module+'.composite', **kwargs)
     except KeyError: pass
     # Then try parsec
