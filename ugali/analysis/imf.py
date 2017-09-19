@@ -4,6 +4,8 @@ Classes to handle initial mass functions (IMFs).
 
 import numpy
 
+from ugali.utils.logger import logger
+
 ############################################################
 
 class IMF:
@@ -18,7 +20,7 @@ class IMF:
         if self.type == 'chabrier':
             self.pdf = chabrierIMF
         else:
-            print 'WARNING: initial mass function type %s not recognized'%(self.type)
+            logger.warn('initial mass function type %s not recognized'%(self.type))
 
     def integrate(self, mass_min, mass_max, log_mode=True, weight=False, steps=10000):
         """

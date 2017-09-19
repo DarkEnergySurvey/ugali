@@ -422,13 +422,14 @@ class CandidateSearch(object):
         logger.info("Writing %s..."%filename)
         hdu.writeto(filename,clobber=True)
 
-        # Dump to txt file 
-        if which('fdump'):
-            txtfile = filename.replace('.fits','.txt')
-            columns = ['NAME','TS','GLON','GLAT','DISTANCE','MASS']
-            cmd = 'fdump %(infile)s %(outfile)s columns="%(columns)s" rows="-" prhead="no" showcol="yes" clobber="yes" pagewidth="256" fldsep=" " showrow="no"'%(dict(infile=filename,outfile=txtfile,columns=','.join(columns)))
-            print cmd
-            subprocess.call(cmd,shell=True)
+        # DEPRECATED: ADW 2017-09-15 
+        ## Dump to txt file 
+        #if which('fdump'):
+        #    txtfile = filename.replace('.fits','.txt')
+        #    columns = ['NAME','TS','GLON','GLAT','DISTANCE','MASS']
+        #    cmd = 'fdump %(infile)s %(outfile)s columns="%(columns)s" rows="-" prhead="no" showcol="yes" clobber="yes" pagewidth="256" fldsep=" " showrow="no"'%(dict(infile=filename,outfile=txtfile,columns=','.join(columns)))
+        #    print cmd
+        #    subprocess.call(cmd,shell=True)
 
 if __name__ == "__main__":
     from optparse import OptionParser
