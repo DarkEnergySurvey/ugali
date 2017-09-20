@@ -6,15 +6,15 @@ from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
-import pyfits
+import fitsio
 from numpy.lib.recfunctions import stack_arrays
 
-import ugali.utils.skymap
 import ugali.utils.projector
 from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
 from ugali.utils.healpix import ang2pix
 from ugali.utils.shell import get_ugali_dir
+from ugali.utils.logger import logger
 
 #class Catalog(numpy.recarray):
 # 
@@ -151,7 +151,7 @@ class Rykoff14(SourceCatalog):
             filename = os.path.join(self.DATADIR,"redmapper/dr8_run_redmapper_v5.10_lgt20_catalog.fit")
         self.filename = filename
 
-        raw = pyfits.open(filename)[1].data
+        raw = fitsio.read(filename)
 
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['MEM_MATCH_ID'])

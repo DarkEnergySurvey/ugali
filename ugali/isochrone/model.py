@@ -1147,9 +1147,6 @@ class Isochrone(IsochroneModel):
 
         return outfile
 
-
-
-
 # Class Aliases
 #Composite = CompositeIsochrone
 
