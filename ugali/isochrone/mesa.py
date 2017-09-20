@@ -66,8 +66,8 @@ class Dotter2016(Isochrone):
 
     download_defaults = copy.deepcopy(mesa_defaults_10)
 
-    abins = np.arange(1., 13.5 + 0.1, 0.1)
-    zbins = np.arange(1e-5,1e-3 + 1e-5,1e-5)
+    abins = np.arange(1., 13.5+0.1, 0.1)
+    zbins = np.arange(1e-5, 1e-3+1e-5, 1e-5)
 
     columns = dict(
             des = odict([
@@ -182,7 +182,7 @@ class Dotter2016(Isochrone):
         #response = requests.post(url,data=params)
         q = urllib.urlencode(params)
         request = urllib2.Request(url,data=q)
-        response = urllib2.urlopen(req)
+        response = urllib2.urlopen(request)
         try:
             #fname = os.path.basename(response.text.split('"')[1])
             fname = os.path.basename(response.read().split('"')[1])
