@@ -653,29 +653,42 @@ class IsochroneModel(Model):
     def histo(self,distance_modulus=None,delta_mag=0.03,mass_steps=10000):
         """
         Histogram the isochrone in mag-mag space.
+
+        Parameters:
+        -----------
+        distance_modulus : distance modulus to calculate histogram at
+        delta_mag : magnitude bin size
+        mass_steps : number of steps to sample isochrone at
+
+        Returns:
+        --------
+        bins_mag_1 : bin edges for first magnitude
+        bins_mag_2 : bin edges for second magnitude
+        histo_isochrone_pdf : weighted pdf of isochrone in each bin
         """
         if distance_modulus is not None:
             self.distance_modulus = distance_modulus
 
-        # Isochrone will be binned in next step, so can sample many points efficiently
+        # Isochrone will be binned, so might as well sample lots of points
         mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_steps=mass_steps)
 
         #logger.warning("Fudging intrinisic dispersion in isochrone.")
         #mag_1 += np.random.normal(scale=0.02,size=len(mag_1))
         #mag_2 += np.random.normal(scale=0.02,size=len(mag_2))
 
+        # We cast to np.float32 to save memory
         bins_mag_1 = np.arange(self.mod+mag_1.min() - (0.5*delta_mag),
                                self.mod+mag_1.max() + (0.5*delta_mag),
-                               delta_mag)
+                               delta_mag).astype(np.float32)
         bins_mag_2 = np.arange(self.mod+mag_2.min() - (0.5*delta_mag),
                                self.mod+mag_2.max() + (0.5*delta_mag),
-                               delta_mag)        
+                               delta_mag).astype(np.float32)
  
-        # ADW: Completeness needs to go in mass_pdf here
+        # ADW: Completeness needs to go in mass_pdf here...
         histo_isochrone_pdf = np.histogram2d(self.mod + mag_1,
                                              self.mod + mag_2,
                                              bins=[bins_mag_1, bins_mag_2],
-                                             weights=mass_pdf)[0]
+                                             weights=mass_pdf)[0].astype(np.float32)
  
         return histo_isochrone_pdf, bins_mag_1, bins_mag_2
  
@@ -716,8 +729,11 @@ class IsochroneModel(Model):
         """
         Compute isochrone probability for each catalog object.
  
+        ADW: This is a memory intensive function, so try as much as
+        possible to keep array types at `float32` or smaller (maybe
+        using add.at would be good?)
         ADW: Still a little speed to be gained here (broadcasting)
-        ADW: Units?
+        ADW: Units? [mag^-2] [per sr?]
 
         Parameters:
         -----------
@@ -731,10 +747,11 @@ class IsochroneModel(Model):
 
         Returns:
         --------
-        u_color : probability that the star belongs to the isochrone
+        u_color : probability that the star belongs to the isochrone [mag^-2]
         """
         nsigma = 5.0
-        if distance_modulus is None: distance_modulus = self.distance_modulus
+        if distance_modulus is None: 
+            distance_modulus = self.distance_modulus
 
         # ADW: HACK FOR SYSTEMATIC UNCERTAINTY
         mag_err_1 = np.sqrt(mag_err_1**2 + 0.01**2)
@@ -763,13 +780,16 @@ class IsochroneModel(Model):
  
         n_catalog = len(mag_1)
         n_isochrone_bins = len(index_mag_1)
-        ones = np.ones([n_catalog, n_isochrone_bins])
+        ones = np.ones([n_catalog, n_isochrone_bins],dtype=np.int32)
  
         mag_1_reshape = mag_1.reshape([n_catalog, 1])
         mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
         mag_2_reshape = mag_2.reshape([n_catalog, 1])
         mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
- 
+
+        # ADW: Creating all of these delta_mag and arg_mag arrays is
+        # memory intensive. Can we cut it down (may add.at?)
+
         # Calculate distance between each catalog object and isochrone bin
         # Assume normally distributed photometry uncertainties
         delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
@@ -784,21 +804,22 @@ class IsochroneModel(Model):
         arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
         #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
          
-        # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
-        index_nonzero_0, index_nonzero_1 = np.nonzero((arg_mag_1_hi > -nsigma) \
-                                                         *(arg_mag_1_lo < nsigma) \
-                                                         *(arg_mag_2_hi > -nsigma) \
-                                                         *(arg_mag_2_lo < nsigma))
-        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_1[index_nonzero_0,index_nonzero_1] = norm_cdf(arg_mag_1_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - norm_cdf(arg_mag_1_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
-        pdf_mag_2[index_nonzero_0,index_nonzero_1] = norm_cdf(arg_mag_2_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - norm_cdf(arg_mag_2_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
+        # Only calculate the PDF using bins where it is ~nonzero. This
+        # means object-bin pairs within 5 sigma in both magnitudes.
+        idx_nonzero_0,idx_nonzero_1 = np.nonzero((arg_mag_1_hi > -nsigma) \
+                                                     *(arg_mag_1_lo < nsigma) \
+                                                     *(arg_mag_2_hi > -nsigma) \
+                                                     *(arg_mag_2_lo < nsigma))
+        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins],dtype=np.float32)
+        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins],dtype=np.float32)
+        pdf_mag_1[idx_nonzero_0,idx_nonzero_1] = norm_cdf(arg_mag_1_hi[idx_nonzero_0,
+                                                                       idx_nonzero_1]) \
+                                               - norm_cdf(arg_mag_1_lo[idx_nonzero_0,
+                                                                       idx_nonzero_1])
+        pdf_mag_2[idx_nonzero_0,idx_nonzero_1] = norm_cdf(arg_mag_2_hi[idx_nonzero_0,
+                                                                       idx_nonzero_1]) \
+                                               - norm_cdf(arg_mag_2_lo[idx_nonzero_0,
+                                                                       idx_nonzero_1])
          
         # Signal color probability is product of PDFs for each object-bin pair 
         # summed over isochrone bins
@@ -806,8 +827,8 @@ class IsochroneModel(Model):
  
         # Remove the bin size to convert the pdf to units of mag^-2
         u_color /= delta_mag**2
- 
-        return u_color
+
+        return u_color.astype(np.float32)
     
     # FIXME: Need to parallelize CMD and MMD formulation
  

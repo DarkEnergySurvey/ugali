@@ -104,7 +104,9 @@ def test_pdf():
     mag_err_2 = 0.1 * np.ones_like(mag_2)
     u_color = iso.pdf(mag_1, mag_2, mag_err_1, mag_err_2)
     #import pdb; pdb.set_trace()
-    test_results = np.array([0.00103531,  0.00210507,  0.00393214,  0.00675272,  0.01066913,  0.01552025,  0.020802  ,  0.02570625,  0.02930542,  0.03083482])
+    test_results = np.array([0.00103531, 0.00210507, 0.00393214, 0.00675272, 
+                             0.01066913, 0.01552025, 0.0208020, 0.02570625, 
+                             0.02930542, 0.03083482], dtype=np.float32)
     np.testing.assert_array_almost_equal(u_color[9490:9500],test_results)
 
 if __name__ == "__main__":
