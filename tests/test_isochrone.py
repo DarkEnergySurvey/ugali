@@ -96,6 +96,11 @@ def test_import():
     from ugali.isochrone import Bressan2012, CompositeIsochrone
 
 def test_pdf():
+    """ 
+    Test the isochrone.pdf function.  
+
+    This test should use ~300 MiB of memory...
+    """
     iso = isochrone.Bressan2012(**default_kwargs)
     mag_1,mag_2 = np.meshgrid(np.linspace(18,22,100),np.linspace(18,22,100))
     mag_1 = mag_1.flatten()
@@ -103,7 +108,6 @@ def test_pdf():
     mag_err_1 = 0.1 * np.ones_like(mag_1)
     mag_err_2 = 0.1 * np.ones_like(mag_2)
     u_color = iso.pdf(mag_1, mag_2, mag_err_1, mag_err_2)
-    #import pdb; pdb.set_trace()
     test_results = np.array([0.00103531, 0.00210507, 0.00393214, 0.00675272, 
                              0.01066913, 0.01552025, 0.0208020, 0.02570625, 
                              0.02930542, 0.03083482], dtype=np.float32)

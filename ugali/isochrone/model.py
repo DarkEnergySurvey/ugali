@@ -26,6 +26,8 @@ you need each unique limit in both magnitudes.
 
 """
 
+# FIXME: Need to parallelize CMD and MMD formulation
+
 import sys
 import os
 from abc import abstractmethod
@@ -125,6 +127,21 @@ class IsochroneModel(Model):
     def sample(self, mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False):
         """Sample the isochrone in steps of mass interpolating between the
         originally defined isochrone points.
+
+        Parameters:
+        -----------
+        mode : 
+        mass_steps : 
+        mass_min : Minimum mass [Msun]
+        full_data_range :
+        
+        Returns:
+        --------
+        mass_init : Initial mass of each point
+        mass_pdf : PDF of number of stars in each point
+        mass_act : Actual (current mass) of each stellar point
+        mag_1 : Array of magnitudes in first band (distance modulus applied)
+        mag_2 : Array of magnitudes in second band (distance modulus applied)
         """
 
         if full_data_range:
@@ -212,7 +229,17 @@ class IsochroneModel(Model):
 
     def stellar_mass(self, mass_min=0.1, steps=10000):
         """
-        Compute the stellar mass (M_Sol; average per star). PDF comes from IMF, but weight by actual stellar mass.
+        Compute the stellar mass (Msun; average per star). PDF comes
+        from IMF, but weight by actual stellar mass.
+
+        Parameters:
+        -----------
+        mass_min : Minimum mass to integrate the IMF
+        steps    : Number of steps to sample the isochrone
+
+        Returns:
+        --------
+        mass     : Stellar mass [Msun]
         """
         mass_max = self.mass_init_upper_bound
             
@@ -231,12 +258,22 @@ class IsochroneModel(Model):
 
     def stellar_luminosity(self, steps=10000):
         """
-        Compute the stellar luminosity (L_Sol; average per star). PDF comes from IMF.
-        The range of integration only covers the input isochrone data (no extrapolation used),
-        but this seems like a sub-percent effect if the isochrone goes to 0.15 stellar masses for the
-        old and metal-poor stellar populations of interest.
+        Compute the stellar luminosity (Lsun; average per star). PDF
+        comes from IMF.  The range of integration only covers the
+        input isochrone data (no extrapolation used), but this seems
+        like a sub-percent effect if the isochrone goes to 0.15 Msun
+        for the old and metal-poor stellar populations of interest.
 
-        Note that the stellar luminosity is very sensitive to the post-AGB population.
+        Note that the stellar luminosity is very sensitive to the
+        post-AGB population.
+
+        Parameters:
+        -----------
+        steps : Number of steps to sample the isochrone.
+
+        Returns:
+        --------
+        lum   : The stellar luminosity [Lsun]
         """
         mass_min = np.min(self.mass_init)
         mass_max = self.mass_init_upper_bound
@@ -252,13 +289,17 @@ class IsochroneModel(Model):
 
     def stellar_luminosity2(self, steps=10000):
         """
-        Compute the stellar luminosity (L_Sol; average per star). 
-        Usese "sample" to generate mass samplint and pdf.
-        The range of integration only covers the input isochrone data (no extrapolation used),
-        but this seems like a sub-percent effect if the isochrone goes to 0.15 stellar masses for the
-        old and metal-poor stellar populations of interest.
+        DEPRECATED: ADW 2017-09-20
 
-        Note that the stellar luminosity is very sensitive to the post-AGB population.
+        Compute the stellar luminosity (L_Sol; average per star).
+        Uses "sample" to generate mass sample and pdf.  The range of
+        integration only covers the input isochrone data (no
+        extrapolation used), but this seems like a sub-percent effect
+        if the isochrone goes to 0.15 Msun for the old and metal-poor
+        stellar populations of interest.
+
+        Note that the stellar luminosity is very sensitive to the
+        post-AGB population.
         """
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps=steps)
         luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity,fill_value=0,bounds_error=False)
@@ -270,6 +311,19 @@ class IsochroneModel(Model):
     stellarLuminosity = stellar_luminosity
 
     def absolute_magnitude(self, richness=1, steps=1e4):
+        """
+        Calculate the absolute magnitude (Mv) by integrating the
+        stellar luminosity.
+
+        Parameters:
+        -----------
+        richness : isochrone normalization parameter
+        steps    : number of isochrone sampling steps
+
+        Returns:
+        --------
+        abs_mag : Absolute magnitude (Mv)
+        """
         # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
         # for stars with R-I < 1.15
         # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
@@ -293,6 +347,24 @@ class IsochroneModel(Model):
         return Mv
 
     def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.32, seed=None):
+        """
+        Calculate the absolute magnitude (Mv) of the isochrone using
+        the prescription of Martin et al. 2008.
+        
+        Parameters:
+        -----------
+        richness : Isochrone nomalization factor
+        steps : Number of steps for sampling the isochrone.
+        n_trials : Number of bootstrap samples
+        mag_bright : Bright magnitude limit for calculating luminosity.
+        mag_faint : Faint magnitude limit for calculating luminosity.
+        alpha : Output confidence interval (1-alpha)
+        seed : Random seed
+
+        Returns:
+        --------
+        med,lo,hi : Absolute magnitude interval
+        """
         # ADW: This function is not quite right. You should be restricting
         # the catalog to the obsevable space (using the function named as such)
         # Also, this needs to be applied in each pixel individually
@@ -650,9 +722,9 @@ class IsochroneModel(Model):
         #final_pdf = sum_pdf.reshape(nmaglim,nbins,nbins)*cut
         return final_pdf
 
-    def histo(self,distance_modulus=None,delta_mag=0.03,mass_steps=10000):
+    def histogram2d(self,distance_modulus=None,delta_mag=0.03,steps=10000):
         """
-        Histogram the isochrone in mag-mag space.
+        Return a 2D histogram the isochrone in mag-mag space.
 
         Parameters:
         -----------
@@ -664,13 +736,13 @@ class IsochroneModel(Model):
         --------
         bins_mag_1 : bin edges for first magnitude
         bins_mag_2 : bin edges for second magnitude
-        histo_isochrone_pdf : weighted pdf of isochrone in each bin
+        isochrone_pdf : weighted pdf of isochrone in each bin
         """
         if distance_modulus is not None:
             self.distance_modulus = distance_modulus
 
         # Isochrone will be binned, so might as well sample lots of points
-        mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_steps=mass_steps)
+        mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_steps=steps)
 
         #logger.warning("Fudging intrinisic dispersion in isochrone.")
         #mag_1 += np.random.normal(scale=0.02,size=len(mag_1))
@@ -685,21 +757,21 @@ class IsochroneModel(Model):
                                delta_mag).astype(np.float32)
  
         # ADW: Completeness needs to go in mass_pdf here...
-        histo_isochrone_pdf = np.histogram2d(self.mod + mag_1,
-                                             self.mod + mag_2,
-                                             bins=[bins_mag_1, bins_mag_2],
-                                             weights=mass_pdf)[0].astype(np.float32)
+        isochrone_pdf = np.histogram2d(self.mod + mag_1,
+                                       self.mod + mag_2,
+                                       bins=[bins_mag_1, bins_mag_2],
+                                       weights=mass_pdf)[0].astype(np.float32)
  
-        return histo_isochrone_pdf, bins_mag_1, bins_mag_2
+        return isochrone_pdf, bins_mag_1, bins_mag_2
  
-    def pdf_mmd(self, lon, lat, mag_1, mag_2, distance_modulus, mask, delta_mag=0.03, mass_steps=1000):
+    def pdf_mmd(self, lon, lat, mag_1, mag_2, distance_modulus, mask, delta_mag=0.03, steps=1000):
         """
         Ok, now here comes the beauty of having the signal MMD.
         """
         logger.info('Running MMD pdf')
  
         roi = mask.roi
-        mmd = self.signalMMD(mask,distance_modulus,delta_mag=delta_mag,mass_steps=mass_steps)
+        mmd = self.signalMMD(mask,distance_modulus,delta_mag=delta_mag,mass_steps=steps)
         
         # This is fragile, store this information somewhere else...
         nedges = np.rint((roi.bins_mag[-1]-roi.bins_mag[0])/delta_mag)+1
@@ -723,9 +795,10 @@ class IsochroneModel(Model):
  
         return u_color
 
-    #import memory_profiler
-    #@memory_profiler.profile
-    def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus=None, delta_mag=0.03, mass_steps=10000):
+    import memory_profiler
+    @memory_profiler.profile
+    def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, 
+            distance_modulus=None, delta_mag=0.03, steps=10000):
         """
         Compute isochrone probability for each catalog object.
  
@@ -743,26 +816,28 @@ class IsochroneModel(Model):
         mag_err_2 : magnitude error of stars (pdf sample points) in second band
         distance_modulus : distance modulus of isochrone
         delta_mag : magnitude binning for evaluating the pdf
-        mass_steps : number of isochrone sample points
+        steps : number of isochrone sample points
 
         Returns:
         --------
         u_color : probability that the star belongs to the isochrone [mag^-2]
         """
         nsigma = 5.0
+        #pad = 1. # mag
+
         if distance_modulus is None: 
             distance_modulus = self.distance_modulus
 
-        # ADW: HACK FOR SYSTEMATIC UNCERTAINTY
+        # ADW: HACK TO ADD SYSTEMATIC UNCERTAINTY (0.010 mag)
         mag_err_1 = np.sqrt(mag_err_1**2 + 0.01**2)
         mag_err_2 = np.sqrt(mag_err_2**2 + 0.01**2)
  
-        # Histogram of the isochrone
-        histo_isochrone_pdf,bins_mag_1,bins_mag_2 = self.histo(distance_modulus,delta_mag,mass_steps)
+        # Binned pdf of the isochrone
+        histo_pdf,bins_mag_1,bins_mag_2 = self.histogram2d(distance_modulus,delta_mag,steps)
          
-        # Keep only isochrone bins that are within the color-magnitude space of the sample
+        # Keep only isochrone bins that are within the magnitude
+        # space of the sample
         mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
-        #pad = 1. # mag
          
         # pdf contribution only calculated out to nsigma,
         # so padding shouldn't be necessary.
@@ -771,180 +846,88 @@ class IsochroneModel(Model):
         mag_2_max = np.max(mag_2+nsigma*mag_err_2)# +pad 
         mag_2_min = np.min(mag_2-nsigma*mag_err_2)# -pad 
          
-        in_color_magnitude_space = ((mag_1_mesh>=mag_1_min)&(mag_1_mesh<=mag_1_max))
-        in_color_magnitude_space*= ((mag_2_mesh>=mag_2_min)&(mag_2_mesh<=mag_2_max))
-        histo_isochrone_pdf *= in_color_magnitude_space
+        in_mag_space = ((mag_1_mesh>=mag_1_min)&(mag_1_mesh<=mag_1_max))
+        in_mag_space*= ((mag_2_mesh>=mag_2_min)&(mag_2_mesh<=mag_2_max))
+        histo_pdf *= in_mag_space
  
-        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
-        isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
+        idx_mag_1, idx_mag_2 = np.nonzero(histo_pdf)
+        isochrone_pdf = histo_pdf[idx_mag_1, idx_mag_2]
  
         n_catalog = len(mag_1)
-        n_isochrone_bins = len(index_mag_1)
+        n_isochrone_bins = len(idx_mag_1)
         ones = np.ones([n_catalog, n_isochrone_bins],dtype=np.int32)
- 
-        mag_1_reshape = mag_1.reshape([n_catalog, 1])
-        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
-        mag_2_reshape = mag_2.reshape([n_catalog, 1])
-        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
+
+        mag_1 = mag_1.reshape([n_catalog, 1])
+        mag_err_1 = mag_err_1.reshape([n_catalog, 1])
+        mag_2 = mag_2.reshape([n_catalog, 1])
+        mag_err_2 = mag_err_2.reshape([n_catalog, 1])
 
         # ADW: Creating all of these delta_mag and arg_mag arrays is
         # memory intensive. Can we cut it down (may add.at?)
 
-        # Calculate distance between each catalog object and isochrone bin
-        # Assume normally distributed photometry uncertainties
-        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
-        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
-        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
-        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
-        #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
+        # Calculate (normalized) distance between each catalog object
+        # and isochrone bin. Assume normally distributed photometric
+        # uncertainties so that the normalized distance is:
+        #   norm_dist = (mag_1 - bins_mag_1)/mag_err_1
+        dist_mag_1_hi = (mag_1-bins_mag_1[idx_mag_1])/mag_err_1
+        dist_mag_1_lo = (mag_1-bins_mag_1[idx_mag_1+1])/mag_err_1
+
+        dist_mag_2_hi = (mag_2-bins_mag_2[idx_mag_2])/mag_err_2
+        dist_mag_2_lo = (mag_2-bins_mag_2[idx_mag_2+1])/mag_err_2
          
-        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
-        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
-        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
-        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
-        #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
-         
-        # Only calculate the PDF using bins where it is ~nonzero. This
-        # means object-bin pairs within 5 sigma in both magnitudes.
-        idx_nonzero_0,idx_nonzero_1 = np.nonzero((arg_mag_1_hi > -nsigma) \
-                                                     *(arg_mag_1_lo < nsigma) \
-                                                     *(arg_mag_2_hi > -nsigma) \
-                                                     *(arg_mag_2_lo < nsigma))
+        # Only calculate the PDF using bins that are < nsigma from the
+        # data point (i.e., where it is ~nonzero).
+        idx_nonzero_0,idx_nonzero_1 = np.nonzero((dist_mag_1_hi > -nsigma) \
+                                                *(dist_mag_1_lo < nsigma)\
+                                                *(dist_mag_2_hi > -nsigma)\
+                                                *(dist_mag_2_lo < nsigma))
+
+        # Now calculate the pdf as the delta of the normalized cdf
+        # (more accurate than the point evaluation of the pdf)
         pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins],dtype=np.float32)
+        pdf_mag_1[idx_nonzero_0,idx_nonzero_1] = norm_cdf(dist_mag_1_hi[idx_nonzero_0,idx_nonzero_1]) \
+            - norm_cdf(dist_mag_1_lo[idx_nonzero_0,idx_nonzero_1])
+
         pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins],dtype=np.float32)
-        pdf_mag_1[idx_nonzero_0,idx_nonzero_1] = norm_cdf(arg_mag_1_hi[idx_nonzero_0,
-                                                                       idx_nonzero_1]) \
-                                               - norm_cdf(arg_mag_1_lo[idx_nonzero_0,
-                                                                       idx_nonzero_1])
-        pdf_mag_2[idx_nonzero_0,idx_nonzero_1] = norm_cdf(arg_mag_2_hi[idx_nonzero_0,
-                                                                       idx_nonzero_1]) \
-                                               - norm_cdf(arg_mag_2_lo[idx_nonzero_0,
-                                                                       idx_nonzero_1])
-         
-        # Signal color probability is product of PDFs for each object-bin pair 
-        # summed over isochrone bins
-        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
+        pdf_mag_2[idx_nonzero_0,idx_nonzero_1] = norm_cdf(dist_mag_2_hi[idx_nonzero_0,idx_nonzero_1]) \
+            - norm_cdf(dist_mag_2_lo[idx_nonzero_0,idx_nonzero_1])
+
+        # Signal "color probability" (as opposed to "spatial
+        # probability", but more accurately "isochrone probability")
+        # is the product of PDFs for each object-bin pair summed over
+        # isochrone bins 
+        #ADW: Here is where add.at would be good...
+        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones),axis=1)
  
         # Remove the bin size to convert the pdf to units of mag^-2
         u_color /= delta_mag**2
 
         return u_color.astype(np.float32)
     
-    # FIXME: Need to parallelize CMD and MMD formulation
  
-    def pdfX(self, mask, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus, delta_mag=0.03, mass_steps=10000):
-        """
-        ADW: DEPRICATED (12/23/2014)
- 
-        Compute isochrone probability for each catalog object.
- 
-        Units 
-        """
-        nsigma = 5.0
- 
-        # Isochrone will be binned in next step, so can sample many points efficiently
-        isochrone_mass_init,isochrone_mass_pdf,isochrone_mass_act,isochrone_mag_1,isochrone_mag_2 = self.sample(mass_steps=mass_steps)
- 
-        bins_mag_1 = np.arange(distance_modulus+isochrone_mag_1.min() - (0.5*delta_mag),
-                               distance_modulus+isochrone_mag_1.max() + (0.5*delta_mag),
-                               delta_mag)
-        bins_mag_2 = np.arange(distance_modulus+isochrone_mag_2.min() - (0.5*delta_mag),
-                               distance_modulus+isochrone_mag_2.max() + (0.5*delta_mag),
-                               delta_mag)        
- 
-        # ADW: Restrict mag and color to range of mask with sufficient solid angle
-        cmd_cut = ugali.utils.binning.take2D(mask.solid_angle_cmd,isochrone_mag_1-isochrone_mag_2,
-                                             isochrone_mag_1+distance_modulus,
-                                             mask.roi.bins_color, mask.roi.bins_mag) > 0
- 
-        # ADW: This does not account for the leakage out of CMD space
-        histo_isochrone_pdf = np.histogram2d(distance_modulus + isochrone_mag_1[cmd_cut],
-                                             distance_modulus + isochrone_mag_2[cmd_cut],
-                                             bins=[bins_mag_1, bins_mag_2],
-                                             weights=isochrone_mass_pdf[cmd_cut])[0]
- 
- 
-        
-        # Histogram of the isochrone
-        #histo_isochrone_pdf,bins_mag_1,bins_mag_2 = self.histo(distance_modulus,delta_mag,mass_steps)
-         
-        # Keep only isochrone bins that are within the color-magnitude space of the sample
-        mag_1_mesh, mag_2_mesh = np.meshgrid(bins_mag_2[1:], bins_mag_1[1:])
-        #pad = 1. # mag
-         
-        ### # pdf contribution only calculated out to nsigma,
-        ### # so padding shouldn't be necessary.
-        ### mag_1_max = np.max(mag_1+nsigma*mag_err_1)# +pad 
-        ### mag_1_min = np.min(mag_1-nsigma*mag_err_1)# -pad 
-        ### mag_2_max = np.max(mag_2+nsigma*mag_err_2)# +pad 
-        ### mag_2_min = np.min(mag_2-nsigma*mag_err_2)# -pad 
-        ###  
-        ### in_color_magnitude_space = ((mag_1_mesh>=mag_1_min)&(mag_1_mesh<=mag_1_max))
-        ### in_color_magnitude_space*= ((mag_2_mesh>=mag_2_min)&(mag_2_mesh<=mag_2_max))
-        ### histo_isochrone_pdf *= in_color_magnitude_space
- 
-        index_mag_1, index_mag_2 = np.nonzero(histo_isochrone_pdf)
-        isochrone_pdf = histo_isochrone_pdf[index_mag_1, index_mag_2]
- 
-        n_catalog = len(mag_1)
-        n_isochrone_bins = len(index_mag_1)
-        ones = np.ones([n_catalog, n_isochrone_bins])
- 
-        mag_1_reshape = mag_1.reshape([n_catalog, 1])
-        mag_err_1_reshape = mag_err_1.reshape([n_catalog, 1])
-        mag_2_reshape = mag_2.reshape([n_catalog, 1])
-        mag_err_2_reshape = mag_err_2.reshape([n_catalog, 1])
- 
-        # Calculate distance between each catalog object and isochrone bin
-        # Assume normally distributed photometry uncertainties
-        delta_mag_1_hi = (mag_1_reshape - bins_mag_1[index_mag_1])
-        arg_mag_1_hi = (delta_mag_1_hi / mag_err_1_reshape)
-        delta_mag_1_lo = (mag_1_reshape - bins_mag_1[index_mag_1 + 1])
-        arg_mag_1_lo = (delta_mag_1_lo / mag_err_1_reshape)
-        #pdf_mag_1 = (scipy.stats.norm.cdf(arg_mag_1_hi) - scipy.stats.norm.cdf(arg_mag_1_lo))
-         
-        delta_mag_2_hi = (mag_2_reshape - bins_mag_2[index_mag_2])
-        arg_mag_2_hi = (delta_mag_2_hi / mag_err_2_reshape)
-        delta_mag_2_lo = (mag_2_reshape - bins_mag_2[index_mag_2 + 1])
-        arg_mag_2_lo = (delta_mag_2_lo / mag_err_2_reshape)
-        #pdf_mag_2 = scipy.stats.norm.cdf(arg_mag_2_hi) - scipy.stats.norm.cdf(arg_mag_2_lo)
-         
-        # PDF is only ~nonzero for object-bin pairs within 5 sigma in both magnitudes  
-        index_nonzero_0, index_nonzero_1 = np.nonzero((arg_mag_1_hi > -nsigma) \
-                                                         *(arg_mag_1_lo < nsigma) \
-                                                         *(arg_mag_2_hi > -nsigma) \
-                                                         *(arg_mag_2_lo < nsigma))
-        pdf_mag_1 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_2 = np.zeros([n_catalog, n_isochrone_bins])
-        pdf_mag_1[index_nonzero_0,index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_1_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - scipy.stats.norm.cdf(arg_mag_1_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
-        pdf_mag_2[index_nonzero_0,index_nonzero_1] = scipy.stats.norm.cdf(arg_mag_2_hi[index_nonzero_0,
-                                                                           index_nonzero_1]) \
-                                                   - scipy.stats.norm.cdf(arg_mag_2_lo[index_nonzero_0,
-                                                                           index_nonzero_1])
-         
-        # Signal color probability is product of PDFs for each object-bin pair 
-        # summed over isochrone bins
-        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones), axis=1)
- 
-        # Remove the bin size to convert the pdf to units of mag^-2
-        u_color /= delta_mag**2
- 
-        return u_color
+    def raw_separation(self,mag_1,mag_2,steps=10000):
+        """ 
+        Calculate the separation in magnitude-magnitude space between points and isochrone. Uses a dense sampling of the isochrone and calculates the metric distance from any isochrone sample point.
 
-    def separation(self,mag_1,mag_2,steps=10000):
-        """ Separation in magnitude-magnitude space between points and isochrone """
+        Parameters:
+        -----------
+        mag_1 : The magnitude of the test points in the first band
+        mag_2 : The magnitude of the test points in the second band
+        steps : Number of steps to sample the isochrone
 
+        Returns:
+        --------
+        sep : Minimum separation between test points and isochrone sample
+        """
+     
         # http://stackoverflow.com/q/12653120/
         mag_1 = np.array(mag_1,copy=False,ndmin=1)
         mag_2 = np.array(mag_2,copy=False,ndmin=1)
-
+     
         init,pdf,act,iso_mag_1,iso_mag_2 = self.sample(mass_steps=steps)
         iso_mag_1+=self.distance_modulus
         iso_mag_2+=self.distance_modulus
-
+     
         iso_cut = (iso_mag_1<np.max(mag_1))&(iso_mag_1>np.min(mag_1)) | \
                   (iso_mag_2<np.max(mag_2))&(iso_mag_2>np.min(mag_2))
         iso_mag_1 = iso_mag_1[iso_cut]
@@ -956,7 +939,21 @@ class IsochroneModel(Model):
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
     def separation(self, mag_1, mag_2):
-        """ Could speed this up..."""
+        """ 
+        Calculate the separation between a specific point and the
+        isochrone in magnitude-magnitude space. Uses an interpolation
+
+        ADW: Could speed this up...
+
+        Parameters:
+        -----------
+        mag_1 : The magnitude of the test points in the first band
+        mag_2 : The magnitude of the test points in the second band
+
+        Returns:
+        --------
+        sep : Minimum separation between test points and isochrone interpolation
+        """
 
         iso_mag_1 = self.mag_1 + self.distance_modulus
         iso_mag_2 = self.mag_2 + self.distance_modulus
