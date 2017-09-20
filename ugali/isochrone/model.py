@@ -710,8 +710,8 @@ class IsochroneModel(Model):
  
         return u_color
 
-    import memory_profiler
-    @memory_profiler.profile
+    #import memory_profiler
+    #@memory_profiler.profile
     def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus=None, delta_mag=0.03, mass_steps=10000):
         """
         Compute isochrone probability for each catalog object.
