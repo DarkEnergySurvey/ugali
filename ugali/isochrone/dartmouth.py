@@ -52,10 +52,12 @@ but we now use the input Z value for internal consistency.
 # Dartmouth Isochrones
 # http://stellar.dartmouth.edu/models/isolf_new.php
 
-dict_clr = {'des' : 14,
-            'sdss': 11,
-            'ps1' : 12,
-            }
+dict_clr = {
+    'acs_wfc':4,
+    'des' : 14,
+    'sdss': 11,
+    'ps1' : 12,
+    }
 
 dict_hel = {'Y=0.245+1.5*Z' : 1,
             'Y=0.33'        : 2,
