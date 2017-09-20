@@ -95,6 +95,18 @@ def test_import():
     import ugali.isochrone
     from ugali.isochrone import Bressan2012, CompositeIsochrone
 
+def test_pdf():
+    iso = isochrone.Bressan2012(**default_kwargs)
+    mag_1,mag_2 = np.meshgrid(np.linspace(18,22,100),np.linspace(18,22,100))
+    mag_1 = mag_1.flatten()
+    mag_2 = mag_2.flatten()
+    mag_err_1 = 0.1 * np.ones_like(mag_1)
+    mag_err_2 = 0.1 * np.ones_like(mag_2)
+    u_color = iso.pdf(mag_1, mag_2, mag_err_1, mag_err_2)
+    #import pdb; pdb.set_trace()
+    test_results = np.array([0.00103531,  0.00210507,  0.00393214,  0.00675272,  0.01066913,  0.01552025,  0.020802  ,  0.02570625,  0.02930542,  0.03083482])
+    np.testing.assert_array_almost_equal(u_color[9490:9500],test_results)
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)

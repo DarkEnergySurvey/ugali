@@ -709,16 +709,32 @@ class IsochroneModel(Model):
         u_color /= delta_mag**2
  
         return u_color
- 
-    def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus, delta_mag=0.03, mass_steps=10000):
+
+    import memory_profiler
+    @memory_profiler.profile
+    def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, distance_modulus=None, delta_mag=0.03, mass_steps=10000):
         """
         Compute isochrone probability for each catalog object.
  
         ADW: Still a little speed to be gained here (broadcasting)
- 
-        Units 
+        ADW: Units?
+
+        Parameters:
+        -----------
+        mag_1 : magnitude of stars (pdf sample points) in first band
+        mag_2 : magnitude of stars (pdf sample points) in second band
+        mag_err_1 : magnitude error of stars (pdf sample points) in first band
+        mag_err_2 : magnitude error of stars (pdf sample points) in second band
+        distance_modulus : distance modulus of isochrone
+        delta_mag : magnitude binning for evaluating the pdf
+        mass_steps : number of isochrone sample points
+
+        Returns:
+        --------
+        u_color : probability that the star belongs to the isochrone
         """
         nsigma = 5.0
+        if distance_modulus is None: distance_modulus = self.distance_modulus
 
         # ADW: HACK FOR SYSTEMATIC UNCERTAINTY
         mag_err_1 = np.sqrt(mag_err_1**2 + 0.01**2)
