@@ -73,9 +73,15 @@ class Kernel(Model):
         """
         Calculate the 2D integral of the 1D surface brightness profile 
         (i.e, the flux) between rmin and rmax (elliptical radii). 
+
+        Parameters:
+        -----------
         rmin : minimum integration radius (deg)
         rmax : maximum integration radius (deg)
-        return : Solid angle integral (deg^2)
+
+        Returns:
+        --------
+        integral : Solid angle integral (deg^2)
         """
         if rmin < 0: raise Exception('rmin must be >= 0')
         integrand = lambda r: self._pdf(r) * 2*numpy.pi * r

@@ -8,6 +8,8 @@ http://adsabs.harvard.edu/abs/2002A%26A...395.1077C
 import numpy
 import numpy as np
 
+from ugali.utils.logger import logger
+
 ############################################################
 
 class SphericalRotator:
@@ -105,7 +107,7 @@ class Projector:
             self.sphere_to_image_func = cartesianSphereToImage
             self.image_to_sphere_func = cartesianImageToSphere
         else:
-            print 'WARNING: %s not recognized'%(proj_type)
+            logger.warn('%s not recognized'%(proj_type))
 
     def sphereToImage(self, lon, lat):
         lon_rotated, lat_rotated = self.rotator.rotate(lon, lat)

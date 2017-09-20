@@ -13,6 +13,7 @@ import numpy
 import numpy as np
 import scipy.signal
 import healpy
+import healpy as hp
 
 #import ugali.utils.plotting
 import ugali.utils.binning
@@ -26,7 +27,7 @@ from ugali.utils.config import Config
 from ugali.utils.constants import MAGERR_PARAMS
 ############################################################
 
-class Mask:
+class Mask(object):
     """
     Contains maps of completeness depth in magnitudes for multiple observing bands, and associated products.
     """
@@ -654,7 +655,7 @@ class Mask:
 
 ############################################################
 
-class MaskBand:
+class MaskBand(object):
     """
     Map of completeness depth in magnitudes for a single observing band.
     """
@@ -730,8 +731,49 @@ class MaskBand:
                                                self.roi.lon, self.roi.lat,
                                               self.roi.config.params['coords']['roi_radius'])
 
+
 ############################################################
 
+class SimpleMask(Mask):
+    """
+    Contains maps of completeness depth in magnitudes for multiple observing bands, and associated products.
+    """
+    def __init__(self, config, roi, maglim_1=23, maglim_2=23):
+        self.config = Config(config)
+        self.roi = roi
+
+        self.mask_1 = SimpleMaskBand(maglim_1,self.roi)
+        self.mask_2 = SimpleMaskBand(maglim_2,self.roi)
+        
+        self.minimum_solid_angle = self.config.params['mask']['minimum_solid_angle'] # deg^2
+
+        # FIXME: Need to parallelize CMD and MMD formulation
+        self._solidAngleCMD()
+        self._pruneCMD(self.minimum_solid_angle)
+        
+        #self._solidAngleMMD()
+        #self._pruneMMD(self.minimum_solid_angle)
+
+        self._photometricErrors()
+
+############################################################
+
+class SimpleMaskBand(MaskBand):
+    """
+    Map of completeness depth in magnitudes for a single observing band.
+    """
+
+    def __init__(self, maglim, roi):
+        """
+        Infile is a sparse HEALPix map fits file.
+        """
+        self.roi = roi
+        mask = maglim*np.ones(hp.nside2npix(self.roi.config['coords']['nside_pixel']))
+        self.nside = healpy.npix2nside(len(mask))
+        # Sparse maps of pixels in various ROI regions
+        self.mask_roi_sparse = mask[self.roi.pixels] 
+
+############################################################
 def simpleMask(config):
 
     #params = ugali.utils.(config, kwargs)

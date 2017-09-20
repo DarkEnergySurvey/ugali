@@ -11,7 +11,7 @@ import time
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-import pyfits
+import astropy.io.fits as pyfits
 
 from ugali.analysis.pipeline import Pipeline
 import ugali.analysis.loglike
@@ -56,7 +56,7 @@ def run(self):
         infiles=sorted(glob.glob(filenames))
 
         f = pyfits.open(infiles[0])
-        table = np.empty(0,dtype=f[1].data.dtype)
+        table = np.empty(0,dtype=data.dtype)
         for filename in infiles:
             logger.debug("Reading %s..."%filename)
             f = pyfits.open(filename)

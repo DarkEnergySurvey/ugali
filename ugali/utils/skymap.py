@@ -133,9 +133,9 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
             logger.warning('Unexpected number of data dimensions for column %s.'%(key))
     
     hdu_pix_data = pyfits.new_table(columns_array)
-    hdu_pix_data.header.update('NSIDE', nside)
-    hdu_pix_data.header.update('COORDSYS', coordsys.upper())
-    hdu_pix_data.header.update('ORDERING', ordering.upper())
+    hdu_pix_data.header.update([('NSIDE', nside)])
+    hdu_pix_data.header.update([('COORDSYS', coordsys.upper())])
+    hdu_pix_data.header.update([('ORDERING', ordering.upper())])
     hdu_pix_data.header.update(header_dict)
     hdu_pix_data.name = 'PIX_DATA'
     hdul.append(hdu_pix_data)
@@ -162,7 +162,10 @@ def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=heal
     nside = reader[extension].header['NSIDE']
 
     # Trying to fix avoid a memory leak
-    pix = numpy.array(reader[extension].data.field('PIX'),copy=True)
+    try:
+        pix = numpy.array(reader[extension].data.field('PIX'),copy=True)
+    except:
+        pix = numpy.array(reader[extension].data.field('PIXEL'),copy=True)
     value = numpy.array(reader[extension].data.field(field),copy=True)
     reader.close()
     

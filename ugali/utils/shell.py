@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import shutil
 import os
+import errno    
 
 # Tools for working with the shell
 
@@ -8,9 +9,16 @@ def pwd():
     # Careful, won't work after a call to os.chdir...
     return os.environ['PWD']
 
-def mkdir(dir):
-    if not os.path.exists(dir):  os.makedirs(dir)
-    return dir
+def mkdir(path):
+    # https://stackoverflow.com/a/600612/4075339
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+    return path
 
 def mkscratch():
     if os.path.exists('/scratch/'):    

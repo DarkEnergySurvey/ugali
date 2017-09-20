@@ -11,6 +11,7 @@ notifications:
   email: false
  
 # Setup dependencies and install package
+# -c jochym is needed for pyfits
 install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
@@ -18,10 +19,10 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose -c fermipy -c astropy
+  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio corner -c conda-forge -c jochym -c kadrlica
   - source activate travis-env
   - export UGALIDIR="$HOME/.ugali"
-  - python setup.py -q install --isochrones --isochrones-path $UGALIDIR
+  - python setup.py -q install --isochrones --catalogs
 
 # command to run tests
 script: 

@@ -5,8 +5,7 @@ import os,sys
 from os.path import join, exists
 import pprint
 import copy
-import numpy
-import numpy.ma.mrecords
+import numpy as np
 import healpy
 
 from ugali.utils.logger import logger
@@ -130,9 +129,9 @@ class Config(dict):
         if nside_catalog is None:
             pixels = [None]
         elif pixels is not None:
-            pixels = [pixels] if numpy.isscalar(pixels) else pixels
+            pixels = [pixels] if np.isscalar(pixels) else pixels
         else:
-            pixels = numpy.arange(healpy.nside2npix(nside_catalog))   
+            pixels = np.arange(healpy.nside2npix(nside_catalog))   
 
         npix = len(pixels)
 
@@ -143,9 +142,9 @@ class Config(dict):
         mask_base_1 = self['mask']['basename_1']
         mask_base_2 = self['mask']['basename_2']
          
-        data = numpy.ma.empty(npix,dtype=[('pix',int), ('catalog',object), 
+        data = np.ma.empty(npix,dtype=[('pix',int), ('catalog',object), 
                                           ('mask_1',object), ('mask_2',object)])
-        mask = numpy.ma.empty(npix,dtype=[('pix',bool), ('catalog',bool), 
+        mask = np.ma.empty(npix,dtype=[('pix',bool), ('catalog',bool), 
                                           ('mask_1',bool), ('mask_2',bool)])
         for ii,pix in enumerate(pixels):
             if pix is None:
@@ -164,10 +163,18 @@ class Config(dict):
             mask[ii]['catalog'] = not os.path.exists(catalog)
             mask[ii]['mask_1']  = not os.path.exists(mask_1)
             mask[ii]['mask_2']  = not os.path.exists(mask_2)
+
+        for name in ['catalog','mask_1','mask_2']:
+            if np.all(mask[name]): logger.warn("All '%s' files masked"%name)
+
         # 'pix' is masked if all files not present
         mask['pix'] = mask['catalog'] | mask['mask_1'] | mask['mask_2']
-        #return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
-        return numpy.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
+
+        if np.all(mask['pix']): logger.warn("All pixels masked")
+                
+
+        #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
+        return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
 
     getCatalogFiles = getFilenames
 

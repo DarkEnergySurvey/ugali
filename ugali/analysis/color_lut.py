@@ -1,17 +1,23 @@
 """
+DEPRECATD 2017-09-01: ADW: This code is deprecated (probably long
+before the quoted date).
+
 Functions to create and use a look-up table for the signal color probability distribution function.
 """
 
 import time
 import numpy
 import scipy.signal
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.config
 import ugali.utils.binning
-import ugali.analysis.isochrone
+import ugali.isochrone
 
 from ugali.utils.logger import logger
+
+msg = "'color_lut': ADW 2017-09-20"
+DeprecationWarning(msg)
 
 ############################################################
 
@@ -35,8 +41,8 @@ def writeColorLUT2(config,
     if isochrone is None:
         isochrones = []
         for ii, name in enumerate(config.params['isochrone']['infiles']):
-            isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
+            isochrones.append(ugali.isochrone.Isochrone(config, name))
+        isochrone = ugali.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
     if distance_modulus_array is None:
         distance_modulus_array = config.params['color_lut']['distance_modulus_array']
     if delta_mag is None:
@@ -196,8 +202,8 @@ def writeColorLUT(config,
     if isochrone is None:
         isochrones = []
         for ii, name in enumerate(config.params['isochrone']['infiles']):
-            isochrones.append(ugali.analysis.isochrone.Isochrone(config, name))
-        isochrone = ugali.analysis.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
+            isochrones.append(ugali.isochrone.Isochrone(config, name))
+        isochrone = ugali.isochrone.CompositeIsochrone(isochrones, config.params['isochrone']['weights'])
     if distance_modulus_array is None:
         distance_modulus_array = config.params['color_lut']['distance_modulus_array']
     if delta_mag is None:

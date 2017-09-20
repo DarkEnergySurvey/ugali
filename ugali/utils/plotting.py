@@ -29,7 +29,7 @@ import ugali.observation.catalog
 import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
-import ugali.analysis.isochrone
+import ugali.isochrone
 
 from ugali.utils.healpix import ang2pix
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
@@ -199,7 +199,8 @@ def drawProjImage(xx, yy, zz=None, coord='C',**kwargs):
         msg = "Unrecognized coordinate: %"%coord
         logger.warning(msg)
     # Celestial orientation (increasing to the east)
-    ax.set_xlim(xx.max(),xx.min())
+    #ax.set_xlim(xx.max(),xx.min())
+    ax.set_xlim(xx.min(),xx.max())
     ax.set_ylim(yy.min(),yy.max())
 
     if zz is None: return None
@@ -228,7 +229,7 @@ def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GML',**kwargs):
     query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.jpeg')
-    cmd='wget -O %s "%s"'%(tmp.name,url+query)
+    cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
     im = pylab.imread(tmp.name)
     tmp.close()
@@ -243,18 +244,38 @@ def getDSSImage(ra,dec,radius=1.0,xsize=800,**kwargs):
     https://archive.stsci.edu/cgi-bin/dss_search
 
     Image is in celestial orientation (RA increases to the right)
+    https://archive.stsci.edu/dss/script_usage.html
+
+    ra (r) - right ascension
+    dec (d) - declination
+    equinox (e) - equinox (B1950 or J2000; default: J2000)
+    height (h) - height of image (arcminutes; default: 15.0)
+    width (w) - width of image (arcminutes; default: 15.0)
+    format (f) - image format (FITS or GIF; default: FITS)
+    compression (c) - compression (UNIX, GZIP, or NONE; default: NONE; compression 
+         applies to FITS only)
+    version (v)  - Which version of the survey to use:
+         1  - First Generation survey (garden variety)
+         2  - Second generation survey (incomplete)
+         3  - Check the 2nd generation; if no image is available,
+              then go to the 1st generation.
+         4  - The Quick V survey (whence came the Guide Stars Catalog;
+              used mostly for Phase II proposal submission)
+    save (s)  - Save the file to disk instead of trying to display.
+         (ON (or anything) or not defined; default: not defined.)
     """
     import subprocess
     import tempfile
 
     url="https://archive.stsci.edu/cgi-bin/dss_search?"
     scale = 2.0 * radius * 60.
-    params=dict(r='%.3f'%ra,d='%.3f'%dec,w=scale,h=scale,
-                f='gif',v='poss2ukstu_red')
+    params=dict(ra='%.3f'%ra,dec='%.3f'%dec,width=scale,height=scale,
+                format='gif',version=1)
+    #v='poss2ukstu_red'
     query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.gif')
-    cmd='wget -O %s "%s"'%(tmp.name,url+query)
+    cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
     im = pylab.imread(tmp.name)
     tmp.close()
@@ -311,7 +332,7 @@ class BasePlotter(object):
             self.galaxies = catalog.applyCut(cut)
         return self.galaxies
 
-    def drawSmoothCatalog(self, catalog, label=None):
+    def drawSmoothCatalog(self, catalog, label=None, **kwargs):
         ax = plt.gca()
         ra,dec = catalog.ra_dec
         x, y = sphere2image(self.ra,self.dec,ra,dec)
@@ -321,18 +342,13 @@ class BasePlotter(object):
         bins = numpy.arange(-self.radius, self.radius + 1.e-10, delta_x)
         h, xbins, ybins = numpy.histogram2d(x, y, bins=[bins, bins])
         blur = nd.filters.gaussian_filter(h.T, smoothing / delta_x)
-        kwargs = dict(extent=[min(xbins), max(xbins), min(ybins), max(ybins)],
-                      cmap='gray_r', aspect='auto', origin='lower', rasterized=False,
-                      interpolation='none')
-        #ax.imshow(blur, **kwargs)
-        #ax.set_xlim(self.radius, -self.radius)
-        #ax.set_ylim(-self.radius, self.radius)
-        #plt.xlabel(r'$\Delta \alpha_{2000}\,(\deg)$')
-        #plt.ylabel(r'$\Delta \delta_{2000}\,(\deg)$')
+
+        defaults = dict(cmap='gray_r',rasterized=True)
+        kwargs = dict(defaults.items()+kwargs.items())
 
         xx,yy = np.meshgrid(xbins,ybins)
-        drawProjImage(xx,yy,blur,coord='C',cmap='gray_r')
-
+        im = drawProjImage(xx,yy,blur,coord='C',**kwargs)
+        
         if label:
             plt.text(0.05, 0.95, label, fontsize=10, ha='left', va='top', 
                      color='k', transform=pylab.gca().transAxes,
@@ -340,7 +356,7 @@ class BasePlotter(object):
 
     def drawROI(self, ax=None, value=None, pixel=None):
         if not ax: ax = plt.gca()
-        roi_map = np.array(healpy.UNSEEN * np.ones(healpy.nside2npix(self.nside)))
+        roi_map = np.array(healpy.UNSEEN*np.ones(healpy.nside2npix(self.nside)))
         
         if value is None:
             roi_map[self.roi.pixels] = 1
@@ -351,7 +367,7 @@ class BasePlotter(object):
         elif value is not None and pixel is not None:
             roi_map[pixel] = value
         else:
-            print 'ERROR: count not parse input'
+            logger.warning('Unable to parse input')
         #im = healpy.gnomview(roi_map,**self.gnom_kwargs)
         im = drawHealpixMap(roi_map,self.glon,self.glat,self.radius,coord=self.coord)
         return im
@@ -359,8 +375,6 @@ class BasePlotter(object):
     def drawImage(self,ax=None,invert=True):
         if not ax: ax = plt.gca()
 
-        #kwargs = dict(cmap='gray',interpolation='none')
-        kwargs = dict(cmap='gray',coord='C')
         if self.config['data']['survey']=='sdss':
             # Optical Image
             im = ugali.utils.plotting.getSDSSImage(**self.image_kwargs)
@@ -380,6 +394,8 @@ class BasePlotter(object):
         y = np.linspace(-size,size,im.shape[1])
         xx, yy = np.meshgrid(x,y)
 
+        #kwargs = dict(cmap='gray',interpolation='none')
+        kwargs = dict(cmap='gray',coord='C')
         im = drawProjImage(xx,yy,im,**kwargs)
         
         try: plt.gcf().delaxes(ax.cax)
@@ -444,8 +460,8 @@ class BasePlotter(object):
             filename = self.config.mergefile
 
         results=pyfits.open(filename)[1]
-
-        pixels,values = results.data['pix'],2*results.data['log_likelihood']
+        pixels = results.data['PIXEL']
+        values = 2*results.data['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
         ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
         # Sum through all distance_moduli
@@ -484,32 +500,21 @@ class BasePlotter(object):
         ax.set_ylim(self.glat-0.5,self.glat+0.5)
         ax.set_xlabel('GLON (deg)')
         ax.set_ylabel('GLAT (deg)')
-        #ax.annotate("Stars",**self.label_kwargs)
 
     def drawCMD(self, ax=None, radius=None, zidx=None):
         if not ax: ax = plt.gca()
-        import ugali.analysis.isochrone
+        import ugali.isochrone
 
         if zidx is not None:
-            #dirname = self.config.params['output2']['searchdir']
-            #basename = self.config.params['output2']['mergefile']
-            #filename = os.path.join(dirname,basename)
             filename = self.config.mergefile
             logger.debug("Opening %s..."%filename)
             f = pyfits.open(filename)
             distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
 
-            iso = ugali.analysis.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
-            drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
+            iso = ugali.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
+            #drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
+            drawIsochrone(iso)
 
-            #for ii, name in enumerate(self.config.params['isochrone']['infiles']):
-            #    print ii, name
-            #    drawIsochrone(ax, self.config, distance_modulus,lw=25,c='0.5')
-            #    drawIsochrone(ax, self.config, distance_modulus,ls='',marker='.',ms=1,c='k')
-            #    #isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
-            #    #mag = isochrone.mag + distance_modulus
-            #    #ax.scatter(isochrone.color,mag, color='0.5', s=750, zorder=0)
-        
         # Stellar Catalog
         self._create_catalog()
         if radius is not None:
@@ -534,20 +539,16 @@ class BasePlotter(object):
         if not ax: ax = plt.gca()
         import ugali.analysis.scan
 
-        #dirname = self.config.params['output2']['searchdir']
-        #basename = self.config.params['output2']['mergefile']
-        #filename = os.path.join(dirname,basename)
         filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
         distance_modulus = f[2].data['DISTANCE_MODULUS'][zidx]
 
         for ii, name in enumerate(self.config.params['isochrone']['infiles']):
-            print ii, name
-            isochrone = ugali.analysis.isochrone.Isochrone(self.config, name)
+            logger.info('%s %s'%(ii, name))
+            isochrone = ugali.isochrone.Isochrone(self.config, name)
             mag = isochrone.mag + distance_modulus
             ax.scatter(isochrone.color,mag, color='0.5', s=800, zorder=0)
-            #ax.plot(isochrone.color,mag, lw=20, color='0.5', zorder=0)
 
 
         pix = ang2pix(self.nside, self.glon, self.glat)
@@ -581,12 +582,10 @@ class BasePlotter(object):
         filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
         f = pyfits.open(filename)
-        pixels,values = f[1].data['pix'],2*f[1].data['LOG_LIKELIHOOD']
+        pixels,values = f[1].data['PIXEL'],2*f[1].data['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
         distances = f[2].data['DISTANCE_MODULUS']
         if distances.ndim == 1: distances = distances.reshape(-1,1)
-        #pixels,values = f[1].data['pix'],f[1].data['fraction_observable']
-        #pixels,values = f[1].data['pix'],f[1].data['richness']*f[1].data['fraction_observable']
         ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
 
         ndim = len(distances)
@@ -658,12 +657,14 @@ class BasePlotter(object):
         #plt.sca(axes[1]); self.drawStellarDensity(axes[1])
         #plt.sca(axes[2]); self.drawMask(axes[2])
         #plt.sca(axes[3]); self.drawTS(axes[3])
-
-        plt.sca(axes[0]); self.drawImage()
+        try: plt.sca(axes[0]); self.drawImage()
+        except IOError as e: logger.warn(str(e))
+            
         plt.sca(axes[1]); self.drawStellarDensity()
         plt.sca(axes[2]); self.drawMask()
-        plt.sca(axes[3]); self.drawTS()
-
+        try: plt.sca(axes[3]); self.drawTS()
+        except IOError as e: logger.warn(str(e))
+            
         axes[0].set_xlim(self.radius,-self.radius)
         axes[0].set_ylim(-self.radius,self.radius)
 
@@ -730,11 +731,6 @@ class SourcePlotter(BasePlotter):
 
     def isochrone_selection(self,catalog,dist=0.1):
         # Cookie cutter
-        #sep = self.source.isochrone.separation(catalog.mag_1,catalog.mag_2)
-        #err = np.sqrt(dist**2 + catalog.mag_err_1**2 + catalog.mag_err_2**2)
-        #sel = (sep < err)
-        #return sel
-
         return cutIsochronePath(catalog.mag_1, catalog.mag_2, 
                                 catalog.mag_err_1, catalog.mag_err_2, 
                                 self.isochrone, radius=dist)
@@ -744,15 +740,15 @@ class SourcePlotter(BasePlotter):
         dist_mod = self.isochrone.distance_modulus
         self.zidx = np.abs(mod - dist_mod).argmin()
 
-    def drawSmoothStars(self):
+    def drawSmoothStars(self,**kwargs):
         stars = self.get_stars()
         sel = self.isochrone_selection(stars,dist=0.1)
-        self.drawSmoothCatalog(stars.applyCut(sel),'Filtered Stars')
+        self.drawSmoothCatalog(stars.applyCut(sel),'Filtered Stars',**kwargs)
 
-    def drawSmoothGalaxies(self):
+    def drawSmoothGalaxies(self,**kwargs):
         galaxies = self.get_galaxies()
         sel = self.isochrone_selection(galaxies,dist=0.1)
-        self.drawSmoothCatalog(galaxies.applyCut(sel), 'Filtered Galaxies')
+        self.drawSmoothCatalog(galaxies.applyCut(sel),'Filtered Galaxies',**kwargs)
 
     def drawHessDiagram(self,catalog=None):
         ax = plt.gca()
@@ -773,14 +769,14 @@ class SourcePlotter(BasePlotter):
 
         h, xbins, ybins = numpy.histogram2d(color, mag, bins=[cbins,mbins])
         blur = nd.filters.gaussian_filter(h.T, 2)
-        kwargs = dict(extent=[np.min(xbins), np.max(xbins), np.min(ybins), np.max(ybins)],
-                      cmap='gray_r', aspect='auto', origin='lower', rasterized=False,
-                      interpolation='none')
+        kwargs = dict(extent=[xbins.min(),xbins.max(),ybins.min(),ybins.max()],
+                      cmap='gray_r', aspect='auto', origin='lower', 
+                      rasterized=True, interpolation='none')
         ax.imshow(blur, **kwargs)
 
         pylab.scatter(catalog.color[cut_inner], catalog.mag[cut_inner], 
                       c='red', s=7, edgecolor='none')# label=r'$r < %.2f$ deg'%(r_peak))
-        ugali.utils.plotting.drawIsochrone(self.isochrone, lw=1, c='blue', zorder=10, marker=None)
+        ugali.utils.plotting.drawIsochrone(self.isochrone, c='b', zorder=10)
         ax.set_xlim(-0.5, 1.)
         ax.set_ylim(24., 16.)
         plt.xlabel(r'$g - r$')
@@ -868,7 +864,7 @@ class SourcePlotter(BasePlotter):
         pylab.xticks([-0.5, 0., 0.5, 1.])
         pylab.yticks(numpy.arange(mmax - 1., mmin - 1., -1.))
 
-        ugali.utils.plotting.drawIsochrone(self.isochrone, lw=1, c='k', zorder=10, marker=None)
+        ugali.utils.plotting.drawIsochrone(self.isochrone, c='k', zorder=10)
 
         pylab.text(0.05, 0.95, r'$\Sigma p_{i} = %i$'%(data['PROB'].sum()),
                    fontsize=10, horizontalalignment='left', verticalalignment='top', color='k', transform=pylab.gca().transAxes,
@@ -905,16 +901,16 @@ class SourcePlotter(BasePlotter):
 
             angsep_gal_arcmin = angsep_gal * 60 # arcmin
             cut_iso_gal = self.isochrone_selection(gals)
-            h_gal = numpy.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & cut_iso_gal], bins=bins)[0]
-            h_gal_out = numpy.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & (~cut_iso_gal)], bins=bins)[0]
+            h_gal = np.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & cut_iso_gal], bins=bins)[0]
+            h_gal_out = np.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & (~cut_iso_gal)], bins=bins)[0]
 
-        plt.plot(centers, h / area, c='red', label='Filtered Stars')
-        plt.errorbar(centers, h / area, yerr=(numpy.sqrt(h) / area), ecolor='red', c='red')
-        plt.scatter(centers, h / area, edgecolor='none', c='red', zorder=22)
+        plt.plot(centers, h/area, c='red', label='Filtered Stars')
+        plt.errorbar(centers, h/area, yerr=(numpy.sqrt(h) / area), ecolor='red', c='red')
+        plt.scatter(centers, h/area, edgecolor='none', c='red', zorder=22)
 
-        plt.plot(centers, h_out / area, c='gray', label='Unfiltered Stars')
-        plt.errorbar(centers, h_out / area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
-        plt.scatter(centers, h_out / area, edgecolor='none', c='gray', zorder=21)
+        plt.plot(centers, h_out/area, c='gray', label='Unfiltered Stars')
+        plt.errorbar(centers, h_out/area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
+        plt.scatter(centers, h_out/area, edgecolor='none', c='gray', zorder=21)
 
         if len(gals):
             plt.plot(centers, h_gal/area, c='black', label='Filtered Galaxies')
@@ -925,32 +921,44 @@ class SourcePlotter(BasePlotter):
         plt.ylabel(r'Density (arcmin$^{-2}$)')
         plt.xlim(0., rmax)
         ymax = pylab.ylim()[1]
-        pylab.ylim(0, ymax)
+        #pylab.ylim(0, ymax)
+        pylab.ylim(0, 12)
         pylab.legend(loc='upper right', frameon=False, fontsize=10)
 
 
-    def plot6(self, filename):
+    def plot6(self, filename, title=None):
         fig = plt.figure('summary', figsize=(11, 6))
         fig.subplots_adjust(wspace=0.4, hspace=0.25)
-        fdg = r'${.}\!^\circ$'
+        fdg = r'{.}\!^\circ'
         coordstring = ('%.2f, %.2f'%(self.ra, self.dec)).replace('.',fdg)
-        plt.suptitle(r'%s; ($\alpha_{2000}$, $\delta_{2000}$, $m - M$) = (%s, %.2f)'%(self.source.name, coordstring, self.isochrone.distance_modulus), fontsize=14)
+        if title is None:
+            #title = r'%s; ($\alpha_{2000}$, $\delta_{2000}$, $m-M$) = (%s, %.2f)'%(self.source.name, coordstring, self.isochrone.distance_modulus)
+            title = r'$(\alpha_{2000}, \delta_{2000}, m-M) = (%s, %.1f)$'%(coordstring, self.isochrone.distance_modulus)
 
+        if title: 
+            plt.suptitle(title, fontsize=14)
+        
+        logger.debug("Drawing smooth stars...")
         plt.subplot(2, 3, 1)
         self.drawSmoothStars()
 
+        logger.debug("Drawing density profile...")
         pylab.subplot(2, 3, 2)
         self.drawDensityProfile()
-
+         
+        logger.debug("Drawing spatial distribution of members...")
         pylab.subplot(2, 3, 3)
         self.drawMembersSpatial(filename)
 
+        logger.debug("Drawing smooth galaxies...")
         plt.subplot(2, 3, 4)
         self.drawSmoothGalaxies()
 
+        logger.debug("Drawing Hess diagram...")         
         plt.subplot(2,3,5)
         self.drawHessDiagram()
 
+        logger.debug("Drawing CMD of members...")                  
         pylab.subplot(2, 3, 6)
         self.drawMembersCMD(filename)
 
@@ -1091,16 +1099,11 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
         data = hdu.data
         header = hdu.header
 
-    kwargs.setdefault('s',20)
-    kwargs.setdefault('edgecolor','none')
-    kwargs.setdefault('vmin',0)
-    kwargs.setdefault('vmax',1)
-    kwargs.setdefault('zorder',3)
+    defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)
+    kwargs = dict(defaults.items()+kwargs.items())
 
-    bkg_kwargs = dict(kwargs)
-    bkg_kwargs['s'] = 3
-    bkg_kwargs['zorder'] = 0
-    bkg_kwargs['c'] = '0.70'
+    bkg_kwargs = dict(s=3,zorder=0,c='0.70')
+    bkg_kwargs = dict(kwargs.items()+bkg_kwargs.items())
 
     try: 
         sort = np.argsort(data['PROB'])
@@ -1113,8 +1116,6 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     lon0,lat0 = np.median(lon),np.median(lat)
     x,y = sphere2image(lon0,lat0,lon,lat)
     lon0,lat0 = image2sphere(lon0,lat0,(x.max()+x.min())/2.,(y.max()+y.min())/2.)
-    #lon0,lat0 = image2sphere(lon0,lat0,np.median(x),np.median(y))
-    print lon0,lat0
     lon,lat = sphere2image(lon0,lat0,lon,lat)
 
     color = data['COLOR'][sort]
@@ -1160,7 +1161,6 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
 
     if isochrone is not None:
         plt.sca(axes[1])
-        #drawIsochrone(isochrone,cookie=True)
         drawIsochrone(isochrone,cookie=False)
 
     axes[1].set_ylabel(r'$g$')
@@ -1182,25 +1182,22 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
 
 def drawIsochrone(isochrone, **kwargs):
     ax = plt.gca()
-    print isochrone
+    logger.debug(str(isochrone))
     if kwargs.pop('cookie',None):
         # Broad cookie cutter
-        kwargs.setdefault('alpha',0.5)
-        kwargs.setdefault('c','0.5')
-        kwargs.setdefault('lw',15)
-        kwargs.setdefault('zorder',0)
-        kwargs.setdefault('ls','-')
+        defaults = dict(alpha=0.5, color='0.5', zorder=0, 
+                        linewidth=15, linestyle='-')
     else:
         # Thin lines
-        kwargs.setdefault('ls','-')
-        kwargs.setdefault('marker','.')
-        kwargs.setdefault('ms',1)
-        kwargs.setdefault('c','k')
+        defaults = dict(color='k', linestyle='-')
+    kwargs = dict(defaults.items()+kwargs.items())
 
     isos = isochrone.isochrones if hasattr(isochrone,'isochrones') else [isochrone]
     for iso in isos:
+        iso = copy.deepcopy(iso)
         logger.debug(iso.filename)
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = iso.sample(mass_steps=5e4)
+        iso.hb_spread = False
+        mass_init,mass_pdf,mass_act,mag_1,mag_2 = iso.sample(mass_steps=1e3)
         mag = mag_1 + isochrone.distance_modulus
         color = mag_1 - mag_2
 
@@ -1218,56 +1215,7 @@ def drawIsochrone(isochrone, **kwargs):
             if i > 0:
                 kwargs['label'] = None
             ax.plot(c,m,**kwargs)
-    
-    #ax.invert_yaxis()
-    #ax.set_xlim(-0.5,1.5)
-    #ax.set_ylim(23,18)
-
-def drawKernel(kernel, contour=False, coords='C', **kwargs):
-    """
-    FIXME: Need to update for projected coordinates.
-    """
-    ax = plt.gca()
-
-    if 'colors' not in kwargs:
-        kwargs.setdefault('cmap',matplotlib.cm.jet)
-    kwargs.setdefault('origin','lower')
-
-    ext   = kernel.extension
-    theta = kernel.theta
-
-    xmin,xmax = -kernel.edge,kernel.edge
-    ymin,ymax = -kernel.edge,kernel.edge
-
-    if coords[-1] == 'G':
-        lon, lat = kernel.lon, kernel.lat
-    elif coords[-1] == 'C':
-        lon,lat = gal2cel(kernel.lon, kernel.lat)
-    else:
-        msg = 'Unrecognized coordinate: %s'%coords
-        raise Exception(msg)
-
-    x = np.linspace(xmin,xmax,500)+lon
-    y = np.linspace(ymin,ymax,500)+lat
-    xx,yy = np.meshgrid(x,y)
-    extent = [x[0],x[-1],y[0],y[-1]]
-    kwargs.setdefault('extent',extent)
-
-    if coords[-1] == 'C': xx,yy = cel2gal(xx,yy)
-    
-    zz = kernel.pdf(xx.flat,yy.flat).reshape(xx.shape)
-    zmax = zz.max()
-
-    if contour:
-        levels = kwargs.pop('levels',10)
-        #levels = np.logspace(np.log10(zmax)-1,np.log10(zmax),7)
-        ret = ax.contour(zz,levels,**kwargs)
-    else:
-        val = np.ma.array(zz,mask=zz<zz.max()/100.)
-        ret = ax.imshow(val,**kwargs)
-
-    return ret
-
+    return ax
 
 def drawKernel(kernel, contour=False, coords='C', **kwargs):
     ax = plt.gca()
@@ -1391,14 +1339,15 @@ def plotChernoff(ts,bands='smooth',pdf=False):
 
 
 def plot_chain(chain,burn=None,clip=None):
-    import triangle
+    #import triangle
+    import corner
     from ugali.analysis.mcmc import Samples 
     samples = Samples(chain)
     names = samples.names
     results = samples.results(clip=clip,burn=burn)
     truths = [results[n][0] for n in names]
     data = samples[burn:].view((float,len(names)))
-    fig = triangle.corner(data, labels=names, truths=truths)
+    fig = corner.corner(data, labels=names, truths=truths)
     return fig
 
 ###################################################
@@ -1442,7 +1391,8 @@ def plotSkymap(skymap, proj='mol', **kwargs):
     return im
 
 def plotTriangle(srcfile,samples,burn=0,**kwargs):
-    import triangle
+    #import triangle
+    import corner
     import ugali.analysis.source
     import ugali.analysis.mcmc
     #matplotlib.rcParams.update({'text.usetex': True})
@@ -1468,7 +1418,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
     kwargs.setdefault('quantiles',[0.16,0.84])
 
     if len(names) > 1:
-        fig = triangle.corner(chain,labels=labels,truths=truths,**kwargs)
+        fig = corner.corner(chain,labels=labels,truths=truths,**kwargs)
     else:
         fig = plt.figure()
         plt.hist(chain,bins=100)
@@ -1482,7 +1432,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
         text += 'NSamples = %i\n'%(len(chain))
         #plt.figtext(0.65,0.90,text,ha='left',va='top')
     except KeyError as e:
-        print e
+        logger.warning(str(e))
         pass
 
     label = map(str.capitalize,source.name.split('_'))
@@ -1511,7 +1461,7 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
     ADW: This should be moved into the isochrone class.
     """
     import scipy.interpolate
-    from ugali.analysis.isochrone import CompositeIsochrone
+    from ugali.isochrone import CompositeIsochrone
 
     if isinstance(isochrone, CompositeIsochrone):
         isochrone = isochrone.isochrones[0]
@@ -1553,10 +1503,10 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
         mag_2_hb = isochrone.mag_2[index_transition:] + isochrone.distance_modulus
         path_hb = makePath(mag_1_hb, mag_2_hb)
         cut_hb = path_hb.contains_points(zip(g, r), radius=0.1)
-        print 'Applying HB selection'
-        print numpy.sum(cut)
+        logger.debug('Applying HB selection')
+        logger.debug(numpy.sum(cut))
         cut = numpy.logical_or(cut, cut_hb)
-        print numpy.sum(cut)
+        logger.debug(numpy.sum(cut))
 
     mag_bins = numpy.arange(16., 24.1, 0.1)
     mag_centers = 0.5 * (mag_bins[1:] + mag_bins[0:-1])

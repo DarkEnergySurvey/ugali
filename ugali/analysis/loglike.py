@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Implementation of the (log) likelihood function.
+"""
 from collections import OrderedDict as odict
 import copy
 import time
@@ -17,14 +20,15 @@ import ugali.utils.parabola
 from ugali.utils.projector import angsep, gal2cel
 from ugali.utils.healpix import ang2pix,pix2ang
 from ugali.utils.logger import logger
-#from ugali.analysis.model import Model,Parameter
-#import ugali.analysis.source
-#from ugali.observation.observation import Observation
 
 from ugali.utils.config import Config
 from ugali.analysis.source import Source
 
 class Observation(object):
+    """
+    Dummy class for storing catalog, roi, mask and other quantities
+    associated with an "observation".
+    """
     def __init__(self,**kwargs):
         self.__dict__.update(**kwargs)
 
@@ -433,6 +437,15 @@ class LogLikelihood(object):
         name = 'HIERARCH %s'%'TIMESTAMP'
         hdu.header.set(name,time.asctime())
         hdu.writeto(filename,clobber=True)
+
+def write_membership(filename,config,srcfile,section=None):
+    """
+    Top level interface to write the membership from a config and source model.
+    """
+    source = Source()
+    source.load(srcfile,section=section)
+    loglike = createLoglike(config,source)
+    loglike.write_membership(filename)
 
 # This should probably be moved into ugali.analysis.source...
 def createSource(config, section=None, **kwargs):

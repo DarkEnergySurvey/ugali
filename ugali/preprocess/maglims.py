@@ -7,6 +7,7 @@ from os.path import join
 import shutil
 
 import pyfits
+import fitsio
 import numpy
 import numpy as np
 
@@ -39,6 +40,14 @@ class Maglims(object):
         self.nside_pixel = self.config['coords']['nside_pixel']
         
         self.filenames = self.config.getFilenames()
+        
+        self.footfile = self.config['data']['footprint']
+        try: 
+            self.footprint = fitsio.read(self.footfile)['I'].ravel()
+        except:
+            logger.warn("Couldn't open %s; will try again."%self.footfile)
+            self.footprint = self.footfile
+
 
     def run(self,field=None,simple=False,force=False):
         """
@@ -59,15 +68,22 @@ class Maglims(object):
                 pixels,maglims=self.calculate(infile,f,simple)
                 logger.info("Creating %s"%outfile)
                 outdir = mkdir(os.path.dirname(outfile))
-                data_dict = dict( MAGLIM=maglims )
-                ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,self.nside_pixel,outfile)
-
+                #data_dict = dict( MAGLIM=maglims )
+                #ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,self.nside_pixel,outfile)
+                data = dict(PIXEL=pixels,MAGLIM=maglims )
+                ugali.utils.healpix.write_partial_map(outfile,data,self.nside_pixel,
+                                                      dtype='f4')
 
     def calculate(self, infile, field=1, simple=False):
         logger.info("Calculating magnitude limit from %s"%infile)
 
         #manglefile = self.config['mangle']['infile_%i'%field]
-        footfile = self.config['data']['footprint']
+        #footfile = self.config['data']['footprint']
+        #try: 
+        #    footprint = fitsio.read(footfile)['I'].ravel()
+        #except:
+        #    logger.warn("Couldn't open %s; will try again."%footfile)
+        #    footprint = footfile
 
         mag_column = self.config['catalog']['mag_%i_field'%field]
         magerr_column = self.config['catalog']['mag_err_%i_field'%field]
@@ -75,11 +91,10 @@ class Maglims(object):
         # For simple maglims
         release = self.config['data']['release'].lower()
         band    = self.config['catalog']['mag_%i_band'%field]
-         
-        f = pyfits.open(infile)
-        header = f[1].header
-        data = f[1].data
-         
+        pixel_pix_name = 'PIX%i'%self.nside_pixel         
+
+        data = fitsio.read(infile,columns=[pixel_pix_name])
+
         #mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
         mask_maglims = numpy.zeros( healpy.nside2npix(self.nside_mask) )
          
@@ -87,7 +102,7 @@ class Maglims(object):
         out_maglims = numpy.zeros(0)
          
         # Find the objects in each pixel
-        pixel_pix = data['PIX%i'%self.nside_pixel]
+        pixel_pix = data[pixel_pix_name]
         mask_pix = ugali.utils.skymap.superpixel(pixel_pix,self.nside_pixel,self.nside_mask)
         count = Counter(mask_pix)
         pixels = sorted(count.keys())
@@ -141,10 +156,10 @@ class Maglims(object):
         out_maglims = out_maglims[idx]
          
         # Remove pixels outside the footprint
-        logger.info("Checking footprint against %s"%footfile)
+        logger.info("Checking footprint against %s"%self.footfile)
         glon,glat = pix2ang(self.nside_pixel,out_pixels)
         ra,dec = gal2cel(glon,glat)
-        footprint = inFootprint(footfile,ra,dec)
+        footprint = inFootprint(self.footprint,ra,dec)
         idx = numpy.nonzero(footprint)[0]
         out_pixels = out_pixels[idx]
         out_maglims = out_maglims[idx]
@@ -152,7 +167,7 @@ class Maglims(object):
         logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))         
         return out_pixels,out_maglims
 
-def inFootprint(filename,ra,dec):
+def inFootprint(footprint,ra,dec):
     """
     Check if set of ra,dec combinations are in footprint.
     Careful, input files must be in celestial coordinates.
@@ -163,13 +178,17 @@ def inFootprint(filename,ra,dec):
     Returns:
     inside   : boolean array of coordinates in footprint
     """
+        
     try:
-        footprint = healpy.read_map(filename,verbose=False)
+        if isinstance(footprint,str) and os.path.exists(footprint):
+            filename = footprint
+            #footprint = healpy.read_map(filename,verbose=False)
+            footprint = fitsio.read(filename)['I'].ravel()
         nside = healpy.npix2nside(len(footprint))
         pix = ang2pix(nside,ra,dec)
         inside = (footprint[pix] > 0)
     except IOError:
-        logger.warning("Failed to load healpix footprint; using MANGLE...")
+        logger.warning("Failed to load healpix footprint; trying to use mangle...")
         inside = inMangle(filename,ra,dec)
     return inside
 
@@ -280,9 +299,11 @@ def simple_split(config,dirname='split',force=False):
             print hpx, len(pix)
 
             maglims = maglim*np.ones(len(pix))
-            data = dict(MAGLIM=maglims )
             logger.info('Writing %s...'%outfile)
-            ugali.utils.skymap.writeSparseHealpixMap(pix,data,nside_pixel,outfile)
+            #data = dict(MAGLIM=maglims )
+            #ugali.utils.skymap.writeSparseHealpixMap(pix,data,nside_pixel,outfile)
+            data = dict(PIXEL=pix,MAGLIM=maglims)
+            ugali.utils.healpix.write_partial_map(outfile,data,nside_pixel,dtype='f4')
         
 if __name__ == "__main__":
     from optparse import OptionParser

@@ -7,7 +7,7 @@ import copy
 
 from ugali.analysis.model import Model, Parameter
 from ugali.analysis.kernel import factory as kernelFactory
-from ugali.analysis.isochrone import factory as isochroneFactory
+from ugali.isochrone import factory as isochroneFactory
 
 class Richness(Model):
     """Dummy model to hold the richness, which is not directly connected
@@ -119,7 +119,11 @@ class Source(object):
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
+
         if section is not None: 
+            params = params[section]
+        elif len(params) == 1:
+            section = params.keys()[0]
             params = params[section]
 
         fill = False

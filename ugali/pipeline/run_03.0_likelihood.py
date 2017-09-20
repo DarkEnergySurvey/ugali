@@ -9,6 +9,7 @@ from ugali.analysis.pipeline import Pipeline
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 import ugali.utils.skymap
+import ugali.utils.healpix
 
 description="Run the likelihood search."
 components = ['scan','merge','tar','plot']
@@ -16,21 +17,28 @@ components = ['scan','merge','tar','plot']
 def run(self):
     if 'scan' in self.opts.run:
         logger.info("Running 'scan'...")
-        farm = Farm(self.config)
+        farm = Farm(self.config,verbose=self.opts.verbose)
         farm.submit_all(coords=self.opts.coords,queue=self.opts.queue,debug=self.opts.debug)
 
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
         mergefile = self.config.mergefile
         roifile = self.config.roifile
-        if (exists(mergefile) or exists(roifile)) and not self.opts.force:
+        filenames = self.config.likefile.split('_%')[0]+'_*'
+        infiles = sorted(glob.glob(filenames))
+
+        if exists(mergefile) and not self.opts.force:
             logger.info("  Found %s; skipping..."%mergefile)
+        else:
+            ugali.utils.healpix.merge_partial_maps(infiles,mergefile)
+
+        if exists(roifile) and not self.opts.force:
             logger.info("  Found %s; skipping..."%roifile)
         else:
-            filenames = self.config.likefile.split('_%')[0]+'_*'
-            infiles = sorted(glob.glob(filenames))
-            ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
+            ugali.utils.healpix.merge_likelihood_headers(infiles,roifile)
 
+            #ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
+            
     if 'tar' in self.opts.run:
         logger.info("Running 'tar'...")
         outdir = mkdir(self.config['output']['likedir'])
