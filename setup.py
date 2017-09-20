@@ -22,21 +22,24 @@ VERSION = versioneer.get_version()
 
 NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
-# Remember to uncomment
-#URL = 'https://github.com/DarkEnergySurvey/ugali'
-URL = 'https://github.com/kadrlica/ugali'
+URL = 'https://github.com/DarkEnergySurvey/ugali'
 DESC = "Ultra-faint galaxy likelihood toolkit."
 LONG_DESC = "See %s"%URL
 CLASSIFIERS = """\
-Development Status :: 2 - Pre-Alpha
+Development Status :: 3 - Alpha
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-Programming Language :: Python :: 2.7
+License :: OSI Approved :: MIT License
 Natural Language :: English
+Operating System :: MacOS :: MacOS X
+Operating System :: POSIX :: Linux
+Programming Language :: Python :: 2.7
 Topic :: Scientific/Engineering
+Topic :: Scientific/Engineering :: Astronomy
+Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE = URL+'/releases/download/v1.7.0rc0'
+RELEASE = URL+'/releases/download/v1.7.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISOSIZE = "~1MB" 
 CATSIZE = "~20MB"
@@ -272,7 +275,6 @@ setup(
     author_email='bechtol@kicp.uchicago.edu, kadrlica@fnal.gov',
     scripts = [],
     install_requires=[
-        #'python >= 2.7.0',
         'numpy >= 1.9.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
