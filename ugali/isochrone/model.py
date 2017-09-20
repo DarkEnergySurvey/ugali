@@ -795,8 +795,8 @@ class IsochroneModel(Model):
  
         return u_color
 
-    import memory_profiler
-    @memory_profiler.profile
+    #import memory_profiler
+    #@memory_profiler.profile
     def pdf(self, mag_1, mag_2, mag_err_1, mag_err_2, 
             distance_modulus=None, delta_mag=0.03, steps=10000):
         """
@@ -855,20 +855,19 @@ class IsochroneModel(Model):
  
         n_catalog = len(mag_1)
         n_isochrone_bins = len(idx_mag_1)
-        ones = np.ones([n_catalog, n_isochrone_bins],dtype=np.int32)
 
         mag_1 = mag_1.reshape([n_catalog, 1])
         mag_err_1 = mag_err_1.reshape([n_catalog, 1])
         mag_2 = mag_2.reshape([n_catalog, 1])
         mag_err_2 = mag_err_2.reshape([n_catalog, 1])
 
-        # ADW: Creating all of these delta_mag and arg_mag arrays is
-        # memory intensive. Can we cut it down (may add.at?)
-
         # Calculate (normalized) distance between each catalog object
         # and isochrone bin. Assume normally distributed photometric
         # uncertainties so that the normalized distance is:
         #   norm_dist = (mag_1 - bins_mag_1)/mag_err_1
+
+        # ADW: Creating the dist arrays is memory intensive.
+        # Can we cut it down (maybe with add.at)?
         dist_mag_1_hi = (mag_1-bins_mag_1[idx_mag_1])/mag_err_1
         dist_mag_1_lo = (mag_1-bins_mag_1[idx_mag_1+1])/mag_err_1
 
@@ -896,8 +895,9 @@ class IsochroneModel(Model):
         # probability", but more accurately "isochrone probability")
         # is the product of PDFs for each object-bin pair summed over
         # isochrone bins 
+
         #ADW: Here is where add.at would be good...
-        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * (isochrone_pdf * ones),axis=1)
+        u_color = np.sum(pdf_mag_1 * pdf_mag_2 * isochrone_pdf, axis=1)
  
         # Remove the bin size to convert the pdf to units of mag^-2
         u_color /= delta_mag**2
