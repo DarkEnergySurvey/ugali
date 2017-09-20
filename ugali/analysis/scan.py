@@ -253,9 +253,6 @@ class GridSearch:
             )
             message = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
             logger.info( message )
-            #outfile = 'srcmdl_%i.yaml'%ii
-            #print "Writing %s..."%outfile
-            #self.loglike.source.write(outfile)
             
     def mle(self):
         a = self.log_likelihood_sparse_array
@@ -399,10 +396,3 @@ if __name__ == "__main__":
     if not opts.debug:
         result = grid.search()
         grid.write(opts.outfile)
-
-
-    ##print opts.coords
-    #scan = Scan(opts.config,opts.coords)
-    #if not opts.debug:
-    #    result = scan.run()
-    #    scan.write(opts.outfile)

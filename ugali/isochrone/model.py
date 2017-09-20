@@ -970,7 +970,6 @@ class Isochrone(IsochroneModel):
     _dirname =  os.path.join(get_iso_dir(),'{survey}')
 
     def __init__(self,**kwargs):
-        print type(self)
         super(Isochrone,self).__init__(**kwargs)
 
         self.grid = self.create_grid()
