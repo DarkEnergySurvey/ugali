@@ -301,6 +301,8 @@ class IsochroneModel(Model):
         Note that the stellar luminosity is very sensitive to the
         post-AGB population.
         """
+        msg = "'%s.stellar_luminosity2': ADW 2017-09-20"%self.__class__.__name__
+        DeprecationWarning(msg)
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps=steps)
         luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity,fill_value=0,bounds_error=False)
         luminosity = luminosity_interpolation(mass_init)

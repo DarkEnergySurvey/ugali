@@ -114,6 +114,9 @@ class GridSearch:
         --------
         None
         """
+        msg = "'%s.precompute': ADW 2017-09-20"%self.__class__.__name__
+        DeprecationWarning(msg)
+
         if distance_modulus_array is not None:
             self.distance_modulus_array = distance_modulus_array
         else:

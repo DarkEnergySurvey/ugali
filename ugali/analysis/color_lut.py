@@ -16,6 +16,9 @@ import ugali.isochrone
 
 from ugali.utils.logger import logger
 
+msg = "'color_lut': ADW 2017-09-20"
+DeprecationWarning(msg)
+
 ############################################################
 
 def writeColorLUT2(config,
