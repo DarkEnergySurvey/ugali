@@ -112,7 +112,7 @@ class IsochroneModel(Model):
         return os.path.expandvars(self.dirname.format(survey=self.survey))
 
     def todict(self):
-        ret = super(Isochrone,self).todict()
+        ret = super(IsochroneModel,self).todict()
         defaults = odict([(d[0],d[1]) for d in self.defaults])
         for k,v in defaults.items():
             if getattr(self,k) != v: ret[k] = getattr(self,k)
