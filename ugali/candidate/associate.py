@@ -123,10 +123,36 @@ class McConnachie12(SourceCatalog):
  
     def _load(self,filename):
         if filename is None: 
+            filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies2012.dat")
+        self.filename = filename
+ 
+        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
+ 
+        self.data.resize(len(raw))
+        self.data['name'] = numpy.char.strip(raw['f0'])
+ 
+        ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
+        dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
+        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
+        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
+        
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
+        self.data['glon'],self.data['glat'] = glon,glat
+
+class McConnachie15(SourceCatalog):
+    """
+    Catalog of nearby dwarf spheroidal galaxies. Updated September 2015.
+    http://arxiv.org/abs/1204.1562
+
+    http://www.astro.uvic.ca/~alan/Nearby_Dwarf_Database_files/NearbyGalaxies.dat
+    """
+ 
+    def _load(self,filename):
+        if filename is None: 
             filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
         self.filename = filename
  
-        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=34)
+        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
  
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])
@@ -151,10 +177,10 @@ class Rykoff14(SourceCatalog):
             filename = os.path.join(self.DATADIR,"redmapper/dr8_run_redmapper_v5.10_lgt20_catalog.fit")
         self.filename = filename
 
-        raw = fitsio.read(filename)
+        raw = fitsio.read(filename,lower=True)
 
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['MEM_MATCH_ID'])
+        self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['mem_match_id'])
         self.data['ra'] = raw['ra']
         self.data['dec'] = raw['dec']
         glon,glat = cel2gal(raw['ra'],raw['dec'])
