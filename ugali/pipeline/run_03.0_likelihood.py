@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Run the likelihood search."""
 import glob
 import os
 from os.path import join, exists
@@ -11,7 +12,6 @@ from ugali.utils.logger import logger
 import ugali.utils.skymap
 import ugali.utils.healpix
 
-description="Run the likelihood search."
 components = ['scan','merge','tar','plot']
 
 def run(self):
@@ -30,11 +30,13 @@ def run(self):
         if exists(mergefile) and not self.opts.force:
             logger.info("  Found %s; skipping..."%mergefile)
         else:
+            logger.info("  Merging likelihood files...")
             ugali.utils.healpix.merge_partial_maps(infiles,mergefile)
 
         if exists(roifile) and not self.opts.force:
             logger.info("  Found %s; skipping..."%roifile)
         else:
+            logger.info("  Merging likelihood headers...")
             ugali.utils.healpix.merge_likelihood_headers(infiles,roifile)
 
             #ugali.utils.skymap.mergeLikelihoodFiles(infiles,mergefile,roifile)
@@ -49,7 +51,7 @@ def run(self):
         jobname = 'tar'
         logfile = os.path.join(logdir,'scan_tar.log')
         cmd = 'tar --remove-files -cvzf %s %s'%(tarfile,scanfile)
-        print cmd
+        logger.info(cmd)
         self.batch.submit(cmd,jobname,logfile)
 
     if 'plot' in self.opts.run:
@@ -67,7 +69,7 @@ def run(self):
         plt.savefig(outfile)
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parser.add_coords(radius=True,targets=True)
 pipeline.parse_args()
 pipeline.execute()

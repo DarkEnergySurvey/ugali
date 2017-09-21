@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Perform targeted followup.
-"""
+"""Perform MCMC follow-up fitting."""
 
 import os
 from os.path import join,exists,basename,splitext
@@ -28,7 +26,6 @@ import ugali.utils.config
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
-description=__doc__
 components = ['mcmc','membership','results','plot','collect','scan']
 
 def make_filenames(config,label):
@@ -236,7 +233,7 @@ def run(self):
 
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parser.add_coords(radius=True,targets=True)
 pipeline.parser.add_ncores()
 pipeline.parse_args()
