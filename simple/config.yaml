@@ -1,0 +1,6 @@
+nside       : 32
+datadir     : '/home/s1/kadrlica/projects/maglites/r4/v1/cat'
+maglim_g    : '/home/s1/kadrlica/projects/y3q2/v6/release/depth/y2q1_maglim_g_n1024_ring.fits.gz'
+maglim_r    : '/home/s1/kadrlica/projects/y2q/v6/release/depth/y2q1_maglim_r_n1024_ring.fits.gz'
+results_dir : 'results_dir'
+save_dir    : 'save_dir'
