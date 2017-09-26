@@ -1,5 +1,4 @@
 # Simple Binning Search Program
----
 
 This code has been adapted from Keith Bechtol's original simple binning code program to be more modular and ready-to-use for future searches.
 
