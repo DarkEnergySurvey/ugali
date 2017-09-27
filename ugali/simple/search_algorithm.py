@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Simple binning search algorithm
+"""
+__author__ = "Keith Bechtol, Sidney Mau"
 
 # Set the backend first!
 import matplotlib
@@ -9,9 +13,11 @@ import sys
 import os
 import glob
 import numpy
+import numpy as np
 import pyfits
 import healpy
 import scipy.interpolate
+from scipy import interpolate
 import scipy.ndimage
 import scipy.signal
 import scipy.stats
@@ -19,13 +25,32 @@ import scipy.spatial
 
 import ugali.utils.healpix
 import ugali.utils.projector
-import ugali.isochrone
+import ugali.analysis.isochrone
 import ugali.utils.plotting
 import ugali.candidate.associate
 
-print matplotlib.get_backend()
+from ugali.analysis.isochrone import factory as isochrone_factory
+from astropy.coordinates import SkyCoord
 
-#pylab.ioff()
+import yaml
+
+###########################################################
+
+with open('config.yaml', 'r') as ymlfile:
+    cfg = yaml.load(ymlfile)
+
+nside = cfg['nside']
+datadir = cfg['datadir']
+maglim_g = cfg['maglim_g']
+maglim_r = cfg['maglim_r']
+
+results_dir = os.path.join(os.getcwd(), cfg['results_dir'])
+if not os.path.exists(results_dir):
+    os.mkdir(results_dir)
+
+###########################################################
+
+print matplotlib.get_backend()
 
 ############################################################
 
@@ -56,15 +81,6 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
     cut_1 = (color_diff < numpy.sqrt(0.1**2 + r_err**2 + g_err**2))
 
     cut = numpy.logical_or(cut_1, cut_2)
-    
-    #print f_isochrone(17.)
-    #print numpy.sum(cut)
-    #pylab.figure('isochrone_cut')
-    #pylab.scatter(g[0:1000], g[0:1000] - r[0:1000], edgecolor='none', s=1)
-    #pylab.scatter(g[cut][0:1000], g[cut][0:1000] - r[cut][0:1000], edgecolor='none', s=1)
-    #pylab.scatter(g[~cut][0:1000], g[~cut][0:1000] - r[~cut][0:1000], edgecolor='none', s=1)
-    #pylab.plot(mag_1_rgb, mag_1_rgb - mag_2_rgb)
-    #raw_input('hold up')
 
     mag_bins = numpy.arange(17., 24.1, 0.1)
     mag_centers = 0.5 * (mag_bins[1:] + mag_bins[0:-1])
@@ -94,23 +110,15 @@ except:
 print 'Search coordinates: (RA, Dec) = (%.2f, %.2f)'%(ra_select, dec_select)
 
 # Now cut for a single pixel
-#ra_select, dec_select = 359.04, -59.63 # Tuc III
-#ra_select, dec_select = 0.668, -60.888 # Tuc IV
-#ra_select, dec_select = 82.85, -28.03 # Col I
-#ra_select, dec_select = 38.00, -34.00 # Fornax
-#ra_select, dec_select = 331.06, -46.47 # Gru II
-#ra_select, dec_select = 354.37, -63.26
-pix_16_select = ugali.utils.healpix.angToPix(16, ra_select, dec_select)
-ra_select, dec_select = ugali.utils.healpix.pixToAng(16, pix_16_select)
-pix_16_neighbors = numpy.concatenate([[pix_16_select], healpy.get_all_neighbours(16, pix_16_select)])
+pix_nside_select = ugali.utils.healpix.angToPix(nside, ra_select, dec_select)
+ra_select, dec_select = ugali.utils.healpix.pixToAng(nside, pix_nside_select)
+pix_nside_neighbors = numpy.concatenate([[pix_nside_select], healpy.get_all_neighbours(nside, pix_nside_select)])
 
 ############################################################
 
-#datadir = '/project/kicp/bechtol/des/mw_substructure/y2n/data/catalog/hpx/cat'
-datadir = '/project/kicp/bechtol/des/mw_substructure/y2n/data/catalog/v6/hpx' # v6
 data_array = []
-for pix_16 in pix_16_neighbors:
-    infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_16)
+for pix_nside in pix_nside_neighbors:
+    infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_nside)
     if not os.path.exists(infile):
         continue
     reader = pyfits.open(infile)
@@ -125,13 +133,11 @@ print 'Found %i objects...'%(len(data))
 
 print 'Applying cuts...'
 cut = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-      & (data['QSLR_FLAG_G'] == 0) & (data['QSLR_FLAG_R'] == 0) \
       & (data['WAVG_MAG_PSF_G'] < 24.0) \
       & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
       & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) < 0.003 + data['SPREADERR_MODEL_R'])
 
 cut_gal = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-          & (data['QSLR_FLAG_G'] == 0) & (data['QSLR_FLAG_R'] == 0) \
           & (data['WAVG_MAG_PSF_G'] < 24.0) \
           & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
           & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) > 0.003 + data['SPREADERR_MODEL_R'])
@@ -157,15 +163,10 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
     print 'Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus)
 
-    #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/v2/' # KCB
-    #dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    #iso = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
-    dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/dotter/dotter_v4/'
-    iso = ugali.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
+    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = 12.
     iso.metallicity = 0.0001
-    #iso.distance_modulus = 21.3 # Col I
-    #iso.distance_modulus = 18.6 # Gru II
     iso.distance_modulus = distance_modulus
 
     cut = cutIsochronePath(data['WAVG_MAG_PSF_G'], data['WAVG_MAG_PSF_R'], data['WAVG_MAGERR_PSF_G'], data['WAVG_MAGERR_PSF_R'], iso, radius=0.1)
@@ -242,7 +243,7 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
     factor_array = numpy.arange(1., 5., 0.05)
     rara, decdec = proj.imageToSphere(xx.flatten(), yy.flatten())
-    cutcut = (ugali.utils.healpix.angToPix(16, rara, decdec) == pix_16_select).reshape(xx.shape)
+    cutcut = (ugali.utils.healpix.angToPix(nside, rara, decdec) == pix_nside_select).reshape(xx.shape)
     threshold_density = 5 * characteristic_density * area
     for factor in factor_array:
         h_region, n_region = scipy.ndimage.measurements.label((h_g * cutcut) > (area * characteristic_density * factor))
@@ -325,18 +326,18 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
 ############################################################
 
-def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_modulus, age=12., metallicity=0.0001, savedir=None):
-    #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/isochrones/v2/' # KCB
-    #dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    #iso = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname)
-    dirname = '/project/kicp/bechtol/des/mw_substructure/isochrones/dotter/dotter_v4/'
-    iso = ugali.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_modulus, age=12., metallicity=0.0001):
+
+    # Dotter isochrones
+    dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
+    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = age
     iso.metallicity = metallicity
     iso.distance_modulus = distance_modulus
 
-    dirname_alt = '/project/kicp/bechtol/des/mw_substructure/isochrones/v2/'
-    iso_alt = ugali.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
+    # Padova isochrones
+    dirname_alt = '/home/s1/kadrlica/.ugali/isochrones/des/bressan2012/' #padova/'
+    iso_alt = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
     iso_alt.age = age
     iso_alt.metallicity = metallicity
     iso_alt.distance_modulus = distance_modulus
@@ -360,6 +361,8 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
     proj = ugali.utils.projector.Projector(ra_peak, dec_peak)
     x, y = proj.sphereToImage(data['RA'][cut_iso], data['DEC'][cut_iso])
     x_gal, y_gal = proj.sphereToImage(data_gal['RA'][cut_iso_gal], data_gal['DEC'][cut_iso_gal])
+
+###########################################################
 
     angsep = ugali.utils.projector.angsep(ra_peak, dec_peak, data['RA'], data['DEC'])
     cut_inner = (angsep < r_peak)
@@ -385,186 +388,9 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
     else:
         association_string = '; no association within 0.5 deg'
 
-    ##########
-
-    fig = pylab.figure('summary', figsize=(18, 15))
-    fig.subplots_adjust(wspace=0.2, hspace=0.3)
-    pylab.clf()
-
-    pylab.suptitle(r'(RA, Dec, m - M) = (%.2f, %.2f, %.2f); Significance = %.2f $\sigma$%s'%(ra_peak, dec_peak, distance_modulus, sig_peak, association_string), fontsize=20)
-
-    pylab.subplot(3, 3, 1)
-    delta_x = 0.01
-    smoothing = 0.03
-    bins = numpy.arange(-1., 1. + 1.e-10, delta_x)
-    h = numpy.histogram2d(x, y, bins=[bins, bins])[0]
-    h_g = scipy.ndimage.filters.gaussian_filter(h, smoothing / delta_x)
-    pylab.imshow(h_g.T, interpolation='nearest', extent=[-1., 1., 1, -1], cmap='binary', vmin=0.5 * numpy.median(h_g))
-    #pylab.xlim(0.5, -0.5)
-    #pylab.ylim(-0.5, 0.5)
-    pylab.xlim(1., -1.)
-    pylab.ylim(-1., 1.)
-    pylab.xlabel(r'$\Delta$ RA (deg)')
-    pylab.ylabel(r'$\Delta$ Dec (deg)')
-    pylab.title('Stars')
-
-    pylab.subplot(3, 3, 4)
-    h = numpy.histogram2d(x_gal, y_gal, bins=[bins, bins])[0]
-    h_g = scipy.ndimage.filters.gaussian_filter(h, smoothing / delta_x)
-    pylab.imshow(h_g.T, interpolation='nearest', extent=[-1., 1., 1, -1], cmap='binary', vmin=0.5 * numpy.median(h_g))
-    #pylab.xlim(0.5, -0.5)
-    #pylab.ylim(-0.5, 0.5)
-    pylab.xlim(1., -1.)
-    pylab.ylim(-1., 1.)
-    pylab.xlabel(r'$\Delta$ RA (deg)')
-    pylab.ylabel(r'$\Delta$ Dec (deg)')
-    pylab.title('Galaxies')
-
-    ##########
-
-    pylab.subplot(3, 3, 2)
-    pylab.scatter(data['WAVG_MAG_PSF_G'][cut_annulus] - data['WAVG_MAG_PSF_R'][cut_annulus], data['WAVG_MAG_PSF_G'][cut_annulus], 
-                  c='0.', alpha=0.1, edgecolor='none', s=3)
-    pylab.scatter(data['WAVG_MAG_PSF_G'][cut_inner] - data['WAVG_MAG_PSF_R'][cut_inner], data['WAVG_MAG_PSF_G'][cut_inner], 
-                  c='red', edgecolor='none', label='r < %.2f deg'%(r_peak))
-    ugali.utils.plotting.drawIsochrone(iso, lw=2, c='blue', zorder=10)
-    pylab.plot(gr_iso_max, g_iso, lw=1, c='blue', zorder=11, label='%.1f Gyr, z = %.4f'%(age, metallicity))
-    pylab.plot(gr_iso_min, g_iso, lw=1, c='blue', zorder=12)
-    ugali.utils.plotting.drawIsochrone(iso_alt, lw=2, c='magenta', zorder=9)
-    pylab.xlim(-0.5, 1.)
-    pylab.ylim(24., 16.)
-    pylab.xlabel('g - r (mag)')
-    pylab.ylabel('g (mag)')
-    pylab.title('Stars')
-    pylab.legend(loc='upper left', frameon=True, scatterpoints=1, fontsize=10)
-
-    pylab.subplot(3, 3, 5)
-    pylab.scatter(data_gal['WAVG_MAG_PSF_G'][cut_annulus_gal] - data_gal['WAVG_MAG_PSF_R'][cut_annulus_gal], data_gal['WAVG_MAG_PSF_G'][cut_annulus_gal], 
-                  c='0.', alpha=0.1, edgecolor='none', s=3)
-    pylab.scatter(data_gal['WAVG_MAG_PSF_G'][cut_inner_gal] - data_gal['WAVG_MAG_PSF_R'][cut_inner_gal], data_gal['WAVG_MAG_PSF_G'][cut_inner_gal], 
-                  c='red', edgecolor='none', label='r < %.2f deg'%(r_peak))
-    ugali.utils.plotting.drawIsochrone(iso, lw=2, c='blue', zorder=10)
-    pylab.plot(gr_iso_max, g_iso, lw=1, c='blue', zorder=11, label='%.1f Gyr, z = %.4f'%(age, metallicity))
-    pylab.plot(gr_iso_min, g_iso, lw=1, c='blue', zorder=12)
-    ugali.utils.plotting.drawIsochrone(iso_alt, lw=2, c='magenta', zorder=9)
-    pylab.xlim(-0.5, 1.)
-    pylab.ylim(24., 16.)
-    pylab.xlabel('g - r (mag)')
-    pylab.ylabel('g (mag)')
-    pylab.title('Galaxies')
-    pylab.legend(loc='upper left', frameon=True, scatterpoints=1, fontsize=10)
-
-    ##########
-
-    bins = numpy.arange(0, 0.4 + 1.e-10, 0.04)
-    centers = 0.5 * (bins[1:] + bins[0:-1])
-    area = numpy.pi * (bins[1:]**2 - bins[0:-1]**2) * 60**2
-
-    bins_narrow = numpy.arange(0, 0.4 + 1.e-10, 0.02)
-    centers_narrow = 0.5 * (bins_narrow[1:] + bins_narrow[0:-1])
-    area_narrow = numpy.pi * (bins_narrow[1:]**2 - bins_narrow[0:-1]**2) * 60**2
-
-    h = numpy.histogram(angsep[(angsep < 0.4) & cut_iso], bins=bins)[0]
-    h_out = numpy.histogram(angsep[(angsep < 0.4) & (~cut_iso)], bins=bins)[0]
-    h_narrow = numpy.histogram(angsep[(angsep < 0.4) & cut_iso], bins=bins_narrow)[0]
-    
-    pylab.subplot(3, 3, 3)
-    pylab.plot(centers, h_out / area, c='gray', label='Iso. Out')
-    pylab.errorbar(centers, h_out / area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
-    pylab.scatter(centers, h_out / area, edgecolor='none', c='gray')
-    pylab.plot(centers, h / area, c='blue', label='Iso. In')
-    pylab.errorbar(centers, h / area, yerr=(numpy.sqrt(h) / area), ecolor='blue', c='blue')
-    pylab.scatter(centers, h / area, edgecolor='none', c='blue')
-    pylab.plot(centers_narrow, h_narrow / area_narrow, c='magenta', label='Iso. In')
-    pylab.errorbar(centers_narrow, h_narrow / area_narrow, yerr=(numpy.sqrt(h_narrow) / area_narrow), ecolor='magenta', c='magenta')
-    pylab.scatter(centers_narrow, h_narrow / area_narrow, edgecolor='none', c='magenta')
-
-    pylab.xlabel('Angsep (deg)')
-    pylab.ylabel('Stars per Square Arcmin')
-    pylab.xlim(0., 0.4)
-    ymax = pylab.ylim()[1]
-    pylab.ylim(0, ymax)
-    pylab.legend(loc='upper right', frameon=True)
-    pylab.title('Stars')
-    
-    h = numpy.histogram(angsep_gal[(angsep_gal < 0.4) & cut_iso_gal], bins=bins)[0]
-    h_out = numpy.histogram(angsep_gal[(angsep_gal < 0.4) & (~cut_iso_gal)], bins=bins)[0]
-    pylab.subplot(3, 3, 6)
-    pylab.plot(centers, h_out / area, c='gray', label='Iso. Out')
-    pylab.errorbar(centers, h_out / area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
-    pylab.scatter(centers, h_out / area, edgecolor='none', c='gray')
-    pylab.plot(centers, h / area, c='blue', label='Iso. In')
-    pylab.errorbar(centers, h / area, yerr=(numpy.sqrt(h) / area), ecolor='blue', c='blue')
-    pylab.scatter(centers, h / area, edgecolor='none', c='blue')
-    pylab.xlabel('Angsep (deg)')
-    pylab.ylabel('Galaxies per Square Arcmin')
-    pylab.xlim(0., 0.4)
-    ymax = pylab.ylim()[1]
-    pylab.ylim(0, ymax)
-    pylab.legend(loc='upper right', frameon=True)
-    pylab.title('Galaxies')
-
-    ##########
-
-    pylab.subplot(3, 3, 7)
-    pylab.scatter(x, y, edgecolor='none', s=3, c='black')
-    pylab.xlim(0.2, -0.2)
-    pylab.ylim(-0.2, 0.2)
-    pylab.xlabel(r'$\Delta$ RA (deg)')
-    pylab.ylabel(r'$\Delta$ Dec (deg)')
-    pylab.title('Stars')
-
-    ##########
-
-    reader = pyfits.open('/project/kicp/bechtol/des/mw_substructure/y2n/data/maglim/v6/y2q1_maglim_g_n1024_ring.fits.gz')
-    m_maglim_g = reader[1].data.field('I').flatten()
-    reader.close()
-    m_maglim_g[numpy.isnan(m_maglim_g)] = healpy.UNSEEN
-
-    reader = pyfits.open('/project/kicp/bechtol/des/mw_substructure/y2n/data/maglim/v6/y2q1_maglim_r_n1024_ring.fits.gz')
-    m_maglim_r = reader[1].data.field('I').flatten()
-    reader.close()
-    m_maglim_r[numpy.isnan(m_maglim_r)] = healpy.UNSEEN
-
-    reso = 0.5
-    xsize = 2. * 60. / reso
-
-    #pylab.subplot(3, 3, 8)
-    healpy.gnomview(m_maglim_g, fig='summary', rot=(ra_peak, dec_peak, 0.), reso=reso, xsize=xsize, title='maglim g (S/N =10)', sub=(3, 3, 8))
-
-    #pylab.subplot(3, 3, 9)
-    healpy.gnomview(m_maglim_r, fig='summary', rot=(ra_peak, dec_peak, 0.), reso=reso, xsize=xsize, title='maglim r (S/N =10)', sub=(3, 3, 9))
-
-    if savedir is not None:
-        pylab.savefig('%s/candidate_%.2f_%.2f.png'%(savedir, ra_peak, dec_peak), dpi=150, bbox_inches='tight')
-    
-    ##########
-
-    """
-    pylab.figure('sanity')
-    pylab.clf()
-    bins = numpy.arange(-0.5, 0.5 + 1.e-10, 0.025)
-    pylab.hist(data['WAVG_MAG_PSF_G'][cut_annulus] - data['WAVG_MAG_AUTO_G'][cut_annulus], bins=bins, color='green', histtype='step', lw=2, normed=True, label='g annulus')
-    pylab.hist(data['WAVG_MAG_PSF_R'][cut_annulus] - data['WAVG_MAG_AUTO_R'][cut_annulus], bins=bins, color='orange', histtype='step', lw=2, normed=True, label='r annulus')
-    pylab.hist(data['WAVG_MAG_PSF_G'][cut_inner] - data['WAVG_MAG_AUTO_G'][cut_inner], bins=bins, color='blue', histtype='step', lw=2, normed=True, label='g inner')
-    pylab.hist(data['WAVG_MAG_PSF_R'][cut_inner] - data['WAVG_MAG_AUTO_R'][cut_inner], bins=bins, color='red', histtype='step', lw=2, normed=True, label='r inner')
-    pylab.legend(loc='upper right', frameon=False)
-    pylab.xlabel('WAVG_MAG_PSF - WAVG_MAG_AUTO (mag)')
-    pylab.ylabel('PDF')
-    pylab.title('(RA, Dec, m - M) = (%.2f, %.2f, %.2f)'%(ra_peak, dec_peak, distance_modulus))
-    if savedir is not None:
-        pylab.savefig('%s/sanity_%.2f_%.2f.png'%(savedir, ra_peak, dec_peak), dpi=250, bbox_inches='tight')
-    """
-
-    #raw_input('WAIT')
-
 ############################################################
 
 distance_modulus_search_array = numpy.arange(16., 24., 0.5)
-#distance_modulus_search_array = [21.3]
-#distance_modulus_search_array = [18.5]
-#distance_modulus_search_array = [19.5] # Just a test
-#distance_modulus_search_array = [17.5, 19.5] # Just a test
 
 ra_peak_array = []
 dec_peak_array = [] 
@@ -578,7 +404,6 @@ for distance_modulus in distance_modulus_search_array:
     r_peak_array.append(r_peak)
     sig_peak_array.append(sig_peak)
     distance_modulus_array.append(distance_modulus)
-    #raw_input('WAIT')
 
 ra_peak_array = numpy.concatenate(ra_peak_array)
 dec_peak_array = numpy.concatenate(dec_peak_array)
@@ -593,10 +418,6 @@ r_peak_array = r_peak_array[index_sort]
 sig_peak_array = sig_peak_array[index_sort]
 distance_modulus_array = distance_modulus_array[index_sort]
 
-#for ii in range(0, len(sig_peak_array)):
-#    print '%.2f   %.2f   %.1f   %.2f'%(ra_peak_array[ii], dec_peak_array[ii], distance_modulus_array[ii], sig_peak_array[ii])
-#raw_input('WAIT')
-
 for ii in range(0, len(sig_peak_array)):
     if sig_peak_array[ii] < 0:
         continue
@@ -610,29 +431,21 @@ r_peak_array = r_peak_array[sig_peak_array > 0.]
 distance_modulus_array = distance_modulus_array[sig_peak_array > 0.]
 sig_peak_array = sig_peak_array[sig_peak_array > 0.] # Update the sig_peak_array last!
 
-#pylab.figure()
-#pylab.scatter(ra_peak_array, dec_peak_array, c=distance_modulus_array, alpha=0.5)
-
 for ii in range(0, len(sig_peak_array)):
     print '%.2f sigma; (RA, Dec, d) = (%.2f, %.2f); r = %.2f deg; d = %.1f, mu = %.2f mag)'%(sig_peak_array[ii], 
-                                                                                             ra_peak_array[ii], 
-                                                                                             dec_peak_array[ii], 
-                                                                                             r_peak_array[ii],
-                                                                                             ugali.utils.projector.distanceModulusToDistance(distance_modulus_array[ii]),
-                                                                                             distance_modulus_array[ii])
+                 ra_peak_array[ii], 
+                 dec_peak_array[ii], 
+                 r_peak_array[ii],
+                 ugali.utils.projector.distanceModulusToDistance(distance_modulus_array[ii]),
+                 distance_modulus_array[ii])
 
     if (sig_peak_array[ii] > 5.5) & (r_peak_array[ii] < 0.28):
-        diagnostic(data, data_gal, ra_peak_array[ii], dec_peak_array[ii], r_peak_array[ii], sig_peak_array[ii], distance_modulus_array[ii], savedir='figs_v8')
+        diagnostic(data, data_gal, ra_peak_array[ii], dec_peak_array[ii], r_peak_array[ii], sig_peak_array[ii], distance_modulus_array[ii])
 
 
-results_dir = 'results_v8'
-outfile = '%s/results_nside_16_%i.csv'%(results_dir, pix_16_select)
+outfile = '%s/results_nside_%s_%i.csv'%(results_dir, nside, pix_nside_select)
 writer = open(outfile, 'w')
-writer.write('sig, ra, dec, distance_modulus, r\n')
+#writer.write('sig, ra, dec, distance_modulus, r\n')
 for ii in range(0, len(sig_peak_array)):
     writer.write('%10.2f, %10.2f, %10.2f, %10.2f, %10.2f\n'%(sig_peak_array[ii], ra_peak_array[ii], dec_peak_array[ii], distance_modulus_array[ii], r_peak_array[ii]))
 writer.close()
-
-
-#proj = ugali.utils.projector.Projector(ra_select, dec_select)
-#print proj.imageToSphere(-4.54, -3.18)
