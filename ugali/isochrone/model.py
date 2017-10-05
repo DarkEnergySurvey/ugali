@@ -426,17 +426,16 @@ class IsochroneModel(Model):
         hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
-    def simulate(self, stellar_mass, distance_modulus=None):
+    def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
         """
-        Simulate observed magnitudes for a satellite of a given stellar mass and distance.
-        KB: Previously, this function had a **kwargs argument, but I don't think this is needed anymore
+        Simulate a set of stellar magnitudes (no uncertainty) for a satellite of a given stellar mass and distance.
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
         n = int(stellar_mass / self.stellar_mass()) 
         f_1 = scipy.interpolate.interp1d(self.mass_init, self.mag_1)
         f_2 = scipy.interpolate.interp1d(self.mass_init, self.mag_2)
-        mass_init_sample = self.imf.sample(np.min(self.mass_init), np.max(self.mass_init), n)
+        mass_init_sample = self.imf.sample(n, np.min(self.mass_init), np.max(self.mass_init), **kwargs)
         mag_1_sample, mag_2_sample = f_1(mass_init_sample), f_2(mass_init_sample) 
         return mag_1_sample + distance_modulus, mag_2_sample + distance_modulus
 
