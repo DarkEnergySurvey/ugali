@@ -452,6 +452,20 @@ class IsochroneModel(Model):
         index = index[index >= 0]
         return mag_1[::-1][index]+distance_modulus, mag_2[::-1][index]+distance_modulus
 
+    def simulate2(self, stellar_mass, distance_modulus=None):
+        """
+        Simulate observed magnitudes for a satellite of a given stellar mass and distance.
+        KB: This is a proposed replacement for the origin simulate function, which shows some unphysical structure
+        """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
+        # Total number of stars in system
+        n = int(stellar_mass / self.stellar_mass()) 
+        f_1 = scipy.interpolate.interp1d(self.mass_init, self.mag_1)
+        f_2 = scipy.interpolate.interp1d(self.mass_init, self.mag_2)
+        mass_init_sample = self.imf.sample(np.min(self.mass_init), np.max(self.mass_init), n)
+        mag_1_sample, mag_2_sample = f_1(mass_init_sample), f_2(mass_init_sample) 
+        return mag_1_sample + distance_modulus, mag_2_sample + distance_modulus
+
     def observableFractionCMDX(self, mask, distance_modulus, mass_min=0.1):
         """
         Compute observable fraction of stars with masses greater than mass_min in each 
