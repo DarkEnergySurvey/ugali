@@ -426,36 +426,10 @@ class IsochroneModel(Model):
         hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
-    def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
-        """
-        Simulate observed magnitudes for satellite of given mass and distance.
-        """
-        if distance_modulus is None: distance_modulus = self.distance_modulus
-        # Total number of stars in system
-        # ADW: is this the predicted number or the observed number?
-        n = int(stellar_mass/self.stellar_mass()) 
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(**kwargs)
-        
-        ## ADW: This assumes that everything is sorted by increasing mass
-        #mag_1, mag_2 = mag_1[::-1],mag_2[::-1]
-        #mass_pdf[::-1]
-
-        cdf = np.cumsum(mass_pdf[::-1])
-        cdf = np.insert(cdf, 0, 0.)
-
-        #mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False
-        #ADW: CDF is *not* normalized (because of minimum mass)
-        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
-        index = np.floor(f(np.random.uniform(size=n))).astype(int)
-        #print "WARNING: non-random isochrone simulation"
-        #index = np.floor(f(np.linspace(0,1,n))).astype(int)
-        index = index[index >= 0]
-        return mag_1[::-1][index]+distance_modulus, mag_2[::-1][index]+distance_modulus
-
-    def simulate2(self, stellar_mass, distance_modulus=None):
+    def simulate(self, stellar_mass, distance_modulus=None):
         """
         Simulate observed magnitudes for a satellite of a given stellar mass and distance.
-        KB: This is a proposed replacement for the origin simulate function, which shows some unphysical structure
+        KB: Previously, this function had a **kwargs argument, but I don't think this is needed anymore
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
