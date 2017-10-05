@@ -54,7 +54,7 @@ class IMF:
             else:
                 return numpy.sum(d_mass * self.pdf(mass, log_mode=False))
 
-    def sample(self, mass_min, mass_max, n, steps=10000):
+    def sample(self, n, mass_min=0.1, mass_max=10., steps=10000):
         """
         Sample n initial mass values between mass_min and mass_max, following the IMF distribution.
         """

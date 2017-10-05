@@ -113,6 +113,14 @@ def test_pdf():
                              0.02930542, 0.03083482], dtype=np.float32)
     np.testing.assert_array_almost_equal(u_color[9490:9500],test_results)
 
+def test_simulate():
+    """ 
+    Test that the isochrone can simulate.
+    """    
+    iso = isochrone.Bressan2012(**default_kwargs)
+    stellar_mass = 5.0e3
+    iso.simulate(stellar_mass)
+    
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
