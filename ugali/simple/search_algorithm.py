@@ -14,6 +14,7 @@ import os
 import glob
 import numpy
 import numpy as np
+from matplotlib import mlab
 import pyfits
 import healpy
 import scipy.interpolate
@@ -25,11 +26,11 @@ import scipy.spatial
 
 import ugali.utils.healpix
 import ugali.utils.projector
-import ugali.analysis.isochrone
+import ugali.isochrone
 import ugali.utils.plotting
 import ugali.candidate.associate
 
-from ugali.analysis.isochrone import factory as isochrone_factory
+from ugali.isochrone import factory as isochrone_factory
 from astropy.coordinates import SkyCoord
 
 import yaml
@@ -127,19 +128,22 @@ for pix_nside in pix_nside_neighbors:
 print 'Assembling data...'
 data = numpy.concatenate(data_array)
 
+# De-redden magnitudes
+data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data['WAVG_MAG_PSF_G'] - data['EXTINCTION_G'], data['WAVG_MAG_PSF_R'] - data['EXTINCTION_R']])
+
 print 'Found %i objects...'%(len(data))
 
 ############################################################
 
 print 'Applying cuts...'
 cut = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-      & (data['WAVG_MAG_PSF_G'] < 24.0) \
-      & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
+      & (data['WAVG_MAG_PSF_DRED_G'] < 24.0) \
+      & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 1.) \
       & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) < 0.003 + data['SPREADERR_MODEL_R'])
 
 cut_gal = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-          & (data['WAVG_MAG_PSF_G'] < 24.0) \
-          & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
+          & (data['WAVG_MAG_PSF_DRED_G'] < 24.0) \
+          & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 1.) \
           & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) > 0.003 + data['SPREADERR_MODEL_R'])
 
 # Separate selections for stars and galaxies
@@ -164,14 +168,14 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
     print 'Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus)
 
     dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = 12.
     iso.metallicity = 0.0001
     iso.distance_modulus = distance_modulus
 
-    cut = cutIsochronePath(data['WAVG_MAG_PSF_G'], data['WAVG_MAG_PSF_R'], data['WAVG_MAGERR_PSF_G'], data['WAVG_MAGERR_PSF_R'], iso, radius=0.1)
+    cut = cutIsochronePath(data['WAVG_MAG_PSF_DRED_G'], data['WAVG_MAG_PSF_DRED_R'], data['WAVG_MAGERR_PSF_G'], data['WAVG_MAGERR_PSF_R'], iso, radius=0.1)
     data = data[cut]
-    cut_magnitude_threshold = (data['WAVG_MAG_PSF_G'] < magnitude_threshold)
+    cut_magnitude_threshold = (data['WAVG_MAG_PSF_DRED_G'] < magnitude_threshold)
 
     print '%i objects left after isochrone cut...'%(len(data))
 
@@ -330,20 +334,20 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
 
     # Dotter isochrones
     dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = age
     iso.metallicity = metallicity
     iso.distance_modulus = distance_modulus
 
-    # Padova isochrones
-    dirname_alt = '/home/s1/kadrlica/.ugali/isochrones/des/bressan2012/' #padova/'
-    iso_alt = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
-    iso_alt.age = age
-    iso_alt.metallicity = metallicity
-    iso_alt.distance_modulus = distance_modulus
+    ## Padova isochrones
+    #dirname_alt = '/home/s1/kadrlica/.ugali/isochrones/des/bressan2012/' #padova/'
+    #iso_alt = ugali.isochrone.factory('Padova', hb_spread=0, dirname=dirname_alt)
+    #iso_alt.age = age
+    #iso_alt.metallicity = metallicity
+    #iso_alt.distance_modulus = distance_modulus
 
-    cut_iso, g_iso, gr_iso_min, gr_iso_max = cutIsochronePath(data['WAVG_MAG_PSF_G'], 
-                                                              data['WAVG_MAG_PSF_R'], 
+    cut_iso, g_iso, gr_iso_min, gr_iso_max = cutIsochronePath(data['WAVG_MAG_PSF_DRED_G'], 
+                                                              data['WAVG_MAG_PSF_DRED_R'], 
                                                               data['WAVG_MAGERR_PSF_G'], 
                                                               data['WAVG_MAGERR_PSF_R'], 
                                                               iso, 
@@ -372,21 +376,21 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
     cut_inner_gal = (angsep_gal < r_peak)
     cut_annulus_gal = (angsep_gal > 0.5) & (angsep_gal < 1.)
 
-    ##########
-
-    # Check for possible associations
-    glon_peak, glat_peak = ugali.utils.projector.celToGal(ra_peak, dec_peak)
-    catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
-    catalog = ugali.candidate.associate.SourceCatalog()
-    for catalog_name in catalog_array:
-        catalog += ugali.candidate.associate.catalogFactory(catalog_name)
-
-    idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
-    match = catalog[idx2]
-    if len(match) > 0:
-        association_string = '; %s at %.3f deg'%(match[0]['name'], sep)
-    else:
-        association_string = '; no association within 0.5 deg'
+#    ##########
+#
+#    # Check for possible associations
+#    glon_peak, glat_peak = ugali.utils.projector.celToGal(ra_peak, dec_peak)
+#    catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
+#    catalog = ugali.candidate.associate.SourceCatalog()
+#    for catalog_name in catalog_array:
+#        catalog += ugali.candidate.associate.catalogFactory(catalog_name)
+#
+#    idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
+#    match = catalog[idx2]
+#    if len(match) > 0:
+#        association_string = '; %s at %.3f deg'%(match[0]['name'], sep)
+#    else:
+#        association_string = '; no association within 0.5 deg'
 
 ############################################################
 

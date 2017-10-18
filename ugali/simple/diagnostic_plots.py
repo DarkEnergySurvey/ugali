@@ -9,7 +9,7 @@ import os
 import fitsio as fits
 from astropy.coordinates import SkyCoord
 from ugali.utils import healpix
-from ugali.analysis.isochrone import factory as isochrone_factory
+from ugali.isochrone import factory as isochrone_factory
 import ugali.utils.projector
 import ugali.utils.plotting
 import healpy
@@ -104,17 +104,14 @@ def analysis(targ_ra, targ_dec, mod):
     print('Found {} objects...').format(len(data))
     print('Loading data...')
 
-    mag_g = data['WAVG_MAG_PSF_G']# - data['EXTINCTION_G'] # Magnitude correction for interstellar extinction
-    mag_r = data['WAVG_MAG_PSF_R']# - data['EXTINCTION_R'] # As above
+    mag_g = data['WAVG_MAG_PSF_G'] - data['EXTINCTION_G'] # Magnitude correction for interstellar extinction
+    mag_r = data['WAVG_MAG_PSF_R'] - data['EXTINCTION_R'] # As above
 
     data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [mag_g, mag_r])
 
     iso = isochrone_factory('Bressan2012', age=12, z=0.0001, distance_modulus=mod)
 
-    #return(targ_ra, targ_dec, data, iso)
-################################################################################
-    # integrated g_radius
-
+    # g_radius estimate
     filter_s = star_filter(data)
 
     mag_g = data['WAVG_MAG_PSF_DRED_G']
@@ -183,75 +180,7 @@ def analysis(targ_ra, targ_dec, mod):
     #return(targ_ra, targ_dec, data, iso, g_radius, nbhd)
     return(data, iso, g_radius, nbhd)
 
-#def g_nbhd(targ_ra, targ_dec, data, iso):
-#    """Galactic radius estimation"""
-#
-#    filter_s = star_filter(data)
-#
-#    mag_g = data['WAVG_MAG_PSF_DRED_G']
-#    mag_r = data['WAVG_MAG_PSF_DRED_R']
-#
-#    iso_filter = (iso.separation(mag_g, mag_r) < 0.1)
-#
-#    angsep = ugali.utils.projector.angsep(targ_ra, targ_dec, data['RA'], data['DEC'])
-#
-#    bins = np.linspace(0, 0.4, 21) # deg
-#    centers = 0.5*(bins[1:] + bins[0:-1])
-#    area = np.pi*(bins[1:]**2 - bins[0:-1]**2) * 60**2
-#    hist = np.histogram(angsep[(angsep < 0.4) & filter_s & iso_filter], bins=bins)[0] # counts
-#
-#    f_interp = interpolate.interp1d(np.linspace(centers[0], centers[-1], len(hist)), hist/area, 'cubic')
-#    f_range = np.linspace(centers[0], centers[-1], 1000)
-#    f_val = f_interp(f_range)
-#
-#    pairs = zip(f_range, f_val)
-#
-#    peak = max(pairs[:len(pairs)/4], key=lambda x: x[1]) # find peak within first quarter
-#
-#    def peak_index(pairs, peak):
-#        for i in range(len(pairs)):
-#            if pairs[i] == peak:
-#                return i
-#
-#    osc = int(0.04/0.4*1000) # +/- 0.04 (rounded down) deg oscillation about local extremum
-#    relmin = argrelextrema(f_val, np.less, order=osc)[0]
-#
-#    try:
-#        if len(relmin) > 0:
-#            #half_point = f_range[relmin[0]] # TODO rename
-#            i = 0
-#            while ((f_range[relmin[i]] <= f_range[peak_index(pairs,peak)]) & (i <= len(relmin)-1)):
-#                i+=1
-#            half_point = f_range[relmin[i]]
-#        elif len(relmin) == 0:
-#            half_peak = (peak[1] + np.mean(f_val[len(f_val)/4:]))/2. # normalized to background (after first quarter)
-#            #half_peak = np.mean(f_val[len(f_val)/4:])
-#            half_pairs = []
-#            for i in pairs[peak_index(pairs, peak):len(pairs)/2]: # start after peak, stay within first quarter
-#                if i != peak:
-#                    half_pairs.append((i[0], abs(i[1]-half_peak)))
-#            half_point = min(half_pairs, key=lambda x: x[1])[0] # deg
-#    except:
-#        half_point = 0.1 # fixed value to catch errors
-#
-#    g_min = 0.5/60. # deg
-#    g_max = 12./60. # deg
-#
-#    if half_point < g_min:
-#        g_radius = g_min
-#    elif half_point > g_max:
-#        g_radius = g_max
-#    else:
-#        g_radius = half_point # deg
-#
-#    #c1 = SkyCoord(targ_ra, targ_dec, unit='deg') # frame is ICRS
-#    #nbhd = c1.separation(SkyCoord(data['RA'], data['DEC'], unit='deg')).deg < g_radius # selects objects inside the galactic radius
-#    angsep = ugali.utils.projector.angsep(targ_ra, targ_dec, data['RA'], data['DEC'])
-#    nbhd = (angsep < g_radius)
-#
-#    return(g_radius, nbhd)
-
-def density_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
+def densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     """Stellar density plot"""
 
     #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
@@ -297,7 +226,7 @@ def density_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     cax = divider.append_axes('right', size = '5%', pad=0)
     plt.colorbar(cax=cax)
 
-def star_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
+def starPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Star bin plot"""
 
     #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
@@ -322,7 +251,7 @@ def star_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
 
     plt.title('Stars')
 
-def cm_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
+def cmPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     """Color-magnitude plot"""
 
     #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
@@ -361,7 +290,7 @@ def cm_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     plt.xlabel('g-r (mag)')
     plt.ylabel('g (mag)')
 
-def hess_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
+def hessPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Hess plot"""
 
     #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
@@ -418,7 +347,7 @@ def hess_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     #cax = divider.append_axes('right', size = '5%', pad=0)
     #plt.colorbar(cax=cax)
 
-def radial_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
+def radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Radial distribution plot"""
 
     #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)

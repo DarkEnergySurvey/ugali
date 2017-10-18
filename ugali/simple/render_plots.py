@@ -27,19 +27,21 @@ with open('config.yaml', 'r') as ymlfile:
 
 nside = cfg['nside']
 datadir = cfg['datadir']
+candidate_list = cfg['candidate_list']
 
 save_dir = os.path.join(os.getcwd(), cfg['save_dir'])
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 
-candidate_list = np.genfromtxt('results.csv', delimiter=',', names=['sig', 'ra', 'dec', 'distance_modulus', 'r'])[1:] #, 'association', 'association_angsep'])[1:]
+candidate_list = np.genfromtxt(candidate_list, delimiter=',', names=['sig', 'ra', 'dec', 'distance_modulus', 'r'])[1:] #, 'association', 'association_angsep'])[1:]
 candidate_list = candidate_list[candidate_list['sig'] > 5.5] # only plot hotspots of sufficent significance
+# try with sig > 10., 5.5, etc...
 
 #################################################################
 
 print('{} candidates found...').format(len(candidate_list))
 
-def render_plot(candidate):
+def renderPlot(candidate):
     """
     Make plots
     """
@@ -57,52 +59,48 @@ def render_plot(candidate):
     mod = candidate_list[candidate]['distance_modulus']
     data, iso, g_radius, nbhd = diagnostic_plots.analysis(targ_ra, targ_dec, mod)
 
-    #targ_ra, targ_dec, data, iso, g_radius, nbhd = diagnostic_plots.analysis(candidate)
-    #mod = candidate_list[candidate]['distance_modulus']
-    #sig = candidate_list[candidate]['sig']
-
     print('Making diagnostic plots for (RA, Dec) = ({}, {})...').format(targ_ra, targ_dec)
 
     fig.add_subplot(gs[0,0])
-    diagnostic_plots.density_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'stars')
+    diagnostic_plots.densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'stars')
 
     fig.add_subplot(gs[1,0])
-    diagnostic_plots.density_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'galaxies')
+    diagnostic_plots.densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'galaxies')
 
     fig.add_subplot(gs[2,0])
-    diagnostic_plots.density_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'blue_stars')
+    diagnostic_plots.densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'blue_stars')
 
     fig.add_subplot(gs[0,1])
-    diagnostic_plots.cm_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'stars')
+    diagnostic_plots.cmPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'stars')
 
     fig.add_subplot(gs[1,1])
-    diagnostic_plots.cm_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'galaxies')
+    diagnostic_plots.cmPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'galaxies')
 
     fig.add_subplot(gs[0,2])
-    diagnostic_plots.hess_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
+    diagnostic_plots.hessPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
 
     fig.add_subplot(gs[1,2])
-    diagnostic_plots.star_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
+    diagnostic_plots.starPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
 
     fig.add_subplot(gs[2,1:3])
-    diagnostic_plots.radial_plot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
+    diagnostic_plots.radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd)
 
+    #try:
     # Check for possible associations
     glon_peak, glat_peak = ugali.utils.projector.celToGal(targ_ra, targ_dec)
-    try:
-        catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
-        catalog = ugali.candidate.associate.SourceCatalog()
-        for catalog_name in catalog_array:
-            catalog += ugali.candidate.associate.catalogFactory(catalog_name)
+    catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
+    catalog = ugali.candidate.associate.SourceCatalog()
+    for catalog_name in catalog_array:
+        catalog += ugali.candidate.associate.catalogFactory(catalog_name)
 
-        idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
-        match = catalog[idx2]
-        if len(match) > 0:
-            association_string = '{} at {:.3f} deg'.format(match[0]['name'], float(sep))
-        else:
-            association_string = 'No association within 0.5 deg'
-    except:
-        association_string = 'Association search error'
+    idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
+    match = catalog[idx2]
+    if len(match) > 0:
+        association_string = '{} at {:.3f} deg'.format(match[0]['name'], float(sep))
+    else:
+        association_string = 'No association within 0.5 deg'
+    #except:
+    #    association_string = 'Association search error'
 
     plt.suptitle('{}\n'.format(association_string) + r'($\alpha$, $\delta$, $\mu$, $\sigma$) = ({}, {}, {}, {})'.format(targ_ra, targ_dec, mod, sig), fontsize=24)
 
@@ -110,8 +108,8 @@ def render_plot(candidate):
     plt.savefig(save_dir+'/'+file_name+'.png',  bbox_inches='tight')
     plt.close()
 
-#render_plot(0)
-if __name__ == '__main__':
-    pool = Pool(20)
-    index = range(len(candidate_list))
-    pool.map(render_plot, index)
+renderPlot(0)
+#if __name__ == '__main__':
+#    pool = Pool(20)
+#    index = range(len(candidate_list))
+#    pool.map(renderPlot, index)
