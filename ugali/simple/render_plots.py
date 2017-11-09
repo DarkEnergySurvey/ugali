@@ -108,8 +108,8 @@ def renderPlot(candidate):
     plt.savefig(save_dir+'/'+file_name+'.png',  bbox_inches='tight')
     plt.close()
 
-renderPlot(0)
-#if __name__ == '__main__':
-#    pool = Pool(20)
-#    index = range(len(candidate_list))
-#    pool.map(renderPlot, index)
+#renderPlot(0)
+if __name__ == '__main__':
+    pool = Pool(20)
+    index = range(len(candidate_list))
+    pool.map(renderPlot, index)

@@ -34,36 +34,50 @@ import yaml
 with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
-nside = cfg['nside']
+nside   = cfg['nside']
 datadir = cfg['datadir']
+
 maglim_g = cfg['maglim_g']
 maglim_r = cfg['maglim_r']
 
-#candidate_list = np.genfromtxt('results.csv', delimiter=',', names=['sig', 'ra', 'dec', 'distance_modulus', 'r'])[1:] #, 'association', 'association_angsep'])[1:]
-#candidate_list = candidate_list[candidate_list['sig'] > 5.5] ### TODO
+mag_g_dred_flag         = cfg['mag_g_dred_flag']
+mag_r_dred_flag         = cfg['mag_r_dred_flag']
+#mag_g_flag              = cfg['mag_g_flag']
+#mag_r_flag              = cfg['mag_r_flag']
+mag_err_g_flag          = cfg['mag_err_g_flag']
+mag_err_r_flag          = cfg['mag_err_r_flag']
+#extinction_g_flag       = cfg['extinction_g_flag']
+#extinction_r_flag       = cfg['extinction_r_flag']
+star_galaxy_classification = cfg['star_galaxy_classification']
+#spread_model_r_flag     = cfg['spread_model_r_flag']
+#spread_model_r_err_flag = cfg['spread_model_r_err_flag']
+flags_g                 = cfg['flags_g']
+flags_r                 = cfg['flags_r']
 
-COLUMNS = ['RA', 'DEC']
-COLUMNS+= ['WAVG_MAG_PSF_G', 'WAVG_MAG_PSF_R']
+#COLUMNS = ['RA', 'DEC']
+#COLUMNS+= ['WAVG_MAG_PSF_G', 'WAVG_MAG_PSF_R']
 #COLUMNS+= ['EXTINCTION_G', 'EXTINCTION_R']
-COLUMNS+= ['WAVG_SPREAD_MODEL_R', 'SPREADERR_MODEL_R']
-COLUMNS+= ['WAVG_MAGERR_PSF_G', 'WAVG_MAGERR_PSF_R']
-COLUMNS+= ['MAGERR_PSF_G', 'MAGERR_PSF_R']
+#COLUMNS+= ['WAVG_SPREAD_MODEL_R', 'SPREADERR_MODEL_R']
+#COLUMNS+= ['WAVG_MAGERR_PSF_G', 'WAVG_MAGERR_PSF_R']
+#COLUMNS+= ['MAGERR_PSF_G', 'MAGERR_PSF_R']
 
 ################################################################################
 
 def star_filter(data):
     """Selects stars from the data set"""
-    filter = (data['WAVG_SPREAD_MODEL_R'] < 0.003)
+    filter = (data[star_galaxy_classification] >= 0) & (data[star_galaxy_classification] <= 1)
+    #filter = (data[spread_model_r_flag] < 0.003)
     return filter
 
 def galaxy_filter(data):
     """Selects galaxies from the data set"""
-    filter = (data['WAVG_SPREAD_MODEL_R'] > 0.005)
+    #filter = (data[spread_model_r_flag] > 0.005)
+    filter = (data[star_galaxy_classification] > 1)
     return filter
 
 def blue_star_filter(data):
     """Selects blue stars from the data set"""
-    filter = (star_filter(data)) & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 0.4) # 0.2
+    filter = (star_filter(data)) & ((data[mag_g_dred_flag] - data[mag_r_dred_flag]) < 0.4) # 0.2
     return filter
 
 #filter_r = mag_r <= 23 # Filters out background galaxy contamination
@@ -71,13 +85,8 @@ def blue_star_filter(data):
 
 ################################################################################
 
-#def analysis(obj):
 def analysis(targ_ra, targ_dec, mod):
     """Analyze a candidate"""
-
-    #targ_ra = candidate_list[obj]['ra']
-    #targ_dec = candidate_list[obj]['dec']
-    #mod = candidate_list[obj]['distance_modulus']
 
     #hdisc = healpix.ang2disc(nside, targ_ra, targ_dec, 1, inclusive=True)
     #files = []
@@ -93,7 +102,9 @@ def analysis(targ_ra, targ_dec, mod):
     pix_nside_neighbors = np.concatenate([[pix_nside_select], healpy.get_all_neighbours(nside, pix_nside_select)])
     data_array = []
     for pix_nside in pix_nside_neighbors:
-        infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_nside)
+        #infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_nside)
+        infile = '%s/y3a2_ngmix_cm_%05i.fits'%(datadir, pix_nside)
+        #infile = '%s/*_%05i.fits'%(datadir, pix_nside) # TODO: get to work
         if not os.path.exists(infile):
             continue
         reader = pyfits.open(infile)
@@ -104,18 +115,26 @@ def analysis(targ_ra, targ_dec, mod):
     print('Found {} objects...').format(len(data))
     print('Loading data...')
 
-    mag_g = data['WAVG_MAG_PSF_G'] - data['EXTINCTION_G'] # Magnitude correction for interstellar extinction
-    mag_r = data['WAVG_MAG_PSF_R'] - data['EXTINCTION_R'] # As above
-
-    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [mag_g, mag_r])
+    ## De-redden magnitudes
+    #try:
+    #    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_dred_flag], data[mag_r_dred_flag]])
+    ##except:
+    ##    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_flag] - data[extinction_g_flag], data[mag_r_flag] - data[extinction_r_flag]])
+    #except:
+    #    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_flag], data[mag_r_flag]])
+    #
+    #mag_g = data['WAVG_MAG_PSF_DRED_G']
+    #mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     iso = isochrone_factory('Bressan2012', age=12, z=0.0001, distance_modulus=mod)
 
     # g_radius estimate
     filter_s = star_filter(data)
 
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     iso_filter = (iso.separation(mag_g, mag_r) < 0.1)
 
@@ -175,18 +194,13 @@ def analysis(targ_ra, targ_dec, mod):
     angsep = ugali.utils.projector.angsep(targ_ra, targ_dec, data['RA'], data['DEC'])
     nbhd = (angsep < g_radius)
 
-    #return(g_radius, nbhd)
-
-    #return(targ_ra, targ_dec, data, iso, g_radius, nbhd)
     return(data, iso, g_radius, nbhd)
 
 def densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     """Stellar density plot"""
 
-    #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
-
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     if type == 'stars':
         filter = star_filter(data)
@@ -229,10 +243,8 @@ def densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
 def starPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Star bin plot"""
 
-    #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
-
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     filter = star_filter(data)
 
@@ -254,13 +266,11 @@ def starPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
 def cmPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
     """Color-magnitude plot"""
 
-    #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
-
     angsep = ugali.utils.projector.angsep(targ_ra, targ_dec, data['RA'], data['DEC'])
     annulus = (angsep > g_radius) & (angsep < 1.)
 
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     if type == 'stars':
         filter = star_filter(data)
@@ -293,10 +303,8 @@ def cmPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, type):
 def hessPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Hess plot"""
 
-    #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
-
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     filter_s = star_filter(data)
 
@@ -350,10 +358,8 @@ def hessPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
 def radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
     """Radial distribution plot"""
 
-    #g_radius, nbhd = g_nbhd(targ_ra, targ_dec, data, iso)
-
-    mag_g = data['WAVG_MAG_PSF_DRED_G']
-    mag_r = data['WAVG_MAG_PSF_DRED_R']
+    mag_g = data[mag_g_dred_flag]
+    mag_r = data[mag_r_dred_flag]
 
     filter_s = star_filter(data)
     filter_g = galaxy_filter(data)
@@ -396,10 +402,8 @@ def radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
             filter = galaxy_filter(data)
         if seln == 'f':
             iso_filter = iso_seln_f
-            #iso_filter = iso_seln ###
         elif seln == 'u':
             iso_filter = iso_seln_u
-            #iso_filter = ~iso_seln ###
 
         hist = np.histogram(angsep[(angsep < 0.4) & filter & iso_filter], bins=bins)[0] # counts
 
@@ -435,7 +439,6 @@ def radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
 
     ymax = plt.ylim()[1]
     plt.annotate(r'$\approx %0.1f$'+str(round(g_radius, 3))+'$^\circ$', (g_radius*1.1, ymax/50.), color='red', bbox=dict(boxstyle='round,pad=0.0', fc='white', alpha=0.75, ec='white', lw=0))
-    #plt.axis([-1.1, max(r_far)+1.1, 0, max(map(add, fs_density, y_error(r_pairs)) + us_density + fg_density)*1.1])
     plt.xlim(bins[0], bins[-1])
     plt.ylim(0., ymax)
     plt.legend(loc='upper right')
