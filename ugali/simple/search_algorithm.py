@@ -14,6 +14,7 @@ import os
 import glob
 import numpy
 import numpy as np
+from matplotlib import mlab
 import pyfits
 import healpy
 import scipy.interpolate
@@ -25,11 +26,11 @@ import scipy.spatial
 
 import ugali.utils.healpix
 import ugali.utils.projector
-import ugali.analysis.isochrone
+import ugali.isochrone
 import ugali.utils.plotting
 import ugali.candidate.associate
 
-from ugali.analysis.isochrone import factory as isochrone_factory
+from ugali.isochrone import factory as isochrone_factory
 from astropy.coordinates import SkyCoord
 
 import yaml
@@ -39,10 +40,25 @@ import yaml
 with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
-nside = cfg['nside']
+nside   = cfg['nside']
 datadir = cfg['datadir']
+
 maglim_g = cfg['maglim_g']
 maglim_r = cfg['maglim_r']
+
+mag_g_dred_flag         = cfg['mag_g_dred_flag']
+mag_r_dred_flag         = cfg['mag_r_dred_flag']
+#mag_g_flag              = cfg['mag_g_flag']
+#mag_r_flag              = cfg['mag_r_flag']
+mag_err_g_flag          = cfg['mag_err_g_flag']
+mag_err_r_flag          = cfg['mag_err_r_flag']
+#extinction_g_flag       = cfg['extinction_g_flag']
+#extinction_r_flag       = cfg['extinction_r_flag']
+star_galaxy_classification = cfg['star_galaxy_classification']
+#spread_model_r_flag     = cfg['spread_model_r_flag']
+#spread_model_r_err_flag = cfg['spread_model_r_err_flag']
+flags_g                 = cfg['flags_g']
+flags_r                 = cfg['flags_r']
 
 results_dir = os.path.join(os.getcwd(), cfg['results_dir'])
 if not os.path.exists(results_dir):
@@ -96,9 +112,9 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
 
 ############################################################
 
-def circle(x, y, r):
-    phi = numpy.linspace(0, 2 * numpy.pi, 1000)
-    return x + (r * numpy.cos(phi)), y + (r * numpy.sin(phi))
+#def circle(x, y, r):
+#    phi = numpy.linspace(0, 2 * numpy.pi, 1000)
+#    return x + (r * numpy.cos(phi)), y + (r * numpy.sin(phi))
 
 ############################################################
 
@@ -118,31 +134,43 @@ pix_nside_neighbors = numpy.concatenate([[pix_nside_select], healpy.get_all_neig
 
 data_array = []
 for pix_nside in pix_nside_neighbors:
-    infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_nside)
+    #infile = '%s/cat_hpx_%05i.fits'%(datadir, pix_nside)
+    infile = '%s/y3a2_ngmix_cm_%05i.fits'%(datadir, pix_nside)
+    #infile = '%s/*_%05i.fits'%(datadir, pix_nside) # TODO - get this to work for adaptable directories
     if not os.path.exists(infile):
         continue
     reader = pyfits.open(infile)
     data_array.append(reader[1].data)
     reader.close()
 print 'Assembling data...'
-data = numpy.concatenate(data_array)
+data = numpy.concatenate(data_array) # TODO reduce this to just use needed columns so there is no excessive use of memory
+
+# De-redden magnitudes
+#try:
+#    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_dred_flag], data[mag_r_dred_flag]])
+#except:
+#    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_flag] - data[extinction_g_flag], data[mag_r_flag] - data[extinction_r_flag]])
+#except:
+#    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_flag], data[mag_r_flag]])
 
 print 'Found %i objects...'%(len(data))
 
 ############################################################
 
 print 'Applying cuts...'
-cut = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-      & (data['WAVG_MAG_PSF_G'] < 24.0) \
-      & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
-      & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) < 0.003 + data['SPREADERR_MODEL_R'])
+#cut = (data[flags_g] < 4) & (data[flags_r] < 4) \
+#      & (data['WAVG_MAG_PSF_DRED_G'] < 24.0) \
+#      & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 1.) \
+#      & (numpy.fabs(data[spread_model_r_flag]) < 0.003 + data[spread_model_r_err_flag])
+#
+#cut_gal = (data[flags_g] < 4) & (data[flags_r] < 4) \
+#          & (data['WAVG_MAG_PSF_DRED_G'] < 24.0) \
+#          & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 1.) \
+#          & (numpy.fabs(data[spread_model_r_flag]) > 0.003 + data[spread_model_r_err_flag])
 
-cut_gal = (data['FLAGS_G'] < 4) & (data['FLAGS_R'] < 4) \
-          & (data['WAVG_MAG_PSF_G'] < 24.0) \
-          & ((data['WAVG_MAG_PSF_G'] - data['WAVG_MAG_PSF_R']) < 1.) \
-          & (numpy.fabs(data['WAVG_SPREAD_MODEL_R']) > 0.003 + data['SPREADERR_MODEL_R'])
+cut = (data[star_galaxy_classification] >= 0) & (data[star_galaxy_classification] <= 1)
+cut_gal = (data[star_galaxy_classification] > 1)
 
-# Separate selections for stars and galaxies
 data_gal = data[cut_gal]
 data = data[cut]
 
@@ -164,14 +192,14 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
     print 'Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus)
 
     dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = 12.
     iso.metallicity = 0.0001
     iso.distance_modulus = distance_modulus
 
-    cut = cutIsochronePath(data['WAVG_MAG_PSF_G'], data['WAVG_MAG_PSF_R'], data['WAVG_MAGERR_PSF_G'], data['WAVG_MAGERR_PSF_R'], iso, radius=0.1)
+    cut = cutIsochronePath(data[mag_g_dred_flag], data[mag_r_dred_flag], data[mag_err_g_flag], data[mag_err_r_flag], iso, radius=0.1)
     data = data[cut]
-    cut_magnitude_threshold = (data['WAVG_MAG_PSF_G'] < magnitude_threshold)
+    cut_magnitude_threshold = (data[mag_g_dred_flag] < magnitude_threshold)
 
     print '%i objects left after isochrone cut...'%(len(data))
 
@@ -207,19 +235,21 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
     h_g = scipy.ndimage.filters.gaussian_filter(h, smoothing / delta_x)
 
-    cut_goodcoverage = (data['NEPOCHS_G'][cut_magnitude_threshold] >= 2) & (data['NEPOCHS_R'][cut_magnitude_threshold] >= 2)
+    #cut_goodcoverage = (data['NEPOCHS_G'][cut_magnitude_threshold] >= 2) & (data['NEPOCHS_R'][cut_magnitude_threshold] >= 2)
+    # expect NEPOCHS to be good in DES data
 
     delta_x_coverage = 0.1
     area_coverage = (delta_x_coverage)**2
     bins_coverage = numpy.arange(-5., 5. + 1.e-10, delta_x_coverage)
     h_coverage = numpy.histogram2d(x, y, bins=[bins_coverage, bins_coverage])[0]
-    h_goodcoverage = numpy.histogram2d(x[cut_goodcoverage], y[cut_goodcoverage], bins=[bins_coverage, bins_coverage])[0]
+    #h_goodcoverage = numpy.histogram2d(x[cut_goodcoverage], y[cut_goodcoverage], bins=[bins_coverage, bins_coverage])[0]
+    h_goodcoverage = numpy.histogram2d(x, y, bins=[bins_coverage, bins_coverage])[0]
 
     n_goodcoverage = h_coverage[h_goodcoverage > 0].flatten()
-    pylab.figure('poisson')
-    pylab.clf()
-    pylab.hist(n_goodcoverage, bins=numpy.arange(20) - 0.5, normed=True)
-    pylab.scatter(numpy.arange(20), scipy.stats.poisson.pmf(numpy.arange(20), mu=numpy.median(n_goodcoverage)), c='red', zorder=10)
+    #pylab.figure('poisson')
+    #pylab.clf()
+    #pylab.hist(n_goodcoverage, bins=numpy.arange(20) - 0.5, normed=True)
+    #pylab.scatter(numpy.arange(20), scipy.stats.poisson.pmf(numpy.arange(20), mu=numpy.median(n_goodcoverage)), c='red', zorder=10)
 
     #print numpy.histogram(n_goodcoverage, bins=numpy.arange(20), normed=True)
     #print scipy.stats.poisson.pmf(numpy.arange(20), mu=numpy.median(n_goodcoverage))
@@ -228,18 +258,18 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
     #characteristic_density = numpy.mean(n_goodcoverage) / area_coverage # per square degree
     characteristic_density = numpy.median(n_goodcoverage) / area_coverage # per square degree
 
-    vmax = min(3. * characteristic_density * area, numpy.max(h_g))
-
-    pylab.figure('smooth')
-    pylab.clf()
-    pylab.imshow(h_g.T,
-                 interpolation='nearest', extent=[-8, 8, -8, 8], origin='lower', cmap='gist_heat', vmax=vmax)
-    pylab.colorbar()
-    pylab.xlim([8, -8])
-    pylab.ylim([-8, 8])
-    pylab.xlabel(r'$\Delta$ RA (deg)')
-    pylab.ylabel(r'$\Delta$ Dec (deg)')
-    pylab.title('(RA, Dec, mu) = (%.2f, %.2f, %.2f)'%(ra_select, dec_select, distance_modulus))
+    #vmax = min(3. * characteristic_density * area, numpy.max(h_g))
+    #
+    #pylab.figure('smooth')
+    #pylab.clf()
+    #pylab.imshow(h_g.T,
+    #             interpolation='nearest', extent=[-8, 8, -8, 8], origin='lower', cmap='gist_heat', vmax=vmax)
+    #pylab.colorbar()
+    #pylab.xlim([8, -8])
+    #pylab.ylim([-8, 8])
+    #pylab.xlabel(r'$\Delta$ RA (deg)')
+    #pylab.ylabel(r'$\Delta$ Dec (deg)')
+    #pylab.title('(RA, Dec, mu) = (%.2f, %.2f, %.2f)'%(ra_select, dec_select, distance_modulus))
 
     factor_array = numpy.arange(1., 5., 0.05)
     rara, decdec = proj.imageToSphere(xx.flatten(), yy.flatten())
@@ -299,8 +329,8 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
             if sig_array[ii] > 25:
                 sig_array[ii] = 25.
 
-        pylab.figure('sig')
-        pylab.plot(size_array, sig_array)
+        #pylab.figure('sig')
+        #pylab.plot(size_array, sig_array)
 
         ra_peak, dec_peak = proj.imageToSphere(x_peak, y_peak)
         r_peak = size_array[numpy.argmax(sig_array)]
@@ -309,10 +339,10 @@ def searchByDistance(data, distance_modulus, ra_select, dec_select, magnitude_th
 
         print 'Candidate:', x_peak, y_peak, r_peak, numpy.max(sig_array), ra_peak, dec_peak
         if numpy.max(sig_array) > 5.:
-            x_circle, y_circle = circle(x_peak, y_peak, r_peak)
-            pylab.figure('smooth')
-            pylab.plot(x_circle, y_circle, c='gray')
-            pylab.text(x_peak - r_peak, y_peak + r_peak, r'%.2f $\sigma$'%(numpy.max(sig_array)), color='gray')
+            #x_circle, y_circle = circle(x_peak, y_peak, r_peak)
+            #pylab.figure('smooth')
+            #pylab.plot(x_circle, y_circle, c='gray')
+            #pylab.text(x_peak - r_peak, y_peak + r_peak, r'%.2f $\sigma$'%(numpy.max(sig_array)), color='gray')
     
             ra_peak_array.append(ra_peak)
             dec_peak_array.append(dec_peak)
@@ -330,32 +360,39 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
 
     # Dotter isochrones
     dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    iso = ugali.analysis.isochrone.isochroneFactory('Dotter', hb_spread=0, dirname=dirname)
+    iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = age
     iso.metallicity = metallicity
     iso.distance_modulus = distance_modulus
 
-    # Padova isochrones
-    dirname_alt = '/home/s1/kadrlica/.ugali/isochrones/des/bressan2012/' #padova/'
-    iso_alt = ugali.analysis.isochrone.isochroneFactory('Padova', hb_spread=0, dirname=dirname_alt)
-    iso_alt.age = age
-    iso_alt.metallicity = metallicity
-    iso_alt.distance_modulus = distance_modulus
+    ## Padova isochrones
+    #dirname_alt = '/home/s1/kadrlica/.ugali/isochrones/des/bressan2012/' #padova/'
+    #iso_alt = ugali.isochrone.factory('Padova', hb_spread=0, dirname=dirname_alt)
+    #iso_alt.age = age
+    #iso_alt.metallicity = metallicity
+    #iso_alt.distance_modulus = distance_modulus
 
-    cut_iso, g_iso, gr_iso_min, gr_iso_max = cutIsochronePath(data['WAVG_MAG_PSF_G'], 
-                                                              data['WAVG_MAG_PSF_R'], 
-                                                              data['WAVG_MAGERR_PSF_G'], 
-                                                              data['WAVG_MAGERR_PSF_R'], 
+    cut_iso, g_iso, gr_iso_min, gr_iso_max = cutIsochronePath(data[mag_g_dred_flag], 
+                                                              data[mag_r_dred_flag], 
+                                                              data[mag_err_g_flag], 
+                                                              data[mag_err_r_flag], 
                                                               iso, 
                                                               radius=0.1, 
                                                               return_all=True)
     
-    cut_iso_gal = cutIsochronePath(data_gal['MAG_PSF_G'], 
-                                   data_gal['MAG_PSF_R'], 
-                                   data_gal['MAGERR_PSF_G'], 
-                                   data_gal['MAGERR_PSF_R'], 
-                                   iso, 
-                                   radius=0.1, 
+    #cut_iso_gal = cutIsochronePath(data_gal['MAG_PSF_G'], # TODO: should these be WAVG? and if so, should these then also be dereddened flags?
+    #                               data_gal['MAG_PSF_R'],
+    #                               data_gal['MAGERR_PSF_G'],
+    #                               data_gal['MAGERR_PSF_R'],
+    #                               iso,
+    #                               radius=0.1,
+    #                               return_all=False)
+    cut_iso_gal = cutIsochronePath(data_gal[mag_g_dred_flag],
+                                   data_gal[mag_r_dred_flag],
+                                   data_gal[mag_err_g_flag],
+                                   data_gal[mag_err_r_flag],
+                                   iso,
+                                   radius=0.1,
                                    return_all=False)
     
     proj = ugali.utils.projector.Projector(ra_peak, dec_peak)
@@ -372,21 +409,21 @@ def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_mod
     cut_inner_gal = (angsep_gal < r_peak)
     cut_annulus_gal = (angsep_gal > 0.5) & (angsep_gal < 1.)
 
-    ##########
-
-    # Check for possible associations
-    glon_peak, glat_peak = ugali.utils.projector.celToGal(ra_peak, dec_peak)
-    catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
-    catalog = ugali.candidate.associate.SourceCatalog()
-    for catalog_name in catalog_array:
-        catalog += ugali.candidate.associate.catalogFactory(catalog_name)
-
-    idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
-    match = catalog[idx2]
-    if len(match) > 0:
-        association_string = '; %s at %.3f deg'%(match[0]['name'], sep)
-    else:
-        association_string = '; no association within 0.5 deg'
+#    ##########
+#
+#    # Check for possible associations
+#    glon_peak, glat_peak = ugali.utils.projector.celToGal(ra_peak, dec_peak)
+#    catalog_array = ['McConnachie12', 'Harris96', 'Corwen04', 'Nilson73', 'Webbink85', 'Kharchenko13', 'WEBDA14','ExtraDwarfs','ExtraClusters']
+#    catalog = ugali.candidate.associate.SourceCatalog()
+#    for catalog_name in catalog_array:
+#        catalog += ugali.candidate.associate.catalogFactory(catalog_name)
+#
+#    idx1, idx2, sep = catalog.match(glon_peak, glat_peak, tol=0.5, nnearest=1)
+#    match = catalog[idx2]
+#    if len(match) > 0:
+#        association_string = '; %s at %.3f deg'%(match[0]['name'], sep)
+#    else:
+#        association_string = '; no association within 0.5 deg'
 
 ############################################################
 
