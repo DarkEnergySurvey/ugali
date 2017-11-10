@@ -12,6 +12,8 @@ candidate_list : 'candidate_list.csv'
 maglim_g : '/home/s1/kadrlica/projects/y3q2/v6/release/depth/y2q1_maglim_g_n1024_ring.fits.gz'
 maglim_r : '/home/s1/kadrlica/projects/y2q/v6/release/depth/y2q1_maglim_r_n1024_ring.fits.gz'
 
+fracdet : None
+
 mag_g_dred_flag         : 'PSF_MAG_SFD_G'
 mag_r_dred_flag         : 'PSF_MAG_SFD_R'
 #mag_g_flag              : 'CM_MAG_G'
