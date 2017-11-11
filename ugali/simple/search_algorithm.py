@@ -6,8 +6,7 @@ __author__ = "Keith Bechtol, Sidney Mau"
 
 # Set the backend first!
 import matplotlib
-# FIXME
-#matplotlib.use('Agg')
+matplotlib.use('Agg') # May need to disable this option for interactive plotting
 import pylab
 
 import sys
@@ -36,14 +35,12 @@ from astropy.coordinates import SkyCoord
 
 import yaml
 
-# FIXME
-pylab.ion()
+#pylab.ion() # For interactive plotting
 
 ###########################################################
 
-# FIXME
-#with open('config.yaml', 'r') as ymlfile:
-with open('config_dev_v1.yaml', 'r') as ymlfile:
+#with open('config_dev_v1.yaml', 'r') as ymlfile:
+with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
 nside   = cfg['nside']
@@ -196,7 +193,7 @@ else:
 
 ############################################################
 
-def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magnitude_threshold=24.5, plot=True, fracdet=None):
+def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magnitude_threshold=24.5, plot=False, fracdet=None):
     """
     Idea: 
     Send a data extension that goes to faint magnitudes, e.g., g < 24.
@@ -213,9 +210,8 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
     
     print 'Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus)
 
-    # FIXME
-    #dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/ugalidir/isochrones/des/dotter2016/'
+    dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
+    #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/ugalidir/isochrones/des/dotter2016/'
     iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = 12.
     iso.metallicity = 0.0001
@@ -471,10 +467,9 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
 def diagnostic(data, data_gal, ra_peak, dec_peak, r_peak, sig_peak, distance_modulus, age=12., metallicity=0.0001):
 
     # Dotter isochrones
-    # FIXME
-    #dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
-    #iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
-    iso = ugali.isochrone.factory('Dotter', hb_spread=0)
+    dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
+    #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/ugalidir/isochrones/des/dotter2016/'
+    iso = ugali.isochrone.factory('Dotter', hb_spread=0, dirname=dirname)
     iso.age = age
     iso.metallicity = metallicity
     iso.distance_modulus = distance_modulus
