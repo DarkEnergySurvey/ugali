@@ -184,9 +184,9 @@ class Parameter(object):
 
     Adapted from `MutableNum` from https://gist.github.com/jheiv/6656349
     """
-    __value__ = None
+    __value__  = None
     __bounds__ = None
-    __free__ = False
+    __free__   = False
     __errors__ = None
 
     def __init__(self, value, bounds=None, free=None, errors=None): 
