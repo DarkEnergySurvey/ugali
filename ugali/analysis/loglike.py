@@ -13,6 +13,7 @@ from scipy.stats import norm
 import healpy
 import healpy as hp
 import pyfits
+import fitsio
 
 import ugali.utils.binning
 import ugali.utils.parabola
@@ -230,7 +231,8 @@ class LogLikelihood(object):
 
         if self.spatial_only:
             # ADW: This assumes a flat mask...
-            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            #solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            solid_angle_annulus = ((self.mask.mask_1.mask_annulus_sparse > 0)*self.mask.frac_annulus_sparse).sum()*self.roi.area_pixel
             b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
             self._b = np.array([b_density*self.roi.area_pixel])
 
@@ -253,7 +255,8 @@ class LogLikelihood(object):
 
         if self.spatial_only:
             # ADW: This assumes a flat mask...
-            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            #solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            solid_angle_annulus = ((self.mask.mask_1.mask_annulus_sparse > 0)*self.mask.frac_annulus_sparse).sum()*self.roi.area_pixel
             b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
             self._b = np.array([b_density*self.roi.area_pixel])
 
@@ -308,11 +311,24 @@ class LogLikelihood(object):
     calc_signal_color = calc_signal_color1
 
     def calc_signal_spatial(self):
+        """
+        Calculate the spatial signal probability for each catalog object.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        u_spatial : array of spatial probabilities per object
+        """
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
         nside = self.config['coords']['nside_pixel']
         #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
         #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+
+        # For small kernels, use the single pixel where they reside; otherwise, calculate over roi
         if self.kernel.extension < 2*np.degrees(healpy.max_pixrad(nside)):
             #msg =  "small kernel"
             #msg += ("\n"+str(self.params))
@@ -399,7 +415,7 @@ class LogLikelihood(object):
         return parabola.confidenceInterval(alpha)
 
 
-    def write_membership(self,filename):
+    def write_membership2(self,filename):
         ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
         
         name_objid = self.config['catalog']['objid_field']
@@ -437,6 +453,66 @@ class LogLikelihood(object):
         name = 'HIERARCH %s'%'TIMESTAMP'
         hdu.header.set(name,time.asctime())
         hdu.writeto(filename,clobber=True)
+
+    # Writing membership files
+    def write_membership(self,filename):
+        """
+        Write a catalog file of the likelihood region including
+        membership properties.
+
+        Parameters:
+        -----------
+        filename : output filename
+        
+        Returns:
+        --------
+        None
+        """
+        # Column names
+        name_objid = self.config['catalog']['objid_field']
+        name_mag_1 = self.config['catalog']['mag_1_field']
+        name_mag_2 = self.config['catalog']['mag_2_field']
+        name_mag_err_1 = self.config['catalog']['mag_err_1_field']
+        name_mag_err_2 = self.config['catalog']['mag_err_2_field']
+
+        # Coordinate conversion
+        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+
+        # Angular and isochrone separations
+        sep = angsep(self.source.lon,self.source.lat,
+                     self.catalog.lon,self.catalog.lat)
+        isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+
+        # If size becomes an issue we can make everything float32
+        data = odict()
+        data[name_objid]     = self.catalog.objid
+        data['GLON']         = self.catalog.lon
+        data['GLAT']         = self.catalog.lat
+        data['RA']           = ra
+        data['DEC']          = dec
+        data[name_mag_1]     = self.catalog.mag_1
+        data[name_mag_err_1] = self.catalog.mag_err_1
+        data[name_mag_2]     = self.catalog.mag_2
+        data[name_mag_err_2] = self.catalog.mag_err_2
+        data['COLOR']        = self.catalog.color
+        data['ANGSEP']       = sep.astype(np.float32)
+        data['ISOSEP']       = isosep.astype(np.float32)
+        data['PROB']         = self.p.astype(np.float32)
+     
+        # HIERARCH allows header keywords longer than 8 characters
+        header = []
+        for param,value in self.source.params.items():
+            card = dict(name='HIERARCH %s'%param.upper(),
+                        value=value.value,
+                        comment=param)
+            header.append(card)
+        card = dict(name='HIERARCH %s'%'TS',value=self.ts(),
+                    comment='test statistic')
+        header.append(card)
+        card = dict(name='HIERARCH %s'%'TIMESTAMP',value=time.asctime(),
+                    comment='creation time')
+        header.append(card)
+        fitsio.write(filename,data,header=header,clobber=True)
 
 def write_membership(filename,config,srcfile,section=None):
     """
