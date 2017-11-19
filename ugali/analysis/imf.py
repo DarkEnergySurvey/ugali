@@ -4,6 +4,8 @@ Classes to handle initial mass functions (IMFs).
 
 import numpy
 import numpy as np
+import scipy.interpolate
+
 from ugali.utils.logger import logger
 
 # ADW: TODO - This needs to be modernized
@@ -12,6 +14,9 @@ from ugali.utils.logger import logger
 ############################################################
 
 class IMF:
+    """
+    Base class for initial mass functions (IMFs).
+    """
 
     def __init__(self, type='chabrier'):
         """
@@ -55,6 +60,17 @@ class IMF:
                 return np.sum(mass * d_mass * self.pdf(mass, log_mode=False))
             else:
                 return np.sum(d_mass * self.pdf(mass, log_mode=False))
+
+    def sample(self, n, mass_min=0.1, mass_max=10., steps=10000):
+        """
+        Sample n initial mass values between mass_min and mass_max, following the IMF distribution.
+        """
+        d_mass = (mass_max - mass_min) / float(steps)
+        mass = numpy.linspace(mass_min, mass_max, steps)
+        cdf = numpy.insert(numpy.cumsum(d_mass * self.pdf(mass[1:], log_mode=False)), 0, 0.)
+        cdf = cdf / cdf[-1]
+        f = scipy.interpolate.interp1d(cdf, mass)
+        return f(numpy.random.uniform(size=n))
 
 ############################################################
 

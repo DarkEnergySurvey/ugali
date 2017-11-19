@@ -11,6 +11,7 @@ import healpy as hp
 import healpy
 import fitsio
 
+import ugali.utils.projector
 import ugali.utils.fileio
 from ugali.utils.logger import logger
 
@@ -73,13 +74,25 @@ angToVec = ang2vec
 
 ############################################################
 
-def healpixMap(nside, lon, lat, fill_value=0.):
+def healpixMap(nside, lon, lat, fill_value=0., nest=False):
     """
     Input (lon, lat) in degrees instead of (theta, phi) in radians.
     Returns HEALPix map at the desired resolution 
     """
-    pix = angToPix(nside, lon, lat)
-    m = np.histogram(pix, np.arange(hp.nside2npix(nside) + 1))[0].astype(float)
+
+    lon_median, lat_median = np.median(lon), np.median(lat)
+    max_angsep = np.max(ugali.utils.projector.angsep(lon, lat, lon_median, lat_median))
+    
+    pix = angToPix(nside, lon, lat, nest=nest)
+    if max_angsep < 10:
+        # More efficient histograming for small regions of sky
+        m = np.tile(fill_value, healpy.nside2npix(nside))
+        pix_subset = ugali.utils.healpix.angToDisc(nside, lon_median, lat_median, max_angsep, nest=nest)
+        bins = np.arange(np.min(pix_subset), np.max(pix_subset) + 1)
+        m_subset = np.histogram(pix, bins=bins - 0.5)[0].astype(float)
+        m[bins[0:-1]] = m_subset
+    else:
+        m = np.histogram(pix, np.arange(hp.nside2npix(nside) + 1))[0].astype(float)
     if fill_value != 0.:
         m[m == 0.] = fill_value
     return m

@@ -2,6 +2,7 @@
 [![PyPI](https://img.shields.io/pypi/v/ugali.svg)](https://pypi.python.org/pypi/ugali)
 [![Release](https://img.shields.io/github/release/DarkEnergySurvey/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
+[![Github Downloads](https://img.shields.io/github/downloads/DarkEnergySurvey/ugali/total.svg)](../../releases)
 
 Overview
 --------
