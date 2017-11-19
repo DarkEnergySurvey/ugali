@@ -112,7 +112,7 @@ class IsochroneModel(Model):
         return os.path.expandvars(self.dirname.format(survey=self.survey))
 
     def todict(self):
-        ret = super(Isochrone,self).todict()
+        ret = super(IsochroneModel,self).todict()
         defaults = odict([(d[0],d[1]) for d in self.defaults])
         for k,v in defaults.items():
             if getattr(self,k) != v: ret[k] = getattr(self,k)
@@ -940,6 +940,7 @@ class IsochroneModel(Model):
         
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
+
     def separation(self, mag_1, mag_2):
         """ 
         Calculate the separation between a specific point and the
@@ -960,15 +961,6 @@ class IsochroneModel(Model):
         iso_mag_1 = self.mag_1 + self.distance_modulus
         iso_mag_2 = self.mag_2 + self.distance_modulus
         
-        # First do the RGB
-        if isinstance(self, DotterIsochrone):
-            rgb_mag_1 = iso_mag_1
-            rgb_mag_2 = iso_mag_2
-        else:
-            sel = self.stage <= 3
-            rgb_mag_1 = iso_mag_1[sel]
-            rgb_mag_2 = iso_mag_2[sel]
-
         def interp_iso(iso_mag_1,iso_mag_2,mag_1,mag_2):
             interp_1 = scipy.interpolate.interp1d(iso_mag_1,iso_mag_2,bounds_error=False)
             interp_2 = scipy.interpolate.interp1d(iso_mag_2,iso_mag_1,bounds_error=False)
@@ -981,13 +973,21 @@ class IsochroneModel(Model):
 
             return dmag_1, dmag_2
 
+        # Separate the various stellar evolution stages
+        if np.issubdtype(self.stage.dtype,np.number):
+            sel = (self.stage < self.hb_stage)
+        else:
+            sel = (self.stage != self.hb_stage)
+
+        # First do the MS/RGB
+        rgb_mag_1 = iso_mag_1[sel]
+        rgb_mag_2 = iso_mag_2[sel]
         dmag_1,dmag_2 = interp_iso(rgb_mag_1,rgb_mag_2,mag_1,mag_2)
 
-        # Then do the HB
-        if not isinstance(self, DotterIsochrone):
-            sel = self.stage > 3
-            hb_mag_1 = iso_mag_1[sel]
-            hb_mag_2 = iso_mag_2[sel]
+        # Then do the HB (if it exists)
+        if not np.all(sel):
+            hb_mag_1 = iso_mag_1[~sel]
+            hb_mag_2 = iso_mag_2[~sel]
 
             hb_dmag_1,hb_dmag_2 = interp_iso(hb_mag_1,hb_mag_2,mag_1,mag_2)
 
@@ -996,7 +996,6 @@ class IsochroneModel(Model):
 
         #return dmag_1,dmag_2
         return np.sqrt(dmag_1**2 + dmag_2**2)
-
 
 class Isochrone(IsochroneModel):
     """ Abstract base class for isochrones """
