@@ -10,12 +10,12 @@ import yaml
 with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
-candidate_list = cfg['candidate_list']
+candidate_list = cfg[cfg['data']]['candidate_list']
 
 
 results_file = open(candidate_list, 'w')
-results_file.write('sig, ra, dec, distance_modulus, r\n')
-for file in glob.glob('{}/*.csv'.format(cfg['results_dir'])):
+results_file.write('SIG, RA, DEC, MODULUS, r\n')
+for file in glob.glob('{}/*.csv'.format(cfg[cfg['data']]['results_dir'])):
     writer = open(file, 'r')
     for line in writer:
         results_file.write(line)

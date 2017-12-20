@@ -21,14 +21,14 @@ import yaml
 with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
-nside = cfg['nside']
-datadir = cfg['datadir']
+nside = cfg[cfg['data']]['nside']
+datadir = cfg[cfg['data']]['datadir']
 
-results_dir = os.path.join(os.getcwd(), cfg['results_dir'])
+results_dir = os.path.join(os.getcwd(), cfg['output']['results_dir'])
 if not os.path.exists(results_dir):
     os.mkdir(results_dir)
 
-log_dir = os.path.join(os.getcwd(), cfg['results_dir'], cfg['log_dir'])
+log_dir = os.path.join(os.getcwd(), cfg['output']['results_dir'], cfg['output']['log_dir'])
 if not os.path.exists(log_dir):
     os.mkdir(log_dir)
 
@@ -50,7 +50,7 @@ for ii in range(0, len(pix_nside)):
 
     #pix_nside[ii] = pix_nside_select
     logfile = '%s/results_nside_%s_%i.log'%(log_dir, nside, pix_nside[ii])
-    batch = 'csub -n 20 -o %s '%logfile # q local for debugging
+    batch = 'csub -n {} -o {} '.format(jobs, logfile) # q local for debugging
     command = 'python search_algorithm.py %.2f %.2f'%(ra, dec)
     command_queue = batch + command
     print command_queue
