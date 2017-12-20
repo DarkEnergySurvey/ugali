@@ -2,7 +2,7 @@
 """
 Simple binning search algorithm
 """
-__author__ = "Keith Bechtol, Sidney Mau"
+__author__ = "Keith Bechtol"
 
 # Set the backend first!
 import matplotlib
