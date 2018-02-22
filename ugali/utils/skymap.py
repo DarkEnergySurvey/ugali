@@ -346,9 +346,6 @@ def randomPositions(input, nside_pix, n=1):
     nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
     Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
-
-    Probably there is a faster algorithm, but limited much more by the simulation and fitting time
-    than by the time it takes to generate random positions within the mask.
     """
     input = numpy.array(input)
     if len(input.shape) == 1:
