@@ -22,7 +22,7 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
     Return the set of HEALPix pixels that cover the given coordinates at resolution nside.
     Optionally return the set of subpixels within those pixels at resolution nside_subpix
     """
-    pix = numpy.unique(ang2pix)
+    pix = numpy.unique(ang2pix(nside_pix, lon, lat))
     if nside_subpix is None:
         return pix
     else:
@@ -339,15 +339,21 @@ def randomPositions(input, nside_pix, n=1):
     """
     Generate n random positions within a full HEALPix mask of booleans, or a set of (lon, lat) coordinates.
 
+    input is either a
+    (1) full HEALPix mask of booleans, or
+    (2) a set of (lon, lat) coordinates for catalog objects that define the occupied pixels.
+    
     nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
-    Return the longitude and latitude of the random positions and the total area (deg^2).
+    Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
 
     Probably there is a faster algorithm, but limited much more by the simulation and fitting time
     than by the time it takes to generate random positions within the mask.
     """
     input = numpy.array(input)
     if len(input.shape) == 1:
+        if healpy.npix2nside(len(input)) < nside_pix:
+            logger.warning('Expected coarser resolution nside_pix in skymap.randomPositions')
         subpix = numpy.nonzero(input)[0] # All the valid pixels in the mask at the NSIDE for the input mask
         lon, lat = pix2ang(healpy.npix2nside(len(input)), subpix)
     elif len(input.shape) == 2:
@@ -358,39 +364,41 @@ def randomPositions(input, nside_pix, n=1):
 
     # Area with which the random points are thrown
     area = len(pix) * healpy.nside2pixarea(nside_pix, degrees=True)
-    
-    lon = []
-    lat = []
-    for ii in range(0, n):
-        # Choose an unmasked pixel at random, which is OK because HEALPix is an equal area scheme
-        pix_ii = pix[numpy.random.randint(0, len(pix))]
-        lon_ii, lat_ii = ugali.utils.projector.pixToAng(nside_pix, pix_ii)
-        projector = ugali.utils.projector.Projector(lon_ii, lat_ii)
 
-        inside = False
-        while not inside:
-            # Apply random offset
-            arcminToDegree = 1 / 60.
-            resolution = arcminToDegree * healpy.nside2resol(nside_pix, arcmin=True)
-            x = 2. * (numpy.random.rand() - 0.5) * resolution # Using factor 2 to be conservative
-            y = 2. * (numpy.random.rand() - 0.5) * resolution
-            
-            lon_candidate, lat_candidate = projector.imageToSphere(x, y)
+    # Create mask at the coarser resolution
+    mask = numpy.tile(False, healpy.nside2npix(nside_pix))
+    mask[pix] = True
 
-            # Make sure that the random position does indeed fall within the randomly selected pixel 
-            if ugali.utils.projector.angToPix(nside_pix, lon_candidate, lat_candidate) == pix_ii:
-                inside = True
-                                    
-        lon.append(lon_candidate)
-        lat.append(lat_candidate)
+    # Estimate the number of points that need to be thrown based off
+    # coverage fraction of the HEALPix mask
+    coverage_fraction = float(numpy.sum(mask)) / len(mask) 
+    n_throw = int(n / coverage_fraction)
+        
+    lon, lat = [], []
+    count = 0
+    while len(lon) < n:
+        lon_throw = numpy.random.uniform(0., 360., n_throw)
+        lat_throw = numpy.degrees(numpy.arcsin(numpy.random.uniform(-1., 1., n_throw)))
 
-    return numpy.array(lon), numpy.array(lat), area
+        pix_throw = ugali.utils.healpix.angToPix(nside_pix, lon_throw, lat_throw)
+        cut = mask[pix_throw].astype(bool)
+
+        lon = numpy.append(lon, lon_throw[cut])
+        lat = numpy.append(lat, lat_throw[cut])
+
+        count += 1
+        if count > 10:
+            raise RuntimeError('Too many loops...')
+
+    return lon[0:n], lat[0:n], area
 
 ############################################################
 
-def randomPositionsMask(mask, n=1):
+def randomPositionsMask(mask, nside_pix, n):
     """
     Generate n random positions within a HEALPix mask of booleans.
+
+    KCB: Likely superceded by the randomPositions function, but more generic.
     """
     
     npix = len(mask)
