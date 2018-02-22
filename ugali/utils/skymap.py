@@ -388,3 +388,36 @@ def randomPositions(input, nside_pix, n=1):
 
 ############################################################
 
+def randomPositionsMask(mask, n=1):
+    """
+    Generate n random positions within a HEALPix mask of booleans.
+    """
+    
+    npix = len(mask)
+    nside = healpy.npix2nside(npix)
+
+    # Estimate the number of points that need to be thrown based off
+    # coverage fraction of the HEALPix mask
+    coverage_fraction = float(numpy.sum(mask)) / len(mask) 
+    n_throw = int(n / coverage_fraction)
+        
+    lon, lat = [], []
+    latch = True
+    count = 0
+    while len(lon) < n:
+        lon_throw = numpy.random.uniform(0., 360., n_throw)
+        lat_throw = numpy.degrees(numpy.arcsin(numpy.random.uniform(-1., 1., n_throw)))
+
+        pix = ugali.utils.healpix.angToPix(nside, lon_throw, lat_throw)
+        cut = mask[pix].astype(bool)
+
+        lon = numpy.append(lon, lon_throw[cut])
+        lat = numpy.append(lat, lat_throw[cut])
+
+        count += 1
+        if count > 10:
+            raise RuntimeError('Too many loops...')
+
+    return lon[0:n], lat[0:n]
+
+############################################################
