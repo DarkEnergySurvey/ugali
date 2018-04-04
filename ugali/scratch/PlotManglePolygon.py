@@ -15,17 +15,17 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     nside = 2**8
-    print "Creating ra, dec..."
+    print("Creating ra, dec...")
     pix = np.arange(healpy.nside2npix(nside))
     ra,dec = pixToAng(nside,pix)
 
     for infile in args:
-        print "Testing %i HEALPix pixels ..."%len(pix)
+        print("Testing %i HEALPix pixels ..."%len(pix))
         inside = inMangle(infile,ra,dec)
 
-        print "Plotting..."
+        print("Plotting...")
         healpy.mollview(inside)
 
         outfile = infile.replace('.ply','.png')
-        print "Writing %s"%outfile
+        print("Writing %s"%outfile)
         plt.savefig(outfile)

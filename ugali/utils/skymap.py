@@ -115,7 +115,7 @@ def writeSparseHealpixMap(pix, data_dict, nside, outfile,
                                    format = 'K',
                                    array = pix)]
 
-    for key in data_dict.keys():
+    for key in list(data_dict.keys()):
         if data_dict[key].shape[0] != len(pix):
             logger.warning('First dimension of column %s (%i) does not match number of pixels (%i).'%(key,
                                                                                                       data_dict[key].shape[0],
@@ -192,7 +192,7 @@ def readSparseHealpixMaps(infiles, field, extension='PIX_DATA', default_value=he
     Read multiple sparse healpix maps and output the results
     identically to a single file read.
     """
-    if isinstance(infiles,basestring): infiles = [infiles]
+    if isinstance(infiles,str): infiles = [infiles]
 
     pix_array   = []
     value_array = []
@@ -239,7 +239,7 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
     Use the first infile to determine the basic contents to expect for the other files.
     """
     # Setup
-    if isinstance(infiles,basestring): infiles = [infiles]
+    if isinstance(infiles,str): infiles = [infiles]
     
     distance_modulus_array = None
     pix_array = []
@@ -279,7 +279,7 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
                                                  extension=pix_data_extension, construct_map=False)[0]
         pix_array.append(pix_array_current)
 
-        for key in data_dict.keys():
+        for key in list(data_dict.keys()):
             value_array_current = readSparseHealpixMap(infiles[ii], key,
                                                        extension=pix_data_extension, construct_map=False)[1]
             data_dict[key].append(value_array_current)
@@ -296,7 +296,7 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
     if n_conflicting_pixels != 0:
         logger.warning('%i conflicting pixels during merge.'%(n_conflicting_pixels))
 
-    for key in data_dict.keys():
+    for key in list(data_dict.keys()):
         if distance_modulus_array is not None:
             data_dict[key] = numpy.concatenate(data_dict[key], axis=1).transpose()
         else:
@@ -325,11 +325,11 @@ def mergeLikelihoodFiles(infiles, lkhdfile, roifile):
         logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
         reader = pyfits.open(infiles[ii])
         pix_array.append(reader[ext].header['LKDPIX'])
-        for key in data_dict.keys():
+        for key in list(data_dict.keys()):
             data_dict[key].append(reader[ext].header[key])
         
     pix_array = numpy.array(pix_array)
-    for key in data_dict.keys():
+    for key in list(data_dict.keys()):
         data_dict[key] = numpy.array(data_dict[key])
     writeSparseHealpixMap(pix_array, data_dict, nside, roifile)
 

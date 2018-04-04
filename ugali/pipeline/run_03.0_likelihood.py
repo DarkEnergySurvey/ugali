@@ -49,7 +49,7 @@ def run(self):
         jobname = 'tar'
         logfile = os.path.join(logdir,'scan_tar.log')
         cmd = 'tar --remove-files -cvzf %s %s'%(tarfile,scanfile)
-        print cmd
+        print(cmd)
         self.batch.submit(cmd,jobname,logfile)
 
     if 'plot' in self.opts.run:

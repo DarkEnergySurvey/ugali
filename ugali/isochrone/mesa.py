@@ -12,7 +12,7 @@ import subprocess
 import shutil
 from collections import OrderedDict as odict
 
-import urllib, urllib2
+import urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse
 #import requests
 import numpy as np
 
@@ -115,11 +115,11 @@ class Dotter2016(Isochrone):
         """
         try:
             columns = self.columns[self.survey.lower()]
-        except KeyError, e:
+        except KeyError as e:
             logger.warning('Unrecognized survey: %s'%(survey))
             raise(e)
 
-        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
         data = np.genfromtxt(filename,**kwargs)
 
         self.mass_init = data['mass_init']
@@ -180,9 +180,9 @@ class Dotter2016(Isochrone):
         url = server + '/iso_form.php'
         logger.debug("Accessing %s..."%url)
         #response = requests.post(url,data=params)
-        q = urllib.urlencode(params)
-        request = urllib2.Request(url,data=q)
-        response = urllib2.urlopen(request)
+        q = urllib.parse.urlencode(params)
+        request = urllib.request.Request(url,data=q)
+        response = urllib.request.urlopen(request)
         try:
             #fname = os.path.basename(response.text.split('"')[1])
             fname = os.path.basename(response.read().split('"')[1])

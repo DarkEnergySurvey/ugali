@@ -26,7 +26,7 @@ def asscalar(a):
     #if   isinstance(value, (int, long, float)): return value
     try:
         return np.asscalar(a)
-    except AttributeError, e:
+    except AttributeError as e:
         return np.asscalar(np.asarray(a))
 
 
@@ -89,8 +89,8 @@ class Model(object):
             pass
         else:            
             ret += '\n{0:>{2}}{1}'.format('','Parameters:',indent+2)
-            width = len(max(self.params.keys(),key=len))
-            for name,value in self.params.items():
+            width = len(max(list(self.params.keys()),key=len))
+            for name,value in list(self.params.items()):
                 par = '{0!s:{width}} : {1!r}'.format(name,value,width=width)
                 ret += '\n{0:>{2}}{1}'.format('',par,indent+4)
         return ret
@@ -139,7 +139,7 @@ class Model(object):
         parameter value (e.g., bounds, free, etc.).
         """
         kwargs = dict(kwargs)
-        for name,value in kwargs.items():
+        for name,value in list(kwargs.items()):
             # Raise AttributeError if param not found
             self.__getattr__(name) 
             # Set attributes
@@ -247,7 +247,7 @@ class Parameter(object):
     #def __imod__(self, x):      self.set(self % x); return self
     #def __ipow__(self, x):      self.set(self **x); return self
     # Casts
-    def __nonzero__(self):      return self.__value__ != 0
+    def __bool__(self):      return self.__value__ != 0
     def __int__(self):          return self.__value__.__int__()    
     def __float__(self):        return self.__value__.__float__()  
     def __long__(self):         return self.__value__.__long__()   
@@ -337,13 +337,13 @@ class Parameter(object):
         http://stackoverflow.com/a/21912744/4075339 
         """
         tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
-        return dumper.represent_mapping(tag,data.todict().items(),flow_style=True)
+        return dumper.represent_mapping(tag,list(data.todict().items()),flow_style=True)
 
 def odict_representer(dumper, data):
     """ http://stackoverflow.com/a/21912744/4075339 """
     # Probably belongs in a util
     return dumper.represent_mapping(
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,data.items())
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,list(data.items()))
 
 yaml.add_representer(odict,odict_representer)
 yaml.add_representer(Parameter,Parameter.representer)

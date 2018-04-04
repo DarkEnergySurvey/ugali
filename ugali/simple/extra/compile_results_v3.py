@@ -118,10 +118,10 @@ cut  = numpy.logical_not((r_array > 0.2) | \
 
 sig_cut_array = [5.5, 6., 6.5, 7., 10.]
 for sig_cut in sig_cut_array:
-    print sig_cut, numpy.sum((sig_array > sig_cut) & (r_array < 0.2))
+    print(sig_cut, numpy.sum((sig_array > sig_cut) & (r_array < 0.2)))
 
 for ii in range(0, numpy.sum(cut)):
-    print ra_array[cut][ii], dec_array[cut][ii], sig_array[cut][ii], association_array[cut][ii], association_angsep_array[cut][ii] 
+    print(ra_array[cut][ii], dec_array[cut][ii], sig_array[cut][ii], association_array[cut][ii], association_angsep_array[cut][ii]) 
 
 for ra, dec, distance_modulus in zip(ra_array[cut], dec_array[cut], distance_modulus_array[cut]):
     outfile = 'candidate_%.2f_%.2f.png'%(ra, dec)
@@ -143,7 +143,7 @@ colorbar.set_label(r'Significance ($\sigma$)')
 gc_catalog = ugali.candidate.associate.catalogFactory('Harris96')
 sat_catalog = ugali.candidate.associate.catalogFactory('McConnachie12')
 
-ra_ngc, dec_ngc = zip(*[[54.63, -35.45],
+ra_ngc, dec_ngc = list(zip(*[[54.63, -35.45],
                         [11.78, -20.76],
                         [51.59, -21.34],
                         [28.25, -13.74],
@@ -151,9 +151,9 @@ ra_ngc, dec_ngc = zip(*[[54.63, -35.45],
                         [51.62, -35.72],
                         [319.12, -48.36],
                         [45.40, -14.85],
-                        [66.93, -55.02]])
+                        [66.93, -55.02]]))
 
-ra_des, dec_des, name_des = zip(*[[53.92, -54.05, 'Ret II'],
+ra_des, dec_des, name_des = list(zip(*[[53.92, -54.05, 'Ret II'],
                                   [56.09, -43.53, 'Eri II'],
                                   [343.06, -58.57, 'Tuc II'],
                                   [43.87, -54.11, 'Hor I'],
@@ -163,9 +163,9 @@ ra_des, dec_des, name_des = zip(*[[53.92, -54.05, 'Ret II'],
                                   [35.69, -52.28, 'Eri III'],
                                   [344.18, -50.16, 'Gru I'],
                                   [49.13, -50.02, 'Hor II'],
-                                  [8.51, -49.04, 'Luque 1']])
+                                  [8.51, -49.04, 'Luque 1']]))
 
-ra_des_new, dec_des_new, name_des_new = zip(*[[331.06, -46.47, 'Gru II'],
+ra_des_new, dec_des_new, name_des_new = list(zip(*[[331.06, -46.47, 'Gru II'],
                                               [359.04, -59.63, 'Tuc III'],
                                               [82.85, -28.03, 'Col I'], # Rock solid
                                               #[32.29, -12.17, 'Cet II'],
@@ -175,7 +175,7 @@ ra_des_new, dec_des_new, name_des_new = zip(*[[331.06, -46.47, 'Gru II'],
                                               #[94.85, -50.33, 'New'],
                                               #[67.01, -44.34, 'New'],
                                               [56.36, -60.44, 'Many faint stars'],
-                                              [30.02, 3.35, 'Wide near S82']])
+                                              [30.02, 3.35, 'Wide near S82']]))
                                               #[8.51, -49.04, 'Luque 1'],
                                               #[344.19, -50.16, 'New'], # Grus I
                                               #[317.21, -51.16, 'New'], # Ind I
@@ -296,14 +296,14 @@ for ii in range(0, len(ra_des)):
     angsep = ugali.utils.projector.angsep(ra_des[ii], dec_des[ii], ra_array, dec_array)
     outfile = 'candidate_%.2f_%.2f.png'%(ra_array[numpy.argmin(angsep)], dec_array[numpy.argmin(angsep)])
     #print name_des[ii], sig_array[numpy.argmin(angsep)], outfile
-    print '| %s | %.2f, %.2f | %.2f | {{thumbnail(%s, size=400)}} |'%(name_des[ii], ra_des[ii], dec_des[ii], sig_array[numpy.argmin(angsep)], outfile)
+    print('| %s | %.2f, %.2f | %.2f | {{thumbnail(%s, size=400)}} |'%(name_des[ii], ra_des[ii], dec_des[ii], sig_array[numpy.argmin(angsep)], outfile))
     os.system('cp figs_midway_v8/%s figs_reported/.'%(outfile))
 
 for ii in range(0, len(ra_des_new)):
     angsep = ugali.utils.projector.angsep(ra_des_new[ii], dec_des_new[ii], ra_array, dec_array)
     outfile = 'candidate_%.2f_%.2f.png'%(ra_array[numpy.argmin(angsep)], dec_array[numpy.argmin(angsep)])
     #print name_des_new[ii], ra_des_new[ii], dec_des_new[ii], sig_array[numpy.argmin(angsep)], outfile
-    print '| %s | %.2f, %.2f | %.2f | {{thumbnail(%s, size=400)}} |'%(name_des_new[ii], ra_des_new[ii], dec_des_new[ii], sig_array[numpy.argmin(angsep)], outfile)
+    print('| %s | %.2f, %.2f | %.2f | {{thumbnail(%s, size=400)}} |'%(name_des_new[ii], ra_des_new[ii], dec_des_new[ii], sig_array[numpy.argmin(angsep)], outfile))
     os.system('cp figs_midway_v8/%s figs_seed/.'%(outfile))
 
 

@@ -352,7 +352,7 @@ from __future__ import print_function
 try:
     import configparser
 except ImportError:
-    import ConfigParser as configparser
+    import configparser as configparser
 import errno
 import json
 import os

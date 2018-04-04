@@ -44,7 +44,7 @@ if __name__ == "__main__":
             msg='%s [%s, %s] (GLON=%.2f,GLAT=%.2f) --> %s (GLON=%.2f,GLAT=%.2f): %.4f'%(name,iau,const,glon,glat,n,l,b,s)
         else:
             msg='%s [%s, %s] (RA=%.2f,DEC=%.2f) --> %s (RA=%.2f,DEC=%.2f): %.4f'%(name,iau,const,ra,dec,n,r,d,s)
-        print msg
+        print(msg)
 
 
         #for i,c in enumerate(opts.coords):

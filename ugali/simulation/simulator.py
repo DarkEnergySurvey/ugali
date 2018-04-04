@@ -37,13 +37,13 @@ class Generator:
 
     def generate(self, size=1):
         params = dict(self.config['simulate']['params'])
-        dtype = [(n,'>f4') for n in params.keys()]
+        dtype = [(n,'>f4') for n in list(params.keys())]
         data = np.zeros(size,dtype=dtype)
 
         lon,lat = params.pop('lon'),params.pop('lat')
         data['lon'],data['lat'] = self.sky(lon,lat,size)
 
-        for key,value in params.items():
+        for key,value in list(params.items()):
             if value[-1] == 'linear':
                 data[key] = self.linear(value[0],value[1],size)
             elif value[-1] == 'log':
@@ -120,7 +120,7 @@ class Generator:
         if outfile: self.write(outfile,results)
 
         for i,d in enumerate(data): 
-            params = dict(zip(data.dtype.names,d))
+            params = dict(list(zip(data.dtype.names,d)))
             lon,lat = params['lon'],params['lat']
             distance_modulus = params['distance_modulus']
 
@@ -502,8 +502,8 @@ class Simulator(object):
         isochrone = kwargs.pop('isochrone',self.isochrone)
         kernel    = kwargs.pop('kernel',self.kernel)
 
-        for k,v in kwargs.items():
-            if k in kernel.params.keys(): setattr(kernel,k,v)
+        for k,v in list(kwargs.items()):
+            if k in list(kernel.params.keys()): setattr(kernel,k,v)
 
         mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
         lon, lat     = kernel.simulate(len(mag_1))
@@ -554,8 +554,8 @@ class Simulator(object):
         isochrone = kwargs.pop('isochrone',self.isochrone)
         kernel    = kwargs.pop('kernel',self.kernel)
 
-        for k,v in kwargs.items():
-            if k in kernel.params.keys(): setattr(kernel,k,v)
+        for k,v in list(kwargs.items()):
+            if k in list(kernel.params.keys()): setattr(kernel,k,v)
 
         mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
         lon, lat     = kernel.simulate(len(mag_1))

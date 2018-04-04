@@ -19,7 +19,7 @@ def run(self):
 
     for name,label,coord in zip(names,labels,coords):
         glon,glat = coord[0],coord[1]
-        print '\t',name,'(%.2f,%.2f)'%(glon,glat)
+        print('\t',name,'(%.2f,%.2f)'%(glon,glat))
         fig,ax = plt.subplots(1,1,figsize=(8,8))
         plotter =ugali.utils.plotting.BasePlotter(glon,glat,self.config,radius=0.5)
         plotter.image_kwargs.update(opt='GL',xsize=800)

@@ -35,7 +35,7 @@ class Results(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = samples
 
     def load_samples(self,filename):
@@ -93,7 +93,7 @@ class Results(object):
         """ Estimate all source parameters """
         mle = self.get_mle()
         out = odict()
-        for param in mle.keys():
+        for param in list(mle.keys()):
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
  
@@ -116,7 +116,7 @@ class Results(object):
         # CAREFUL: Assumes a flat prior...
         try: 
             data = self.samples.get(param,burn=burn,clip=clip)
-        except ValueError,msg:
+        except ValueError as msg:
             logger.warning(msg)
             return ugali.utils.stats.interval(np.nan)
  
@@ -136,7 +136,7 @@ class Results(object):
         # Calculate best-fit parameters from MCMC chain
         logger.debug('Estimating parameters...')
         estimate = self.estimate_params(**kwargs)
-        params = {k:v[0] for k,v in estimate.items()}
+        params = {k:v[0] for k,v in list(estimate.items())}
         results = dict(estimate)
 
         # Extra parameters from the MCMC chain
