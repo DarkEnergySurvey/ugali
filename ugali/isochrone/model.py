@@ -96,9 +96,9 @@ class IsochroneModel(Model):
 
     def _setup(self, **kwargs):
         defaults = odict([(d[0],d[1]) for d in self.defaults])
-        [defaults.update([i]) for i in list(kwargs.items()) if i[0] in defaults]
+        [defaults.update([i]) for i in kwargs.items() if i[0] in defaults]
 
-        for k,v in list(defaults.items()):
+        for k,v in defaults.items():
             setattr(self,k,v)
 
         self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
@@ -114,7 +114,7 @@ class IsochroneModel(Model):
     def todict(self):
         ret = super(Isochrone,self).todict()
         defaults = odict([(d[0],d[1]) for d in self.defaults])
-        for k,v in list(defaults.items()):
+        for k,v in defaults.items():
             if getattr(self,k) != v: ret[k] = getattr(self,k)
         return ret
 
@@ -169,7 +169,7 @@ class IsochroneModel(Model):
         # ADW: Any other modes possible?
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
-            mass_interpolation = scipy.interpolate.interp1d(list(range(0, len(mass_init))), mass_init)
+            mass_interpolation = scipy.interpolate.interp1d(range(0, len(mass_init)), mass_init)
             mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
             d_mass = mass_array[1:] - mass_array[0:-1]
             mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])

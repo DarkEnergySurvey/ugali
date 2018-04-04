@@ -11,17 +11,17 @@ import ugali
 def test_isochrone():
     import ugali.isochrone
     iso = ugali.isochrone.Padova()
-    print(iso)
+    print iso
 
 def test_kernel():
     import ugali.analysis.kernel
     kernel = ugali.analysis.kernel.Plummer()
-    print(kernel)
+    print kernel
 
 def test_source():
     import ugali.analysis.source
     source = ugali.analysis.source.Source()
-    print(source)
+    print source
 
 def test_factory():
     import ugali.isochrone as isochrone

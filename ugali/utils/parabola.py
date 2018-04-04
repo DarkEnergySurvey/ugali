@@ -115,9 +115,9 @@ class Parabola:
             c = self.p_0 - self.vertex_y + delta
 
         if b**2 - 4. * a * c < 0.:
-            print('WARNING')
+            print 'WARNING'
 
-            print(a, b, c)
+            print a, b, c
             
             #pylab.figure()
             #pylab.scatter(self.x, self.y)

@@ -131,7 +131,7 @@ class Parser(argparse.ArgumentParser):
             data = recfuncs.append_fields(data,'RADIUS',np.zeros(len(data)),usemask=False)
             return data['NAME'],data[['GLON','GLAT','RADIUS']]
         elif (ext=='.txt') or (ext=='.dat'):
-            data = np.loadtxt(filename,unpack=True,usecols=list(range(5)),dtype=object)
+            data = np.loadtxt(filename,unpack=True,usecols=range(5),dtype=object)
             # Deal with one-line input files
             if data.ndim == 1: data = np.array([data]).T
             names = data[0]
@@ -173,4 +173,4 @@ if __name__ == "__main__":
     parser.add_version()
     parser.add_coords()
     opts = parser.parse_args()
-    print(opts)
+    print opts

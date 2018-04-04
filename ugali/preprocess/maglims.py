@@ -286,9 +286,9 @@ def simple_split(config,dirname='split',force=False):
 
 
         pixels = np.nonzero((mangle>0)&(mangle>maglim))[0]
-        print(len(pixels))
+        print len(pixels)
         superpix = superpixel(pixels,nside_mangle,nside_catalog)
-        print(healpix)
+        print healpix
         for hpx in healpix:
             outfile = join(outdir,base)%hpx
             if os.path.exists(outfile) and not force:
@@ -296,7 +296,7 @@ def simple_split(config,dirname='split',force=False):
                 continue
 
             pix = pixels[superpix == hpx]
-            print(hpx, len(pix))
+            print hpx, len(pix)
 
             maglims = maglim*np.ones(len(pix))
             logger.info('Writing %s...'%outfile)

@@ -374,7 +374,7 @@ def dec2hms(dec):
     MINUTE = 60.
     SECOND = 3600.
     
-    if isinstance(dec,str):
+    if isinstance(dec,basestring):
         dec = float(dec)
 
     fhour = dec*(HOUR/DEGREE)
@@ -395,7 +395,7 @@ def dec2dms(dec):
     MINUTE = 60.
     SECOND = 3600.
     
-    if isinstance(dec,str):
+    if isinstance(dec,basestring):
         dec = float(dec)
 
     sign = numpy.copysign(1.0,dec)
@@ -423,7 +423,7 @@ def hms2dec(hms):
     MINUTE = 60.
     SECOND = 3600.
 
-    if isinstance(hms,str):
+    if isinstance(hms,basestring):
         hour,minute,second = numpy.array(re.split('[hms]',hms))[:3].astype(float)
     else:
         hour,minute,second = hms.T
@@ -445,7 +445,7 @@ def dms2dec(dms):
     # can have its signbit set:
     # http://docs.scipy.org/doc/numpy-1.7.0/reference/c-api.coremath.html#NPY_NZERO
 
-    if isinstance(dms,str):
+    if isinstance(dms,basestring):
         degree,minute,second = numpy.array(re.split('[dms]',hms))[:3].astype(float)
     else:
         degree,minute,second = dms.T

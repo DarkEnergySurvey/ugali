@@ -20,7 +20,7 @@ import ugali.utils.projector
 import ugali.candidate.associate
 import diagnostic_plots
 
-print((matplotlib.get_backend()))
+print(matplotlib.get_backend())
 
 with open('config.yaml', 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -39,7 +39,7 @@ candidate_list = candidate_list[candidate_list['sig'] > 5.5] # only plot hotspot
 
 #################################################################
 
-print(('{} candidates found...').format(len(candidate_list)))
+print('{} candidates found...').format(len(candidate_list))
 
 def renderPlot(candidate):
     """
@@ -50,7 +50,7 @@ def renderPlot(candidate):
     fig.subplots_adjust(wspace=0.3, hspace=0.3)
     gs = gridspec.GridSpec(3, 3)
 
-    print(('Analyzing candidate {}/{}...').format(candidate+1, len(candidate_list)))
+    print('Analyzing candidate {}/{}...').format(candidate+1, len(candidate_list))
 
     #sig, targ_ra, targ_dec, mod, r = candidate_list[candidate]
     sig = round(candidate_list[candidate]['sig'], 2)
@@ -59,7 +59,7 @@ def renderPlot(candidate):
     mod = candidate_list[candidate]['distance_modulus']
     data, iso, g_radius, nbhd = diagnostic_plots.analysis(targ_ra, targ_dec, mod)
 
-    print(('Making diagnostic plots for (RA, Dec) = ({}, {})...').format(targ_ra, targ_dec))
+    print('Making diagnostic plots for (RA, Dec) = ({}, {})...').format(targ_ra, targ_dec)
 
     fig.add_subplot(gs[0,0])
     diagnostic_plots.densityPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd, 'stars')
@@ -111,5 +111,5 @@ def renderPlot(candidate):
 #renderPlot(0)
 if __name__ == '__main__':
     pool = Pool(20)
-    index = list(range(len(candidate_list)))
+    index = range(len(candidate_list))
     pool.map(renderPlot, index)

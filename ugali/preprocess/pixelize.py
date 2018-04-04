@@ -141,7 +141,7 @@ def pixelizeCatalog(infiles, config, force=False):
                 out.write(arr)
                 hdr = ugali.utils.healpix.header_odict(nside=nside_catalog,coord='G')
                 for key in ['PIXTYPE','ORDERING','NSIDE','COORDSYS']:
-                    out[1].write_key(*list(hdr[key].values()))
+                    out[1].write_key(*hdr[key].values())
                 out[1].write_key('PIX',pix,comment='HEALPIX pixel for this file')
             else:
                 out=fitsio.FITS(outfile,mode='rw')

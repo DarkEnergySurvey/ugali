@@ -49,7 +49,7 @@ def factory(queue,**kwargs):
     if queue is None: queue = 'local'
 
     name = queue.lower()
-    if name in list(chain(*list(QUEUES.values()))):
+    if name in list(chain(*QUEUES.values())):
         kwargs.setdefault('q',name)
 
     if name in CLUSTERS['local']+QUEUES['local']:
@@ -101,7 +101,7 @@ class Batch(object):
         return sub.call(command,shell=True)
 
     def remap_options(self,opts):
-        for k in list(self._mapping.keys()):
+        for k in self._mapping.keys():
             v = opts.pop(k,None)
             if v is not None:
                 opts[self._mapping[k]] = v
@@ -170,11 +170,11 @@ class LSF(Batch):
         #options.update(OPTIONS[options.get('q')])
         # User specified options
         options.update(opts)
-        if 'n' in list(options.keys()): 
+        if 'n' in options.keys(): 
             options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
-        return ''.join('-%s %s '%(k,v) for k,v in list(options.items()))
+        return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
 class Slurm(Batch):
     _defaults = odict([
@@ -193,7 +193,7 @@ class Slurm(Batch):
     def parse_options(self, **opts):
         options = odict(self.default_opts)
         options.update(opts)
-        return ''.join('--%s %s '%(k,v) for k,v in list(options.items()))
+        return ''.join('--%s %s '%(k,v) for k,v in options.items())
 
 class Condor(Batch):
     """ Not implemented yet... """

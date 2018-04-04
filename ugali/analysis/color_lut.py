@@ -273,7 +273,7 @@ def writeColorLUT(config,
                                                                  bins_mag_1, bins_mag_2,
                                                                  lim_x=None, lim_y=None,
                                                                  vmin=None, vmax=None)
-                    input('WAIT')
+                    raw_input('WAIT')
 
                 columns_array.append(pyfits.Column(name = '%i%i'%(index_mag_err_1, index_mag_err_2),
                                                    format = '%iE'%(histo_isochrone_pdf.shape[1]),

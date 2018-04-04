@@ -70,12 +70,12 @@ def load(args):
     return fitsio.read(infile,columns=columns)
 
 def load_infiles(infiles,columns=None,multiproc=False):
-    if isinstance(infiles,str):
+    if isinstance(infiles,basestring):
         infiles = [infiles]
 
     logger.debug("Loading %s files..."%len(infiles))
 
-    args = list(zip(infiles,len(infiles)*[columns]))
+    args = zip(infiles,len(infiles)*[columns])
 
     if multiproc:
         from multiprocessing import Pool

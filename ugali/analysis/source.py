@@ -40,14 +40,14 @@ class Source(object):
         self.set_model('isochrone',self.createIsochrone())
 
         # Toggle for tracking which models need to be synched
-        self._sync = odict([(k,True) for k in list(self.models.keys())])
+        self._sync = odict([(k,True) for k in self.models.keys()])
 
         self.name = name
         self.set_params(**kwargs)
 
     def __str__(self):
         ret = "%s : Name=%s"%(self.__class__.__name__,self.name)
-        for key,model in list(self.models.items()):
+        for key,model in self.models.items():
             ret += "\n  %s Model (sync=%s):\n"%(key.capitalize(),self._sync[key])
             ret += model.__str__(indent=4)
         return ret
@@ -88,7 +88,7 @@ class Source(object):
             return object.__setattr__(self, name, value)
 
     def setp(self, name, *args, **kwargs):
-        for key,model in list(self.models.items()):
+        for key,model in self.models.items():
             try:
                 ret = model.setp(name, *args, **kwargs)
                 self._sync[key] = True
@@ -98,7 +98,7 @@ class Source(object):
         raise AttributeError
 
     def getp(self, name):
-        for key,model in list(self.models.items()):
+        for key,model in self.models.items():
             try:
                 return model.getp(name).value
             except KeyError:
@@ -109,13 +109,13 @@ class Source(object):
     def params(self):
         # DANGEROUS: Altering properties directly doesn't call model._cache
         params = odict([])
-        for key,model in list(self.models.items()):
+        for key,model in self.models.items():
             params.update(model.params)
         return params
 
 
     def load(self,srcmdl,section=None):
-        if isinstance(srcmdl,str): 
+        if isinstance(srcmdl,basestring): 
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
@@ -123,7 +123,7 @@ class Source(object):
         if section is not None: 
             params = params[section]
         elif len(params) == 1:
-            section = list(params.keys())[0]
+            section = params.keys()[0]
             params = params[section]
 
         fill = False
@@ -152,26 +152,26 @@ class Source(object):
     def todict(self):
         ret = odict()
         if self.name is not None: ret['name'] = self.name
-        for name,model in list(self.models.items()):
+        for name,model in self.models.items():
             ret[name] = model.todict()
         return ret
         
     # ADW: Should be class methods
     @staticmethod
     def createRichness(**kwargs):
-        for k,v in list(copy.deepcopy(Source._defaults['richness']).items()):
+        for k,v in copy.deepcopy(Source._defaults['richness']).items():
             kwargs.setdefault(k,v)
         return richnessFactory(**kwargs)
 
     @staticmethod
     def createKernel(**kwargs):
-        for k,v in list(copy.deepcopy(Source._defaults['kernel']).items()):
+        for k,v in copy.deepcopy(Source._defaults['kernel']).items():
             kwargs.setdefault(k,v)
         return kernelFactory(**kwargs)
 
     @staticmethod
     def createIsochrone(**kwargs):
-        for k,v in list(copy.deepcopy(Source._defaults['isochrone']).items()):
+        for k,v in copy.deepcopy(Source._defaults['isochrone']).items():
             kwargs.setdefault(k,v)
         return isochroneFactory(**kwargs)
     
@@ -198,19 +198,19 @@ class Source(object):
 
     def set_params(self,**kwargs):
         """ Set the parameter values """
-        for key,value in list(kwargs.items()):
+        for key,value in kwargs.items():
             setattr(self,key,value)
 
     def get_params(self):
         """ Get an odict of the parameter names and values """
-        return odict([(key,param.value) for key,param in list(self.params.items())])
+        return odict([(key,param.value) for key,param in self.params.items()])
 
     def get_free_params(self):
         """ Get an odict of free parameter names and values """
-        return odict([(key,param.value) for key,param in list(self.params.items()) if param.free])
+        return odict([(key,param.value) for key,param in self.params.items() if param.free])
 
     def set_free_params(self, names):
-        for name in list(self.get_params().keys()):
+        for name in self.get_params().keys():
             self.setp(name,free=False)
         for name in np.array(names,ndmin=1):
             self.setp(name,free=True)
@@ -219,7 +219,7 @@ class Source(object):
         return self._sync.get(model)
 
     def reset_sync(self):
-        for k in list(self._sync.keys()): self._sync[k]=False
+        for k in self._sync.keys(): self._sync[k]=False
 
     def read(self,filename):
         pass

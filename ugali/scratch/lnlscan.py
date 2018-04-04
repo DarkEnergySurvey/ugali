@@ -45,15 +45,15 @@ from collections import OrderedDict as odict
 
 
 def scan(loglike,xdict,ydict,zdict):
-    xpar,xvals = list(xdict.items())[0]
-    ypar,yvals = list(ydict.items())[0]
-    zpar,zvals = list(zdict.items())[0]
+    xpar,xvals = xdict.items()[0]
+    ypar,yvals = ydict.items()[0]
+    zpar,zvals = zdict.items()[0]
 
     nx,ny,nz = len(xvals),len(yvals),len(zvals)
     
     val,lnl,rich = [],[],[]
     for i in range(nz):
-        print(i,"%s: %.2f"%(zpar,zvals[i]))
+        print i,"%s: %.2f"%(zpar,zvals[i])
         loglike.set_params(**{zpar:zvals[i]})
         for j in range(ny):
             loglike.set_params(**{ypar:yvals[j]})
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     for name in names:
         if opts.name is not None:
             if name.lower() != opts.name.lower(): continue
-        print(name)
+        print name
         #ra,dec = params['ra'],params['dec']
         #lon,lat = cel2gal(ra,dec)
         #params['lon'],params['lat'] = lon,lat
@@ -164,7 +164,7 @@ if __name__ == "__main__":
         maxlnl = np.max(lnl)
         idx =np.argmax(lnl)
         zidx,yidx,xidx = np.unravel_index(idx,lnl.shape)
-        print(list(zip([xpar,ypar,zpar],[x[xidx],y[yidx],z[zidx]])))
+        print zip([xpar,ypar,zpar],[x[xidx],y[yidx],z[zidx]])
 
         # Probably a better way to do the profile with more variables...
         #stackoverflow.com/q/30589211

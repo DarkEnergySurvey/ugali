@@ -94,7 +94,7 @@ class ToyKernel(Kernel):
     """
 
     _params = odict(
-        list(Kernel._params.items()) + 
+        Kernel._params.items() + 
         [
             ('extension',     Parameter(0.1, [0.0001,5.0]) ), 
             ('nside',         Parameter(4096,[4096,4096])),
@@ -131,7 +131,7 @@ class EllipticalKernel(Kernel):
     ### Documentation?
     """
     _params = odict(
-        list(Kernel._params.items()) + 
+        Kernel._params.items() + 
         [
             ('extension',     Parameter(0.1, [0.0001,0.5]) ),   
             ('ellipticity',   Parameter(0.0, [0.0, 0.99]) ),    # Default 0 for RadialKernel
@@ -189,7 +189,7 @@ class EllipticalKernel(Kernel):
         pdf = self._pdf(radius) * np.sin(np.radians(radius))
         cdf = np.cumsum(pdf)
         cdf /= cdf[-1]
-        fn = scipy.interpolate.interp1d(cdf, list(range(0, len(cdf))))
+        fn = scipy.interpolate.interp1d(cdf, range(0, len(cdf)))
         index = numpy.floor(fn(numpy.random.uniform(size=n))).astype(int)
         return radius[index]
  
@@ -240,7 +240,7 @@ class EllipticalDisk(EllipticalKernel):
     """
     _params = EllipticalKernel._params
     _mapping = odict(
-        list(EllipticalKernel._mapping.items()) +
+        EllipticalKernel._mapping.items() +
         [
             ('r_0','extension')
         ])
@@ -260,7 +260,7 @@ class EllipticalGaussian(EllipticalKernel):
     """
     _params = EllipticalKernel._params
     _mapping = odict(
-        list(EllipticalKernel._mapping.items()) +
+        EllipticalKernel._mapping.items() +
         [
             ('sigma','extension')
         ])
@@ -283,7 +283,7 @@ class EllipticalExponential(EllipticalKernel):
     """
     _params = odict(EllipticalKernel._params)
     _mapping = odict(
-        list(EllipticalKernel._mapping.items()) +
+        EllipticalKernel._mapping.items() +
         [
             ('r_h','extension'), # Half-light radius
         ])
@@ -313,12 +313,12 @@ class EllipticalPlummer(EllipticalKernel):
     http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 6)
     """
     _params = odict(
-        list(EllipticalKernel._params.items()) + 
+        EllipticalKernel._params.items() + 
         [
             ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
-        list(EllipticalKernel._mapping.items()) +
+        EllipticalKernel._mapping.items() +
         [
             ('r_c','extension'), # Plummer radius
             ('r_h','extension'), # ADW: Depricated
@@ -359,12 +359,12 @@ class EllipticalKing(EllipticalKernel):
     http://adsabs.harvard.edu/abs/2010MNRAS.406.1220W (App.B)
     """
     _params = odict(
-        list(EllipticalKernel._params.items()) + 
+        EllipticalKernel._params.items() + 
         [
             ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
-        list(EllipticalKernel._mapping.items()) +
+        EllipticalKernel._mapping.items() +
         [
             ('r_c','extension'), # Core radius
             ('r_t','truncate'),  # Tidal radius
