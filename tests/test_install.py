@@ -25,7 +25,7 @@ def call_cmd(cmd):
 def call_chdir(path):
     if not os.path.isdir(path):
         raise Exception("Directory does not exist: %s"%path)
-    print('os.chdir(%s)'%path)
+    print(('os.chdir(%s)'%path))
     os.chdir(path)
 
 def setup_env():

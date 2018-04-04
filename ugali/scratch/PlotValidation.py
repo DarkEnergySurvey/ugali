@@ -33,7 +33,7 @@ if __name__ == "__main__":
         low *= norm
         rich *= norm
         up *= norm
-        plt.errorbar(range(len(rich)), rich, yerr=[rich-low, up-rich], fmt='o',label=label)
+        plt.errorbar(list(range(len(rich))), rich, yerr=[rich-low, up-rich], fmt='o',label=label)
         plt.axhline(np.mean(rich),ls='--',color='r')
 
         for mc_mass in np.unique(results['mc_stellar_mass']):

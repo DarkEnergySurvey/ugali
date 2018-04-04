@@ -70,10 +70,10 @@ class MCMC(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = None
 
-        self.priors = odict(zip(self.params,len(self.params)*[UniformPrior()]))
+        self.priors = odict(list(zip(self.params,len(self.params)*[UniformPrior()])))
         self.priors['extension'] = InversePrior()
 
         self.pool = None
@@ -132,21 +132,21 @@ class MCMC(object):
     def lnlike(self, theta):
         """ Logarithm of the likelihood """
         params,loglike = self.params,self.loglike
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         try:
             lnlike = loglike.value(**kwargs)
-        except ValueError,AssertionError:
+        except ValueError as AssertionError:
             lnlike = -np.inf
         return lnlike
  
     def lnprior(self,theta):
         """ Logarithm of the prior """
         params,priors = self.params,self.priors
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         err = np.seterr(invalid='raise')
         try:
-            lnprior = np.sum(np.log([priors[k](v) for k,v in kwargs.items()]))
-        except FloatingPointError,ValueError:
+            lnprior = np.sum(np.log([priors[k](v) for k,v in list(kwargs.items())]))
+        except FloatingPointError as ValueError:
             lnprior = -np.inf
         np.seterr(**err)
         return lnprior
@@ -177,7 +177,7 @@ class MCMC(object):
         # Initailize the likelihood to maximal value
         mle =self.get_mle()
         msg = "Setting inital values..."
-        for k,v in mle.items():
+        for k,v in list(mle.items()):
             msg+='\n  %s : %s'%(k,v)
         logger.info(msg)
  
@@ -331,7 +331,7 @@ if __name__ == "__main__":
         grid.search()
         source.set_params(**grid.mle())
 
-    params = source.get_free_params().keys()
+    params = list(source.get_free_params().keys())
 
     mcmc = MCMC(config,like)
 

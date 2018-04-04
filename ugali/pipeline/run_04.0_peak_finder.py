@@ -66,7 +66,7 @@ def run(self):
                       candidate['dec'],0.5,candidate['modulus'])
             cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f --radius %s -m %.2f'
             cmd = cmd%params
-            print cmd
+            print(cmd)
             jobname = candidate['name'].lower().replace(' ','_')
             logfile = os.path.join(logdir,jobname+'.log')
             self.batch.submit(cmd,jobname,logfile)

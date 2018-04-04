@@ -24,16 +24,16 @@ def set_parameters(name):
     iso = isochrone.factory(name,**default_kwargs)
 
     # Test that parameters are set in construction
-    for k,v in default_kwargs.items():
+    for k,v in list(default_kwargs.items()):
         assert getattr(iso,k) == v
 
     # Test that parameters are set through setattr
-    for k,v in alt_kwargs.items():
+    for k,v in list(alt_kwargs.items()):
         setattr(iso,k,v)
         assert getattr(iso,k) == v
 
     # Test that parameters are set through setp
-    for k,v in default_kwargs.items():
+    for k,v in list(default_kwargs.items()):
         iso.setp(k,v)
         assert getattr(iso,k) == v
 
@@ -50,10 +50,10 @@ def test_abbr(name='Padova'):
     """ Test that parameters can be set by abbreviation. """
     iso = isochrone.factory(name,**abbr_kwargs)
 
-    for k,v in abbr_kwargs.items():
+    for k,v in list(abbr_kwargs.items()):
         setattr(iso,k,v)
 
-    for k,v in abbr_kwargs.items():
+    for k,v in list(abbr_kwargs.items()):
         iso.setp(k,v)
 
 
