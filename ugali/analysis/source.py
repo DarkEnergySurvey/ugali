@@ -53,6 +53,8 @@ class Source(object):
         return ret
 
     def __getattr__(self, name):
+        """ Overload __getattr__ to access parameters through self.getp.
+        """
         #for key,model in self.models.items():
         #    if name in model.params:
         #        return getattr(model, name)
@@ -65,7 +67,8 @@ class Source(object):
         #return object.__getattribute__(self,name)
         try:
             return self.getp(name)
-        except AttributeError:
+        except AttributeError as e:
+            print(e)
             return object.__getattribute__(self,name)
 
     def __setattr__(self, name, value):
@@ -185,8 +188,22 @@ class Source(object):
         return self.models['isochrone']
 
     def set_model(self, name, model):
-        """ Set a model """
-        if not hasattr(self,'models'):
+        """ Set a model.
+
+        Parameters
+        ----------
+        name  : name of the model -- e.g., richness, kernel, isochrone, etc.
+        model : the model instance
+
+        Returns
+        -------
+        None
+        """
+        # Careful to not use `hasattr`
+        # https://hynek.me/articles/hasattr/
+        try:
+            self.__getattribute__('models')
+        except AttributeError:
             object.__setattr__(self, 'models',odict())
         self.models[name] = model
 
