@@ -12,10 +12,14 @@ import subprocess
 import shutil
 from collections import OrderedDict as odict
 
-import urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse
-#import requests
-import numpy as np
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen, Request
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen, Request
 
+import numpy as np
 
 from ugali.utils.logger import logger
 
@@ -180,9 +184,9 @@ class Dotter2016(Isochrone):
         url = server + '/iso_form.php'
         logger.debug("Accessing %s..."%url)
         #response = requests.post(url,data=params)
-        q = urllib.parse.urlencode(params)
-        request = urllib.request.Request(url,data=q)
-        response = urllib.request.urlopen(request)
+        q = urlencode(params)
+        request = Request(url,data=q)
+        response = urlopen(request)
         try:
             #fname = os.path.basename(response.text.split('"')[1])
             fname = os.path.basename(response.read().split('"')[1])
