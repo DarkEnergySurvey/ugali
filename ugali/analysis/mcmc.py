@@ -146,7 +146,7 @@ class MCMC(object):
         err = np.seterr(invalid='raise')
         try:
             lnprior = np.sum(np.log([priors[k](v) for k,v in list(kwargs.items())]))
-        except FloatingPointError as ValueError:
+        except (FloatingPointError,ValueError):
             lnprior = -np.inf
         np.seterr(**err)
         return lnprior
