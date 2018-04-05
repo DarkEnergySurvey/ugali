@@ -96,9 +96,9 @@ class IsochroneModel(Model):
 
     def _setup(self, **kwargs):
         defaults = odict([(d[0],d[1]) for d in self.defaults])
-        [defaults.update([i]) for i in kwargs.items() if i[0] in defaults]
+        [defaults.update([i]) for i in list(kwargs.items()) if i[0] in defaults]
 
-        for k,v in defaults.items():
+        for k,v in list(defaults.items()):
             setattr(self,k,v)
 
         self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])

@@ -513,7 +513,7 @@ def simulateCatalog(config,roi=None,lon=None,lat=None):
 
 def createLoglike(config,source=None,lon=None,lat=None):
 
-    if isinstance(source,basestring):
+    if isinstance(source,str):
         srcfile = source
         source = ugali.analysis.source.Source()
         source.load(srcfile,section='source')

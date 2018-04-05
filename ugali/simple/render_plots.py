@@ -111,5 +111,5 @@ def renderPlot(candidate):
 #renderPlot(0)
 if __name__ == '__main__':
     pool = Pool(20)
-    index = range(len(candidate_list))
+    index = list(range(len(candidate_list)))
     pool.map(renderPlot, index)
