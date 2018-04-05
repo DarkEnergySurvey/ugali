@@ -101,7 +101,7 @@ class Batch(object):
         return sub.call(command,shell=True)
 
     def remap_options(self,opts):
-        for k in list(self._mapping.keys()):
+        for k in self._mapping.keys():
             v = opts.pop(k,None)
             if v is not None:
                 opts[self._mapping[k]] = v

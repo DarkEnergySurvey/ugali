@@ -502,7 +502,7 @@ class Simulator(object):
         isochrone = kwargs.pop('isochrone',self.isochrone)
         kernel    = kwargs.pop('kernel',self.kernel)
 
-        for k,v in kwargs.items()):
+        for k,v in kwargs.items():
             if k in kernel.params.keys(): setattr(kernel,k,v)
 
         mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
@@ -554,8 +554,8 @@ class Simulator(object):
         isochrone = kwargs.pop('isochrone',self.isochrone)
         kernel    = kwargs.pop('kernel',self.kernel)
 
-        for k,v in list(kwargs.items()):
-            if k in list(kernel.params.keys()): setattr(kernel,k,v)
+        for k,v in kwargs.items():
+            if k in kernel.params.keys(): setattr(kernel,k,v)
 
         mag_1, mag_2 = isochrone.simulate(stellar_mass, distance_modulus)
         lon, lat     = kernel.simulate(len(mag_1))
