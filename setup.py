@@ -102,9 +102,10 @@ class TarballCommand(distutils.cmd.Command,object):
     def install_tarball(self, tarball):
         try:
             from urllib.request import urlopen, urlretrieve
+            from urllib.error import HTTPError
         except ImportError:
             from urllib import urlopen, urlretrieve
-        from urllib2 import HTTPError
+            from urllib2 import HTTPError
 
 
         import tarfile
