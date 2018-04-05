@@ -90,7 +90,7 @@ class Model(object):
         else:            
             ret += '\n{0:>{2}}{1}'.format('','Parameters:',indent+2)
             width = len(max(list(self.params.keys()),key=len))
-            for name,value in list(self.params.items()):
+            for name,value in self.params.items():
                 par = '{0!s:{width}} : {1!r}'.format(name,value,width=width)
                 ret += '\n{0:>{2}}{1}'.format('',par,indent+4)
         return ret
@@ -139,7 +139,7 @@ class Model(object):
         parameter value (e.g., bounds, free, etc.).
         """
         kwargs = dict(kwargs)
-        for name,value in list(kwargs.items()):
+        for name,value in kwargs.items():
             # Raise AttributeError if param not found
             self.__getattr__(name) 
             # Set attributes
@@ -247,6 +247,7 @@ class Parameter(object):
     #def __imod__(self, x):      self.set(self % x); return self
     #def __ipow__(self, x):      self.set(self **x); return self
     # Casts
+    def __nonzero__(self):      return self.__value__ != 0
     def __bool__(self):      return self.__value__ != 0
     def __int__(self):          return self.__value__.__int__()    
     def __float__(self):        return self.__value__.__float__()  

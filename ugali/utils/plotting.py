@@ -226,7 +226,7 @@ def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GML',**kwargs):
     params=dict(ra=ra,dec=dec,
                 width=xsize,height=xsize,
                 scale=scale,opt=opt)
-    query='&'.join("%s=%s"%(k,v) for k,v in list(params.items()))
+    query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.jpeg')
     cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
@@ -272,7 +272,7 @@ def getDSSImage(ra,dec,radius=1.0,xsize=800,**kwargs):
     params=dict(ra='%.3f'%ra,dec='%.3f'%dec,width=scale,height=scale,
                 format='gif',version=1)
     #v='poss2ukstu_red'
-    query='&'.join("%s=%s"%(k,v) for k,v in list(params.items()))
+    query='&'.join("%s=%s"%(k,v) for k,v in params.items())
     
     tmp = tempfile.NamedTemporaryFile(suffix='.gif')
     cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)

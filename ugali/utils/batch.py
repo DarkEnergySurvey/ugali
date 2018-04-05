@@ -174,7 +174,7 @@ class LSF(Batch):
             options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
-        return ''.join('-%s %s '%(k,v) for k,v in list(options.items()))
+        return ''.join('-%s %s '%(k,v) for k,v in options.items())
         
 class Slurm(Batch):
     _defaults = odict([
@@ -193,7 +193,7 @@ class Slurm(Batch):
     def parse_options(self, **opts):
         options = odict(self.default_opts)
         options.update(opts)
-        return ''.join('--%s %s '%(k,v) for k,v in list(options.items()))
+        return ''.join('--%s %s '%(k,v) for k,v in options.items())
 
 class Condor(Batch):
     """ Not implemented yet... """

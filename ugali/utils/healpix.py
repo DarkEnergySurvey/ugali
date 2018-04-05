@@ -241,7 +241,7 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
     hdr = header_odict(nside=nside,coord=coord,ordering=ordering)
     fitshdr = fitsio.FITSHDR(list(hdr.values()))
     if header is not None:
-        for k,v in list(header.items()):
+        for k,v in header.items():
             fitshdr.add_record({'name':k,'value':v})
 
     logger.info("Writing %s"%filename)

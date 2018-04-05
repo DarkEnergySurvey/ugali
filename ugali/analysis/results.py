@@ -93,7 +93,7 @@ class Results(object):
         """ Estimate all source parameters """
         mle = self.get_mle()
         out = odict()
-        for param in list(mle.keys()):
+        for param in mle.keys():
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
  
@@ -136,7 +136,7 @@ class Results(object):
         # Calculate best-fit parameters from MCMC chain
         logger.debug('Estimating parameters...')
         estimate = self.estimate_params(**kwargs)
-        params = {k:v[0] for k,v in list(estimate.items())}
+        params = {k:v[0] for k,v in estimate.items()}
         results = dict(estimate)
 
         # Extra parameters from the MCMC chain

@@ -428,7 +428,7 @@ class LogLikelihood(object):
             pyfits.Column(name='PROB',format='E',array=self.p),
         ]
         hdu = pyfits.new_table(columns)
-        for param,value in list(self.source.params.items()):
+        for param,value in self.source.params.items():
             # HIERARCH allows header keywords longer than 8 characters
             name = 'HIERARCH %s'%param.upper()
             hdu.header.set(name,value.value,param)

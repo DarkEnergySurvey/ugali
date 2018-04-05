@@ -6,9 +6,13 @@ import sys
 import subprocess
 import re
 import os
-import http.client
 import io
 
+try:
+    import http.client as httpcl
+except ImportError:
+    import httplib as httpcl
+ 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
@@ -242,7 +246,7 @@ class SDSSDatabase(Database):
         message = SOAP_TEMPLATE % (wsid, password, table, tb_data, "false")
         
         #construct and send the header
-        webservice = http.client.HTTP("skyserver.sdss3.org")
+        webservice = httpcl.HTTP("skyserver.sdss3.org")
         webservice.putrequest("POST", "/casjobs/services/jobs.asmx")
         webservice.putheader("Host", "skyserver.sdss3.org")
         webservice.putheader("Content-type", "text/xml; charset=\"UTF-8\"")

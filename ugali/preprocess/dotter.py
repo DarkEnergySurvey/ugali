@@ -311,7 +311,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.verbose:
-        from http.client import HTTPConnection
+        try:
+            from http.client as HTTPConnection
+        except ImportError:
+            from httplib import HTTPConnection
         HTTPConnection.debuglevel = 1
 
     if args.outdir is None: 

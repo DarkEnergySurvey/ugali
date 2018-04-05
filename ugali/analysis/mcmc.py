@@ -177,7 +177,7 @@ class MCMC(object):
         # Initailize the likelihood to maximal value
         mle =self.get_mle()
         msg = "Setting inital values..."
-        for k,v in list(mle.items()):
+        for k,v in mle.items():
             msg+='\n  %s : %s'%(k,v)
         logger.info(msg)
  

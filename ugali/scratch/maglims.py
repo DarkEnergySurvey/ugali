@@ -65,7 +65,7 @@ for filename in sorted(glob.glob(path+'/*'))[:nfiles]:
     #mag_2 = f[1].data['mag_psf_g'][::100]
     #mag_err_2 = f[1].data['magerr_psf_'][::100]
 
-for b,meds in list(medians.items()):
+for b,meds in medians.items():
     fig,ax = plt.subplots()
     plt.title('%s band'%b)
     for med in meds:
