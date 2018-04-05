@@ -7,7 +7,7 @@ import matplotlib.patheffects as patheffects
 
 import numpy as np
 import fitsio
-import pyfits
+import astropy.io.fits as pyfits
 
 from astropy.coordinates import SkyCoord
 import astropy.units as u

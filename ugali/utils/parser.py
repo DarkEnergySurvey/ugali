@@ -8,7 +8,7 @@ import argparse
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-import pyfits
+import astropy.io.fits as pyfits
 
 from ugali.utils.healpix import pix2ang
 from ugali.utils.projector import cel2gal

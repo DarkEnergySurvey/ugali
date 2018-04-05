@@ -12,7 +12,7 @@ from scipy.stats import norm
 
 import healpy
 import healpy as hp
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.binning
 import ugali.utils.parabola

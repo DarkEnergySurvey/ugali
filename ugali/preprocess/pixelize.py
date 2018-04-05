@@ -8,7 +8,7 @@ For pixelizing catalogs and masks.
 import os
 from os.path import join
 
-import pyfits
+import astropy.io.fits as pyfits
 import fitsio
 import numpy
 import numpy as np

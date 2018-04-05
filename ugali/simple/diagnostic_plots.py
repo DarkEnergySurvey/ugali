@@ -22,7 +22,7 @@ import scipy.ndimage
 import utils
 
 import pylab as plt
-import pyfits
+import astropy.io.fits as pyfits
 import matplotlib
 from matplotlib import mlab
 from mpl_toolkits.axes_grid1 import make_axes_locatable

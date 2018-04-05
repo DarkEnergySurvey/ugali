@@ -15,7 +15,7 @@ import numpy as np
 import pylab
 import pylab as plt
 import healpy
-import pyfits
+import astropy.io.fits as pyfits
 import scipy.ndimage as nd
 import scipy.misc
 

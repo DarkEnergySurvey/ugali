@@ -328,8 +328,10 @@ class DESDatabase(Database):
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client...
         # This should work but it doesn't
+        import warnings
+        warnings.warn("desdbi is deprecated", DeprecationWarning)
         import despydb.desdbi
-        import pyfits
+        import astropy.io.fits as pyfits
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
