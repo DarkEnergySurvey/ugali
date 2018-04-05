@@ -18,7 +18,7 @@ npix = healpy.nside2npix(nside)
 
 pix_array = []
 for infile in infiles:
-    print infile
+    print(infile)
     reader = pyfits.open(infile)
     cut = (reader[1].data['FLAGS_G'] < 4) & (reader[1].data['FLAGS_R'] < 4) \
           & (reader[1].data['QSLR_FLAG_G'] == 0) & (reader[1].data['QSLR_FLAG_R'] == 0) \

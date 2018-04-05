@@ -49,7 +49,7 @@ def factory(queue,**kwargs):
     if queue is None: queue = 'local'
 
     name = queue.lower()
-    if name in list(chain(*QUEUES.values())):
+    if name in list(chain(*list(QUEUES.values()))):
         kwargs.setdefault('q',name)
 
     if name in CLUSTERS['local']+QUEUES['local']:
@@ -170,7 +170,7 @@ class LSF(Batch):
         #options.update(OPTIONS[options.get('q')])
         # User specified options
         options.update(opts)
-        if 'n' in options.keys(): 
+        if 'n' in list(options.keys()): 
             options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))

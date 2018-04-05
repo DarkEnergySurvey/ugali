@@ -192,7 +192,7 @@ def readSparseHealpixMaps(infiles, field, extension='PIX_DATA', default_value=he
     Read multiple sparse healpix maps and output the results
     identically to a single file read.
     """
-    if isinstance(infiles,basestring): infiles = [infiles]
+    if isinstance(infiles,str): infiles = [infiles]
 
     pix_array   = []
     value_array = []
@@ -239,7 +239,7 @@ def mergeSparseHealpixMaps(infiles, outfile=None,
     Use the first infile to determine the basic contents to expect for the other files.
     """
     # Setup
-    if isinstance(infiles,basestring): infiles = [infiles]
+    if isinstance(infiles,str): infiles = [infiles]
     
     distance_modulus_array = None
     pix_array = []

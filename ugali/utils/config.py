@@ -50,7 +50,7 @@ class Config(dict):
         return yaml.dump(self)
 
     def _load(self, input):
-        if isinstance(input, basestring):
+        if isinstance(input, str):
             self.filename = input
             ext = os.path.splitext(input)[1]
             if ext == '.py':

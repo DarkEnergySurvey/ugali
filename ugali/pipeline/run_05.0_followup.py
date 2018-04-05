@@ -77,7 +77,7 @@ def do_plot(args):
     import pylab as plt
 
     config,name,label,coord = args
-    print args
+    print(args)
 
     filenames = make_filenames(config,label)
     srcfile = filenames['srcfile']
@@ -147,7 +147,7 @@ def run(self):
     self.outdir=mkdir(self.config['output']['mcmcdir'])
     self.logdir=mkdir(join(self.outdir,'log'))
 
-    args = zip(len(names)*[self.opts.config],names,labels,coords)
+    args = list(zip(len(names)*[self.opts.config],names,labels,coords))
 
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")

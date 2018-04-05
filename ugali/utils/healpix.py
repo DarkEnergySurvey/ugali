@@ -153,7 +153,7 @@ def query_disc(nside, vec, radius, inclusive=False, fact=4, nest=False):
         # New-style call (healpy 1.6.3)
         return hp.query_disc(nside, vec, np.radians(radius), inclusive, fact, nest)
     except Exception as e: 
-        print e
+        print(e)
         # Old-style call (healpy 0.10.2)
         return hp.query_disc(nside, vec, np.radians(radius), nest, deg=False)
 
@@ -230,7 +230,7 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
     # ADW: Do we want to make everything uppercase?
 
     if isinstance(data,dict):
-        names = data.keys()
+        names = list(data.keys())
     else:
         names = data.dtype.names
 
@@ -239,7 +239,7 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
         raise ValueError(msg)
 
     hdr = header_odict(nside=nside,coord=coord,ordering=ordering)
-    fitshdr = fitsio.FITSHDR(hdr.values())
+    fitshdr = fitsio.FITSHDR(list(hdr.values()))
     if header is not None:
         for k,v in header.items():
             fitshdr.add_record({'name':k,'value':v})

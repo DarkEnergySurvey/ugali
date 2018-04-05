@@ -120,7 +120,7 @@ class Generator:
         if outfile: self.write(outfile,results)
 
         for i,d in enumerate(data): 
-            params = dict(zip(data.dtype.names,d))
+            params = dict(list(zip(data.dtype.names,d)))
             lon,lat = params['lon'],params['lat']
             distance_modulus = params['distance_modulus']
 

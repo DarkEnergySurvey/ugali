@@ -35,7 +35,7 @@ class Results(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = samples
 
     def load_samples(self,filename):
@@ -116,7 +116,7 @@ class Results(object):
         # CAREFUL: Assumes a flat prior...
         try: 
             data = self.samples.get(param,burn=burn,clip=clip)
-        except ValueError,msg:
+        except ValueError as msg:
             logger.warning(msg)
             return ugali.utils.stats.interval(np.nan)
  
