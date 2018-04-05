@@ -112,7 +112,7 @@ def analysis(targ_ra, targ_dec, mod):
         reader.close()
     print('Assembling data...')
     data = np.concatenate(data_array)
-    print(('Found {} objects...').format(len(data)))
+    print('Found {} objects...').format(len(data))
     print('Loading data...')
 
     ## De-redden magnitudes

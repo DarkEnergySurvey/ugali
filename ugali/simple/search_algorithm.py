@@ -397,7 +397,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
             else:
                 # Check pixels in annulus with complete coverage
                 subpix_annulus_region = np.intersect1d(subpix_region_array, subpix_annulus)
-                print((float(len(subpix_annulus_region)) / len(subpix_annulus)))
+                print(float(len(subpix_annulus_region)) / len(subpix_annulus))
                 if (float(len(subpix_annulus_region)) / len(subpix_annulus)) < 0.25:
                     characteristic_density_local = characteristic_density
                     print('characteristic_density_local spotty', characteristic_density_local)
