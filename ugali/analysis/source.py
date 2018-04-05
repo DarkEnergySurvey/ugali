@@ -68,7 +68,6 @@ class Source(object):
         try:
             return self.getp(name)
         except AttributeError as e:
-            print(e)
             return object.__getattribute__(self,name)
 
     def __setattr__(self, name, value):
