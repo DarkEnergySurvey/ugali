@@ -8,8 +8,12 @@ https://github.com/mfouesneau/ezpadova
 
 """
 import os
-from urllib.parse import urlencode
-from urllib.request import urlopen
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
 import re
 import subprocess
 from multiprocessing import Pool

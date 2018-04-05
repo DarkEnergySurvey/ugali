@@ -12,9 +12,13 @@ http://waps.cfa.harvard.edu/MIST/interp_isos.html
 
 import os
 import re
-import urllib.request, urllib.error, urllib.parse
-from urllib.parse import urlencode
-from urllib.request import urlopen
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
+
 import requests
 import sys
 import copy
