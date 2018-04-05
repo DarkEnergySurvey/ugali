@@ -104,7 +104,7 @@ class TarballCommand(distutils.cmd.Command,object):
             from urllib.request import urlopen, urlretrieve
         except ImportError:
             from urllib import urlopen, urlretrieve
-        from urllib.error import HTTPError
+        from urllib2 import HTTPError
 
 
         import tarfile
