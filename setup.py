@@ -107,7 +107,6 @@ class TarballCommand(distutils.cmd.Command,object):
             from urllib import urlopen, urlretrieve
             from urllib2 import HTTPError
 
-
         import tarfile
 
         if not os.path.exists(self.ugali_dir):
