@@ -7,9 +7,9 @@ Class to farm out analysis tasks.
 @author: Alex Drlica-Wagner <kadrlica@fnal.gov>
 """
 
-import os
+import os,sys
 from os.path import join, exists
-import sys
+import shutil
 import subprocess
 import time
 import glob
@@ -29,6 +29,7 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
 class Farm:
+    """ Class for organizing and submitting likelihood scan jobs. """
 
     def __init__(self, configfile, verbose=False):
         self.configfile = configfile
@@ -141,8 +142,9 @@ class Farm:
 
         # Only write the configfile once
         outdir = mkdir(self.config['output']['likedir'])
-        configfile = '%s/config_queue.py'%(outdir)
-        self.config.write(configfile)
+        # Actually copy config instead of re-writing
+        shutil.copy(self.config.filename,outdir)
+        configfile = join(outdir,os.path.basename(self.config.filename))
 
         pixels = pixels[inside]
         self.submit(pixels,queue=queue,debug=debug,configfile=configfile)
@@ -166,11 +168,8 @@ class Farm:
         # Save the current configuation settings; avoid writing 
         # file multiple times if configfile passed as argument.
         if configfile is None:
-            if local:
-                configfile = self.configfile
-            else:
-                configfile = '%s/config_queue.py'%(outdir)
-                self.config.write(configfile)
+            shutil.copy(self.config.filename,outdir)
+            configfile = join(outdir,os.path.basename(self.config.filename))
                 
         lon,lat = pix2ang(self.nside_likelihood,pixels)
         commands = []
@@ -190,8 +189,8 @@ class Farm:
             cmd = self.command(outfile,configfile,pix)
             commands.append([ii,cmd,lon[ii],lat[ii],sub])
             
-            if local or chunk == 0:
-                # Not chunking
+            if chunk == 0:
+                # No chunking
                 command = cmd
                 submit = sub
                 logfile = join(logdir,os.path.splitext(outbase)[0]+'.log')

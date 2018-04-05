@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@author: Alex Drlica-Wagner <kadrlica@fnal.gov>
+Search for candidates in a likelihood significance map.
 """
 
 import os
@@ -9,28 +9,28 @@ import subprocess
 from collections import OrderedDict as odict
 
 import healpy
-import pyfits
 import fitsio
 import numpy as np
 import numpy
 import numpy.lib.recfunctions as recfuncs
 import scipy.ndimage as ndimage
-
-import ugali.candidate.associate
-import ugali.utils.skymap
+from matplotlib import mlab
 
 from ugali.utils.shell import mkdir, which
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
-from ugali.utils.projector import Projector, gal2cel, dec2hms, dec2dms, mod2dist
+from ugali.utils.projector import Projector,gal2cel,cel2gal,dec2hms,dec2dms,mod2dist
+from ugali.utils import healpix
 from ugali.utils.healpix import pix2ang, ang2pix
+from ugali.candidate.associate import SourceCatalog, catalogFactory
+from ugali.utils.config import Config
 
 class CandidateSearch(object):
     """
     Object used to search for candidate objects in TS maps.
     """
     def __init__(self, config, mergefile=None, roifile=None):
-        self.config = config
+        self.config = Config(config)
         self._config()
         if mergefile is not None: self.mergefile = mergefile
         if roifile is not None: self.roifile = roifile
@@ -57,11 +57,6 @@ class CandidateSearch(object):
 
     def loadLikelihood(self,filename=None):
         if filename is None: filename = self.mergefile
-        #f = pyfits.open(self.mergefile)
-        #self.pixels = f[1].data['PIX']
-        #self.values = 2*f[1].data['LOG_LIKELIHOOD']
-        #self.distances = f[2].data['DISTANCE_MODULUS']
-        #self.richness = f[1].data['RICHNESS']
         f = fitsio.FITS(self.mergefile)
         data = f[1].read()
         self.pixels = data['PIXEL'] if 'PIXEL' in data.dtype.names else data['PIX']
@@ -71,9 +66,10 @@ class CandidateSearch(object):
 
     def loadROI(self,filename=None):
         if filename is None: filename = self.roifile
-        self.ninterior = ugali.utils.skymap.readSparseHealpixMap(filename,'NINSIDE')
-        self.nannulus = ugali.utils.skymap.readSparseHealpixMap(filename,'NANNULUS')
-        self.stellar = ugali.utils.skymap.readSparseHealpixMap(filename,'STELLAR')
+
+        self.ninterior = healpix.read_partial_map(filename,'NINSIDE')[-1]
+        self.nannulus = healpix.read_partial_map(filename,'NANNULUS')[-1]
+        self.stellar = healpix.read_partial_map(filename,'STELLAR')[-1]
 
     def createLabels2D(self):
         """ 2D labeling at zmax """
@@ -97,21 +93,27 @@ class CandidateSearch(object):
 
     def writeLabels(self,filename=None):
         if filename is None: filename = self.labelfile
-        # Converting to float is a waste of memory...
-        # This should be much more robustly done in writeSparseHealpixMap
-        data_dict = {'LABEL':self.labels.astype(float)}
+
+        # ADW: Is it necessary to convert labels?
+        data_dict = {'PIXEL':self.pixels,
+                     'LABEL':self.labels.astype(float,copy=False)}
+
         logger.info("Writing %s..."%filename)
-        ugali.utils.skymap.writeSparseHealpixMap(self.pixels,data_dict,self.nside,filename,
-                                                 distance_modulus_array=self.distances)
+        healpix.write_partial_map(filename,data_dict,self.nside)
+        fitsio.write(filename,
+                     {'DISTANCE_MODULUS':self.distances.astype('f4',copy=False)},
+                     extname='DISTANCE_MODULUS',
+                     clobber=False)
+
 
     def loadLabels(self,filename=None):
         if filename is None: filename = self.labelfile
-        #f = pyfits.open(filename)
         data = fitsio.read(filename)
+        distances = fitsio.read(filename,ext='DISTANCE_MODULUS')['DISTANCE_MODULUS']
         if not (self.pixels == data['PIXEL']).all(): 
-            raise Exception("...")
-        if not (self.distances == data['DISTANCE_MODULUS']).all():
-            raise Exception("...")            
+            raise Exception("Pixels do not match")
+        if not (self.distances == distances).all():
+            raise Exception("Distance moduli do not match.")
 
         self.labels = data['LABEL'].astype(int)
         self.nlabels = self.labels.max()
@@ -137,9 +139,6 @@ class CandidateSearch(object):
 
     def writeObjects(self,filename=None):
         if filename is None: filename = self.objectfile
-        #hdu = pyfits.new_table(self.objects.view(np.recarray))
-        #logger.info("Writing %s..."%filename)
-        #hdu.writeto(filename,clobber=True)
         logger.info("Writing %s..."%filename)
         fitsio.write(filename,self.objects.view(np.recarray),clobber=True)
 
@@ -304,23 +303,24 @@ class CandidateSearch(object):
                                      ])
         
         objs['TS'] = self.values[objects['IDX_MAX'],objects['ZIDX_MAX']]
+        lon,lat = objects['X_MAX'],objects['Y_MAX']
 
-        glon,glat = objects['X_MAX'],objects['Y_MAX']
-        objs['GLON'],objs['GLAT'] = glon,glat
-        
-        ra,dec    = gal2cel(glon,glat)
-        objs['RA'],objs['DEC'] = ra,dec
+        coordsys = self.config['coords']['coordsys']
+        if coordsys.lower() == 'gal':
+            print "GAL coordintes"
+            objs['GLON'],objs['GLAT'] = lon,lat
+            objs['RA'],objs['DEC'] = gal2cel(lon,lat)
+        else:
+            print "CEL coordintes"
+            objs['RA'],objs['DEC'] = lon,lat
+            objs['GLON'],objs['GLAT'] = cel2gal(lon,lat)
 
         modulus = objects['Z_MAX']
         objs['MODULUS'] = modulus
         objs['DISTANCE'] = mod2dist(modulus)
 
-        #ninterior = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NINSIDE')
-        #nannulus = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'NANNULUS')
-        #stellar = ugali.utils.skymap.readSparseHealpixMap(self.roifile,'STELLAR')
-
         nside = healpy.npix2nside(len(self.nannulus))
-        pix = ang2pix(nside,glon,glat)
+        pix = ang2pix(nside,lon,lat)
 
         richness = self.richness[objects['IDX_MAX'],objects['ZIDX_MAX']]
         objs['RICHNESS'] = richness
@@ -333,25 +333,27 @@ class CandidateSearch(object):
         # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
         # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
         fmt = "J%(hour)02i%(hmin)04.1f%(deg)+03i%(dmin)02i"
-        for obj,_ra,_dec in zip(objs,ra,dec):
+        for obj,_ra,_dec in zip(objs,objs['RA'],objs['DEC']):
             hms = dec2hms(_ra); dms = dec2dms(_dec)
             params = dict(hour=hms[0],hmin=hms[1]+hms[2]/60.,
                           deg=dms[0],dmin=dms[1]+dms[2]/60.)
             obj['NAME'] = fmt%params
 
-        out = recfuncs.merge_arrays([objs,objects],usemask=False,asrecarray=True,flatten=True)
-        # This is safer than viewing as FITS_rec
-        return pyfits.new_table(out).data
+        out = recfuncs.merge_arrays([objs,objects],usemask=False,
+                                    asrecarray=True,flatten=True)
+
+        return out
 
     def loadLabels(self,filename=None):
         if filename is None: filename = self.labelfile
-        f = pyfits.open(filename)
-        if not (self.pixels == f[1].data['PIX']).all(): 
-            raise Exception("...")
-        if not (self.distances == f[2].data['DISTANCE_MODULUS']).all():
-            raise Exception("...")            
+        data = fitsio.read(filename)
+        distances = fitsio.read(filename,ext='DISTANCE_MODULUS')['DISTANCE_MODULUS']
+        if not (self.pixels == data['PIXEL']).all(): 
+            raise Exception("Pixels do not match")
+        if not (self.distances == distances).all():
+            raise Exception("Distance moduli do not match.")
 
-        self.labels = f[1].data['LABEL'].astype(int)
+        self.labels = data['LABEL'].astype(int)
         self.nlabels = self.labels.max()
         if self.nlabels != (len(np.unique(self.labels)) - 1):
             raise Exception("Incorrect number of labels found.")
@@ -359,27 +361,26 @@ class CandidateSearch(object):
 
     def loadObjects(self,filename=None):
         if filename is None: filename = self.objectfile
-        f = pyfits.open(filename)
-        self.objects = f[1].data
+        self.objects = fitsio.read(filename)
 
     def loadAssociations(self,filename=None):
         if filename is None: filename = self.assocfile
-        f = pyfits.open(filename)
-        self.assocs = f[1].data
+        self.assocs = fitsio.read(filename)
 
     def createAssociations(self):
         objects = self.objects
 
         tol = self.config['search']['proximity']
-        columns = []
-     
+        columns = odict()
+
         names = np.empty(len(objects),dtype=object)
         names.fill('')
         for i,refs in enumerate(self.config['search']['catalogs']):
             i += 1
-            catalog = ugali.candidate.associate.SourceCatalog()
+            catalog = SourceCatalog()
             for ref in refs:
-                catalog += ugali.candidate.associate.catalogFactory(ref)
+                print ref
+                catalog += catalogFactory(ref)
      
             # String length (should be greater than longest name)
             length = len(max(catalog['name'],key=len)) + 1
@@ -387,25 +388,27 @@ class CandidateSearch(object):
      
             assoc = np.empty(len(objects),dtype=dtype)
             assoc.fill('')
-            idx1,idx2,dist = catalog.match(objects['GLON'],objects['GLAT'],tol=tol)
+            angsep = np.zeros(len(objects),dtype=np.float32)
+            idx1,idx2,sep = catalog.match(objects['GLON'],objects['GLAT'],tol=tol)
             assoc[idx1] = catalog['name'][idx2].astype(dtype)
-            columns.append(pyfits.Column(name='ASSOC%i'%i,format=fitstype,array=assoc))
-            columns.append(pyfits.Column(name='ANGSEP%i'%i,format='E',array=dist))
+            angsep[idx1] = sep
+            columns['ASSOC%i'%i] = assoc
+            columns['ANGSEP%i'%i] = angsep
 
             if length > objects['NAME'].itemsize:
                 logger.warning("Association name may not fit.")
             names = np.where(names=='',assoc,names)
         names = names.astype(objects['NAME'].dtype)
         objects['NAME'][:] = np.where(names=='',objects['NAME'],names)
+        objects['NAME'][:] = np.char.replace(objects['NAME'],'_',' ')
 
-        self.assocs = pyfits.new_table(objects.columns+pyfits.ColDefs(columns)).data
-        self.assocs = self.assocs[self.assocs['NAME'].argsort()]
+        self.assocs=mlab.rec_append_fields(objects,columns.keys(),columns.values())
+        self.assocs=self.assocs[self.assocs['NAME'].argsort()]
 
     def writeAssociations(self,filename=None):
         if filename is None: filename = self.assocfile
-        hdu = pyfits.new_table(self.assocs.view(np.recarray))
         logger.info("Writing %s..."%filename)
-        hdu.writeto(filename,clobber=True)
+        fitsio.write(filename,self.assocs,clobber=True)
 
     def writeCandidates(self,filename=None):
         if filename is None: filename = self.candfile
@@ -416,20 +419,8 @@ class CandidateSearch(object):
         #select &= (self.assocs['ASSOC2']=='')
 
         self.candidates = self.assocs[select]
-        # ADW: View as a recarray or selection doesn't work.
-        # Why? I don't know, and I'm slightly terrified...
-        hdu = pyfits.new_table(self.candidates.view(np.recarray))
         logger.info("Writing %s..."%filename)
-        hdu.writeto(filename,clobber=True)
-
-        # DEPRECATED: ADW 2017-09-15 
-        ## Dump to txt file 
-        #if which('fdump'):
-        #    txtfile = filename.replace('.fits','.txt')
-        #    columns = ['NAME','TS','GLON','GLAT','DISTANCE','MASS']
-        #    cmd = 'fdump %(infile)s %(outfile)s columns="%(columns)s" rows="-" prhead="no" showcol="yes" clobber="yes" pagewidth="256" fldsep=" " showrow="no"'%(dict(infile=filename,outfile=txtfile,columns=','.join(columns)))
-        #    print cmd
-        #    subprocess.call(cmd,shell=True)
+        fitsio.write(filename,self.candidates,clobber=True)
 
 if __name__ == "__main__":
     from optparse import OptionParser
