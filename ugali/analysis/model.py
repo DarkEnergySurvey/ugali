@@ -248,8 +248,8 @@ class Parameter(object):
     #def __ipow__(self, x):      self.set(self **x); return self
     # Casts
     def __nonzero__(self):      return self.__value__ != 0
-    def __bool__(self):      return self.__value__ != 0
-    def __int__(self):          return self.__value__.__int__()    
+    def __bool__(self):         return self.__nonzero__
+    def __int__(self):          return self.__value__.__int__()
     def __float__(self):        return self.__value__.__float__()  
     def __long__(self):         return self.__value__.__long__()   
     # Conversions
