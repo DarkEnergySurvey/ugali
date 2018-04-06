@@ -328,9 +328,8 @@ if __name__ == "__main__":
 
     if args.verbose:
         try:                                                                                            
-            from http.client as HTTPConnection
-        except ImportError:                                                                             
-            from httplib import HTTPConnection
+            from http.client import HTTPConnection
+        except ImportError:                                                                     from httplib import HTTPConnection
         HTTPConnection.debuglevel = 1
 
     if args.outdir is None: 
