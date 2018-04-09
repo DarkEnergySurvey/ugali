@@ -152,7 +152,9 @@ class IsochroneModel(Model):
             # Not generating points for the post-AGB stars,
             # but still count those stars towards the normalization
             select = slice(self.index)
-            
+
+        mass_steps = int(mass_steps)
+
         mass_init = self.mass_init[select]
         mass_act = self.mass_act[select]
         mag_1 = self.mag_1[select]
@@ -169,15 +171,15 @@ class IsochroneModel(Model):
         # ADW: Any other modes possible?
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
-            mass_interpolation = scipy.interpolate.interp1d(list(range(0, len(mass_init))), mass_init)
+            mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
             mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
-            d_mass = mass_array[1:] - mass_array[0:-1]
-            mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])
-            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode = False)
+            d_mass = mass_array[1:] - mass_array[:-1]
+            mass_init_array = np.sqrt(mass_array[1:] * mass_array[:-1])
+            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode=False)
             mass_act_array = mass_act_interpolation(mass_init_array)
             mag_1_array = mag_1_interpolation(mass_init_array)
             mag_2_array = mag_2_interpolation(mass_init_array)
-            
+
         # Horizontal branch dispersion
         if self.hb_spread and (self.stage==self.hb_stage).any():
             logger.debug("Performing dispersion of horizontal branch...")

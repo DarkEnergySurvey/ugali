@@ -346,6 +346,7 @@ def odict_representer(dumper, data):
     return dumper.represent_mapping(
         yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,list(data.items()))
 
+# This changes yaml downstream...
 yaml.add_representer(odict,odict_representer)
 yaml.add_representer(Parameter,Parameter.representer)
 

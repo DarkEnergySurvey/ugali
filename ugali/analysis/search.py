@@ -9,7 +9,7 @@ import subprocess
 from collections import OrderedDict as odict
 
 import healpy
-import pyfits
+import astropy.io.fits as pyfits
 import fitsio
 import numpy as np
 import numpy

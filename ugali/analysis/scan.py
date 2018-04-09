@@ -8,7 +8,7 @@ from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
-import pyfits
+import astropy.io.fits as pyfits
 import healpy
 import fitsio
 

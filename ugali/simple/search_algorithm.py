@@ -14,7 +14,7 @@ import os
 import glob
 import numpy as np
 from matplotlib import mlab
-#import pyfits
+#import astropy.io.fits as pyfits
 import astropy.io.fits as pyfits
 import healpy
 import scipy.interpolate

@@ -6,7 +6,7 @@ import os
 from os.path import join
 import shutil
 
-import pyfits
+import astropy.io.fits as pyfits
 import fitsio
 import numpy
 import numpy as np
