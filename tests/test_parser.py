@@ -30,5 +30,3 @@ object_2 19.45  -17.46 1.0 CEL
     os.remove('targets.txt')
     return args
 
-if __name__ == "__main__":
-    pass
