@@ -8,6 +8,7 @@ import copy
 import numpy
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
+from matplotlib import mlab
 import scipy.special
 import scipy.stats
 
@@ -197,10 +198,12 @@ class Samples(np.recarray):
         else:
             return self.view((float,len(self.dtype)))
 
-    def supplement(self):
+    def supplement(self,coordsys='gal'):
         """ Add some supplemental columns """
         from ugali.utils.projector import gal2cel, gal2cel_angle
+        from ugali.utils.projector import cel2gal, cel2gal_angle
 
+        coordsys = coordsys.lower()
         kwargs = dict(usemask=False, asrecarray=True)
         out = copy.deepcopy(self)
 
@@ -208,15 +211,35 @@ class Samples(np.recarray):
             # Ignore entries that are all zero
             zeros = np.all(self.ndarray==0,axis=1)
 
-            ra,dec = gal2cel(out.lon,out.lat)
+            if coordsys == 'gal':
+                ra,dec = gal2cel(out.lon,out.lat)
+                glon,glat = out.lon,out.lat
+            else:
+                ra,dec = out.lon,out.lat
+                glon,glat = cel2gal(out.lon,out.lat)
+
             ra[zeros] = 0; dec[zeros] = 0
-            out = recfuncs.append_fields(out,['ra','dec'],[ra,dec],**kwargs).view(Samples)
+            glon[zeros] = 0; glat[zeros] = 0
+
+            names = ['ra','dec','glon','glat']
+            arrs = [ra,dec,glon,glat]
+            out = mlab.rec_append_fields(out,names,arrs).view(Samples)
+            #out = recfuncs.append_fields(out,names,arrs,**kwargs).view(Samples)
 
             if 'position_angle' in out.names:
-                pa = gal2cel_angle(out.lon,out.lat,out.position_angle)
-                pa = pa - 180.*(pa > 180.)
-                pa[zeros] = 0
-                out = recfuncs.append_fields(out,['position_angle_cel'],[pa],**kwargs).view(Samples)
+                if coordsys == 'gal':
+                    pa_gal = out.position_angle
+                    pa_cel = gal2cel_angle(out.lon,out.lat,out.position_angle)
+                    pa_cel = pa_cel - 180.*(pa_cel > 180.)
+                else:
+                    pa_gal = cel2gal_angle(out.lon,out.lat,out.position_angle)
+                    pa_cel = out.position_angle
+                    pa_gal = pa_gal - 180.*(pa_gal > 180.)
+                    
+                pa_gal[zeros] = 0; pa_cel[zeros] = 0
+                names = ['position_angle_gal','position_angle_cel']
+                arrs = [pa_gal,pa_cel]
+                out = recfuncs.append_fields(out,names,arrs**kwargs).view(Samples)
         
         return out
 
@@ -240,7 +263,7 @@ class Samples(np.recarray):
         data = self.ndarray[:,idx][bsel&zsel]
         if clip is not None:
             from astropy.stats import sigma_clip
-            mask = sigma_clip(data,sig=clip,copy=False,axis=0).mask
+            mask = sigma_clip(data,sigma=clip,copy=False,axis=0).mask
             data = data[np.where(~mask.any(axis=1))]
 
         return data
