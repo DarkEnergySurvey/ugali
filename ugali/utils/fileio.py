@@ -144,3 +144,49 @@ def write_fits(filename,data,header=None,force=False):
         return
     fitsio.write(filename,data,header=header,clobber=force)
 
+# Writing membership files
+def write_membership(self,filename,loglike):
+
+    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        
+    name_objid = self.config['catalog']['objid_field']
+    name_mag_1 = self.config['catalog']['mag_1_field']
+    name_mag_2 = self.config['catalog']['mag_2_field']
+    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
+    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
+
+    # Angular and isochrone separations
+    sep = angsep(self.source.lon,self.source.lat,
+                 self.catalog.lon,self.catalog.lat)
+    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+
+    data = odict()
+    data[name_objid] = self.catalog.objid
+    data['GLON'] = self.catalog.lon
+    data['GLAT'] = self.catalog.lat
+    data['RA']   = ra
+    data['DEC']  = dec
+    data[name_mag_1] = self.catalog.mag_1
+    data[name_mag_err_1] = self.catalog.mag_err_1
+    data[name_mag_2] = self.catalog.mag_2
+    data[name_mag_err_2] = self.catalog.mag_err_2
+    data['COLOR'] = self.catalog.color
+    data['ANGSEP'] = sep
+    data['ISOSEP'] = isosep
+    data['PROB'] = self.p
+
+    # HIERARCH allows header keywords longer than 8 characters
+    header = []
+    for param,value in self.source.params.items():
+        card = dict(name='HIERARCH %s'%param.upper(),
+                    value=value.value,
+                    comment=param)
+        header.append(card)
+    card = dict(name='HIERARCH %s'%'TS',value=self.ts(),
+                comment='test statistic')
+    header.append(card)
+    card = dict(name='HIERARCH %s'%'TIMESTAMP',value=time.asctime(),
+                comment='creation time')
+    header.append(card)
+    fitsio.write(filename,data,header=header,clobber=True)
+
