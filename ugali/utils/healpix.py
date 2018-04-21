@@ -10,7 +10,6 @@ import numpy as np
 import healpy as hp
 import healpy
 import fitsio
-import pandas as pd
 
 import ugali.utils.projector
 import ugali.utils.fileio
