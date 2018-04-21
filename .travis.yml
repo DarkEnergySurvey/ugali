@@ -36,3 +36,4 @@ script:
       nosetests -v;
     else 
       nosetests -v -I test_tutorial.py;
+    fi
