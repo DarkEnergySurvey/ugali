@@ -29,18 +29,27 @@ QUEUES = odict([
 RUNLIMITS = odict([              #Hard limits
         (None       ,'4:00'),    # Default value
         ('express'  ,'0:01'),    # 0:01
-        ('short'    ,'0:30'),    # 0:30
+        ('short'    ,'0:30'),    # 0:30, max = 1:00
         ('medium'   ,'1:00'),    # 4:00
         ('long'     ,'4:00'),    # 32:00
         ('xlong'    ,'72:00'),   # 72:00
         ('xxl'      ,'168:00'),
-        ('kipac-ibq','24:00'),   # MPI queues
-        ('bulletmpi','72:00'),
+        # MPI queues
+        ('kipac-ibq','36:00'),   # 24:00 (deprecated)
+        ('bulletmpi','36:00'),   # 72:00
         ])
+
+# SLAC updated how memory was handled on the batch system  
+# General queues now only have 4GB of RAM
+# To get more memory for a general job, you need to request more cores with:
+# '-n 2 -R "span[hosts=1]"'
+# https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
 
 MPIOPTS = odict([
         (None       ,' -R "span[ptile=4]"'),
         ('local'    ,''),
+        ('short'    ,''),
+        ('medium'   ,''),
         ('kipac-ibq',' -R "span[ptile=8]"'),
         ('bulletmpi',' -R "span[ptile=16]"'),
         ])
@@ -171,7 +180,7 @@ class LSF(Batch):
         # User specified options
         options.update(opts)
         if 'n' in options.keys(): 
-            options['a'] = 'mpirun'
+            #options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
