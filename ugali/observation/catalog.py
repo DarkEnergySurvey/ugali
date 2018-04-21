@@ -195,6 +195,9 @@ class Catalog:
     def lon(self): return self.data[self.config['catalog']['lon_field']]
     @property 
     def lat(self): return self.data[self.config['catalog']['lat_field']]
+    @property
+    def coordsys(self): 
+        return self.config['coords']['coordsys'].lower()
 
     @property
     def mag_1(self): return self.data[self.config['catalog']['mag_1_field']]
@@ -225,18 +228,22 @@ class Catalog:
 
     # This assumes Galactic coordinates
     @property
-    def ra_dec(self): return gal2cel(self.lon,self.lat)
+    def ra_dec(self): 
+        if self.coordsys == 'cel': return self.lon, self.lat
+        else:                      return gal2cel(self.lon,self.lat)
     @property
     def ra(self): return self.ra_dec[0]
     @property
     def dec(self): return self.ra_dec[1]
 
     @property
-    def glon_glat(self): return self.lon,self.lat
+    def glon_glat(self): 
+        if self.coordsys == 'gal': return self.lon,self.lat
+        else:                      return cel2gal(self.lon,self.lat)
     @property
-    def glon(self): return self.lon
+    def glon(self): return self.glon_glat[0]
     @property
-    def glat(self): return self.lat
+    def glat(self): return self.glon_glat[1]
 
 ############################################################
 
