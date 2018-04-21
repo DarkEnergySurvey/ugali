@@ -128,7 +128,7 @@ class Parser(argparse.ArgumentParser):
             import fitsio
             data = fitsio.read(filename)
         else:
-            data = np.genfromtxt(filename,names=True,dtype=None)
+            data = np.genfromtxt(filename,names=True,dtype=None,encoding=None)
             #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
         data.dtype.names = list(map(str.lower,data.dtype.names))
 
