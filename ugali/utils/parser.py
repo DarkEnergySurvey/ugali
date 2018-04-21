@@ -130,7 +130,7 @@ class Parser(argparse.ArgumentParser):
         else:
             data = np.genfromtxt(filename,names=True,dtype=None)
             #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
-        data.dtype.names = map(str.lower,data.dtype.names)
+        data.dtype.names = list(map(str.lower,data.dtype.names))
 
         # Deal with one-line input files
         #if data.ndim == 1: data = np.array([data]).T
