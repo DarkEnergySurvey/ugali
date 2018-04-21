@@ -74,7 +74,7 @@ class Dotter2016(Isochrone):
                 (2, ('mass_init',float)),
                 (3, ('mass_act',float)),
                 (8, ('log_lum',float)),
-                (9,('u',float)),
+                (9, ('u',float)),
                 (10,('g',float)),
                 (11,('r',float)),
                 (12,('i',float)),
