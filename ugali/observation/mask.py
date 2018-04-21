@@ -20,6 +20,7 @@ import ugali.utils.binning
 import ugali.utils.skymap
 
 import ugali.observation.roi
+from ugali.utils import healpix
 
 from ugali.utils.logger import logger
 from ugali.utils.healpix import ang2pix
@@ -39,7 +40,8 @@ class Mask(object):
 
         self.mask_1 = MaskBand(filenames['mask_1'][catalog_pixels],self.roi)
         self.mask_2 = MaskBand(filenames['mask_2'][catalog_pixels],self.roi)
-        
+        self._fracRoiSparse()
+
         self.minimum_solid_angle = self.config.params['mask']['minimum_solid_angle'] # deg^2
 
         # FIXME: Need to parallelize CMD and MMD formulation
@@ -86,18 +88,44 @@ class Mask(object):
         indices = np.searchsorted(b[idx],a)
         return idx[indices]
 
+    @property
+    def frac_annulus_sparse(self):
+        return self.frac_roi_sparse[self.roi.pixel_annulus_cut]
+     
+    @property
+    def frac_interior_sparse(self):
+        return self.frac_roi_sparse[self.roi.pixel_interior_cut]
 
+    def _fracRoiSparse(self):
+        """
+        Calculate an approximate pixel coverage fraction from the two masks.
+
+        We have no way to know a priori how much the coverage of the
+        two masks overlap in a give pixel. For example, to masks each
+        of frac = 0.5 could have a combined frac = [0.0 to 0.5]. 
+        The limits will be: 
+          max:  min(frac1,frac2)
+          min:  max((frac1+frac2)-1, 0.0)
+
+        Sometimes we are lucky and our fracdet is actually already
+        calculated for the two masks combined, so that the max
+        condition is satisfied. That is what we will assume...
+        """
+        self.frac_roi_sparse = np.min([self.mask_1.frac_roi_sparse,self.mask_2.frac_roi_sparse],axis=0)
+        return self.frac_roi_sparse
 
     def _solidAngleMMD(self):
         """
-        Compute solid angle within the mask annulus (deg^2) as a function of mag_1 and mag_2
+        Compute solid angle within the mask annulus (deg^2) as a
+        function of mag_1 and mag_2
         """
         # Take upper corner of the magnitude bin
         mag_2,mag_1 = np.meshgrid(self.roi.bins_mag[1:],self.roi.bins_mag[1:])
 
+        # Havent tested since adding fracdet
         unmasked_mag_1 = (self.mask_1.mask_annulus_sparse[:,np.newaxis]>mag_1[:,np.newaxis])
         unmasked_mag_2 = (self.mask_2.mask_annulus_sparse[:,np.newaxis]>mag_2[:,np.newaxis])
-        n_unmasked_pixels = (unmasked_mag_1*unmasked_mag_2).sum(axis=1)
+        n_unmasked_pixels = (unmasked_mag_1*unmasked_mag_2*self.frac_annulus_sparse).sum(axis=1)
 
         self.solid_angle_mmd = self.roi.area_pixel * n_unmasked_pixels
 
@@ -105,7 +133,6 @@ class Mask(object):
             msg = "Mask annulus contains no solid angle."
             logger.error(msg)
             raise Exception(msg)
-
 
     def _pruneMMD(self, minimum_solid_angle):
         """
@@ -138,7 +165,8 @@ class Mask(object):
 
     def _solidAngleCMD(self):
         """
-        Compute solid angle within the mask annulus (deg^2) as a function of color and magnitude.
+        Compute solid angle within the mask annulus (deg^2) as a
+        function of color and magnitude.
         """
 
         self.solid_angle_cmd = numpy.zeros([len(self.roi.centers_mag),
@@ -168,8 +196,13 @@ class Mask(object):
 
                 # ADW: Is there a problem here?
                 #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
-                n_unmasked_pixels = np.sum((self.mask_1.mask_annulus_sparse > mag_1) \
-                                               * (self.mask_2.mask_annulus_sparse > mag_2))
+                    
+                unmasked_mag_1 = (self.mask_1.mask_annulus_sparse > mag_1)
+                unmasked_mag_2 = (self.mask_2.mask_annulus_sparse > mag_2)
+                n_unmasked_pixels = np.sum(unmasked_mag_1*unmasked_mag_2*self.frac_annulus_sparse)
+
+                #n_unmasked_pixels = np.sum((self.mask_1.mask_annulus_sparse > mag_1) \
+                #                               * (self.mask_2.mask_annulus_sparse > mag_2))
 
                 self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * n_unmasked_pixels
         if self.solid_angle_cmd.sum() == 0:
@@ -657,18 +690,47 @@ class Mask(object):
 
 class MaskBand(object):
     """
-    Map of completeness depth in magnitudes for a single observing band.
+    Map of liming magnitude for a single observing band.
     """
 
     def __init__(self, infiles, roi):
         """
-        Infile is a sparse HEALPix map fits file.
+        Parameters:
+        -----------
+        infiles : list of sparse healpix mask files
+        roi : roi object
+
+        Returns:
+        --------
+        mask : MaskBand object
         """
         self.roi = roi
-        mask = ugali.utils.skymap.readSparseHealpixMaps(infiles, field='MAGLIM')
-        self.nside = healpy.npix2nside(len(mask))
+        self.config = self.roi.config
+
+        # ADW: It's overkill to make the full map just to slim it
+        # down, but we don't have a great way to go from map pixels to
+        # roi pixels.
+        nside,pixel,maglim = healpix.read_partial_map(infiles,column='MAGLIM')
+        self.nside = nside
+
         # Sparse maps of pixels in various ROI regions
-        self.mask_roi_sparse = mask[self.roi.pixels] 
+        self.mask_roi_sparse = maglim[self.roi.pixels] 
+
+        # Try to get the detection fraction
+        self.frac_roi_sparse = (self.mask_roi_sparse > 0)
+        try: 
+            nside,pixel,frac=healpix.read_partial_map(infiles,column='FRACDET')
+            # This clipping might gloss over bugs...
+            fracmin = self.config['mask'].get('fracmin',0.5)
+            frac[frac < fracmin] = 0.0
+            self.frac_roi_sparse = np.clip(frac[self.roi.pixels],0.0,1.0)
+        except ValueError as e:
+            # No detection fraction present
+            msg = "No 'FRACDET' column found in masks"
+            logger.warn(msg)
+
+        # Explicitly zero the maglim of pixels with fracdet < fracmin
+        self.mask_roi_sparse[self.frac_roi_sparse == 0] = 0.0
 
     #ADW: Safer and more robust (though slightly slower)
     @property
@@ -685,7 +747,16 @@ class MaskBand(object):
 
     @property
     def mask_roi_digi(self):
+        """ Mapping from unique pixels to roi pixels """
         return np.digitize(self.mask_roi_sparse,bins=self.mask_roi_unique)-1
+
+    @property
+    def frac_annulus_sparse(self):
+        return self.frac_roi_sparse[self.roi.pixel_annulus_cut]
+     
+    @property
+    def frac_interior_sparse(self):
+        return self.frac_roi_sparse[self.roi.pixel_interior_cut]
 
     def completeness(self, mags, method='step'):
         """
@@ -701,7 +772,7 @@ class MaskBand(object):
             def func(x):
                 # Efficiency at bright end (assumed to be 100%)
                 e = 1.0
-                # EDR says full width is ~0.5 mag
+                # SDSS EDR says full width is ~0.5 mag
                 width = 0.2 
                 # This should be the halfway point in the curve
                 maglim = self.mask_roi_unique[:,np.newaxis]
@@ -728,8 +799,24 @@ class MaskBand(object):
         mask[mask == 0.] = healpy.UNSEEN
         ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
                                               mask,
-                                               self.roi.lon, self.roi.lat,
+                                              self.roi.lon, self.roi.lat,
                                               self.roi.config.params['coords']['roi_radius'])
+
+
+class CoverageBand(object):
+    """
+    Map of coverage fraction for a single observing band.
+    """
+
+    def __init__(self, infiles, roi):
+        """
+        Infile is a sparse HEALPix map fits file.
+        """
+        self.roi = roi
+        mask = ugali.utils.skymap.readSparseHealpixMaps(infiles, field='COVERAGE')
+        self.nside = healpy.npix2nside(len(mask))
+        # Sparse maps of pixels in various ROI regions
+        self.mask_roi_sparse = mask[self.roi.pixels] 
 
 
 ############################################################
