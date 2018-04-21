@@ -328,6 +328,8 @@ class DESDatabase(Database):
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client...
         # This should work but it doesn't
+        import warnings
+        warnings.warn("desdbi is deprecated", DeprecationWarning)
         import despydb.desdbi
         import astropy.io.fits as pyfits
 
@@ -376,7 +378,7 @@ class DESDatabase(Database):
         #return ret
 
     def download(self, pixel, outdir=None, force=False):
-        import pyfits 
+        import astropy.io.fits as pyfits
 
         if outdir is None: outdir = './'
         else:              mkdir(outdir)

@@ -8,7 +8,7 @@ import os
 import time
 import subprocess
 import glob
-import pyfits
+import astropy.io.fits as pyfits
 import healpy
 import numpy
 

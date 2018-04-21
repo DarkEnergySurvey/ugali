@@ -8,7 +8,7 @@ import gc
 
 import numpy
 import healpy
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc

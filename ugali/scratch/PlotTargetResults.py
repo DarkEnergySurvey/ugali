@@ -4,7 +4,7 @@ import matplotlib
 import healpy
 import pylab as plt
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.skymap
 import ugali.utils.projector

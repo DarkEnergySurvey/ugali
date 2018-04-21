@@ -16,7 +16,6 @@ import pylab
 import pylab as plt
 import healpy
 import healpy as hp
-#import pyfits
 import fitsio
 import scipy.ndimage as nd
 import scipy.misc

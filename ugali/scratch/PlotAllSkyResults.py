@@ -3,7 +3,7 @@ import healpy
 import pylab as plt
 import ugali.utils.skymap
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 
 if __name__ == "__main__":
     from optparse import OptionParser
