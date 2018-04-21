@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Pipeline script for data pre-processing."""
 import os
 import glob
 
@@ -9,7 +10,6 @@ import ugali.preprocess.maglims
 from ugali.utils.logger import logger
 
 components = ['pixelize','density','maglims','simple','split']
-description="Pipeline script for data pre-processing."
 
 def run(self):
     if 'pixelize' in self.opts.run:
@@ -38,6 +38,6 @@ def run(self):
         ugali.preprocess.maglims.simple_split(self.config,'split',force=self.opts.force)
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parse_args()
 pipeline.execute()

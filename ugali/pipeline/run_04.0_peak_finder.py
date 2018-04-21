@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Perform object finding and association."""
 import os
 from os.path import exists, join
 import time
@@ -10,7 +11,6 @@ import ugali.candidate.associate
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
-description="Perform object finding and association."
 components = ['label','objects','associate','candidate','plot']
 
 def run(self):
@@ -57,22 +57,23 @@ def run(self):
         logdir = mkdir(os.path.join(outdir,'log'))
 
         # Eventually move this into 'plotting' module
-        candidates = fitsio.read(self.config.candfile)
-        candidates = candidates[candidates['TS'] >= threshold]
+        candidates = fitsio.read(self.config.candfile,lower=True,trim_strings=True)
+        candidates = candidates[candidates['ts'] >= threshold]
 
-        for candidate in candidates:
-            logger.info("Plotting %s (%.2f,%.2f)..."%(candidate['name'],candidate['glon'],candidate['glat']))
-            params = (self.opts.config,outdir,candidate['name'],candidate['ra'],
-                      candidate['dec'],0.5,candidate['modulus'])
+        for i,c in enumerate(candidates):
+            msg = "(%i/%i) Plotting %s (%.2f,%.2f)..."%(i,len(candidates),c['name'],c['glon'],c['glat'])
+            logger.info(msg)
+            params = (self.opts.config,outdir,c['name'],c['ra'],
+                      c['dec'],0.5,c['modulus'])
             cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f --radius %s -m %.2f'
             cmd = cmd%params
-            print(cmd)
-            jobname = candidate['name'].lower().replace(' ','_')
+            logger.info(cmd)
+            jobname = c['name'].lower().replace(' ','_')
             logfile = os.path.join(logdir,jobname+'.log')
             self.batch.submit(cmd,jobname,logfile)
             time.sleep(5)
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parse_args()
 pipeline.execute()

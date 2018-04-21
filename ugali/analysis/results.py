@@ -39,8 +39,9 @@ class Results(object):
         self.samples = samples
 
     def load_samples(self,filename):
+        coordsys = self.config['coords']['coordsys']
         samples = Samples(filename)
-        self.samples = samples.supplement()
+        self.samples = samples.supplement(coordsys=coordsys)
 
 
     def get_mle(self):
@@ -62,7 +63,6 @@ class Results(object):
 
         # If the parameter is in the samples
         if param in self.samples.names:
-
             if param.startswith('position_angle'):
                 return self.estimate_position_angle(param,burn=burn,
                                                     clip=clip,alpha=alpha)
