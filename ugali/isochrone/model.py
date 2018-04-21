@@ -499,6 +499,7 @@ class IsochroneModel(Model):
         ADW: Could this function be even faster / more readable?
         ADW: Should this include magnitude error leakage?
         """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
         mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_min=mass_min,full_data_range=False)
 
         mag = mag_1 if self.band_1_detection else mag_2
@@ -516,10 +517,13 @@ class IsochroneModel(Model):
         # Create 2D arrays of cuts for each pixel
         mask_1_cut = (mag_1+distance_modulus)[:,np.newaxis] < mag_1_mask
         mask_2_cut = (mag_2+distance_modulus)[:,np.newaxis] < mag_2_mask
-        mask_cut_repeat = mask_1_cut & mask_2_cut
+        mask_cut_repeat = (mask_1_cut & mask_2_cut)
 
+        # Condense back into one per digi
         observable_fraction = (mass_pdf_cut[:,np.newaxis]*mask_cut_repeat).sum(axis=0)
-        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]]
+
+        # Expand to the roi and multiply by coverage fraction
+        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]] * mask.frac_interior_sparse
 
 
     def observableFractionCDF(self, mask, distance_modulus, mass_min=0.1):
