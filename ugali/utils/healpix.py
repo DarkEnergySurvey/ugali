@@ -10,6 +10,7 @@ import numpy as np
 import healpy as hp
 import healpy
 import fitsio
+import pandas as pd
 
 import ugali.utils.fileio
 from ugali.utils.logger import logger
@@ -71,6 +72,12 @@ pixToAng = pix2ang
 angToPix = ang2pix
 angToVec = ang2vec
 
+def get_nside(m):
+    try: 
+        return hp.get_nside(m)
+    except TypeError:
+        return hp.get_nside(m.data)
+
 ############################################################
 
 def healpixMap(nside, lon, lat, fill_value=0.):
@@ -93,24 +100,73 @@ def in_pixels(lon,lat,pixels,nside):
     pix = ang2pix(nside,lon,lat)
     return np.in1d(pix,pixels)
 
-def index_pixels(lon,lat,pixels,nside):
-   """
-   Find the index for object amoung a subset of healpix pixels.
-   Set index of objects outside the pixel subset to -1
 
-   # ADW: Not really safe to set index = -1 (accesses last entry); 
-   # -np.inf would be better, but breaks other code...
-   """
-   pix = ang2pix(nside,lon,lat)
-   # pixels should be pre-sorted, otherwise...???
-   index = np.searchsorted(pixels,pix)
-   if np.isscalar(index):
-       if not np.in1d(pix,pixels).any(): index = -1
-   else:
-       # Find objects that are outside the roi
-       #index[np.take(pixels,index,mode='clip')!=pix] = -1
-       index[~np.in1d(pix,pixels)] = -1
-   return index
+def index_pix_in_pixels(pix,pixels,sort=False,outside=-1):
+    """
+    Find the indices of a set of pixels into another set of pixels.
+    !!! ASSUMES SORTED PIXELS !!!
+
+    Parameters:
+    -----------
+    pix    : set of search pixels
+    pixels : set of reference pixels
+  
+    Returns:
+    --------
+    index : index into the reference pixels
+    """
+    # ADW: Not really safe to set index = -1 (accesses last entry); 
+    # -np.inf would be better, but breaks other code...
+
+    # ADW: Are the pixels always sorted? Is there a quick way to check?
+    if sort: pixels = np.sort(pixels)
+
+    # Assumes that 'pixels' is pre-sorted, otherwise...???
+    index = np.searchsorted(pixels,pix)
+    if np.isscalar(index):
+        if not np.in1d(pix,pixels).any(): index = outside
+    else:
+        # Find objects that are outside the pixels
+        index[~np.in1d(pix,pixels)] = outside
+    return index
+
+def index_lonlat_in_pixels(lon,lat,pixels,nside,sort=False,outside=-1):
+    """
+    Find the indices of a set of angles into a set of pixels
+
+    Parameters:
+    -----------
+    pix    : set of search pixels
+    pixels : set of reference pixels
+  
+    Returns:
+    --------
+    index : index into the reference pixels
+    """
+
+    pix = ang2pix(nside,lon,lat)
+    return index_pix_in_pixels(pix,pixels,sort,outside)
+
+index_pixels = index_lonlat_in_pixels
+
+#def index_pixels(lon,lat,pixels,nside):
+#    """
+#    Find the index for object amoung a subset of healpix pixels.
+#    Set index of objects outside the pixel subset to -1
+#    """
+#    # ADW: Not really safe to set index = -1 (accesses last entry); 
+#    # -np.inf would be better, but breaks other code...
+#    pix = ang2pix(nside,lon,lat)
+#    # pixels should be pre-sorted, otherwise...???
+#    index = np.searchsorted(pixels,pix)
+#    if np.isscalar(index):
+#        if not np.in1d(pix,pixels).any(): index = -1
+#    else:
+#        # Find objects that are outside the roi
+#        #index[np.take(pixels,index,mode='clip')!=pix] = -1
+#        index[~np.in1d(pix,pixels)] = -1
+#    return index
+
 
 ############################################################
 
@@ -158,7 +214,7 @@ def get_interp_val(m, lon, lat, *args, **kwargs):
 
 ############################################################
 
-def header_odict(nside,nest=False,ordering='RING',coord=None, partial=True):
+def header_odict(nside,nest=False,coord=None, partial=True):
     """Mimic the healpy header keywords."""
     hdr = odict([])
     hdr['PIXTYPE']=odict([('name','PIXTYPE'),
@@ -192,7 +248,7 @@ def header_odict(nside,nest=False,ordering='RING',coord=None, partial=True):
                          ('comment','Sky coverage, either FULLSKY or PARTIAL')])
     return hdr
 
-def write_partial_map(filename, data, nside, coord=None, ordering='RING',
+def write_partial_map(filename, data, nside, coord=None, nest=False,
                       header=None,dtype=None,**kwargs):
     """
     Partial HEALPix maps are used to efficiently store maps of the sky by only
@@ -225,7 +281,7 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
         msg = "'PIXEL' column not found."
         raise ValueError(msg)
 
-    hdr = header_odict(nside=nside,coord=coord,ordering=ordering)
+    hdr = header_odict(nside=nside,coord=coord,nest=nest)
     fitshdr = fitsio.FITSHDR(hdr.values())
     if header is not None:
         for k,v in header.items():
@@ -234,9 +290,9 @@ def write_partial_map(filename, data, nside, coord=None, ordering='RING',
     logger.info("Writing %s"%filename)
     fitsio.write(filename,data,extname='PIX_DATA',header=fitshdr,clobber=True)
 
-def read_partial_map(filename, column, fullsky=True, **kwargs):
+def read_partial_map(filenames, column, fullsky=True, **kwargs):
     """
-    Read a partial HEALPix file and return pixels and values/map. Can
+    Read a partial HEALPix file(s) and return pixels and values/map. Can
     handle 3D healpix maps (pix, value, zdim). Returned array has
     shape (dimz,npix).
 
@@ -252,12 +308,12 @@ def read_partial_map(filename, column, fullsky=True, **kwargs):
     (nside,pix,map) : pixel array and healpix map (partial or fullsky)
     """
     # Make sure that PIXEL is in columns
-    kwargs['columns'] = ['PIXEL',column]
+    #kwargs['columns'] = ['PIXEL',column]
+    kwargs['columns'] = ['PIXEL'] + np.atleast_1d(column).tolist()
 
-    filenames = np.atleast_1d(filename)
+    filenames = np.atleast_1d(filenames)
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
     data = ugali.utils.fileio.load_files(filenames,**kwargs)
-    #data,header = fitsio.read(filename,**kwargs)
 
     pix = data['PIXEL']
     value = data[column]
@@ -269,6 +325,9 @@ def read_partial_map(filename, column, fullsky=True, **kwargs):
         msg = '%i duplicate pixels during load.'%(ndupes)
         raise Exception(msg)
 
+    if fullsky and not np.isscalar(column):
+        raise Exception("Cannot make fullsky map from list of columns.")
+    
     if fullsky:
         shape = list(value.shape)
         shape[0] = npix
