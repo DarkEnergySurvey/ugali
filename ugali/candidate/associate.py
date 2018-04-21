@@ -155,8 +155,8 @@ class McConnachie15(SourceCatalog):
         raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
  
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
- 
+        self.data['name'] = np.char.lstrip(np.char.strip(raw['f0']),'*')
+
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
         self.data['ra'] = ugali.utils.projector.hms2dec(ra)
@@ -319,16 +319,13 @@ class Webbink85(SourceCatalog):
                 filename = os.path.join(self.DATADIR,basename)
                 raw.append(np.genfromtxt(filename,**kwargs))
             raw = numpy.concatenate(raw)
-            print raw.dtype
         else:
             raw = np.genfromtxt(filename,**kwargs)
-            print raw.dtype
         self.filename = filename
         
         self.data.resize(len(raw))
         #self.data['name'] = np.char.strip(raw['f0'])
         self.data['name'] = np.char.join(' ',np.char.split(raw['f0']))
-        print self.data.dtype
 
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5']].view(float).reshape(len(raw),-1)
