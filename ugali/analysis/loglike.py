@@ -476,7 +476,9 @@ class LogLikelihood(object):
         name_mag_err_2 = self.config['catalog']['mag_err_2_field']
 
         # Coordinate conversion
-        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        #ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        glon,glat = self.catalog.glon_glat
+        ra,dec    = self.catalog.ra_dec
 
         # Angular and isochrone separations
         sep = angsep(self.source.lon,self.source.lat,
@@ -486,8 +488,8 @@ class LogLikelihood(object):
         # If size becomes an issue we can make everything float32
         data = odict()
         data[name_objid]     = self.catalog.objid
-        data['GLON']         = self.catalog.lon
-        data['GLAT']         = self.catalog.lat
+        data['GLON']         = glon
+        data['GLAT']         = glat
         data['RA']           = ra
         data['DEC']          = dec
         data[name_mag_1]     = self.catalog.mag_1
