@@ -1,0 +1,36 @@
+#data: 'y3a2'
+
+#y3a2:
+nside          : 32
+#datadir        : '/home/s1/kadrlica/projects/y3a2/dsphs/v1/skim'
+datadir        : '/home/s1/kadrlica/projects/y3a2/dsphs/v2/skim'
+results_dir    : 'results_dir'
+log_dir        : 'log_dir'
+save_dir       : 'save_dir_y3a2_low_sig'
+candidate_list : 'candidate_list.csv'
+
+maglim_g : '/home/s1/kadrlica/projects/y3q2/v6/release/depth/y2q1_maglim_g_n1024_ring.fits.gz'
+maglim_r : '/home/s1/kadrlica/projects/y2q/v6/release/depth/y2q1_maglim_r_n1024_ring.fits.gz'
+
+fracdet : None
+
+mag_g_dred_flag         : 'PSF_MAG_SFD_G'
+mag_r_dred_flag         : 'PSF_MAG_SFD_R'
+#mag_g_flag              : 'CM_MAG_G'
+#mag_r_flag              : 'CM_MAG_R'
+mag_err_g_flag          : 'PSF_MAG_ERR_G'
+mag_err_r_flag          : 'PSF_MAG_ERR_R'
+#extinction_g_flag       : 'EXTINCTION_G'
+#extinction_r_flag       : 'EXTINCTION_R'
+star_galaxy_classification     : 'EXTENDED_CLASS_MASH'
+#star_filter             : ''
+#spread_model_r_flag     : 'CM_T' # use for BISS/MagLiteS
+#spread_model_r_err_flag : 'CM_T_ERR'
+flags_g                 : 'SEXTRACTOR_FLAGS_G'
+flags_r                 : 'SEXTRACTOR_FLAGS_R'
+
+# star, galaxy, blue_star filters defined with a string of selections
+# make another config string that takes in kind of data (i.e. DES, BLISS, MagLiteS) and then determines which selections to put together in which order to make the appropriate filter
+# also include sub flags for reddened vs de-redenned to handle how those strings should work
+# this will put a fair bit of emphasis on the structure of the config file, but it may help generalize the code to these various data sets. Then, any new format of data (i.e. LSST) can just used a new "class" within the config file.
+# Ultimately, this should separate the data handling from the analysis of the data

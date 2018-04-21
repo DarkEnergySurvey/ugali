@@ -12,7 +12,6 @@ from scipy.stats import norm
 
 import healpy
 import healpy as hp
-import pyfits
 import fitsio
 
 import ugali.utils.binning
@@ -416,6 +415,8 @@ class LogLikelihood(object):
 
 
     def write_membership2(self,filename):
+        import astropy.io.fits as pyfits
+
         ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
         
         name_objid = self.config['catalog']['objid_field']
@@ -591,7 +592,7 @@ def simulateCatalog(config,roi=None,lon=None,lat=None):
 
 def createLoglike(config,source=None,lon=None,lat=None):
 
-    if isinstance(source,basestring):
+    if isinstance(source,str):
         srcfile = source
         source = ugali.analysis.source.Source()
         source.load(srcfile,section='source')

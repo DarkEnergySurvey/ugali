@@ -96,9 +96,9 @@ class IsochroneModel(Model):
 
     def _setup(self, **kwargs):
         defaults = odict([(d[0],d[1]) for d in self.defaults])
-        [defaults.update([i]) for i in kwargs.items() if i[0] in defaults]
+        [defaults.update([i]) for i in list(kwargs.items()) if i[0] in defaults]
 
-        for k,v in defaults.items():
+        for k,v in list(defaults.items()):
             setattr(self,k,v)
 
         self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
@@ -152,7 +152,9 @@ class IsochroneModel(Model):
             # Not generating points for the post-AGB stars,
             # but still count those stars towards the normalization
             select = slice(self.index)
-            
+
+        mass_steps = int(mass_steps)
+
         mass_init = self.mass_init[select]
         mass_act = self.mass_act[select]
         mag_1 = self.mag_1[select]
@@ -169,15 +171,15 @@ class IsochroneModel(Model):
         # ADW: Any other modes possible?
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
-            mass_interpolation = scipy.interpolate.interp1d(range(0, len(mass_init)), mass_init)
+            mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
             mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
-            d_mass = mass_array[1:] - mass_array[0:-1]
-            mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])
-            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode = False)
+            d_mass = mass_array[1:] - mass_array[:-1]
+            mass_init_array = np.sqrt(mass_array[1:] * mass_array[:-1])
+            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode=False)
             mass_act_array = mass_act_interpolation(mass_init_array)
             mag_1_array = mag_1_interpolation(mass_init_array)
             mag_2_array = mag_2_interpolation(mass_init_array)
-            
+
         # Horizontal branch dispersion
         if self.hb_spread and (self.stage==self.hb_stage).any():
             logger.debug("Performing dispersion of horizontal branch...")
@@ -428,29 +430,16 @@ class IsochroneModel(Model):
 
     def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
         """
-        Simulate observed magnitudes for satellite of given mass and distance.
+        Simulate a set of stellar magnitudes (no uncertainty) for a satellite of a given stellar mass and distance.
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
-        # ADW: is this the predicted number or the observed number?
-        n = int(stellar_mass/self.stellar_mass()) 
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(**kwargs)
-        
-        ## ADW: This assumes that everything is sorted by increasing mass
-        #mag_1, mag_2 = mag_1[::-1],mag_2[::-1]
-        #mass_pdf[::-1]
-
-        cdf = np.cumsum(mass_pdf[::-1])
-        cdf = np.insert(cdf, 0, 0.)
-
-        #mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False
-        #ADW: CDF is *not* normalized (because of minimum mass)
-        f = scipy.interpolate.interp1d(cdf, range(0, len(cdf)), bounds_error=False, fill_value=-1)
-        index = np.floor(f(np.random.uniform(size=n))).astype(int)
-        #print "WARNING: non-random isochrone simulation"
-        #index = np.floor(f(np.linspace(0,1,n))).astype(int)
-        index = index[index >= 0]
-        return mag_1[::-1][index]+distance_modulus, mag_2[::-1][index]+distance_modulus
+        n = int(stellar_mass / self.stellar_mass()) 
+        f_1 = scipy.interpolate.interp1d(self.mass_init, self.mag_1)
+        f_2 = scipy.interpolate.interp1d(self.mass_init, self.mag_2)
+        mass_init_sample = self.imf.sample(n, np.min(self.mass_init), np.max(self.mass_init), **kwargs)
+        mag_1_sample, mag_2_sample = f_1(mass_init_sample), f_2(mass_init_sample) 
+        return mag_1_sample + distance_modulus, mag_2_sample + distance_modulus
 
     def observableFractionCMDX(self, mask, distance_modulus, mass_min=0.1):
         """

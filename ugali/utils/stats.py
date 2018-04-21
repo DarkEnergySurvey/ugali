@@ -124,7 +124,7 @@ def random_pdf(value,pdf,size=None):
     if size is None: size = 1.0
     cdf = np.cumsum(pdf)
     cdf /= cdf[-1]
-    fn = scipy.interpolate.interp1d(cdf, range(0, len(cdf)))
+    fn = scipy.interpolate.interp1d(cdf, list(range(0, len(cdf))))
     index = np.rint(fn(np.random.uniform(size=size))).astype(int)
     return value[index]
 

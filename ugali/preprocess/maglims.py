@@ -6,7 +6,6 @@ import os
 from os.path import join
 import shutil
 
-import pyfits
 import fitsio
 import numpy
 import numpy as np
@@ -300,9 +299,7 @@ def split(config,dirname='split',force=False):
 
         pixels = np.nonzero(mangle>0)[0]
         superpix = superpixel(pixels,nside_mangle,nside_catalog)
-        
         healpix = np.unique(superpix)
-
         for hpx in healpix:
             outfile = join(outdir,base)%hpx
             if os.path.exists(outfile) and not force:
@@ -310,7 +307,7 @@ def split(config,dirname='split',force=False):
                 continue
 
             pix = pixels[superpix == hpx]
-            print outfile, len(pix)
+            print(hpx, len(pix))
 
             logger.info('Writing %s...'%outfile)
             data = odict()

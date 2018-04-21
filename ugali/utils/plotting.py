@@ -374,7 +374,7 @@ class BasePlotter(object):
         blur = nd.filters.gaussian_filter(h.T, smoothing / delta_x)
 
         defaults = dict(cmap='gray_r',rasterized=True)
-        kwargs = dict(defaults.items()+kwargs.items())
+        kwargs = dict(list(defaults.items())+list(kwargs.items()))
 
         xx,yy = np.meshgrid(xbins,ybins)
         im = drawProjImage(xx,yy,blur,coord='C',**kwargs)
@@ -856,7 +856,7 @@ class SourcePlotter(BasePlotter):
 
     def drawMembersSpatial(self,data):
         ax = plt.gca()
-        if isinstance(data,basestring):
+        if isinstance(data,str):
             filename = data
             data = fitsio.read(filename)
 
@@ -894,7 +894,7 @@ class SourcePlotter(BasePlotter):
 
     def drawMembersCMD(self,data):
         ax = plt.gca()
-        if isinstance(data,basestring):
+        if isinstance(data,str):
             filename = data
             data = fitsio.read(filename)
 
@@ -1164,10 +1164,10 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
         data,header = fitsio.read(data,header=True)
 
     defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)
-    kwargs = dict(defaults.items()+kwargs.items())
+    kwargs = dict(list(defaults.items())+list(kwargs.items()))
 
     bkg_kwargs = dict(s=3,zorder=0,c='0.70')
-    bkg_kwargs = dict(kwargs.items()+bkg_kwargs.items())
+    bkg_kwargs = dict(list(kwargs.items())+list(bkg_kwargs.items()))
 
     try: 
         sort = np.argsort(data['PROB'])
@@ -1254,7 +1254,7 @@ def drawIsochrone(isochrone, **kwargs):
     else:
         # Thin lines
         defaults = dict(color='k', linestyle='-')
-    kwargs = dict(defaults.items()+kwargs.items())
+    kwargs = dict(list(defaults.items())+list(kwargs.items()))
 
     isos = isochrone.isochrones if hasattr(isochrone,'isochrones') else [isochrone]
     for iso in isos:
@@ -1499,7 +1499,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
         logger.warning(str(e))
         pass
 
-    label = map(str.capitalize,source.name.split('_'))
+    label = list(map(str.capitalize,source.name.split('_')))
     label[-1] = label[-1].upper()
     title = '%s'%' '.join(label)
     plt.suptitle(title)
@@ -1513,7 +1513,7 @@ def makePath(x_path, y_path, epsilon=1.e-10):
     """
     x_path_closed = numpy.concatenate([x_path, x_path[::-1]])
     y_path_closed = numpy.concatenate([y_path, epsilon + y_path[::-1]])
-    path = matplotlib.path.Path(zip(x_path_closed, y_path_closed))
+    path = matplotlib.path.Path(list(zip(x_path_closed, y_path_closed)))
     return path
 
 ############################################################
@@ -1566,7 +1566,7 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
         mag_1_hb = isochrone.mag_1[index_transition:] + isochrone.distance_modulus
         mag_2_hb = isochrone.mag_2[index_transition:] + isochrone.distance_modulus
         path_hb = makePath(mag_1_hb, mag_2_hb)
-        cut_hb = path_hb.contains_points(zip(g, r), radius=0.1)
+        cut_hb = path_hb.contains_points(list(zip(g, r)), radius=0.1)
         logger.debug('Applying HB selection')
         logger.debug(numpy.sum(cut))
         cut = numpy.logical_or(cut, cut_hb)

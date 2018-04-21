@@ -8,7 +8,6 @@ import argparse
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-import pyfits
 
 from ugali.utils.healpix import pix2ang
 from ugali.utils.projector import cel2gal
@@ -124,35 +123,37 @@ class Parser(argparse.ArgumentParser):
         LAT   = [GLAT | DEC | PIX  ]
 
         """
+        print('parse_targets')
         base,ext = os.path.splitext(filename)
-        if ext == '.fits':
-            f = pyfits.open(filename)
-            data = f[1].data.view(np.recarray)
-            data = recfuncs.append_fields(data,'RADIUS',np.zeros(len(data)),usemask=False)
-            return data['NAME'],data[['GLON','GLAT','RADIUS']]
-        elif (ext=='.txt') or (ext=='.dat'):
-            data = np.loadtxt(filename,unpack=True,usecols=range(5),dtype=object)
-            # Deal with one-line input files
-            if data.ndim == 1: data = np.array([data]).T
-            names = data[0]
-            out   = data[1:4].astype(float)
-            lon,lat,radius = out
-             
-            coord = np.array([s.lower() for s in data[4]])
-            gal = (coord=='gal')
-            cel = (coord=='cel')
-            hpx = (coord=='hpx')
-             
-            if cel.any():
-                glon,glat = cel2gal(lon[cel],lat[cel])
-                out[0][cel] = glon
-                out[1][cel] = glat
-            if hpx.any():
-                glon,glat = pix2ang(lat[hpx],lon[hpx])
-                out[0][hpx] = glon
-                out[1][hpx] = glat
-             
-            return names,out.T
+        if (ext=='.fits'):
+            import fitsio
+            data = fitsio.read(filename)
+        else:
+            data = np.genfromtxt(filename,names=True,dtype=None)
+            #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
+
+        data.dtype.names = map(str.lower,data.dtype.names)
+        print data.dtype.names
+        # Deal with one-line input files
+        #if data.ndim == 1: data = np.array([data]).T
+        names = data['name']
+        out   = data[['lon','lat','radius']].copy()
+         
+        coord = np.char.lower(data['coord'])
+        gal = (coord=='gal')
+        cel = (coord=='cel')
+        hpx = (coord=='hpx')
+         
+        if cel.any():
+            glon,glat = cel2gal(data['lon'][cel],data['lat'][cel])
+            out['lon'][cel] = glon
+            out['lat'][cel] = glat
+        if hpx.any():
+            glon,glat = pix2ang(data['lat'][hpx],data['lon'][hpx])
+            out['lon'][hpx] = glon
+            out['lat'][hpx] = glat
+         
+        return names,out.view(np.ndarray)
 
     #def _parse_local(self,opts):
     #    if vars(opts).get('local') is not None: return
@@ -173,4 +174,4 @@ if __name__ == "__main__":
     parser.add_version()
     parser.add_coords()
     opts = parser.parse_args()
-    print opts
+    print(opts)
