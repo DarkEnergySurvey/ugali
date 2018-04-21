@@ -13,7 +13,7 @@ import ugali.utils.skymap
 import ugali.utils.healpix
 
 components = ['scan','merge','tar','plot']
-
+defaults = ['scan','merge']
 def run(self):
     if 'scan' in self.opts.run:
         logger.info("Running 'scan'...")
@@ -24,17 +24,17 @@ def run(self):
         logger.info("Running 'merge'...")
         mergefile = self.config.mergefile
         roifile = self.config.roifile
-        filenames = self.config.likefile.split('_%')[0]+'_*'
+        filenames = self.config.likefile.split('_%')[0]+'_*.fits'
         infiles = sorted(glob.glob(filenames))
 
         if exists(mergefile) and not self.opts.force:
-            logger.info("  Found %s; skipping..."%mergefile)
+            logger.warn("  Found %s; skipping..."%mergefile)
         else:
             logger.info("  Merging likelihood files...")
             ugali.utils.healpix.merge_partial_maps(infiles,mergefile)
 
         if exists(roifile) and not self.opts.force:
-            logger.info("  Found %s; skipping..."%roifile)
+            logger.warn("  Found %s; skipping..."%roifile)
         else:
             logger.info("  Merging likelihood headers...")
             ugali.utils.healpix.merge_likelihood_headers(infiles,roifile)
@@ -51,12 +51,17 @@ def run(self):
         jobname = 'tar'
         logfile = os.path.join(logdir,'scan_tar.log')
         cmd = 'tar --remove-files -cvzf %s %s'%(tarfile,scanfile)
-        logger.info(cmd)
-        self.batch.submit(cmd,jobname,logfile)
+        if exists(tarfile) and not self.opts.force:
+            logger.warn("  Found %s; skipping..."%tarfile)
+        else:
+            logger.info("  Tarring likelihood files...")
+            logger.info(cmd)
+            self.batch.submit(cmd,jobname,logfile)
 
     if 'plot' in self.opts.run:
         # WARNING: Loading the full 3D healpix map is memory intensive.
         logger.info("Running 'plot'...")
+        # Should do this in environment variable
         import matplotlib
         matplotlib.use('Agg')
         import pylab as plt
@@ -69,6 +74,7 @@ def run(self):
         plt.savefig(outfile)
 
 Pipeline.run = run
+Pipeline.defaults = defaults
 pipeline = Pipeline(__doc__,components)
 pipeline.parser.add_coords(radius=True,targets=True)
 pipeline.parse_args()
