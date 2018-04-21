@@ -25,7 +25,14 @@ install:
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py -q install --isochrones --catalogs
 
+before_script:
+  - export MPLBACKEND=Agg
+  - conda install ipython notebook;
+
 # command to run tests
 script: 
   #- nosetests -v --nocapture
-  - nosetests -v
+  - if [[ $TRAVIS_PYTHON_VERSION < 3.0 ]]; then
+      nosetests -v;
+    else 
+      nosetests -v -I test_tutorial.py;
