@@ -1,0 +1,206 @@
+### ### ### ### ### ### ### ### ### ### 
+### Options for building analysis   ### 
+### ### ### ### ### ### ### ### ### ### 
+
+# HEALPix nside choices
+# 2^4  -> 219. arcmin,  13.43 deg^2, 
+# 2^5  -> 109. arcmin,   3.36 deg^2,
+# 2^6  -> 55.0 arcmin,   0.84 deg^2, 3021 arcmin^2
+# 2^7  -> 27.5 arcmin,   0.21 deg^2,  755 arcmin^2
+# 2^8  -> 13.7 arcmin,  0.052 deg^2,  189 arcmin^2
+# 2^9  -> 6.87 arcmin,  0.013 deg^2, 47.2 arcmin^2
+# 2^10 -> 3.44 arcmin, 3.3e-3 deg^2, 11.8 arcmin^2
+# 2^11 -> 1.72 arcmin, 8.2e-4 deg^2, 2.95 arcmin^2
+# 2^12 -> 0.86 arcmin, 2.0e-4 deg^2, 0.74 arcmin^2
+# 2^13 -> 0.43 arcmin, 5.1e-5 deg^2, 0.18 arcmin^2
+  
+catalog:
+  #infile: None
+  dirname: /u/ki/kadrlica/des/data/y3a2/gold/1.2/healpix
+  basename: "catalog_hpx%04i.fits"
+  lon_field: RA
+  lat_field: DEC
+  # Color always defined as mag_1 - mag_2
+  objid_field       : COADD_OBJECT_ID
+  mag_1_band        : &band1 g
+  mag_1_field       : PSF_MAG_SFD_G
+  mag_err_1_field   : PSF_MAG_ERR_G
+  mag_2_band        : &band2 r
+  mag_2_field       : PSF_MAG_SFD_R
+  mag_err_2_field   : PSF_MAG_ERR_R
+  # True = band 1 is detection band; False = band 2 is detection band     
+  band_1_detection  : &detection True
+  mc_source_id_field: MC_SOURCE_ID
+  selection         : "((self.data['FLAG_FOREGROUND'] & 16) == 0)"
+  #selection         : null
+
+coords:
+  nside_catalog   : 8      # Size of patches for catalog binning
+  nside_mask      : 64     # Size of patches for mask creation
+  nside_likelihood: 256    # Size of target pixel
+  nside_pixel     : 4096   # Size of pixels within target region
+  roi_radius      : 2.0    # Outer radius of background annulus
+  roi_radius_annulus: 0.5  # Inner radius of background annulus
+  roi_radius_interior: 0.5 # Radius of interior region for likelihood analysis
+  coordsys : cel           # Coordinate system ['CEL','GAL']
+  proj_type: ait
+
+data: 
+  script : ./ugali/preprocess/database.py
+  survey : des
+  release: y3a2
+  dirname: /u/ki/kadrlica/des/data/y3a2/gold/1.2/raw
+  density: /u/ki/kadrlica/des/data/y3a2/gold/1.2/density/density_hpx%04i.fits
+  footprint: /u/ki/kadrlica/des/data/y3a2/gold/1.2/maps/y3a2_fracdet_nest_n4096_v1.0.fits.gz
+
+mask:
+  dirname    : /u/ki/kadrlica/des/data/y3a2/gold/1.2/split
+  basename_1 : "maglim_g_hpx%04i.fits"
+  basename_2 : "maglim_r_hpx%04i.fits"
+  minimum_solid_angle: 0.1 # deg^2
+
+mangle:
+  dirname    : /u/ki/kadrlica/des/data/y3a2/gold/1.2/maps
+  filename_1 : 'y3a2_g_o.4096_t.32768_maglim_EQU.fits.gz'
+  filename_2 : 'y3a2_r_o.4096_t.32768_maglim_EQU.fits.gz'
+
+#ADW: Depricated in favor of 'binning'
+color:
+  min   : &cmin -0.5
+  max   : &cmax 1.0 # 1.0
+  n_bins: &cbins 12  # 15
+ 
+mag:
+  min   : &mmin  16    # 18
+  max   : &mmax  24.0  # 25
+  n_bins: &mbins 100 # 0.1, 0.02
+
+# DEPRECATED?: ADW 2017-09-22
+binning: 
+  ###type: [min, max, nbins]
+  color  : [ *cmin, *cmax, *cbins]
+  mag    : [ *mmin, *mmax, *mbins] 
+  age    : [     1,  13.5, 125] # Age (Gyr)   [max a=13.5]
+  z      : [0.0001,  0.01,  32] # Metallicity [max z=0.07]
+ 
+# Default kernel specification
+kernel:
+  name: RadialPlummer
+  r_h: 0.03
+  proj: 'ait'
+
+# Default isochrone specifications
+isochrone:
+   name: CompositeIsochrone
+   isochrones:
+     - {name: Bressan2012, age: 10.0, z: 0.0001}
+     - {name: Bressan2012, age: 10.0, z: 0.0002}
+     - {name: Bressan2012, age: 12.0, z: 0.0001}
+     - {name: Bressan2012, age: 12.0, z: 0.0002}
+   weights: [0.25,0.25,0.25,0.25]
+   distance_modulus : 17.0
+   band_1 : *band1
+   band_2 : *band2
+   band_1_detection : *detection
+  
+likelihood:
+  #delta_mag: 0.01 # 1.e-3 
+  delta_mag: 0.01 # 1.e-3 
+
+### ### ### ### ### ### ### ### ### ### 
+### Options for analysis components ###
+### ### ### ### ### ### ### ### ### ### 
+
+output:
+  likedir    : ./scan
+  searchdir  : ./search
+  mcmcdir    : ./mcmc_v01
+  simdir     : ./sims
+  resultdir  : ./results
+  plotdir    : ./plots
+  likefile   : "scan_%08i_%s.fits"
+  mergefile  :  merged_scan.fits
+  roifile    :  merged_roi.fits
+  labelfile  :  merged_labels.fits
+  objectfile :  ugali_objects.fits
+  assocfile  :  ugali_assocs.fits
+  candfile   :  ugali_candidates.fits
+  mcmcfile   : "%s_mcmc.npy"
+  simfile    : "sims_%04i.fits"
+
+#https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
+batch:
+  cluster: slac
+  #cluster: local
+  jobname: ugali
+  # This works on the kipac-ibq
+  #opts : {"W":"8:00", "R":"rusage[mem=12G]","M":"12G"}
+  # Something like this may work to get 4*n GB on the general queues
+  opts : {"W":"4:00", "n":4, "R":"span[hosts=1]"}
+  max_jobs: 200
+  chunk: 25
+  
+scan:
+  script : ./ugali/analysis/scan.py
+  distance_modulus_array: [16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0, 21.5, 22.0, 22.5, 23.0]
+  #extension_array: [0.03,0.1,0.3]
+  full_pdf: False
+  color_lut_infile: null
+  source:
+    kernel:
+      name: RadialPlummer
+      r_h: 0.07
+    isochrone:
+       name: CompositeIsochrone
+       isochrones:
+         - {name: Bressan2012, age: 10.0, z: 0.0001}
+         - {name: Bressan2012, age: 10.0, z: 0.0002}
+         - {name: Bressan2012, age: 12.0, z: 0.0001}
+         - {name: Bressan2012, age: 12.0, z: 0.0002}
+       weights: [0.25,0.25,0.25,0.25]
+       band_1 : *band1
+       band_2 : *band2
+       band_1_detection : *detection
+  
+search:
+  obj_threshold  : 10  # TS threshold for object selection
+  cand_threshold : 45 # TS threshold for object selection
+  xsize    : 1.0e+4
+  minpix   : 1
+  catalogs: [ [McConnachie12, ExtraDwarfs],                           # ASSOC1
+              [Rykoff14, Harris96, Corwen04, Nilson73,                # ASSOC2
+              Webbink85, Kharchenko13, WEBDA14, ExtraClusters]
+              ]
+  proximity: 0.1 # deg
+  
+mcmc:
+  script : ./ugali/analysis/mcmc.py
+  #params  : ['richness','age','metallicity','distance_modulus']
+  params  : ['richness','lon','lat','extension']
+  #params  : ['richness','lon','lat','extension','ellipticity','position_angle','distance_modulus']
+  #srcmdl: 'srcmdl_v0.yaml'
+  nsamples: 1000
+  nwalkers: 100
+  nthreads: 16
+  nburn   : 10
+  nchunk  : 25
+
+results:
+  martin  : True
+  nburn   : 100
+  alpha   : 0.10
+
+simulate:
+  script : ./ugali/simulation/simulator.py
+  njobs  : 200
+  size   : 10000
+  save   : 1
+  isochrone : null # default to using 'isochrone'
+  kernel  : null
+  params: 
+    lon              : 266.3065
+    lat              : -49.7437
+    stellar_mass     : [5500,5500,'log']
+    distance_modulus : [17.5,17.5,'linear']
+    extension        : [0.1,0.1,'linear']
+    ellipticity      : [0.0,0.0,'linear']
