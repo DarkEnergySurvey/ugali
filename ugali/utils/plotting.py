@@ -33,6 +33,7 @@ import ugali.utils.healpix
 import ugali.isochrone
 import ugali.analysis.loglike
 
+from ugali.utils import fileio
 from ugali.utils.healpix import ang2pix, get_nside
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
 from ugali.utils.projector import sphere2image,image2sphere
@@ -497,9 +498,6 @@ class BasePlotter(object):
             #filename = os.path.join(dirname,basename)
             filename = self.config.mergefile
 
-        #results=pyfits.open(filename)[1]
-        #pixels = results.data['PIXEL']
-        #values = 2*results.data['LOG_LIKELIHOOD']
         data = fitsio.read(filename)
         pixels = data['PIXEL']
         values = 2*data['LOG_LIKELIHOOD']
@@ -554,7 +552,6 @@ class BasePlotter(object):
         if zidx is not None:
             filename = self.config.mergefile
             logger.debug("Opening %s..."%filename)
-            #f = pyfits.open(filename)
             f = fitsio.FITS(filename)
             distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]
 
@@ -589,7 +586,6 @@ class BasePlotter(object):
 
         filename = self.config.mergefile
         logger.debug("Opening %s..."%filename)
-        #f = pyfits.open(filename)
         f = fitsio.FITS(filenaem)
         distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]
 
@@ -1157,9 +1153,6 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
 
     config = ugali.utils.config.Config(config)
     if isinstance(data,basestring):
-        #hdu = pyfits.open(data)[1]
-        #data = hdu.data
-        #header = hdu.header
         data,header = fitsio.read(data,header=True)
 
     defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)

@@ -9,7 +9,7 @@ import glob
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-import astropy.io.fits as pyfits
+import fitsio
 
 from ugali.analysis.pipeline import Pipeline
 import ugali.analysis.loglike
@@ -70,20 +70,19 @@ def run(self):
         filenames=join(outdir,self.config['output']['simfile']).split('_%')[0]+'_*'
         infiles=sorted(glob.glob(filenames))
 
-        f = pyfits.open(infiles[0])
+        f = fitsio.read(infiles[0])
         table = np.empty(0,dtype=data.dtype)
         for filename in infiles:
             logger.debug("Reading %s..."%filename)
-            f = pyfits.open(filename)
-            t = f[1].data[~np.isnan(f[1].data['ts'])]
+            d = fitsio.read(filename)
+            t = d[~np.isnan(d['ts'])]
             table = recfuncs.stack_arrays([table,t],usemask=False,asrecarray=True)
 
         logger.info("Found %i simulations."%len(table))
         outfile = join(outdir,"merged_sims.fits")
-        hdu = pyfits.new_table(table)
         logger.info("Writing %s..."%outfile)
-        hdu.writeto(outfile,clobber=True)
-
+        fitsio.write(outfile,table,clobber=True)
+        
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
         import ugali.utils.plotting
@@ -91,7 +90,7 @@ def run(self):
 
         plotdir = mkdir(self.config['output']['plotdir'])
 
-        data = pyfits.open(join(outdir,"merged_sims.fits"))[1].data
+        data = fitsio.read(join(outdir,"merged_sims.fits"))
         data = data[~np.isnan(data['ts'])]
         
         bigfig,bigax = plt.subplots()
