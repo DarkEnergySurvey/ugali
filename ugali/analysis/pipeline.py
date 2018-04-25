@@ -4,8 +4,6 @@ Base functionality for pipeline scripts
 """
 
 import ugali.utils.batch
-#from ugali.utils.batch import factory as batchFactory
-
 from ugali.utils.parser import Parser
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
@@ -40,7 +38,9 @@ class Pipeline(object):
             self.opts.run = self.defaults
 
         self.config = Config(self.opts.config)        
-        self.batch = ugali.utils.batch.batchFactory(self.opts.queue)
+        # Setup the batch system
+        #kwargs = self.config['batch'].get(self.opts.queue,dict())
+        self.batch = ugali.utils.batch.batch_factory(self.opts.queue)
 
     def run(self):
         logger.warning("Doing nothing...")

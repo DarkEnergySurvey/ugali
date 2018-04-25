@@ -17,6 +17,56 @@ from ugali.utils.logger import logger
 #import logging as logger
 import warnings
 
+def read(filename,**kwargs):
+    """ Read a generic input file into a recarray.
+    Accepted file formats: [.fits,.fz,.npy,.csv,.txt,.dat]
+    
+    Parameters:
+    filename : input file name
+    kwargs   : keyword arguments for the reader
+    Returns:
+    recarray : data array
+    """
+    base,ext = os.path.splitext(filename)
+    if ext in ('.fits','.fz'):
+        # Abstract fits here...
+        return fitsio.read(filename,**kwargs)
+    elif ext in ('.npy'):
+        return np.load(filename,**kwargs)
+    elif ext in ('.csv'):
+        return np.recfromcsv(filename,**kwargs)
+    elif ext in ('.txt','.dat'):
+        return np.genfromtxt(filename,**kwargs)
+
+    msg = "Unrecognized file type: %s"%filename
+    raise ValueError(msg)
+
+def write(filename,data,**kwargs):
+    """ Write a recarray to a specific format.
+    Accepted file formats: [.fits,.fz,.npy,.csv,.txt,.dat]
+    
+    Parameters:
+    filename : output file name
+    data     : the recarray data
+    kwargs   : keyword arguments for the writer
+    Returns:
+    ret      : writer return (usually None)
+    """
+    base,ext = os.path.splitext(filename)
+    if ext in ('.fits','.fz'):
+        # Abstract fits here...
+        return fitsio.write(filename,data,**kwargs)
+    elif ext in ('.npy'):
+        return np.save(filename,data,**kwargs)
+    elif ext in ('.csv'):
+        return np.savetxt(filename,data,header=','.join(data.dtype.names),delimiter=',',**kwargs)
+    elif ext in ('.txt','.dat'):
+        return np.savetxt(filename,data,**kwargs)
+
+    msg = "Unrecognized file type: %s"%filename
+    raise ValueError(msg)
+    
+
 def add_column(filename,column,formula,force=False):
     """ Add a column to a FITS file.
 
@@ -35,7 +85,13 @@ def add_column(filename,column,formula,force=False):
     return True
 
 def load_file(kwargs):
-    """ Load a FITS file with kwargs. """
+    """ Load a FITS file with kwargs. 
+
+    Parameters:
+    kwargs : keyword arguments passed to fitsio.read
+    Returns:
+    ndarray : fits catalog data
+    """
     logger.debug("Loading %s..."%kwargs['filename'])
     return fitsio.read(**kwargs)
 
