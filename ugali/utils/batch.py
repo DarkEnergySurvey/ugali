@@ -26,12 +26,13 @@ QUEUES = odict([
     ('condor',['local','vanilla','universe','grid']),
 ])
 
+# https://confluence.slac.stanford.edu/x/OaUlCw
 RUNLIMITS = odict([              #Hard limits
         (None       ,'4:00'),    # Default value
-        ('express'  ,'0:01'),    # 0:01
-        ('short'    ,'0:30'),    # 0:30, max = 1:00
-        ('medium'   ,'1:00'),    # 4:00
-        ('long'     ,'4:00'),    # 32:00
+        ('express'  ,'0:04'),    # 0:04
+        ('short'    ,'0:30'),    # 1:00
+        ('medium'   ,'1:00'),    # 48:00
+        ('long'     ,'4:00'),    # 120:00
         ('xlong'    ,'72:00'),   # 72:00
         ('xxl'      ,'168:00'),
         # MPI queues
@@ -40,11 +41,12 @@ RUNLIMITS = odict([              #Hard limits
         ])
 
 # SLAC updated how memory was handled on the batch system  
-# General queues now only have 4GB of RAM
-# To get more memory for a general job, you need to request more cores with:
-# '-n 2 -R "span[hosts=1]"'
+# General queues now only have 4GB of RAM per CPU
+# To get more memory for a general job, you need to request more cores:
+# i.e., '-n 2 -R "span[hosts=1]"' for 8GB of RAM
 # https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
 
+# These are options for MPI jobs
 MPIOPTS = odict([
         (None       ,' -R "span[ptile=4]"'),
         ('local'    ,''),
@@ -55,6 +57,7 @@ MPIOPTS = odict([
         ])
 
 def factory(queue,**kwargs):
+    # The default for the factory
     if queue is None: queue = 'local'
 
     name = queue.lower()
@@ -77,6 +80,7 @@ def factory(queue,**kwargs):
     return batch
 
 batchFactory = factory
+batch_factory = factory
 
 class Batch(object):
     # Default options for batch submission
