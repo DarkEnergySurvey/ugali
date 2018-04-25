@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 """
 Simulate the likelihood search.
-
 """
-
-import glob
 import os
 from os.path import join, splitext
 import time
+import glob
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
@@ -22,30 +20,47 @@ from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.healpix import pix2ang
 
-description=__doc__
-components = ['simulate','merge','plot']
+components = ['simulate','analyze','merge','plot']
 
 def run(self):
-    outdir=self.config['output']['simdir']
-    logdir=join(outdir,'log')
+    outdir=mkdir(self.config['output']['simdir'])
+    logdir=mkdir(join(outdir,'log'))
 
     if 'simulate' in self.opts.run:
         logger.info("Running 'simulate'...")
-        mkdir(outdir)
-        mkdir(logdir)
 
-        if self.opts.num is None: self.opts.num = self.config['simulate']['njobs']
+        if self.opts.num is None: self.opts.num = self.config['simulator']['njobs']
         for i in range(self.opts.num):
             outfile=join(outdir,self.config['output']['simfile']%i)
             base = splitext(os.path.basename(outfile))[0]
             logfile=join(logdir,base+'.log')
             jobname=base
-            script = self.config['simulate']['script']
+            script = self.config['simulator']['script']
             cmd='%s %s %s --seed %i'%(script,self.opts.config,outfile,i)
             #cmd='%s %s %s'%(script,self.opts.config,outfile)
             self.batch.submit(cmd,jobname,logfile)
             time.sleep(0.1)
 
+    if 'analyze' in self.opts.run:
+        logger.info("Running 'analyze'...")
+        dirname = self.config['simulate']['dirname']
+        catfiles = sorted(glob.glob(join(dirname,self.config['simulate']['catfile'])))
+        popfile = join(dirname,self.config['simulate']['popfile'])
+        batch = self.config['simulate']['batch']
+
+        for i,catfile in enumerate(catfiles):
+            basename = os.path.basename(catfile)
+            outfile = join(outdir,basename)
+
+            base = splitext(os.path.basename(outfile))[0]
+            logfile=join(logdir,base+'.log')
+            jobname=base
+            script = self.config['simulate']['script']
+            cmd='%s %s -p %s -c %s -o %s'%(script,self.opts.config,popfile,catfile,outfile)
+            opts = batch.get(self.opts.queue)
+            self.batch.submit(cmd,jobname,logfile,**opts)
+            time.sleep(0.1)
+        
     if 'sensitivity' in self.opts.run:
         logger.info("Running 'sensitivity'...")
 
@@ -124,7 +139,7 @@ def run(self):
         """
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parser.add_argument('-n','--num',default=None,type=int)
 pipeline.parse_args()
 pipeline.execute()

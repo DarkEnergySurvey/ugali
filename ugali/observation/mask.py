@@ -600,10 +600,10 @@ class Mask(object):
         """
         Retain only the catalog objects which fall within the observable (i.e., unmasked) space.
 
-        INPUTS:
-            catalog: a Catalog object
-        OUTPUTS:
-            boolean cut array where True means the object would be observable (i.e., unmasked).
+        Parameters:
+        catalog: a Catalog object
+        Returns:
+        sel    : boolean selection array where True means the object would be observable (i.e., unmasked).
 
         ADW: Careful, this function is fragile! The selection here should
              be the same as isochrone.observableFraction space. However,
@@ -619,30 +619,29 @@ class Mask(object):
         # unclear that this is being correctly accounted for in the likelihood
 
         catalog.spatialBin(self.roi)
-        cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
-        cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
-        cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
+        sel_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
+        sel_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
+        sel_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 
         # and are located in the region of mag-mag space where background can be estimated
-        cut_mmd = ugali.utils.binning.take2D(self.solid_angle_mmd,
+        sel_mmd = ugali.utils.binning.take2D(self.solid_angle_mmd,
                                              catalog.mag_2, catalog.mag_1,
                                              self.roi.bins_mag, self.roi.bins_mag) > 0.
 
-        cut = numpy.all([cut_roi,
-                         cut_mag_1,
-                         cut_mag_2,
-                         cut_mmd], axis=0)
-                         
-        return cut
+        sel = numpy.all([sel_roi,sel_mag_1,sel_mag_2,sel_mmd], axis=0)
+        return sel
 
     def restrictCatalogToObservableSpaceCMD(self, catalog):
         """
-        Retain only the catalog objects which fall within the observable (i.e., unmasked) space.
+        Retain only the catalog objects which fall within the
+        observable (i.e., unmasked) space.  NOTE: This returns a
+        *selection* (i.e., objects are retained if the value of the
+        output array is True).
 
-        INPUTS:
-            catalog: a Catalog object
-        OUTPUTS:
-            boolean cut array where True means the object would be observable (i.e., unmasked).
+        Parameters:
+        catalog: a Catalog object
+        Returns:
+        sel    : boolean selection array where True means the object would be observable (i.e., unmasked).
 
         ADW: Careful, this function is fragile! The selection here should
              be the same as isochrone.observableFraction space. However,
@@ -659,29 +658,26 @@ class Mask(object):
 
         ### # Check that the objects fall in the color-magnitude space of the ROI
         ### # ADW: I think this is degenerate with the cut_cmd
-        ### cut_mag = numpy.logical_and(catalog.mag > self.roi.bins_mag[0],
+        ### sel_mag = numpy.logical_and(catalog.mag > self.roi.bins_mag[0],
         ###                             catalog.mag < self.roi.bins_mag[-1])
-        ### cut_color = numpy.logical_and(catalog.color > self.roi.bins_color[0],
+        ### sel_color = numpy.logical_and(catalog.color > self.roi.bins_color[0],
         ###                               catalog.color < self.roi.bins_color[-1])
 
         # and are observable in the ROI-specific mask for both bands
         #if not hasattr(catalog, 'pixel_roi_index'): # TODO: An attempt to save computations, but not robust
         #    catalog.spatialBin(self.roi)
         catalog.spatialBin(self.roi)
-        cut_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
-        cut_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
-        cut_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
+        sel_roi = (catalog.pixel_roi_index >= 0) # Objects outside ROI have pixel_roi_index of -1
+        sel_mag_1 = catalog.mag_1 < self.mask_1.mask_roi_sparse[catalog.pixel_roi_index]
+        sel_mag_2 = catalog.mag_2 < self.mask_2.mask_roi_sparse[catalog.pixel_roi_index]
 
         # and are located in the region of color-magnitude space where background can be estimated
-        cut_cmd = ugali.utils.binning.take2D(self.solid_angle_cmd,
+        sel_cmd = ugali.utils.binning.take2D(self.solid_angle_cmd,
                                              catalog.color, catalog.mag,
                                              self.roi.bins_color, self.roi.bins_mag) > 0.
 
-        cut = numpy.all([cut_roi,
-                         cut_mag_1,
-                         cut_mag_2,
-                         cut_cmd], axis=0)
-        return cut
+        sel = numpy.all([sel_roi,sel_mag_1,sel_mag_2,sel_cmd], axis=0)
+        return sel
     
     # FIXME: Need to parallelize CMD and MMD formulation
     restrictCatalogToObservableSpace = restrictCatalogToObservableSpaceCMD

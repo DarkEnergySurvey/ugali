@@ -53,7 +53,7 @@ class Catalog:
         Return a new catalog which is a subset of objects selected
         using the input cut array.
 
-        NOTE: This should really be a selection.
+        NOTE: This is really a *selection* (i.e., objects are retained if the value of 'cut' is True)
         """
         return Catalog(self.config, data=self.data[cut])
 
@@ -182,7 +182,7 @@ class Catalog:
         mc_source_id_field = self.config['catalog']['mc_source_id_field']
         if mc_source_id_field is not None:
             if mc_source_id_field not in self.data.dtype.names:
-                array = np.zeros(len(self.data),dtype=int)
+                array = np.zeros(len(self.data),dtype='>i8') # FITS byte-order convention
                 self.data = mlab.rec_append_fields(self.data,
                                                    names=mc_source_id_field,
                                                    arrs=array)
@@ -224,7 +224,7 @@ class Catalog:
     def color_err(self): return np.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
     @property
     def mc_source_id(self):
-        return self.data.field(self.config['catalog']['mc_source_id_field'])
+        return self.data[self.config['catalog']['mc_source_id_field']]
 
     # This assumes Galactic coordinates
     @property
