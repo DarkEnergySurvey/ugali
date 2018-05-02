@@ -60,7 +60,8 @@ def getCatalog(catalog_dir):
 save = False
 dpi = 150
 
-infile_population = 'v3/sim_population_v3.fits'
+#infile_population = 'v3/sim_population_v3.fits'
+infile_population = 'v4/sim_population_v4.fits'
 reader_population = pyfits.open(infile_population)
 data_population = reader_population[1].data
 print len(data_population)
@@ -76,7 +77,8 @@ reader_population.close()
 #data_catalog = reader_catalog[1].data
 #reader_catalog.close()
 
-data_catalog = getCatalog('v3')
+#data_catalog = getCatalog('v3')
+data_catalog = getCatalog('v4')
 
 """
 pylab.figure()
@@ -112,7 +114,7 @@ for band, color in zip(['g', 'r'], ['blue', 'green']):
     if save:
         pylab.savefig('sim_population_magnitude_errors_%s.png'%(band), dpi=dpi)
 
-
+"""
 
 pylab.figure()
 pylab.xscale('log')
@@ -147,7 +149,7 @@ pylab.xlabel('Number of Stars with g < 24 mag')
 pylab.ylabel('Surface Brightness (mag arcsec^-2)')
 if save:
     pylab.savefig('sim_population_n_g24_surface_brightness.png', dpi=dpi)
-"""
+
 """
 pylab.figure()
 counts_array = []
@@ -166,7 +168,7 @@ pylab.ylim(pylab.ylim()[::-1])
 """
 
 pylab.figure()
-pylab.scatter(wrap(data_population['RA']), data_population['DEC'], c=data_population['FRACDET'], vmin=0., vmax=1.)
+pylab.scatter(wrap(data_population['RA']), data_population['DEC'], c=data_population['FRACDET_WIDE'], vmin=0., vmax=1.)
 colorbar = pylab.colorbar()
 colorbar.set_label('Average Fracdet within Azimuthally Averaged Half-light Radius')
 pylab.xlabel('RA (deg)')
@@ -177,6 +179,14 @@ pylab.figure()
 pylab.scatter(wrap(data_population['RA']), data_population['DEC'], c=data_population['DENSITY'], vmax=1.)
 colorbar = pylab.colorbar()
 colorbar.set_label('Local Stellar Density (arcmin^-2)')
+pylab.xlabel('RA (deg)')
+pylab.ylabel('Dec (deg)')
+pylab.xlim(pylab.xlim()[::-1])
+
+pylab.figure()
+pylab.scatter(wrap(data_population['RA']), data_population['DEC'], c=data_population['EBV'], vmax=0.05)
+pylab.colorbar().set_label('E(B-V)')
+#colorbar.set_label('Local Stellar Density (arcmin^-2)')
 pylab.xlabel('RA (deg)')
 pylab.ylabel('Dec (deg)')
 pylab.xlim(pylab.xlim()[::-1])
@@ -196,7 +206,7 @@ pylab.ylabel('Number of Satellites')
 #pylab.scatter(centers, centers * counts)
 """
 ##########
-
+"""
 print "Machine learning"
 
 save = False
@@ -283,3 +293,4 @@ pylab.hist(y_pred[:,1][~y], bins=bins, color='red', alpha=0.5, normed=True, labe
 pylab.xlabel('ML Predicted Detection Probability')
 pylab.ylabel('PDF')
 pylab.legend(loc='upper center')
+"""

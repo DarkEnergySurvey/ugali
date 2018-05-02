@@ -25,7 +25,7 @@ cut_hsc = np.in1d(data_actual['galaxy_key'], ['virgo_1', 'cetus_3'])
 
 #########
 
-save = True
+save = False
 
 #data_search = np.recfromcsv('results_12apr2018.csv')
 reader_search = pyfits.open('/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/simple/sid/simulations_v2/candidate_list.fits')
@@ -172,9 +172,8 @@ for index in np.nonzero(cut_why_not)[0]:
     
 ############################################################
 
-#save = True
-
-fit = False
+save = False
+fit = True
 
 import sklearn.gaussian_process
 import sklearn.neighbors
