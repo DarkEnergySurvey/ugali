@@ -83,20 +83,16 @@ binning:
   z      : [0.0001,  0.01,  32] # Metallicity [max z=0.07]
  
 # Default kernel specification
-kernel:
+kernel: &kernel
   name: RadialPlummer
   r_h: 0.03
   proj: 'ait'
 
 # Default isochrone specifications
-isochrone:
-   name: CompositeIsochrone
-   isochrones:
-     - {name: Bressan2012, age: 10.0, z: 0.0001}
-     - {name: Bressan2012, age: 10.0, z: 0.0002}
-     - {name: Bressan2012, age: 12.0, z: 0.0001}
-     - {name: Bressan2012, age: 12.0, z: 0.0002}
-   weights: [0.25,0.25,0.25,0.25]
+isochrone: &isochrone
+   name: Bressan2012
+   age: 12.0
+   z: 0.0001
    distance_modulus : 17.0
    band_1 : *band1
    band_2 : *band2
@@ -151,24 +147,11 @@ batch: &batch
 scan:
   script : ./ugali/analysis/scan.py
   distance_modulus_array: [17.5]
-  #extension_array: [0.03,0.1,0.3]
   full_pdf: False
   color_lut_infile: null
   source:
-    kernel:
-      name: RadialPlummer
-      r_h: 0.07
-    isochrone:
-       name: CompositeIsochrone
-       isochrones:
-         - {name: Bressan2012, age: 10.0, z: 0.0001}
-         - {name: Bressan2012, age: 10.0, z: 0.0002}
-         - {name: Bressan2012, age: 12.0, z: 0.0001}
-         - {name: Bressan2012, age: 12.0, z: 0.0002}
-       weights: [0.25,0.25,0.25,0.25]
-       band_1 : *band1
-       band_2 : *band2
-       band_1_detection : *detection
+    kernel:    *kernel
+    isochrone: *isochrone
   
 search:
   obj_threshold  : 10  # TS threshold for object selection

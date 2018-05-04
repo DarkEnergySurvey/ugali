@@ -19,7 +19,7 @@ def test_pipeline_02():
     _test_pipeline(2)
 
 def test_pipeline_03():
-    _test_pipeline(3,'-q local --cel 53.92 -54.05')
+    _test_pipeline(3,'-f -q local --cel 53.92 -54.05')
 
 #def test_pipeline_04():
 #    test_pipeline(4)
