@@ -26,6 +26,7 @@ install:
 before_script:
   - export MPLBACKEND=Agg
   - conda install ipython notebook;
+  - wget http://desdr-server.ncsa.illinois.edu/despublic/dr1_tiles/DES0337-5414/DES0337-5414_dr1_main.fits
 
 # command to run tests
 script: 
