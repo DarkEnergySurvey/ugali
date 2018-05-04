@@ -141,6 +141,9 @@ class Local(Batch):
         if opts.get('logfile'): return ' 2>&1 | tee %(logfile)s'%opts
         return ''
 
+    def njobs(self):
+        return 0
+
 class LSF(Batch):
     _defaults = odict([
         ('R','"scratch > 1 && rhel60"'),

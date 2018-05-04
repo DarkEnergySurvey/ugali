@@ -56,9 +56,11 @@ def inFootprint(config, pixels, nside=None):
 
     for fnames in filenames[catalog_pix]:
         logger.debug("Loading %s"%filenames['mask_1'])
-        subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_1'],'MAGLIM',construct_map=False)
+        #subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_1'],'MAGLIM',construct_map=False)
+        _nside,subpix_1,val_1 = ugali.utils.healpix.read_partial_map(fnames['mask_1'],'MAGLIM',fullsky=False)
         logger.debug("Loading %s"%fnames['mask_2'])
-        subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_2'],'MAGLIM',construct_map=False)
+        #subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_2'],'MAGLIM',construct_map=False)
+        _nside,subpix_2,val_2 = ugali.utils.healpix.read_partial_map(fnames['mask_2'],'MAGLIM',fullsky=False)
         subpix = numpy.intersect1d(subpix_1,subpix_2)
         superpix = numpy.unique(superpixel(subpix,nside_pixel,nside))
         inside |= numpy.in1d(pixels, superpix)

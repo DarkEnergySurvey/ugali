@@ -3,7 +3,7 @@
 Simulate the likelihood search.
 """
 import os
-from os.path import join, splitext
+from os.path import join, splitext, exists
 import time
 import glob
 
@@ -52,12 +52,16 @@ def run(self):
             basename = os.path.basename(catfile)
             outfile = join(outdir,basename)
 
+            if exists(outfile) and not self.opts.force:
+                logger.info("  Found %s; skipping..."%outfile)
+                continue
+
             base = splitext(os.path.basename(outfile))[0]
             logfile=join(logdir,base+'.log')
             jobname=base
             script = self.config['simulate']['script']
             cmd='%s %s -p %s -c %s -o %s'%(script,self.opts.config,popfile,catfile,outfile)
-            opts = batch.get(self.opts.queue)
+            opts = batch.get(self.opts.queue,dict())
             self.batch.submit(cmd,jobname,logfile,**opts)
             time.sleep(0.1)
         

@@ -14,6 +14,7 @@ import ugali.utils.healpix
 
 components = ['scan','merge','tar','plot']
 defaults = ['scan','merge']
+
 def run(self):
     if 'scan' in self.opts.run:
         logger.info("Running 'scan'...")

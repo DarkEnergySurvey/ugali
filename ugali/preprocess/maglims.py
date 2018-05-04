@@ -47,7 +47,7 @@ class Maglims(object):
         try: 
             self.footprint = fitsio.read(self.footfile)['I'].ravel()
         except:
-            logger.warn("Couldn't open %s; will try again."%self.footfile)
+            logger.warn("Couldn't open %s; will pass through."%self.footfile)
             self.footprint = self.footfile
 
 
@@ -181,7 +181,9 @@ def inFootprint(footprint,ra,dec):
     Returns:
     inside   : boolean array of coordinates in footprint
     """
-        
+    if footprint is None:
+        return np.ones(len(ra),dtype=bool)
+    
     try:
         if isinstance(footprint,str) and os.path.exists(footprint):
             filename = footprint
