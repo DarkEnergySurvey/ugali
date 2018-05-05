@@ -201,48 +201,60 @@ def write_fits(filename,data,header=None,force=False):
     fitsio.write(filename,data,header=header,clobber=force)
 
 # Writing membership files
-def write_membership(self,filename,loglike):
+def write_membership(loglike,filename):
+    """
+    Write a catalog file of the likelihood region including
+    membership properties.
 
-    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+    Parameters:
+    -----------
+    loglike : input loglikelihood object
+    filename : output filename
+    
+    Returns:
+    --------
+    None
+    """
+
+    ra,dec = gal2cel(loglike.catalog.lon,loglike.catalog.lat)
         
-    name_objid = self.config['catalog']['objid_field']
-    name_mag_1 = self.config['catalog']['mag_1_field']
-    name_mag_2 = self.config['catalog']['mag_2_field']
-    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
-    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
+    name_objid = loglike.config['catalog']['objid_field']
+    name_mag_1 = loglike.config['catalog']['mag_1_field']
+    name_mag_2 = loglike.config['catalog']['mag_2_field']
+    name_mag_err_1 = loglike.config['catalog']['mag_err_1_field']
+    name_mag_err_2 = loglike.config['catalog']['mag_err_2_field']
 
     # Angular and isochrone separations
-    sep = angsep(self.source.lon,self.source.lat,
-                 self.catalog.lon,self.catalog.lat)
-    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+    sep = angsep(loglike.source.lon,loglike.source.lat,
+                 loglike.catalog.lon,loglike.catalog.lat)
+    isosep = loglike.isochrone.separation(loglike.catalog.mag_1,loglike.catalog.mag_2)
 
     data = odict()
-    data[name_objid] = self.catalog.objid
-    data['GLON'] = self.catalog.lon
-    data['GLAT'] = self.catalog.lat
+    data[name_objid] = loglike.catalog.objid
+    data['GLON'] = loglike.catalog.lon
+    data['GLAT'] = loglike.catalog.lat
     data['RA']   = ra
     data['DEC']  = dec
-    data[name_mag_1] = self.catalog.mag_1
-    data[name_mag_err_1] = self.catalog.mag_err_1
-    data[name_mag_2] = self.catalog.mag_2
-    data[name_mag_err_2] = self.catalog.mag_err_2
-    data['COLOR'] = self.catalog.color
+    data[name_mag_1] = loglike.catalog.mag_1
+    data[name_mag_err_1] = loglike.catalog.mag_err_1
+    data[name_mag_2] = loglike.catalog.mag_2
+    data[name_mag_err_2] = loglike.catalog.mag_err_2
+    data['COLOR'] = loglike.catalog.color
     data['ANGSEP'] = sep
     data['ISOSEP'] = isosep
-    data['PROB'] = self.p
+    data['PROB'] = loglike.p
 
     # HIERARCH allows header keywords longer than 8 characters
     header = []
-    for param,value in self.source.params.items():
+    for param,value in loglike.source.params.items():
         card = dict(name='HIERARCH %s'%param.upper(),
                     value=value.value,
                     comment=param)
         header.append(card)
-    card = dict(name='HIERARCH %s'%'TS',value=self.ts(),
+    card = dict(name='HIERARCH %s'%'TS',value=loglike.ts(),
                 comment='test statistic')
     header.append(card)
     card = dict(name='HIERARCH %s'%'TIMESTAMP',value=time.asctime(),
                 comment='creation time')
     header.append(card)
     fitsio.write(filename,data,header=header,clobber=True)
-
