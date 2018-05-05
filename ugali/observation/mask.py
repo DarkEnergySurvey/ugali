@@ -101,8 +101,8 @@ class Mask(object):
         Calculate an approximate pixel coverage fraction from the two masks.
 
         We have no way to know a priori how much the coverage of the
-        two masks overlap in a give pixel. For example, to masks each
-        of frac = 0.5 could have a combined frac = [0.0 to 0.5]. 
+        two masks overlap in a give pixel. For example, masks that each
+        have frac = 0.5 could have a combined frac = [0.0 to 0.5]. 
         The limits will be: 
           max:  min(frac1,frac2)
           min:  max((frac1+frac2)-1, 0.0)
@@ -172,33 +172,35 @@ class Mask(object):
         self.solid_angle_cmd = numpy.zeros([len(self.roi.centers_mag),
                                             len(self.roi.centers_color)])
 
-        for index_mag in range(0, len(self.roi.centers_mag)):
-            for index_color in range(0, len(self.roi.centers_color)):
+        for index_mag in np.arange(len(self.roi.centers_mag)):
+            for index_color in np.arange(len(self.roi.centers_color)):
+                # mag and color at bin center
                 mag = self.roi.centers_mag[index_mag]
                 color = self.roi.centers_color[index_color]
 
                 if self.config.params['catalog']['band_1_detection']:
-                    # Evaluating at the center of the color-magnitude bin, be consistent!
+                    # Evaluating at the center of the color-mag bin, be consistent!
                     #mag_1 = self.roi.centers_mag[index_mag]
                     #color = self.roi.centers_color[index_color]
                     #mag_2 = mag_1 - color
-                    # Evaluating at corner of the color-magnitude bin, be consistent!
+                    # Evaluating at corner of the color-mag bin, be consistent!
                     mag_1 = mag + (0.5 * self.roi.delta_mag)
                     mag_2 = mag - color + (0.5 * self.roi.delta_color)
                 else:
-                    # Evaluating at the center of the color-magnitude bin, be consistent!
+                    # Evaluating at the center of the color-mag bin, be consistent!
                     #mag_2 = self.roi.centers_mag[index_mag]
                     #color = self.roi.centers_color[index_color]
                     #mag_1 = mag_2 + color
-                    # Evaluating at corner of the color-magnitude bin, be consistent!
+                    # Evaluating at corner of the color-mag bin, be consistent!
                     mag_1 = mag + color + (0.5 * self.roi.delta_color)
                     mag_2 = mag + (0.5 * self.roi.delta_mag)
 
                 # ADW: Is there a problem here?
                 #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
-                    
-                unmasked_mag_1 = (self.mask_1.mask_annulus_sparse > mag_1)
-                unmasked_mag_2 = (self.mask_2.mask_annulus_sparse > mag_2)
+
+                # ADW: I think we want to keep pixels that are >= mag
+                unmasked_mag_1 = (self.mask_1.mask_annulus_sparse >= mag_1)
+                unmasked_mag_2 = (self.mask_2.mask_annulus_sparse >= mag_2)
                 n_unmasked_pixels = np.sum(unmasked_mag_1*unmasked_mag_2*self.frac_annulus_sparse)
 
                 #n_unmasked_pixels = np.sum((self.mask_1.mask_annulus_sparse > mag_1) \
@@ -210,31 +212,36 @@ class Mask(object):
             logger.error(msg)
             raise Exception(msg)
 
+        return self.solid_angle_cmd
+        
     def _pruneCMD(self, minimum_solid_angle):
         """
         Remove regions of color-magnitude space where the unmasked solid angle is
         statistically insufficient to estimate the background.
+
+        ADW: Why are we clipping at the bin center instead of edge?
 
         INPUTS:
             solid_angle[1]: minimum solid angle (deg^2)
         """
 
         logger.info('Pruning mask based on minimum solid angle of %.2f deg^2'%(minimum_solid_angle))
-
         self.solid_angle_cmd *= self.solid_angle_cmd > minimum_solid_angle
+
         if self.solid_angle_cmd.sum() == 0:
             msg = "Pruned mask contains no solid angle."
             logger.error(msg)
             raise Exception(msg)
+
         # Compute which magnitudes the clipping correspond to
-        index_mag, index_color = numpy.nonzero(self.solid_angle_cmd)
+        index_mag, index_color = np.nonzero(self.solid_angle_cmd)
         mag = self.roi.centers_mag[index_mag]
         color = self.roi.centers_color[index_color]
         if self.config.params['catalog']['band_1_detection']:
             mag_1 = mag
             mag_2 = mag_1 - color
-            self.mag_1_clip = numpy.max(mag_1) + (0.5 * self.roi.delta_mag)
-            self.mag_2_clip = numpy.max(mag_2) + (0.5 * self.roi.delta_color)
+            self.mag_1_clip = np.max(mag_1) + (0.5 * self.roi.delta_mag)
+            self.mag_2_clip = np.max(mag_2) + (0.5 * self.roi.delta_color)
         else:
             mag_2 = mag
             mag_1 = color + mag_2
@@ -360,8 +367,10 @@ class Mask(object):
         """
         Solid angle within the mask as a function of color and magnitude.
         """
-        import ugali.utils.plotting        
+        msg = "'%s.plotSolidAngleCMD': ADW 2018-05-05"%self.__class__.__name__
+        DeprecationWarning(msg)
 
+        import ugali.utils.plotting        
         ugali.utils.plotting.twoDimensionalHistogram('mask', 'color', 'magnitude',
                                                      self.solid_angle_cmd,
                                                      self.roi.bins_color,
@@ -375,6 +384,9 @@ class Mask(object):
         """
         Solid angle within the mask as a function of color and magnitude.
         """
+        msg = "'%s.plotSolidAngleMMD': ADW 2018-05-05"%self.__class__.__name__
+        DeprecationWarning(msg)
+
         import ugali.utils.plotting        
 
         ugali.utils.plotting.twoDimensionalHistogram('mask', 'mag_2', 'mag_1',
@@ -778,7 +790,7 @@ class MaskBand(object):
 
         return func(mags)
         
-    def depth(self, x, y):
+    def depth(self, lon, lat):
         """
         Magnitude limit at given image coordinates.
         """
@@ -788,6 +800,9 @@ class MaskBand(object):
         """
         Plot the magnitude depth.
         """
+        msg = "'%s.plot': ADW 2018-05-05"%self.__class__.__name__
+        DeprecationWarning(msg)
+
         import ugali.utils.plotting
 
         mask = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
@@ -879,10 +894,13 @@ def simpleMask(config):
 
 def readMangleFile(infile, lon, lat, index = None):
     """
+    DEPRECATED: 2018-05-04
     Mangle must be set up on your system.
     The index argument is a temporary file naming convention to avoid file conflicts.
     Coordinates must be given in the native coordinate system of the Mangle file.
     """
+    msg = "'mask.readMangleFile': ADW 2018-05-05"
+    DeprecationWarning(msg)
 
     if index is None:
         index = numpy.random.randint(0, 1.e10)
@@ -927,6 +945,8 @@ def readMangleFile(infile, lon, lat, index = None):
 ############################################################
 
 def allSkyMask(infile, nside):
+    msg = "'mask.allSkyMask': ADW 2018-05-05"
+    DeprecationWarning(msg)
     lon, lat = ugali.utils.skymap.allSkyCoordinates(nside)
     maglim = readMangleFile(infile, lon, lat, index = None)
     return maglim
@@ -934,22 +954,24 @@ def allSkyMask(infile, nside):
 ############################################################
 
 def scale(mask, mag_scale, outfile=None):
-        """
-        Scale the completeness depth of a mask such that mag_new = mag + mag_scale.
-        Input is a full HEALPix map.
-        Optionally write out the scaled mask as an sparse HEALPix map.
-        """
-        mask_new = healpy.UNSEEN * numpy.ones(len(mask))
-        mask_new[mask == 0.] = 0.
-        mask_new[mask > 0.] = mask[mask > 0.] + mag_scale
+    """
+    Scale the completeness depth of a mask such that mag_new = mag + mag_scale.
+    Input is a full HEALPix map.
+    Optionally write out the scaled mask as an sparse HEALPix map.
+    """
+    msg = "'mask.scale': ADW 2018-05-05"
+    DeprecationWarning(msg)
+    mask_new = healpy.UNSEEN * numpy.ones(len(mask))
+    mask_new[mask == 0.] = 0.
+    mask_new[mask > 0.] = mask[mask > 0.] + mag_scale
 
-        if outfile is not None:
-            pix = numpy.nonzero(mask_new > 0.)[0]
-            data_dict = {'MAGLIM': mask_new[pix]}
-            nside = healpy.npix2nside(len(mask_new))
-            ugali.utils.skymap.writeSparseHealpixMap(pix, data_dict, nside, outfile)
+    if outfile is not None:
+        pix = numpy.nonzero(mask_new > 0.)[0]
+        data_dict = {'MAGLIM': mask_new[pix]}
+        nside = healpy.npix2nside(len(mask_new))
+        ugali.utils.skymap.writeSparseHealpixMap(pix, data_dict, nside, outfile)
 
-        return mask_new
+    return mask_new
 
 ############################################################
 
