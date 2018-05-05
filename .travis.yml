@@ -3,7 +3,6 @@ language: python
 python:
   - "2.7"
   - "3.6"
-#  - "nightly" # currently points to 3.6-dev
 
 sudo: false
 
@@ -28,7 +27,6 @@ before_script:
   - conda install ipython notebook;
   - wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz
   - tar -xzf ugali-test-data.tar.gz
-  - ls -lh
 
 # command to run tests
 script: 
