@@ -26,7 +26,9 @@ install:
 before_script:
   - export MPLBACKEND=Agg
   - conda install ipython notebook;
-  - wget http://desdr-server.ncsa.illinois.edu/despublic/dr1_tiles/DES0337-5414/DES0337-5414_dr1_main.fits -P raw
+  - wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz
+  - tar -xzf ugali-test-data.tar.gz
+  - ls -lh
 
 # command to run tests
 script: 

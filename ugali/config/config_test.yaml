@@ -45,15 +45,15 @@ catalog:
   #selection         : null
 
 data: 
+  dirname: ./raw
   script : ./ugali/preprocess/database.py
   survey : des
   release: y3a2
-  dirname: ./raw
   density: ./density/density_hpx%04i.fits
   footprint: null 
 
 mask:
-  dirname    : ./split
+  dirname    : ./mask
   basename_1 : "maglim_g_hpx%04i.fits"
   basename_2 : "maglim_r_hpx%04i.fits"
   minimum_solid_angle: 0.1 # deg^2
