@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Testing the pipeline.
+Testing the pipeline (probably a bit outside the scope of unit tests).
 """
 __author__ = "Alex Drlica-Wagner"
 import glob
@@ -18,8 +18,8 @@ def _test_pipeline(n=2,args=None):
 #def test_pipeline_02():
 #    _test_pipeline(2)
 
-def test_pipeline_03():
-    _test_pipeline(3,'-f -q local --cel 53.92 -54.05')
+#def test_pipeline_03():
+#    _test_pipeline(3,'-f -q local --cel 53.92 -54.05')
 
 #def test_pipeline_04():
 #    test_pipeline(4)
@@ -33,4 +33,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=description)
     args = parser.parse_args()
 
-    test_pipeline_03()
+    #test_pipeline_03()
