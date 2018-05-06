@@ -165,20 +165,18 @@ search:
   proximity: 0.1 # deg
   
 mcmc:
-  script : ./ugali/analysis/mcmc.py
-  #params  : ['richness','age','metallicity','distance_modulus']
-  params  : ['richness','lon','lat','extension']
-  #params  : ['richness','lon','lat','extension','ellipticity','position_angle','distance_modulus']
-  #srcmdl: 'srcmdl_v0.yaml'
-  nsamples: 1000
-  nwalkers: 100
-  nthreads: 16
+  script  : ./ugali/analysis/mcmc.py
+  params  : ['richness','lon','lat','extension','position_angle']
+  srcmdl  : 'srcmdl.yaml'
+  nsamples: 100
+  nwalkers: 20
+  nthreads: 4
   nburn   : 10
-  nchunk  : 25
+  nchunk  : 10
 
 results:
-  martin  : True
-  nburn   : 100
+  martin  : 100
+  nburn   : 10
   alpha   : 0.10
 
 simulate:

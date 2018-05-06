@@ -22,10 +22,10 @@ def _test_pipeline(n=2,args=None):
 #    _test_pipeline(3,'-f -q local --cel 53.92 -54.05')
 
 #def test_pipeline_04():
-#    test_pipeline(4)
-# 
+#    _test_pipeline(4)
+ 
 #def test_pipeline_05():
-#    test_pipeline(5)
+#    _test_pipeline(5,'-q local --name reticulum_ii --srcmdl -r mcmc')
 
 if __name__ == "__main__":
     import argparse
@@ -34,3 +34,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     #test_pipeline_03()
+    #test_pipeline_05()

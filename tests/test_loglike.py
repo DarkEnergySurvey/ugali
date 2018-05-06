@@ -11,11 +11,8 @@ LON = RA = 53.92
 LAT = DEC = -54.05
 IDX = [1,2537,9000]
 
-
-def test_source():
-    pass
-
 def test_loglike():
+    """ Test ugali.analysis.loglike """
     import ugali.analysis.loglike
     loglike = ugali.analysis.loglike.createLoglike(CONFIG,lon=LON,lat=LAT)
 
