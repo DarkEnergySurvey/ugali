@@ -173,10 +173,10 @@ class LogLikelihood(object):
         # The signal probability for each object
         self._p = (self.source.richness * self.u)/((self.source.richness * self.u) + self.b)
 
-        #print 'b',np.unique(self.b)[:20]
-        #print 'u',np.unique(self.u)[:20]
-        #print 'f',np.unique(self.f)[:20]
-        #print 'p',np.unique(self.p)[:20] 
+        #logging.debug('b: %s'%np.unique(self.b)[:20])
+        #logging.debug('u: %s'%np.unique(self.u)[:20])
+        #logging.debug('f: %s'%np.unique(self.f)[:20])
+        #logging.debug('p: %s'%np.unique(self.p)[:20])
 
         # Reset the sync toggle
         #for k in self._sync.keys(): self._sync[k]=False 

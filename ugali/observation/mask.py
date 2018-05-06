@@ -776,8 +776,8 @@ class MaskBand(object):
             self.frac_roi_sparse = np.clip(frac[self.roi.pixels],0.0,1.0)
         except ValueError as e:
             # No detection fraction present
-            msg = "No 'FRACDET' column found in masks"
-            logger.warn(msg)
+            msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1"
+            logger.info(msg)
 
         # Explicitly zero the maglim of pixels with fracdet < fracmin
         self.mask_roi_sparse[self.frac_roi_sparse == 0] = 0.0
@@ -973,12 +973,12 @@ def readMangleFile(infile, lon, lat, index = None):
         elif len(lines[ii].split()) == 2:
             maglim.append(0.) # Coordinates outside of the MANGLE ploygon
         elif len(lines[ii].split()) > 3:
-            #print 'WARNING: coordinate inside multiple polygons, using weight from first polygon'
-            #maglim.append(float(lines[ii].split()[2])) # Mask out the pixels inside multiple polygons
-            logger.warning('Coordinate inside multiple polygons, masking that coordinate.')
+            msg = 'Coordinate inside multiple polygons, masking that coordinate.'
+            logger.warning(msg)
             maglim.append(0.)
         else:
-            logger.warning('Cannot parse maglim file, unexpected number of columns, stop reading now.')
+            msg = 'Cannot parse maglim file, unexpected number of columns.'
+            logger.error(msg)
             break
             
     maglim = numpy.array(maglim)
