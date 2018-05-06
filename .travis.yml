@@ -8,9 +8,8 @@ sudo: false
 
 notifications:
   email: false
- 
-# Setup dependencies and install package
-install:
+
+before_install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
@@ -19,13 +18,16 @@ install:
   - conda info -a
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose fitsio corner -c conda-forge -c kadrlica
   - source activate travis-env
+ 
+# Setup dependencies and install package
+install:
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py -q install --isochrones --catalogs
 
 before_script:
   - export MPLBACKEND=Agg
   - conda install ipython notebook;
-  - wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz
+  - wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
   - tar -xzf ugali-test-data.tar.gz
 
 # command to run tests
@@ -34,5 +36,5 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION < 3.0 ]]; then
       nosetests -v;
     else 
-      nosetests -v -I test_tutorial.py;
+      nosetests -v -I test_notebook.py;
     fi
