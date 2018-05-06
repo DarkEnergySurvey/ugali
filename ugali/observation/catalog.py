@@ -48,6 +48,9 @@ class Catalog:
     def __len__(self):
         return len(self.objid)
 
+    def __eq__(self, other):
+        return bool((self.data == other.data).all())
+        
     def applyCut(self, cut):
         """
         Return a new catalog which is a subset of objects selected
@@ -75,6 +78,8 @@ class Catalog:
         """
         Project coordinates on sphere to image plane using Projector class.
         """
+        msg = "'%s.project': ADW 2018-05-05"%self.__class__.__name__
+        DeprecationWarning(msg)
         if projector is None:
             try:
                 self.projector = ugali.utils.projector.Projector(self.config['coords']['reference'][0],
@@ -259,11 +264,11 @@ def mergeCatalogs(catalog_list):
     --------
     catalog      : Combined Catalog object 
     """
-    config = catalog_list[0]
     # Check the columns
     for c in catalog_list:
         if c.data.dtype.names != catalog_list[0].data.dtype.names:
             msg = "Catalog data columns not the same."
             raise Exception(msg)
     data = np.concatenate([c.data for c in catalog_list])
+    config = catalog_list[0].config
     return Catalog(config,data=data)

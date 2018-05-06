@@ -12,6 +12,7 @@ import ugali.preprocess.maglims
 from ugali.utils.logger import logger
 
 components = ['pixelize','density','maglims','simple','split']
+defaults = ['pixelize','density','simple']
 
 def run(self):
     # The three mask options are (semi-)mutually exclusive
@@ -46,6 +47,7 @@ def run(self):
 
 
 Pipeline.run = run
+Pipeline.defaults = defaults
 pipeline = Pipeline(__doc__,components)
 pipeline.parse_args()
 pipeline.execute()

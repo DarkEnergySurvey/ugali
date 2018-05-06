@@ -239,7 +239,7 @@ class Samples(np.recarray):
                 pa_gal[zeros] = 0; pa_cel[zeros] = 0
                 names = ['position_angle_gal','position_angle_cel']
                 arrs = [pa_gal,pa_cel]
-                out = recfuncs.append_fields(out,names,arrs**kwargs).view(Samples)
+                out = recfuncs.append_fields(out,names,arrs,**kwargs).view(Samples)
         
         return out
 

@@ -307,11 +307,11 @@ class CandidateSearch(object):
 
         coordsys = self.config['coords']['coordsys']
         if coordsys.lower() == 'gal':
-            print "GAL coordintes"
+            print("GAL coordintes")
             objs['GLON'],objs['GLAT'] = lon,lat
             objs['RA'],objs['DEC'] = gal2cel(lon,lat)
         else:
-            print "CEL coordintes"
+            print("CEL coordintes")
             objs['RA'],objs['DEC'] = lon,lat
             objs['GLON'],objs['GLAT'] = cel2gal(lon,lat)
 
@@ -379,7 +379,7 @@ class CandidateSearch(object):
             i += 1
             catalog = SourceCatalog()
             for ref in refs:
-                print ref
+                print(ref)
                 catalog += catalogFactory(ref)
      
             # String length (should be greater than longest name)

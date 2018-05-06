@@ -189,7 +189,7 @@ class MCMC(object):
         logger.info(str(self.loglike))
  
         if params is not None: self.params = params
-        if len(params) == 0:
+        if len(self.params) == 0:
             raise Exception("No free parameters to fit.")
             
         params   = self.params

@@ -344,7 +344,7 @@ class GridSearch:
             data['FRACTION_OBSERVABLE']=self.fraction_observable_sparse_array.T
 
         # Convert to 32bit float
-        for k in data.keys()[1:]:
+        for k in list(data.keys())[1:]:
             data[k] = data[k].astype('f4',copy=False)
             
         # Stellar mass can be calculated from STELLAR * RICHNESS

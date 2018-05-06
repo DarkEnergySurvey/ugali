@@ -104,15 +104,16 @@ class Config(dict):
                 ('batch',[]),
                 ])  
 
-        keys = np.array(sections.keys())
-        found = np.in1d(keys,self.keys())
+        keys = np.array(list(sections.keys()))
+        found = np.in1d(keys,list(self.keys()))
+
         if not np.all(found):
             msg = 'Missing sections: '+str(keys[~found])
             raise Exception(msg)
 
         for section,keys in sections.items():
             keys = np.array(keys)
-            found = np.in1d(keys,self[section].keys())
+            found = np.in1d(keys,list(self[section].keys()))
             if not np.all(found):
                 msg = 'Missing keys in %s: '%(section)+str(keys[~found])
                 raise Exception(msg)
@@ -213,9 +214,9 @@ class Config(dict):
 
         if np.all(mask['pix']): logger.warn("All pixels masked")
                 
-
         #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
-        return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
+        #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
+        return np.ma.MaskedArray(data, mask, fill_value=[-1,'','',''])
 
     getCatalogFiles = getFilenames
 

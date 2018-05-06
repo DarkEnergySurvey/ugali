@@ -47,7 +47,7 @@ class Maglims(object):
         try: 
             self.footprint = fitsio.read(self.footfile)['I'].ravel()
         except:
-            logger.warn("Couldn't open %s; will try again."%self.footfile)
+            logger.warn("Couldn't open %s; will pass through."%self.footfile)
             self.footprint = self.footfile
 
 
@@ -99,7 +99,7 @@ class Maglims(object):
         data = fitsio.read(infile,columns=[pixel_pix_name])
 
         #mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
-        mask_maglims = numpy.zeros( healpy.nside2npix(self.nside_mask) )
+        mask_maglims = numpy.zeros(healpy.nside2npix(self.nside_mask))
          
         out_pixels = numpy.zeros(0,dtype='int')
         out_maglims = numpy.zeros(0)
@@ -159,13 +159,14 @@ class Maglims(object):
         out_maglims = out_maglims[idx]
          
         # Remove pixels outside the footprint
-        logger.info("Checking footprint against %s"%self.footfile)
-        glon,glat = pix2ang(self.nside_pixel,out_pixels)
-        ra,dec = gal2cel(glon,glat)
-        footprint = inFootprint(self.footprint,ra,dec)
-        idx = numpy.nonzero(footprint)[0]
-        out_pixels = out_pixels[idx]
-        out_maglims = out_maglims[idx]
+        if self.footfile:
+            logger.info("Checking footprint against %s"%self.footfile)
+            glon,glat = pix2ang(self.nside_pixel,out_pixels)
+            ra,dec = gal2cel(glon,glat)
+            footprint = inFootprint(self.footprint,ra,dec)
+            idx = numpy.nonzero(footprint)[0]
+            out_pixels = out_pixels[idx]
+            out_maglims = out_maglims[idx]
          
         logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))         
         return out_pixels,out_maglims
@@ -181,7 +182,9 @@ def inFootprint(footprint,ra,dec):
     Returns:
     inside   : boolean array of coordinates in footprint
     """
-        
+    if footprint is None:
+        return np.ones(len(ra),dtype=bool)
+    
     try:
         if isinstance(footprint,str) and os.path.exists(footprint):
             filename = footprint

@@ -27,7 +27,10 @@ def superpixel(subpix, nside_subpix, nside_superpix):
 
 def subpixel(superpix, nside_superpix, nside_subpix):
     """
-    Return the indices of sub-pixels (resolution nside_subpix) within the super-pixel with (resolution nside_superpix).
+    Return the indices of sub-pixels (resolution nside_subpix) within
+    the super-pixel with (resolution nside_superpix).
+    
+    ADW: It would be better to convert to next and do this explicitly
     """
     if nside_superpix==nside_subpix: return superpix
     vec = hp.pix2vec(nside_superpix, superpix)
@@ -36,6 +39,28 @@ def subpixel(superpix, nside_superpix, nside_subpix):
     pix_for_subpix = superpixel(subpix,nside_subpix,nside_superpix)
     # Might be able to speed up array indexing...
     return subpix[pix_for_subpix == superpix]
+
+def subpixel2(superpix, nside_superpix, nside_subpix):
+    """
+    Return the indices of sub-pixels (resolution nside_subpix) within
+    the super-pixel(s) (resolution nside_superpix).
+    
+    Parameters:
+    superpix : index of the superixel(s)
+    nside_superpix : nside of the superpixel
+    nside_subpix : nside of the desired subpixels
+    Returns:
+    subpix : subpixels for each superpixel
+    """
+    if nside_superpix==nside_subpix: return superpix
+    nest_superpix = hp.ring2nest(nside_superpix, superpix)
+    factor = (nside_subpix//nside_superpix)**2
+    if np.isscalar(superpix):
+        nest_subpix = factor*nest_superpix + np.arange(factor)
+    else:
+        nest_subpix = factor*nest_superpix[:,np.newaxis] + np.arange(factor)
+                            
+    return hp.nest2ring(nside_subpix, nest_subpix)
 
 ############################################################
 

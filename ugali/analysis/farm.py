@@ -118,13 +118,18 @@ class Farm:
             if coords.ndim == 1:
                 coords = np.array([coords])
             if coords.shape[1] == 2:
-                glon,glat = coords.T
-                radius    = np.zeros(len(glon))
+                lon,lat = coords.T
+                radius  = np.zeros(len(lon))
             elif coords.shape[1] == 3:
-                glon,glat,radius = coords.T
+                lon,lat,radius = coords.T
             else:
                 raise Exception("Unrecognized coords shape:"+str(coords.shape))
-            vec = ang2vec(glon,glat)
+
+            #ADW: targets is still in glon,glat
+            if self.config['coords']['coordsys'].lower() == 'cel':
+                lon,lat = gal2cel(lon,lat)
+
+            vec = ang2vec(lon,lat)
             pixels = np.zeros(0, dtype=int)
             for v,r in zip(vec,radius):
                 pix = query_disc(self.nside_likelihood,v,r,inclusive=True,fact=32)
