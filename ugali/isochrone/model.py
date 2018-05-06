@@ -169,8 +169,8 @@ class IsochroneModel(Model):
         # ADW: Any other modes possible?
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
-            mass_interpolation = scipy.interpolate.interp1d(range(0, len(mass_init)), mass_init)
-            mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
+            mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
+            mass_array = mass_interpolation(np.linspace(0, len(mass_init)-1, mass_steps+1))
             d_mass = mass_array[1:] - mass_array[0:-1]
             mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])
             mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode = False)
