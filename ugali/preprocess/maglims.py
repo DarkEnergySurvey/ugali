@@ -6,7 +6,6 @@ import os
 from os.path import join
 import shutil
 
-import pyfits
 import fitsio
 import numpy
 import numpy as np
@@ -16,13 +15,14 @@ import tempfile
 import subprocess
 import healpy
 from collections import Counter
+from collections import OrderedDict as odict
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
 import ugali.utils.skymap
 import ugali.utils.binning
 from ugali.utils.projector import cel2gal, gal2cel
-from ugali.utils.healpix import ang2pix, pix2ang,superpixel
+from ugali.utils.healpix import ang2pix, pix2ang, superpixel
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
@@ -30,6 +30,8 @@ from ugali.utils.constants import MAGLIMS
 
 
 class Maglims(object):
+    """ Object for deriving magnitude limits from the catalog """
+
     def __init__(self, config):
         self.config = Config(config)
         self._setup()
@@ -45,7 +47,7 @@ class Maglims(object):
         try: 
             self.footprint = fitsio.read(self.footfile)['I'].ravel()
         except:
-            logger.warn("Couldn't open %s; will try again."%self.footfile)
+            logger.warn("Couldn't open %s; will pass through."%self.footfile)
             self.footprint = self.footfile
 
 
@@ -68,11 +70,12 @@ class Maglims(object):
                 pixels,maglims=self.calculate(infile,f,simple)
                 logger.info("Creating %s"%outfile)
                 outdir = mkdir(os.path.dirname(outfile))
-                #data_dict = dict( MAGLIM=maglims )
-                #ugali.utils.skymap.writeSparseHealpixMap(pixels,data_dict,self.nside_pixel,outfile)
-                data = dict(PIXEL=pixels,MAGLIM=maglims )
-                ugali.utils.healpix.write_partial_map(outfile,data,self.nside_pixel,
-                                                      dtype='f4')
+                data = odict()
+                data['PIXEL']=pixels
+                data['MAGLIM']=maglims.astype('f4')
+                ugali.utils.healpix.write_partial_map(outfile,data,
+                                                      self.nside_pixel)
+                                                      
 
     def calculate(self, infile, field=1, simple=False):
         logger.info("Calculating magnitude limit from %s"%infile)
@@ -96,7 +99,7 @@ class Maglims(object):
         data = fitsio.read(infile,columns=[pixel_pix_name])
 
         #mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
-        mask_maglims = numpy.zeros( healpy.nside2npix(self.nside_mask) )
+        mask_maglims = numpy.zeros(healpy.nside2npix(self.nside_mask))
          
         out_pixels = numpy.zeros(0,dtype='int')
         out_maglims = numpy.zeros(0)
@@ -156,13 +159,14 @@ class Maglims(object):
         out_maglims = out_maglims[idx]
          
         # Remove pixels outside the footprint
-        logger.info("Checking footprint against %s"%self.footfile)
-        glon,glat = pix2ang(self.nside_pixel,out_pixels)
-        ra,dec = gal2cel(glon,glat)
-        footprint = inFootprint(self.footprint,ra,dec)
-        idx = numpy.nonzero(footprint)[0]
-        out_pixels = out_pixels[idx]
-        out_maglims = out_maglims[idx]
+        if self.footfile:
+            logger.info("Checking footprint against %s"%self.footfile)
+            glon,glat = pix2ang(self.nside_pixel,out_pixels)
+            ra,dec = gal2cel(glon,glat)
+            footprint = inFootprint(self.footprint,ra,dec)
+            idx = numpy.nonzero(footprint)[0]
+            out_pixels = out_pixels[idx]
+            out_maglims = out_maglims[idx]
          
         logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))         
         return out_pixels,out_maglims
@@ -178,7 +182,9 @@ def inFootprint(footprint,ra,dec):
     Returns:
     inside   : boolean array of coordinates in footprint
     """
-        
+    if footprint is None:
+        return np.ones(len(ra),dtype=bool)
+    
     try:
         if isinstance(footprint,str) and os.path.exists(footprint):
             filename = footprint
@@ -215,80 +221,88 @@ def inMangle(polyfile,ra,dec):
 
     return data > 0
 
-def simple_maglims(config,dirname='simple',force=False):
-    """
-    Create simple, uniform magnitude limits based on nominal
-    survey depth.
-    """
-    filenames = config.getFilenames()
-    release = config['data']['release'].lower()
-    #band_1 = config['isochrone']['mag_1_field']
-    #band_2 = config['isochrone']['mag_2_field']
-    band_1 = config['catalog']['mag_1_field']
-    band_2 = config['catalog']['mag_2_field']
-    mask_1 = filenames['mask_1'].compressed()
-    mask_2 = filenames['mask_2'].compressed()
-    basedir,basename = os.path.split(config['mask']['dirname'])
-    if basename == dirname:
-        raise Exception("Input and output directory are the same.")
-    outdir = mkdir(os.path.join(basedir,dirname))
+#def simple_maglims(config,dirname='simple',force=False):
+#    """
+#    Create simple, uniform magnitude limits based on nominal
+#    survey depth.
+#    """
+#    DeprecationWarning("'simple_maglims' is deprecated")
+#    filenames = config.getFilenames()
+#    release = config['data']['release'].lower()
+#    #band_1 = config['isochrone']['mag_1_field']
+#    #band_2 = config['isochrone']['mag_2_field']
+#    band_1 = config['catalog']['mag_1_field']
+#    band_2 = config['catalog']['mag_2_field']
+#    mask_1 = filenames['mask_1'].compressed()
+#    mask_2 = filenames['mask_2'].compressed()
+#    basedir,basename = os.path.split(config['mask']['dirname'])
+#    if basename == dirname:
+#        raise Exception("Input and output directory are the same.")
+#    outdir = mkdir(os.path.join(basedir,dirname))
+# 
+#    for band, infiles in [(band_1,mask_1),(band_2,mask_2)]:
+#        maglim = MAGLIMS[release][band]
+#        for infile in infiles:
+#            basename = os.path.basename(infile)
+#            outfile = join(outdir,basename)
+#            logger.debug('Reading %s...'%infile)
+#            f = pyfits.open(infile)
+#            f[1].data['MAGLIM'][:] = maglim
+#            logger.debug('Writing %s...'%outfile)
+#            f.writeto(outfile,clobber=True)
 
-    for band, infiles in [(band_1,mask_1),(band_2,mask_2)]:
-        maglim = MAGLIMS[release][band]
-        for infile in infiles:
-            basename = os.path.basename(infile)
-            outfile = join(outdir,basename)
-            logger.debug('Reading %s...'%infile)
-            f = pyfits.open(infile)
-            f[1].data['MAGLIM'][:] = maglim
-            logger.debug('Writing %s...'%outfile)
-            f.writeto(outfile,clobber=True)
+def split(config,dirname='split',force=False):
+    """ Take a pre-existing maglim map and divide it into
+    chunks consistent with the catalog pixels. """
 
-def simple_split(config,dirname='split',force=False):
     config = Config(config)
     filenames = config.getFilenames()
-    healpix = filenames['pix'].compressed()
+    #healpix = filenames['pix'].compressed()
 
+    # Check that things are ok
+    basedir,basename = os.path.split(config['mask']['dirname'])
+    #if basename == dirname:
+    #    msg = "Input and output directory are the same."
+    #    raise Exception(msg)
+    outdir = mkdir(os.path.join(basedir,dirname))
+    
     nside_catalog = config['coords']['nside_catalog']
     nside_pixel = config['coords']['nside_pixel']
 
     release = config['data']['release'].lower()
-    band_1 = config['catalog']['mag_1_band']
-    band_2 = config['catalog']['mag_2_band']
+    band1 = config['catalog']['mag_1_band']
+    band2 = config['catalog']['mag_2_band']
 
+    # Read the magnitude limits
     mangledir = config['mangle']['dirname']
 
-    mangle_file_1 = join(mangledir,config['mangle']['filename_1'])
-    logger.info("Reading %s..."%mangle_file_1)
-    mangle_1 = healpy.read_map(mangle_file_1)
+    manglefile_1 = join(mangledir,config['mangle']['filename_1'])
+    logger.info("Reading %s..."%manglefile_1)
+    mangle1 = healpy.read_map(manglefile_1)
     
-    mangle_file_2 = join(mangledir,config['mangle']['filename_2'])
-    logger.info("Reading %s..."%mangle_file_2)
-    mangle_2 = healpy.read_map(mangle_file_2)
+    manglefile_2 = join(mangledir,config['mangle']['filename_2'])
+    logger.info("Reading %s..."%manglefile_2)
+    mangle2 = healpy.read_map(manglefile_2)
 
-    basedir,basename = os.path.split(config['mask']['dirname'])
-    if basename == dirname:
-        msg = "Input and output directory are the same."
-        raise Exception(msg)
-    outdir = mkdir(os.path.join(basedir,dirname))
+    # Read the footprint
+    footfile = config['data']['footprint']
+    logger.info("Reading %s..."%footfile)
+    footprint = healpy.read_map(footfile)
 
-    mask_1 = os.path.basename(config['mask']['basename_1'])
-    mask_2 = os.path.basename(config['mask']['basename_2'])
+    # Output mask names
+    mask1 = os.path.basename(config['mask']['basename_1'])
+    mask2 = os.path.basename(config['mask']['basename_2'])
 
-    for band,mangle,base in [(band_1,mangle_1,mask_1),(band_2,mangle_2,mask_2)]:
-        maglim = MAGLIMS[release][band]
-
+    for band,mangle,base in [(band1,mangle1,mask1),(band2,mangle2,mask2)]:
         nside_mangle = healpy.npix2nside(len(mangle))
         if nside_mangle != nside_pixel:
-            msg = "Mangle nside different from pixel nside"
+            msg = "Mask nside different from pixel nside"
             logger.warning(msg)
             #raise Exception(msg)
 
-
-        pixels = np.nonzero((mangle>0)&(mangle>maglim))[0]
-        print len(pixels)
+        pixels = np.nonzero(mangle>0)[0]
         superpix = superpixel(pixels,nside_mangle,nside_catalog)
-        print healpix
+        healpix = np.unique(superpix)
         for hpx in healpix:
             outfile = join(outdir,base)%hpx
             if os.path.exists(outfile) and not force:
@@ -296,15 +310,15 @@ def simple_split(config,dirname='split',force=False):
                 continue
 
             pix = pixels[superpix == hpx]
-            print hpx, len(pix)
+            print(hpx, len(pix))
 
-            maglims = maglim*np.ones(len(pix))
             logger.info('Writing %s...'%outfile)
-            #data = dict(MAGLIM=maglims )
-            #ugali.utils.skymap.writeSparseHealpixMap(pix,data,nside_pixel,outfile)
-            data = dict(PIXEL=pix,MAGLIM=maglims)
-            ugali.utils.healpix.write_partial_map(outfile,data,nside_pixel,dtype='f4')
-        
+            data = odict()
+            data['PIXEL']=pix
+            data['MAGLIM']=mangle[pix].astype('f4')
+            data['FRACDET']=footprint[pix].astype('f4')
+            ugali.utils.healpix.write_partial_map(outfile,data,nside_pixel)
+                                                  
 if __name__ == "__main__":
     from optparse import OptionParser
     usage = "Usage: %prog  [options] input"

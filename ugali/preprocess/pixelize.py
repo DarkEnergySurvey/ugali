@@ -8,7 +8,6 @@ For pixelizing catalogs and masks.
 import os
 from os.path import join
 
-import pyfits
 import fitsio
 import numpy
 import numpy as np
@@ -19,78 +18,16 @@ import healpy as hp
 import glob
 from matplotlib import mlab
 
-import ugali.utils.binning
-import ugali.utils.skymap
+#import ugali.utils.binning
+#import ugali.utils.skymap
 from ugali.utils.projector import cel2gal, gal2cel
-import ugali.utils.healpix
+from ugali.utils import healpix
 from ugali.utils.healpix import ang2pix, pix2ang, superpixel
 
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 import ugali.utils.fileio
-
-def pixelizeCatalog(infiles, config, force=False):
-    """
-    Break catalog up into a set of healpix files.
-    """
-    nside_catalog = config['coords']['nside_catalog']
-    nside_pixel = config['coords']['nside_pixel']
-    outdir = mkdir(config['catalog']['dirname'])
-    filenames = config.getFilenames()
-    
-    for ii,infile in enumerate(infiles):
-        logger.info('(%i/%i) %s'%(ii+1, len(infiles), infile))
-        f = pyfits.open(infile)
-        data = f[1].data
-        header = f[1].header
-        logger.info("%i objects found"%len(data))
-        if not len(data): continue
-        glon,glat = cel2gal(data['RA'],data['DEC'])
-        catalog_pix = ang2pix(nside_catalog,glon,glat)
-        pixel_pix = ang2pix(nside_pixel,glon,glat)
-        names = [n.upper() for n in data.columns.names]
-        ra_idx = names.index('RA'); dec_idx = names.index('DEC')
-        idx = ra_idx if ra_idx > dec_idx else dec_idx
-        catalog_pix_name = 'PIX%i'%nside_catalog
-        pixel_pix_name = 'PIX%i'%nside_pixel
- 
-        coldefs = pyfits.ColDefs(
-            [pyfits.Column(name='GLON',format='1D',array=glon),
-             pyfits.Column(name='GLAT',format='1D',array=glat),
-             pyfits.Column(name=catalog_pix_name,format='1J',array=catalog_pix),
-             pyfits.Column(name=pixel_pix_name  ,format='1J',array=pixel_pix)]
-        )
-        hdu = pyfits.new_table(data.columns[:idx+1]+coldefs+data.columns[idx+1:])
-        table = hdu.data
- 
-        for pix in numpy.unique(catalog_pix):
-            logger.debug("Processing pixel %s"%pix)
-            outfile = filenames.data['catalog'][pix]
-            if not os.path.exists(outfile):
-                logger.debug("Creating %s"%outfile)
-                names = [n.upper() for n in table.columns.names]
-                formats = table.columns.formats
-                columns = [pyfits.Column(n,f) for n,f in zip(names,formats)]
-                out = pyfits.HDUList([pyfits.PrimaryHDU(),pyfits.new_table(columns)])
-                out[1].header['NSIDE'] = nside_catalog
-                out[1].header['PIX'] = pix
-                out.writeto(outfile)
-            hdulist = pyfits.open(outfile,mode='update')
-            t1 = hdulist[1].data
-            # Could we speed up with sorting and indexing?
-            t2 = table[ table[catalog_pix_name] == pix ]
-            nrows1 = t1.shape[0]
-            nrows2 = t2.shape[0]
-            nrows = nrows1 + nrows2
-            out = pyfits.new_table(t1.columns, nrows=nrows)
-            for name in t1.columns.names:
-                out.data.field(name)[nrows1:]=t2.field(name)
-            hdulist[1] = out
-            logger.debug("Writing %s"%outfile)
-            hdulist.flush()
-            hdulist.close()
-
 
 def pixelizeCatalog(infiles, config, force=False):
     """
@@ -108,26 +45,47 @@ def pixelizeCatalog(infiles, config, force=False):
     """
     nside_catalog = config['coords']['nside_catalog']
     nside_pixel = config['coords']['nside_pixel']
+    coordsys = config['coords']['coordsys'].upper()
     outdir = mkdir(config['catalog']['dirname'])
     filenames = config.getFilenames()
-    
+    lon_field = config['catalog']['lon_field'].upper()
+    lat_field = config['catalog']['lat_field'].upper()
+
+    # ADW: It would probably be better (and more efficient) to do the
+    # pixelizing and the new column insertion separately.
     for i,filename in enumerate(infiles):
         logger.info('(%i/%i) %s'%(i+1, len(infiles), filename))
         data = fitsio.read(filename)
         logger.info("%i objects found"%len(data))
         if not len(data): continue
 
-        glon,glat = cel2gal(data['RA'],data['DEC'])
-        cat_pix = ang2pix(nside_catalog,glon,glat)
-        pix_pix = ang2pix(nside_pixel,glon,glat)
+        columns = map(str.upper,data.dtype.names)
+        names,arrs = [],[]
+
+        if (lon_field in columns) and (lat_field in columns):
+            lon,lat = data[lon_field],data[lat_field]
+        elif coordsys == 'GAL':
+            msg = "Columns '%s' and '%s' not found."%(lon_field,lat_field)
+            msg += "\nConverting from RA,DEC"
+            logger.warning(msg)
+            lon,lat = cel2gal(data['RA'],data['DEC'])
+            names += [lon_field,lat_field]
+            arrs  += [lon,lat]
+        elif coordsys == 'CEL':
+            msg = "Columns '%s' and '%s' not found."%(lon_field,lat_field)
+            msg += "\nConverting from GLON,GLAT"
+            lon,lat = gal2cel(data['GLON'],data['GLAT'])
+            names  += [lon_field,lat_field]
+            arrs   += [lon,lat]
+
+        cat_pix = ang2pix(nside_catalog,lon,lat)
+        pix_pix = ang2pix(nside_pixel,lon,lat)
         cat_pix_name = 'PIX%i'%nside_catalog
         pix_pix_name = 'PIX%i'%nside_pixel
 
-        data=mlab.rec_append_fields(data,
-                                    names=['GLON','GLAT',cat_pix_name,pix_pix_name],
-                                    arrs=[glon,glat,cat_pix,pix_pix],
-                                    dtypes=['f4','f4',int,int])
-                               
+        names += [cat_pix_name,pix_pix_name]
+        arrs  += [cat_pix,pix_pix]
+        data=mlab.rec_append_fields(data,names=names,arrs=arrs)
                                
         for pix in np.unique(cat_pix):
             logger.debug("Processing pixel %s"%pix)
@@ -139,9 +97,11 @@ def pixelizeCatalog(infiles, config, force=False):
                 logger.debug("Creating %s"%outfile)
                 out=fitsio.FITS(outfile,mode='rw')
                 out.write(arr)
-                hdr = ugali.utils.healpix.header_odict(nside=nside_catalog,coord='G')
+
+                hdr=healpix.header_odict(nside=nside_catalog,
+                                                     coord=coordsys[0])
                 for key in ['PIXTYPE','ORDERING','NSIDE','COORDSYS']:
-                    out[1].write_key(*hdr[key].values())
+                    out[1].write_key(*list(hdr[key].values()))
                 out[1].write_key('PIX',pix,comment='HEALPIX pixel for this file')
             else:
                 out=fitsio.FITS(outfile,mode='rw')
@@ -153,8 +113,11 @@ def pixelizeCatalog(infiles, config, force=False):
 def pixelizeDensity(config, nside=None, force=False):
     if nside is None: 
         nside = config['coords']['nside_likelihood']
+    coordsys = config['coords']['coordsys'].upper()
     filenames = config.getFilenames()
     infiles = filenames[~filenames['catalog'].mask]
+    lon_field = config['catalog']['lon_field'].upper()
+    lat_field = config['catalog']['lat_field'].upper()
 
     for ii,f in enumerate(infiles.data):
         infile = f['catalog']
@@ -167,18 +130,20 @@ def pixelizeDensity(config, nside=None, force=False):
             continue
             
         outdir = mkdir(os.path.dirname(outfile))
-        pixels, density = stellarDensity(infile,nside)
-        logger.info("Writing %s..."%outfile)
-        data = dict(PIXEL=pixels,DENSITY=density)
-        ugali.utils.healpix.write_partial_map(outfile,data,nside=nside)
+        pixels, density = stellarDensity(infile,nside,
+                                         lon_field=lon_field,lat_field=lat_field)
 
-def stellarDensity(infile, nside=2**8): 
+        data = dict(PIXEL=pixels,DENSITY=density)
+        healpix.write_partial_map(outfile,data,nside=nside,coord=coordsys[0])
+
+
+def stellarDensity(infile, nside=256, lon_field='RA', lat_field='DEC'): 
     area = healpy.nside2pixarea(nside,degrees=True)
     logger.debug("Reading %s"%infile)
-    data = fitsio.read(infile,columns=['GLON','GLAT'])
+    data = fitsio.read(infile,columns=[lon_field,lat_field])
 
-    glon,glat = data['GLON'],data['GLAT']
-    pix = ang2pix(nside,glon,glat)
+    lon,lat = data[lon_field],data[lat_field]
+    pix = ang2pix(nside,lon,lat)
     counts = collections.Counter(pix)
     pixels, number = numpy.array(sorted(counts.items())).T
     density = number/area

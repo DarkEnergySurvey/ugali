@@ -8,8 +8,14 @@ import copy
 from collections import OrderedDict as odict
 
 # For downloading isochrones...
-from urllib import urlencode
-from urllib2 import urlopen
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
+
+
 import subprocess
 import re
 
@@ -274,8 +280,8 @@ class Bressan2012(ParsecIsochrone):
 
         # delimiter='\t' is used to be compatible with OldPadova...
         # ADW: This should be updated, but be careful of column numbering
-        kwargs = dict(delimiter='\t',usecols=columns.keys(),
-                      dtype=columns.values())
+        kwargs = dict(delimiter='\t',usecols=list(columns.keys()),
+                      dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
 
         self.mass_init = self.data['mass_init']
@@ -354,7 +360,7 @@ class Marigo2017(ParsecIsochrone):
             logger.warning('Unrecognized survey: %s'%(survey))
             raise(e)
 
-        kwargs = dict(usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(usecols=list(columns.keys()),dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
 
         self.mass_init = self.data['mass_init']

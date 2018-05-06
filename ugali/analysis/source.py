@@ -53,6 +53,8 @@ class Source(object):
         return ret
 
     def __getattr__(self, name):
+        """ Overload __getattr__ to access parameters through self.getp.
+        """
         #for key,model in self.models.items():
         #    if name in model.params:
         #        return getattr(model, name)
@@ -65,7 +67,7 @@ class Source(object):
         #return object.__getattribute__(self,name)
         try:
             return self.getp(name)
-        except AttributeError:
+        except AttributeError as e:
             return object.__getattribute__(self,name)
 
     def __setattr__(self, name, value):
@@ -98,7 +100,7 @@ class Source(object):
         raise AttributeError
 
     def getp(self, name):
-        for key,model in self.models.items():
+        for key, model in self.models.items():
             try:
                 return model.getp(name).value
             except KeyError:
@@ -115,7 +117,7 @@ class Source(object):
 
 
     def load(self,srcmdl,section=None):
-        if isinstance(srcmdl,basestring): 
+        if isinstance(srcmdl,str): 
             params = yaml.load(open(srcmdl))
         else:
             params = copy.deepcopy(srcmdl)
@@ -123,7 +125,7 @@ class Source(object):
         if section is not None: 
             params = params[section]
         elif len(params) == 1:
-            section = params.keys()[0]
+            section = list(params.keys())[0]
             params = params[section]
 
         fill = False
@@ -185,8 +187,22 @@ class Source(object):
         return self.models['isochrone']
 
     def set_model(self, name, model):
-        """ Set a model """
-        if not hasattr(self,'models'):
+        """ Set a model.
+
+        Parameters
+        ----------
+        name  : name of the model -- e.g., richness, kernel, isochrone, etc.
+        model : the model instance
+
+        Returns
+        -------
+        None
+        """
+        # Careful to not use `hasattr`
+        # https://hynek.me/articles/hasattr/
+        try:
+            self.__getattribute__('models')
+        except AttributeError:
             object.__setattr__(self, 'models',odict())
         self.models[name] = model
 
@@ -198,7 +214,7 @@ class Source(object):
 
     def set_params(self,**kwargs):
         """ Set the parameter values """
-        for key,value in kwargs.items():
+        for key,value in list(kwargs.items()):
             setattr(self,key,value)
 
     def get_params(self):

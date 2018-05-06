@@ -86,7 +86,7 @@ class SourceCatalog(object):
         """
         try:
             return self.data[key]
-        except ValueError, message:
+        except ValueError as message:
             if key in self.data['name']:
                 return self.data[self.data['name'] == key]
             else:
@@ -106,7 +106,7 @@ class SourceCatalog(object):
         pass
  
     def match(self,lon,lat,coord='gal',tol=0.1,nnearest=1):
-        if coord.lower == 'cel':
+        if coord.lower() == 'cel':
             glon, glat = cel2gal(lon,lat)
         else:
             glon,glat = lon, lat
@@ -123,14 +123,40 @@ class McConnachie12(SourceCatalog):
  
     def _load(self,filename):
         if filename is None: 
-            filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
+            filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies2012.dat")
         self.filename = filename
  
-        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=34)
+        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
  
         self.data.resize(len(raw))
         self.data['name'] = numpy.char.strip(raw['f0'])
  
+        ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
+        dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
+        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
+        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
+        
+        glon,glat = cel2gal(self.data['ra'],self.data['dec'])
+        self.data['glon'],self.data['glat'] = glon,glat
+
+class McConnachie15(SourceCatalog):
+    """
+    Catalog of nearby dwarf spheroidal galaxies. Updated September 2015.
+    http://arxiv.org/abs/1204.1562
+
+    http://www.astro.uvic.ca/~alan/Nearby_Dwarf_Database_files/NearbyGalaxies.dat
+    """
+ 
+    def _load(self,filename):
+        if filename is None: 
+            filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
+        self.filename = filename
+ 
+        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=list(range(7)),dtype=['|S19']+6*[float],skip_header=36)
+
+        self.data.resize(len(raw))
+        self.data['name'] = np.char.lstrip(np.char.strip(raw['f0']),'*')
+
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
         self.data['ra'] = ugali.utils.projector.hms2dec(ra)
@@ -151,10 +177,10 @@ class Rykoff14(SourceCatalog):
             filename = os.path.join(self.DATADIR,"redmapper/dr8_run_redmapper_v5.10_lgt20_catalog.fit")
         self.filename = filename
 
-        raw = fitsio.read(filename)
+        raw = fitsio.read(filename,lower=True)
 
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['MEM_MATCH_ID'])
+        self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['mem_match_id'])
         self.data['ra'] = raw['ra']
         self.data['dec'] = raw['dec']
         glon,glat = cel2gal(raw['ra'],raw['dec'])
@@ -196,7 +222,7 @@ class Corwen04(SourceCatalog):
     Modern compilation of the New General Catalogue and IC
     """
     def _load(self,filename):
-        kwargs = dict(delimiter=[1,1,4,15,3,3,8,3,3,7],usecols=[1,2]+range(4,10),dtype=['S1']+[int]+6*[float])
+        kwargs = dict(delimiter=[1,1,4,15,3,3,8,3,3,7],usecols=[1,2]+list(range(4,10)),dtype=['S1']+[int]+6*[float])
         if filename is None: 
             raw = []
             for basename in ['VII_239A/ngcpos.dat','VII_239A/icpos.dat']:
@@ -286,7 +312,7 @@ class Webbink85(SourceCatalog):
     http://spider.seds.org/spider/MWGC/mwgc.html
     """
     def _load(self,filename):
-        kwargs = dict(delimiter=[8,15,9,4,3,3,5,5],usecols=[1]+range(3,8),dtype=['S13']+5*[float])
+        kwargs = dict(delimiter=[8,15,9,4,3,3,5,5],usecols=[1]+list(range(3,8)),dtype=['S13']+5*[float])
         if filename is None: 
             raw = []
             for basename in ['VII_151/table1a.dat','VII_151/table1c.dat']:
@@ -298,7 +324,8 @@ class Webbink85(SourceCatalog):
         self.filename = filename
         
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        #self.data['name'] = np.char.strip(raw['f0'])
+        self.data['name'] = np.char.join(' ',np.char.split(raw['f0']))
 
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5']].view(float).reshape(len(raw),-1)
@@ -431,8 +458,8 @@ def catalogFactory(name, **kwargs):
     fn = lambda member: inspect.isclass(member) and member.__module__==__name__
     catalogs = odict(inspect.getmembers(sys.modules[__name__], fn))
 
-    if name not in catalogs.keys():
-        msg = "%s not found in catalogs:\n %s"%(name,kernels.keys())
+    if name not in list(catalogs.keys()):
+        msg = "%s not found in catalogs:\n %s"%(name,list(kernels.keys()))
         logger.error(msg)
         msg = "Unrecognized catalog: %s"%name
         raise Exception(msg)

@@ -17,7 +17,7 @@ def run(self):
 
     for name,label,coord in zip(names,labels,coords):
         glon,glat = coord[0],coord[1]
-        print '\t',name,'(%.2f,%.2f)'%(glon,glat)
+        print('\t',name,'(%.2f,%.2f)'%(glon,glat))
         plotter =ugali.utils.plotting.BasePlotter(glon,glat,self.config,radius=0.5)
         plotter.plotDistance()
         outfile='%s_distances.png'%label

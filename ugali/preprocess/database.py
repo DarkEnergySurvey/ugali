@@ -6,9 +6,13 @@ import sys
 import subprocess
 import re
 import os
-import httplib
-import StringIO
+import io
 
+try:
+    import http.client as httpcl
+except ImportError:
+    import httplib as httpcl
+ 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
@@ -179,14 +183,14 @@ class SDSSDatabase(Database):
 
         try:
             self.query(self.release,taskname,sqlname)
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             logger.error(e.output)
             self.drop(dbname)
             raise e
         
         try:
             url = self.extract(dbname)
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             self.drop(dbname)
             raise e
             
@@ -232,7 +236,7 @@ class SDSSDatabase(Database):
         """
      
         logger.info("Writing array...")
-        s = StringIO.StringIO()
+        s = io.StringIO()
         np.savetxt(s,array,delimiter=',',fmt="%.10g")
         tb_data = ''
         if fields is not None: 
@@ -242,7 +246,7 @@ class SDSSDatabase(Database):
         message = SOAP_TEMPLATE % (wsid, password, table, tb_data, "false")
         
         #construct and send the header
-        webservice = httplib.HTTP("skyserver.sdss3.org")
+        webservice = httpcl.HTTP("skyserver.sdss3.org")
         webservice.putrequest("POST", "/casjobs/services/jobs.asmx")
         webservice.putheader("Host", "skyserver.sdss3.org")
         webservice.putheader("Content-type", "text/xml; charset=\"UTF-8\"")
@@ -253,10 +257,10 @@ class SDSSDatabase(Database):
          
         # get the response
         statuscode, statusmessage, header = webservice.getreply()
-        print "Response: ", statuscode, statusmessage
-        print "headers: ", header
+        print("Response: ", statuscode, statusmessage)
+        print("headers: ", header)
         res = webservice.getfile().read()
-        print res
+        print(res)
 
 
     def run(self,pixfile=None,outdir=None):
@@ -324,8 +328,9 @@ class DESDatabase(Database):
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client...
         # This should work but it doesn't
+        import warnings
+        warnings.warn("desdbi is deprecated", DeprecationWarning)
         import despydb.desdbi
-        import pyfits
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
@@ -372,8 +377,6 @@ class DESDatabase(Database):
         #return ret
 
     def download(self, pixel, outdir=None, force=False):
-        import pyfits 
-
         if outdir is None: outdir = './'
         else:              mkdir(outdir)
         sqldir = mkdir(os.path.join(outdir,'sql'))
@@ -409,7 +412,7 @@ class Y1A1Database(DESDatabase):
         super(Y1A1Database,self).__init__(release=release)
         self.release = release.lower()
         self.basename = "des_%s_photometry"%self.release
-        print self.basename
+        print(self.basename)
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested

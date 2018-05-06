@@ -35,12 +35,13 @@ class Results(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = samples
 
     def load_samples(self,filename):
+        coordsys = self.config['coords']['coordsys']
         samples = Samples(filename)
-        self.samples = samples.supplement()
+        self.samples = samples.supplement(coordsys=coordsys)
 
 
     def get_mle(self):
@@ -62,7 +63,6 @@ class Results(object):
 
         # If the parameter is in the samples
         if param in self.samples.names:
-
             if param.startswith('position_angle'):
                 return self.estimate_position_angle(param,burn=burn,
                                                     clip=clip,alpha=alpha)
@@ -116,7 +116,7 @@ class Results(object):
         # CAREFUL: Assumes a flat prior...
         try: 
             data = self.samples.get(param,burn=burn,clip=clip)
-        except ValueError,msg:
+        except ValueError as msg:
             logger.warning(msg)
             return ugali.utils.stats.interval(np.nan)
  
@@ -256,15 +256,7 @@ class Results(object):
         else:
             logger.warning("Skipping Martin magnitude")
             results['Mv_martin'] = np.nan
- 
-        # Surface Brightness
-        def surfaceBrightness(abs_mag, r_physical, distance):
-            r_angle = np.degrees(np.arctan(r_physical / distance))
-            # corrected to use radius
-            c_v = 19.06 # mag/arcsec^2
-            #c_v = 10.17 # mag/arcmin^2
-            #c_v = 1.28  # mag/deg^2
-            return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
+        
         mu = surfaceBrightness(Mv, size, dist)
         results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
  
@@ -315,6 +307,22 @@ class Results(object):
         out.write(yaml.dump(source))
         out.close()
 
+def surfaceBrightness(abs_mag, r_physical, distance):
+    """
+    Compute the average surface brightness [mag arcsec^-2] within the half-light radius
+
+    abs_mag = absolute magnitude [mag]
+    r_physical = half-light radius [kpc] 
+    distance = [kpc]
+
+    The factor 2 in the c_v equation below account for half the luminosity 
+    within the half-light radius. The 3600.**2 is conversion from deg^2 to arcsec^2
+
+    c_v = 2.5 * np.log10(2.) + 2.5 * np.log10(np.pi * 3600.**2) = 19.78
+    """
+    r_angle = np.degrees(np.arctan(r_physical / distance))
+    c_v = 19.78 # mag/arcsec^2
+    return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
 
 def createResults(config,srcfile,section='source',samples=None):
     """ Create an MCMC instance """

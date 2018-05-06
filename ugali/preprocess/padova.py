@@ -8,8 +8,12 @@ https://github.com/mfouesneau/ezpadova
 
 """
 import os
-from urllib import urlencode
-from urllib2 import urlopen
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
 import re
 import subprocess
 from multiprocessing import Pool
@@ -323,7 +327,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.verbose:
-        from httplib import HTTPConnection
+        try:                                                                                            
+            from http.client import HTTPConnection
+        except ImportError:                                                                     from httplib import HTTPConnection
         HTTPConnection.debuglevel = 1
 
     if args.outdir is None: 
@@ -351,5 +357,5 @@ if __name__ == "__main__":
         pool = Pool(processes=args.njobs, maxtasksperchild=100)
         results = pool.map(run,arguments)
     else:
-        results = map(run,arguments)
+        results = list(map(run,arguments))
     

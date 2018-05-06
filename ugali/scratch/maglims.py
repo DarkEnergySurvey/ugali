@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-import pyfits
+import astropy.io.fits as pyfits
 import pylab as plt
 import glob
 import scipy.optimize
@@ -54,7 +54,7 @@ def fitfunc(mag,band='r'):
 
 
 for filename in sorted(glob.glob(path+'/*'))[:nfiles]:
-    print filename
+    print(filename)
     f = pyfits.open(filename)
     for b in bands:
         mag = f[1].data['mag_psf_%s'%b][::sample]
@@ -81,8 +81,8 @@ for b,meds in medians.items():
     plt.plot(centers,expf(absfit.x,centers,b),'-b',lw=2,zorder=10,label='Abs Fit')
 
     plt.ylim(0,0.7)
-    print b, 'relfit', relfit.x
-    print b, 'absfit', absfit.x
+    print(b, 'relfit', relfit.x)
+    print(b, 'absfit', absfit.x)
     plt.legend()
 
 plt.ion()

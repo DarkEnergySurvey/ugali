@@ -12,7 +12,7 @@ from scipy.stats import norm
 
 import healpy
 import healpy as hp
-import pyfits
+import fitsio
 
 import ugali.utils.binning
 import ugali.utils.parabola
@@ -173,10 +173,10 @@ class LogLikelihood(object):
         # The signal probability for each object
         self._p = (self.source.richness * self.u)/((self.source.richness * self.u) + self.b)
 
-        #print 'b',np.unique(self.b)[:20]
-        #print 'u',np.unique(self.u)[:20]
-        #print 'f',np.unique(self.f)[:20]
-        #print 'p',np.unique(self.p)[:20] 
+        #logging.debug('b: %s'%np.unique(self.b)[:20])
+        #logging.debug('u: %s'%np.unique(self.u)[:20])
+        #logging.debug('f: %s'%np.unique(self.f)[:20])
+        #logging.debug('p: %s'%np.unique(self.p)[:20])
 
         # Reset the sync toggle
         #for k in self._sync.keys(): self._sync[k]=False 
@@ -230,7 +230,8 @@ class LogLikelihood(object):
 
         if self.spatial_only:
             # ADW: This assumes a flat mask...
-            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            #solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            solid_angle_annulus = ((self.mask.mask_1.mask_annulus_sparse > 0)*self.mask.frac_annulus_sparse).sum()*self.roi.area_pixel
             b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
             self._b = np.array([b_density*self.roi.area_pixel])
 
@@ -253,7 +254,8 @@ class LogLikelihood(object):
 
         if self.spatial_only:
             # ADW: This assumes a flat mask...
-            solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            #solid_angle_annulus = (self.mask.mask_1.mask_annulus_sparse > 0).sum()*self.roi.area_pixel
+            solid_angle_annulus = ((self.mask.mask_1.mask_annulus_sparse > 0)*self.mask.frac_annulus_sparse).sum()*self.roi.area_pixel
             b_density = self.roi.inAnnulus(self.catalog_roi.lon,self.catalog_roi.lat).sum()/solid_angle_annulus
             self._b = np.array([b_density*self.roi.area_pixel])
 
@@ -308,11 +310,24 @@ class LogLikelihood(object):
     calc_signal_color = calc_signal_color1
 
     def calc_signal_spatial(self):
+        """
+        Calculate the spatial signal probability for each catalog object.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        u_spatial : array of spatial probabilities per object
+        """
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
         nside = self.config['coords']['nside_pixel']
         #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
         #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+
+        # For small kernels, use the single pixel where they reside; otherwise, calculate over roi
         if self.kernel.extension < 2*np.degrees(healpy.max_pixrad(nside)):
             #msg =  "small kernel"
             #msg += ("\n"+str(self.params))
@@ -399,44 +414,108 @@ class LogLikelihood(object):
         return parabola.confidenceInterval(alpha)
 
 
+    #def write_membership2(self,filename):
+    #    import astropy.io.fits as pyfits
+    # 
+    #    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+    #    
+    #    name_objid = self.config['catalog']['objid_field']
+    #    name_mag_1 = self.config['catalog']['mag_1_field']
+    #    name_mag_2 = self.config['catalog']['mag_2_field']
+    #    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
+    #    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
+    # 
+    #    # Angular and isochrone separations
+    #    sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
+    #    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+    # 
+    #    columns = [
+    #        pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
+    #        pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
+    #        pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
+    #        pyfits.Column(name='RA',format='D',array=ra),
+    #        pyfits.Column(name='DEC',format='D',array=dec),
+    #        pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
+    #        pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
+    #        pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
+    #        pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
+    #        pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
+    #        pyfits.Column(name='ANGSEP',format='E',array=sep),
+    #        pyfits.Column(name='ISOSEP',format='E',array=isosep),
+    #        pyfits.Column(name='PROB',format='E',array=self.p),
+    #    ]
+    #    hdu = pyfits.new_table(columns)
+    #    for param,value in self.source.params.items():
+    #        # HIERARCH allows header keywords longer than 8 characters
+    #        name = 'HIERARCH %s'%param.upper()
+    #        hdu.header.set(name,value.value,param)
+    #    name = 'HIERARCH %s'%'TS'
+    #    hdu.header.set(name,self.ts())
+    #    name = 'HIERARCH %s'%'TIMESTAMP'
+    #    hdu.header.set(name,time.asctime())
+    #    hdu.writeto(filename,clobber=True)
+
+    # Writing membership files
     def write_membership(self,filename):
-        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        """
+        Write a catalog file of the likelihood region including
+        membership properties.
+
+        Parameters:
+        -----------
+        filename : output filename
         
+        Returns:
+        --------
+        None
+        """
+        # Column names
         name_objid = self.config['catalog']['objid_field']
         name_mag_1 = self.config['catalog']['mag_1_field']
         name_mag_2 = self.config['catalog']['mag_2_field']
         name_mag_err_1 = self.config['catalog']['mag_err_1_field']
         name_mag_err_2 = self.config['catalog']['mag_err_2_field']
 
+        # Coordinate conversion
+        #ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        glon,glat = self.catalog.glon_glat
+        ra,dec    = self.catalog.ra_dec
+
         # Angular and isochrone separations
-        sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
+        sep = angsep(self.source.lon,self.source.lat,
+                     self.catalog.lon,self.catalog.lat)
         isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
 
-        columns = [
-            pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
-            pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
-            pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
-            pyfits.Column(name='RA',format='D',array=ra),
-            pyfits.Column(name='DEC',format='D',array=dec),
-            pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
-            pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
-            pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
-            pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
-            pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
-            pyfits.Column(name='ANGSEP',format='E',array=sep),
-            pyfits.Column(name='ISOSEP',format='E',array=isosep),
-            pyfits.Column(name='PROB',format='E',array=self.p),
-        ]
-        hdu = pyfits.new_table(columns)
+        # If size becomes an issue we can make everything float32
+        data = odict()
+        data[name_objid]     = self.catalog.objid
+        data['GLON']         = glon
+        data['GLAT']         = glat
+        data['RA']           = ra
+        data['DEC']          = dec
+        data[name_mag_1]     = self.catalog.mag_1
+        data[name_mag_err_1] = self.catalog.mag_err_1
+        data[name_mag_2]     = self.catalog.mag_2
+        data[name_mag_err_2] = self.catalog.mag_err_2
+        data['COLOR']        = self.catalog.color
+        data['ANGSEP']       = sep.astype(np.float32)
+        data['ISOSEP']       = isosep.astype(np.float32)
+        data['PROB']         = self.p.astype(np.float32)
+     
+        # HIERARCH allows header keywords longer than 8 characters
+        header = []
         for param,value in self.source.params.items():
-            # HIERARCH allows header keywords longer than 8 characters
-            name = 'HIERARCH %s'%param.upper()
-            hdu.header.set(name,value.value,param)
-        name = 'HIERARCH %s'%'TS'
-        hdu.header.set(name,self.ts())
-        name = 'HIERARCH %s'%'TIMESTAMP'
-        hdu.header.set(name,time.asctime())
-        hdu.writeto(filename,clobber=True)
+            card = dict(name='HIERARCH %s'%param.upper(),
+                        value=value.value,
+                        comment=param)
+            header.append(card)
+        card = dict(name='HIERARCH %s'%'TS',value=self.ts(),
+                    comment='test statistic')
+        header.append(card)
+        card = dict(name='HIERARCH %s'%'TIMESTAMP',value=time.asctime(),
+                    comment='creation time')
+        header.append(card)
+        fitsio.write(filename,data,header=header,clobber=True)
 
 def write_membership(filename,config,srcfile,section=None):
     """
@@ -513,7 +592,7 @@ def simulateCatalog(config,roi=None,lon=None,lat=None):
 
 def createLoglike(config,source=None,lon=None,lat=None):
 
-    if isinstance(source,basestring):
+    if isinstance(source,str):
         srcfile = source
         source = ugali.analysis.source.Source()
         source.load(srcfile,section='source')

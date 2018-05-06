@@ -4,7 +4,7 @@ import os
 import healpy
 import pylab as plt
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 import copy
 
 import ugali.utils.skymap
@@ -81,11 +81,11 @@ if __name__ == "__main__":
             glon, glat = float(target[1]),float(target[2])
         else:
             raise Exception('...')
-        print target[0],"(%.2f,%.2f)"%(glon,glat)
+        print(target[0],"(%.2f,%.2f)"%(glon,glat))
 
         infile = "%s_merged.fits"%(name)
         if not os.path.exists(infile):
-            print "WARNING: %s does not exist; skipping..."%infile
+            print("WARNING: %s does not exist; skipping..."%infile)
             continue
         f = pyfits.open(infile)
         data = f[1].data
@@ -117,19 +117,19 @@ if __name__ == "__main__":
         mass_err = numpy.mean([mass_upper-mass,mass-mass_lower])
         glon_max,glat_max = pixToAng(nside,pixel)
 
-        print "\t","(%.2f,%.2f)"%(glon_max,glat_max),"TS = %.1f"%data['LOG_LIKELIHOOD'][ii][idx]
-        print "\t","mass = %.2e+/-%.1e"%(mass,mass_err)
+        print("\t","(%.2f,%.2f)"%(glon_max,glat_max),"TS = %.1f"%data['LOG_LIKELIHOOD'][ii][idx])
+        print("\t","mass = %.2e+/-%.1e"%(mass,mass_err))
         luminosity = mass
         magv = float(MAGVSUN - 2.5*numpy.log10(mass))
         magv_lower = MAGVSUN - 2.5*numpy.log10(mass_upper)
         magv_upper = MAGVSUN - 2.5*numpy.log10(mass_lower)
         magv_err =  numpy.mean([magv_upper-magv,magv-magv_lower])
-        print "\tmagv_0 = %.1f+/-%.1f"%(target[7],target[8])
-        print "\tmagv = %.1f+/-%.1f"%(magv,magv_err)
+        print("\tmagv_0 = %.1f+/-%.1f"%(target[7],target[8]))
+        print("\tmagv = %.1f+/-%.1f"%(magv,magv_err))
         output = list(target)
         output[7] = magv
         output[8] = magv_err
         output+= [mass, mass_err, ts]
         #print "\t",output
         out.write(fmt.format(*output))
-        print
+        print()

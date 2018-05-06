@@ -5,8 +5,10 @@ import os,sys
 from os.path import join, exists
 import pprint
 import copy
+from collections import OrderedDict as odict
+
 import numpy as np
-import healpy
+import healpy as hp
 
 from ugali.utils.logger import logger
 import ugali.utils.config # To recognize own type
@@ -37,6 +39,9 @@ class Config(dict):
         # For back-compatibility...
         self.params = self
 
+        # Run some basic validation
+        self._validate()
+
         # Possible filenames from this config (masked by existence)
         try:
             self.filenames = self.getFilenames()
@@ -50,12 +55,14 @@ class Config(dict):
         return yaml.dump(self)
 
     def _load(self, input):
-        if isinstance(input, basestring):
+        if isinstance(input, str):
             self.filename = input
             ext = os.path.splitext(input)[1]
             if ext == '.py':
                 # ADW: This is dangerous and terrible!!!
                 # THIS SHOULD BE DEPRICATED!!!
+                msg = "Python configuration files are deprecated."
+                DeprecationWarning(msg)
                 reader = open(input)
                 params = eval(''.join(reader.readlines()))
                 reader.close()
@@ -76,6 +83,41 @@ class Config(dict):
 
         return params
 
+    def _validate(self):
+        """ Enforce some structure to the config file """
+        # This could be done with a default config
+
+        # Check that specific keys exist
+        sections = odict([
+                ('catalog',['dirname','basename',
+                            'lon_field','lat_field','objid_field',
+                            'mag_1_band', 'mag_1_field', 'mag_err_1_field',
+                            'mag_2_band', 'mag_2_field', 'mag_err_2_field',
+                            ]),
+                ('mask',[]),
+                ('coords',['nside_catalog','nside_mask','nside_likelihood',
+                           'nside_pixel','roi_radius','roi_radius_annulus',
+                           'roi_radius_interior','coordsys',
+                           ]),
+                ('likelihood',[]),
+                ('output',[]),
+                ('batch',[]),
+                ])  
+
+        keys = np.array(list(sections.keys()))
+        found = np.in1d(keys,list(self.keys()))
+
+        if not np.all(found):
+            msg = 'Missing sections: '+str(keys[~found])
+            raise Exception(msg)
+
+        for section,keys in sections.items():
+            keys = np.array(keys)
+            found = np.in1d(keys,list(self[section].keys()))
+            if not np.all(found):
+                msg = 'Missing keys in %s: '%(section)+str(keys[~found])
+                raise Exception(msg)
+            
     def _makeFilenames(self):
         likedir=self['output']['likedir']
         self.likefile  = join(likedir,self['output']['likefile'])
@@ -131,7 +173,7 @@ class Config(dict):
         elif pixels is not None:
             pixels = [pixels] if np.isscalar(pixels) else pixels
         else:
-            pixels = np.arange(healpy.nside2npix(nside_catalog))   
+            pixels = np.arange(hp.nside2npix(nside_catalog))   
 
         npix = len(pixels)
 
@@ -172,9 +214,9 @@ class Config(dict):
 
         if np.all(mask['pix']): logger.warn("All pixels masked")
                 
-
         #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
-        return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
+        #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
+        return np.ma.MaskedArray(data, mask, fill_value=[-1,'','',''])
 
     getCatalogFiles = getFilenames
 

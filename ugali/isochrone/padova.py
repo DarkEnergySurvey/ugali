@@ -56,11 +56,11 @@ class Girardi2002(PadovaIsochrone):
         """
         try:
             columns = self.columns[self.survey.lower()]
-        except KeyError, e:
+        except KeyError as e:
             logger.warning('did not recognize survey %s'%(survey))
             raise(e)
 
-        kwargs = dict(delimiter='\t',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(delimiter='\t',usecols=list(columns.keys()),dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
         
         self.mass_init = self.data['mass_init']

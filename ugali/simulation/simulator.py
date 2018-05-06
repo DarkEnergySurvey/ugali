@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 """
 Module for simulation.
-
 """
 
 import copy
+import os
 
 import numpy
 import numpy as np
 import scipy.interpolate
-import pyfits
+import astropy.io.fits as pyfits
 import healpy
 import numpy.lib.recfunctions as recfuncs
-
+import fitsio
 
 import ugali.observation.catalog
 import ugali.observation.mask
@@ -101,8 +101,8 @@ class Generator:
             hdu.writeto(filename,clobber=True)
         elif filename.endswith('.txt') or filename.endswith('.dat'):
             np.savetxt(filename,data)
-        elif filename.endswith('.txt') or filename.endswith('.dat'):
-            np.savetxt(filename,data)
+        elif filename.endswith('.csv'):
+            np.savetxt(filename,data,delimiter=',')
         else:
             raise Exception('Unrecognized file extension: %s'%filename)
 
@@ -120,7 +120,7 @@ class Generator:
         if outfile: self.write(outfile,results)
 
         for i,d in enumerate(data): 
-            params = dict(zip(data.dtype.names,d))
+            params = dict(list(zip(data.dtype.names,d)))
             lon,lat = params['lon'],params['lat']
             distance_modulus = params['distance_modulus']
 
@@ -215,7 +215,7 @@ class Simulator(object):
             params['simulate']['kernel'] = params['kernel']
 
         self.isochrone = ugali.analysis.loglike.createIsochrone(params)
-        self.kernel = ugali.analysis.loglike.createKernel(params['simulate'],self.roi.lon,self.roi.lat)
+        self.kernel = ugali.analysis.loglike.createKernel(params['simulate'],lon=self.roi.lon,lat=self.roi.lat)
 
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
@@ -632,7 +632,6 @@ class Simulator(object):
 
         ADW: This should be combined with the write_membership function of loglike.
         """
-
         if self.config['catalog']['coordsys'].lower() == 'cel' \
            and self.config['coords']['coordsys'].lower() == 'gal':
             lon, lat = ugali.utils.projector.gal2cel(lon, lat)
@@ -667,6 +666,145 @@ class Simulator(object):
         """
         """
         pass
+
+############################################################
+
+class Analyzer(object):
+    """
+    Class for generating the parameters of the simulation.
+    """
+    def __init__(self, config, seed=None):
+        self.config = Config(config)
+
+    def create_population(self):
+        if self.config['simulate']['popfile']:
+            filename = os.path.join(self.config['simulate']['dirname'],self.config['simulate']['popfile'])
+            population = fitsio.read(filename)
+        else:
+            size = self.config['simulate']['size']
+            population = self.generate(size)
+            
+        self.population = population
+
+        return self.population
+
+    def write(self, filename, data=None):
+        """ Write the output results """
+        if data is None: data = self.results
+        logger.info("Writing %s..."%filename)
+        if filename.endswith('.npy'):
+            np.save(filename,data)
+        elif filename.endswith('.fits'):
+            # Copies data, so be careful..
+            out = np.rec.array(data)
+            out.dtype.names = np.char.upper(out.dtype.names)
+            hdu = pyfits.new_table(out)
+            hdu.writeto(filename,clobber=True)
+        elif filename.endswith('.txt') or filename.endswith('.dat'):
+            np.savetxt(filename,data)
+        elif filename.endswith('.csv'):
+            np.savetxt(filename,data,delimiter=',')
+        else:
+            raise Exception('Unrecognized file extension: %s'%filename)
+
+    def run(self, catalog=None, outfile=None):
+        #if size is None: size = self.config['simulate']['size']
+        #data = self.generate(size)
+        data = self.create_population()
+        size = len(data)
+
+        dtype=[('kernel','S18'),('ts','>f4'),('fit_kernel','S18'),('fit_ts','>f4'),
+               ('fit_mass','>f4'),('fit_mass_err','>f4'),
+               ('fit_distance','>f4'),('fit_distance_err','>f4')]
+        results = np.array(np.nan*np.ones(size),dtype=dtype)
+        results = recfuncs.merge_arrays([data,results],flatten=True,asrecarray=False,usemask=False)
+        self.results = results
+
+        if outfile: self.write(outfile,results)
+
+        for i,d in enumerate(data): 
+            params = dict(list(zip(data.dtype.names,d)))
+            lon,lat = params['ra'],params['dec']
+            distance_modulus = params['distance_modulus']
+
+            logger.info('\n(%i/%i); (lon, lat) = (%.2f, %.2f)'%(i+1,len(data),lon,lat))
+            roi = ugali.analysis.loglike.createROI(self.config,lon,lat)
+            mask = ugali.analysis.loglike.createMask(self.config,roi)
+            isochrone = ugali.analysis.loglike.createIsochrone(self.config)
+            kernel = ugali.analysis.loglike.createKernel(self.config,lon=lon,lat=lat)
+            pix = roi.indexTarget(lon,lat)
+
+            if not config['simulate']['catfile']:
+                simulator = Simulator(self.config,roi)
+                #catalog   = simulator.simulate(seed=self.seed, **params)
+                catalog   = simulator.simulate(**params)
+                #print "Catalog annulus contains:",roi.inAnnulus(simulator.catalog.lon,simulator.catalog.lat).sum()
+            else:
+                
+                pass
+            import pdb; pdb.set_trace()
+            logger.info("Simulated catalog annulus contains %i stars"%roi.inAnnulus(catalog.lon,catalog.lat).sum())
+
+            if len(catalog.lon) < 1000:
+                logger.error("Simulation contains too few objects; skipping...")
+                continue
+
+            """
+            like = ugali.analysis.loglike.LogLikelihood(self.config, roi, mask, catalog, isochrone, kernel)
+            like.set_params(distance_modulus=params['distance_modulus'])
+            like.sync_params()
+            results[i]['ts'] = 2*like.fit_richness()[0]
+            print 'TS=',results[i]['ts'] 
+            
+            like2 = ugali.analysis.loglike.LogLikelihood(self.config, roi, mask, simulator.catalog, isochrone, kernel)
+            like2.set_params(distance_modulus=params['distance_modulus'])
+            like2.sync_params()
+            print 'TS=',2*like2.fit_richness()[0]
+            """
+            #return simulator,like,like2
+
+            # Index of closest distance modulus
+            grid = ugali.analysis.scan.GridSearch(self.config,roi,mask,catalog,isochrone,kernel)
+
+            self.catalog = catalog
+            self.simulator = simulator
+            self.grid = grid
+            self.loglike = self.grid.loglike
+
+            # ADW: Should allow fit_distance to float in order to model search procedure
+            #fit_distance = float(distance_modulus)
+            distance_idx = np.fabs(grid.distance_modulus_array-params['distance_modulus']).argmin()
+            fit_distance = grid.distance_modulus_array[distance_idx]
+            grid.search(coords=(lon,lat),distance_modulus=fit_distance)
+
+            logger.info(str(self.loglike))
+
+            mle = grid.mle()
+            results[i]['kernel'] = simulator.kernel.name
+            results[i]['fit_kernel'] = grid.loglike.kernel.name
+            results[i]['ts'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
+            results[i]['fit_ts'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
+            results[i]['fit_mass'] = grid.stellar_mass_conversion*mle['richness']
+            results[i]['fit_distance'] = fit_distance #mle['distance_modulus']
+
+            err = grid.err()
+            richness_err = (err['richness'][1]-err['richness'][0])/2.
+            results[i]['fit_mass_err'] = grid.stellar_mass_conversion*richness_err
+
+            distance_modulus_err = (err['distance_modulus'][1]-err['distance_modulus'][0])/2.
+            results[i]['fit_distance_err'] = distance_modulus_err
+
+            for d in dtype:
+                logger.info('\t%s: %s'%(d[0], results[i][d[0]]))
+
+            if i%self.config['simulate']['save']==0 and outfile: 
+                self.write(outfile,results)
+
+        if outfile: self.write(outfile,results)
+            
+        return results
+    
+
 
 ############################################################
 

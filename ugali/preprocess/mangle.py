@@ -12,10 +12,10 @@ def fits2ply(infile,outfile=None):
         outfile = base + '.ply'
     if os.path.exists(outfile): os.remove(outfile)
 
-    print "Converting %s to %s"%(infile,outfile)
+    print("Converting %s to %s"%(infile,outfile))
 
     ### Python Routine
-    import mangle
+    from . import mangle
     mask = mangle.Mangle(infile)
     mask.write(outfile)
 
@@ -44,31 +44,31 @@ def fits2ply(infile,outfile=None):
 def poly2poly(infile, outfile, *opts):
     opts = ' '.join(opts)
     cmd = "poly2poly %s %s %s"%(opts,infile,outfile)
-    print cmd
+    print(cmd)
     subprocess.call(cmd,shell=True)
 
 def pixelize(infile, outfile, *opts):
     opts = ' '.join(opts)
     cmd = "pixelize %s %s %s"%(opts,infile,outfile)
-    print cmd
+    print(cmd)
     subprocess.call(cmd,shell=True)
 
 def snap(infile, outfile, *opts):
     opts = ' '.join(opts)
     cmd = "snap %s %s %s"%(opts,infile,outfile)
-    print cmd
+    print(cmd)
     subprocess.call(cmd,shell=True)
     
 def balkanize(infile, outfile, *opts):
     opts = ' '.join(opts)
     cmd = "balkanize %s %s %s"%(opts,infile,outfile)
-    print cmd
+    print(cmd)
     subprocess.call(cmd,shell=True)
         
 def unify(infile, outfile, *opts):
     opts = ' '.join(opts)
     cmd = "unify %s %s %s"%(balkfile,unifile,opts)
-    print cmd
+    print(cmd)
     subprocess.call(cmd,shell=True)    
 
 if __name__ == "__main__":
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     if not len(args):
-        print "ERROR: Infile require."
+        print("ERROR: Infile require.")
         parser.print_help()
         sys.exit(1)
      
@@ -143,23 +143,23 @@ if __name__ == "__main__":
     pixfile = base + '.pix.ply'
     if not os.path.exists(pixfile):
         pixelize(infile,pixfile,pixopts,mtol)
-    else: print "Found %s; skipping..."%pixfile
+    else: print("Found %s; skipping..."%pixfile)
 
     # Snap
     snapfile =  base + '.snap.ply'
     if not os.path.exists(snapfile):
         snap(pixfile,snapfile,snapopts,mtol)
-    else: print "Found %s; skipping..."%snapfile
+    else: print("Found %s; skipping..."%snapfile)
 
     # Balkanize
     balkfile = base + '.balk.ply'
     if not os.path.exists(balkfile):
         balkanize(snapfile,balkfile,mtol)
-    else: print "Found %s; skipping..."%balkfile
+    else: print("Found %s; skipping..."%balkfile)
 
     # Unify
     unifile = base + '.uni.ply'
     if not os.path.exists(unifile):
         unify(balkfile, unifile)
-    else: print "Found %s; skipping..."%unifile
+    else: print("Found %s; skipping..."%unifile)
 

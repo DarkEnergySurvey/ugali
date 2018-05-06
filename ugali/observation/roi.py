@@ -124,6 +124,7 @@ class ROI(object):
         """
 
         # ADW: These are really bin edges, should be careful and consistent
+        # It would be cleaner to separate the CMD from ROI
         self.bins_mag = numpy.linspace(self.config.params['mag']['min'],
                                        self.config.params['mag']['max'],
                                        self.config.params['mag']['n_bins'] + 1)
@@ -138,7 +139,7 @@ class ROI(object):
         self.delta_mag = self.bins_mag[1] - self.bins_mag[0]
         self.delta_color = self.bins_color[1] - self.bins_color[0]
 
-        # Axis labels
+        # Axis labels (DEPRECATED)
         self.label_x = 'x (deg)'
         self.label_y = 'y (deg)'
         
@@ -155,6 +156,7 @@ class ROI(object):
         """
         Plot the ROI
         """
+        # DEPRECATED
         import ugali.utils.plotting
 
         map_roi = numpy.array(healpy.UNSEEN \

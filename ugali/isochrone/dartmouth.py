@@ -6,8 +6,13 @@ import copy
 from collections import OrderedDict as odict
 
 import re
-from urllib import urlencode
-from urllib2 import urlopen
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
+
 #import requests
 import tempfile
 import subprocess
@@ -155,11 +160,11 @@ class Dotter2008(Isochrone):
         """
         try:
             columns = self.columns[self.survey.lower()]
-        except KeyError, e:
+        except KeyError as e:
             logger.warning('Unrecognized survey: %s'%(survey))
             raise(e)
 
-        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
 
         # KCB: Not sure whether the mass in Dotter isochrone output

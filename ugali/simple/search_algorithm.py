@@ -14,7 +14,7 @@ import os
 import glob
 import numpy as np
 from matplotlib import mlab
-#import pyfits
+#import astropy.io.fits as pyfits
 import astropy.io.fits as pyfits
 import healpy
 import scipy.interpolate
@@ -69,7 +69,7 @@ if not os.path.exists(results_dir):
 
 ###########################################################
 
-print matplotlib.get_backend()
+print(matplotlib.get_backend())
 
 ############################################################
 
@@ -126,7 +126,7 @@ try:
 except:
     sys.exit('ERROR! Coordinates not given in correct format.')
 
-print 'Search coordinates: (RA, Dec) = (%.2f, %.2f)'%(ra_select, dec_select)
+print('Search coordinates: (RA, Dec) = (%.2f, %.2f)'%(ra_select, dec_select))
 
 # Now cut for a single pixel
 pix_nside_select = ugali.utils.healpix.angToPix(nside, ra_select, dec_select)
@@ -145,7 +145,7 @@ for pix_nside in pix_nside_neighbors:
     reader = pyfits.open(infile)
     data_array.append(reader[1].data)
     reader.close()
-print 'Assembling data...'
+print('Assembling data...')
 data = np.concatenate(data_array) # TODO reduce this to just use needed columns so there is no excessive use of memory
 
 # De-redden magnitudes
@@ -156,11 +156,11 @@ data = np.concatenate(data_array) # TODO reduce this to just use needed columns 
 #except:
 #    data = mlab.rec_append_fields(data, ['WAVG_MAG_PSF_DRED_G', 'WAVG_MAG_PSF_DRED_R'], [data[mag_g_flag], data[mag_r_flag]])
 
-print 'Found %i objects...'%(len(data))
+print('Found %i objects...'%(len(data)))
 
 ############################################################
 
-print 'Applying cuts...'
+print('Applying cuts...')
 #cut = (data[flags_g] < 4) & (data[flags_r] < 4) \
 #      & (data['WAVG_MAG_PSF_DRED_G'] < 24.0) \
 #      & ((data['WAVG_MAG_PSF_DRED_G'] - data['WAVG_MAG_PSF_DRED_R']) < 1.) \
@@ -179,16 +179,16 @@ cut_gal = (data[star_galaxy_classification] > 1)
 data_gal = data[cut_gal]
 data = data[cut]
 
-print '%i star-like objects in ROI...'%(len(data))
-print '%i galaxy-like objects in ROI...'%(len(data_gal))
+print('%i star-like objects in ROI...'%(len(data)))
+print('%i galaxy-like objects in ROI...'%(len(data_gal)))
 
 ############################################################
 
 if (cfg['fracdet'] is not None) and (cfg['fracdet'].lower().strip() != 'none') and (cfg['fracdet'] != ''):
-    print 'Reading fracdet map %s ...'%(cfg['fracdet'])
+    print('Reading fracdet map %s ...'%(cfg['fracdet']))
     fracdet = healpy.read_map(cfg['fracdet'])
 else:
-    print 'No fracdet map specified ...'
+    print('No fracdet map specified ...')
     fracdet = None
 
 ############################################################
@@ -208,7 +208,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
 
     SCALE = 2.75 * (healpy.nside2resol(nside, arcmin=True) / 60.) # deg, scale for 2D histogram and various plotting
     
-    print 'Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus)
+    print('Distance = %.1f kpc (m-M = %.1f)'%(ugali.utils.projector.distanceModulusToDistance(distance_modulus), distance_modulus))
 
     dirname = '/home/s1/kadrlica/.ugali/isochrones/des/dotter2016/'
     #dirname = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/ugalidir/isochrones/des/dotter2016/'
@@ -221,7 +221,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
     data = data[cut]
     cut_magnitude_threshold = (data[mag_g_dred_flag] < magnitude_threshold)
 
-    print '%i objects left after isochrone cut...'%(len(data))
+    print('%i objects left after isochrone cut...'%(len(data)))
 
     ###
 
@@ -278,7 +278,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
 
     #characteristic_density = np.mean(n_goodcoverage) / area_coverage # per square degree
     characteristic_density = np.median(n_goodcoverage) / area_coverage # per square degree
-    print 'Characteristic density = %.1f deg^-2'%(characteristic_density)
+    print('Characteristic density = %.1f deg^-2'%(characteristic_density))
 
     # Use pixels with fracdet ~1.0 to estimate the characteristic density
     if fracdet is not None:
@@ -303,12 +303,12 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
                                               data['DEC'][cut_magnitude_threshold]) # Remember to apply mag threshold to objects
         characteristic_density_fracdet = float(np.sum(np.in1d(subpix, subpix_region_array))) \
                                          / (healpy.nside2pixarea(nside_fracdet, degrees=True) * len(subpix_region_array)) # deg^-2
-        print 'Characteristic density fracdet = %.1f deg^-2'%(characteristic_density_fracdet)
+        print('Characteristic density fracdet = %.1f deg^-2'%(characteristic_density_fracdet))
         
         # Correct the characteristic density by the mean fracdet value
         characteristic_density_raw = 1. * characteristic_density
         characteristic_density /= mean_fracdet 
-        print 'Characteristic density (fracdet corrected) = %.1f deg^-2'%(characteristic_density)
+        print('Characteristic density (fracdet corrected) = %.1f deg^-2'%(characteristic_density))
 
     if plot:
         pylab.figure('poisson')
@@ -390,21 +390,21 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
             subpix_inner = ugali.utils.healpix.angToDisc(nside_fracdet, ra_peak, dec_peak, 0.3)
             subpix_annulus = subpix_all[~np.in1d(subpix_all, subpix_inner)]
             mean_fracdet = np.mean(fracdet_zero[subpix_annulus])
-            print 'mean_fracdet', mean_fracdet
+            print('mean_fracdet', mean_fracdet)
             if mean_fracdet < 0.5:
                 characteristic_density_local = characteristic_density
-                print 'characteristic_density_local baseline', characteristic_density_local
+                print('characteristic_density_local baseline', characteristic_density_local)
             else:
                 # Check pixels in annulus with complete coverage
                 subpix_annulus_region = np.intersect1d(subpix_region_array, subpix_annulus)
-                print (float(len(subpix_annulus_region)) / len(subpix_annulus))
+                print(float(len(subpix_annulus_region)) / len(subpix_annulus))
                 if (float(len(subpix_annulus_region)) / len(subpix_annulus)) < 0.25:
                     characteristic_density_local = characteristic_density
-                    print 'characteristic_density_local spotty', characteristic_density_local
+                    print('characteristic_density_local spotty', characteristic_density_local)
                 else:
                     characteristic_density_local = float(np.sum(np.in1d(subpix, subpix_annulus_region))) \
                                                    / (healpy.nside2pixarea(nside_fracdet, degrees=True) * len(subpix_annulus_region)) # deg^-2
-                    print 'characteristic_density_local cleaned up', characteristic_density_local
+                    print('characteristic_density_local cleaned up', characteristic_density_local)
         else:
             # Compute the local characteristic density
             area_field = np.pi * (0.5**2 - 0.3**2)
@@ -420,7 +420,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
                 #angsep_peak = np.sqrt((x - x_peak)**2 + (y - y_peak)**2)
                 characteristic_density_local = characteristic_density
 
-        print 'Characteristic density local = %.1f deg^-2'%(characteristic_density_local)
+        print('Characteristic density local = %.1f deg^-2'%(characteristic_density_local))
 
         size_array = np.arange(0.01, 0.3, 0.01)
         sig_array = np.tile(0., len(size_array))
@@ -443,7 +443,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
             r_peak = 0.5
 
         #print 'Candidate:', x_peak, y_peak, r_peak, np.max(sig_array), ra_peak, dec_peak
-        print 'Candidate: %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f'%(x_peak, y_peak, r_peak, np.max(sig_array), ra_peak, dec_peak)
+        print('Candidate: %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f'%(x_peak, y_peak, r_peak, np.max(sig_array), ra_peak, dec_peak))
         if np.max(sig_array) > 5.:
             if plot:
                 x_circle, y_circle = circle(x_peak, y_peak, r_peak)
@@ -458,7 +458,7 @@ def searchByDistance(nside, data, distance_modulus, ra_select, dec_select, magni
             distance_modulus_array.append(distance_modulus)
 
     if plot:
-        raw_input('Plots are ready...')
+        input('Plots are ready...')
 
     return ra_peak_array, dec_peak_array, r_peak_array, sig_peak_array, distance_modulus_array
 
@@ -580,12 +580,12 @@ distance_modulus_array = distance_modulus_array[sig_peak_array > 0.]
 sig_peak_array = sig_peak_array[sig_peak_array > 0.] # Update the sig_peak_array last!
 
 for ii in range(0, len(sig_peak_array)):
-    print '%.2f sigma; (RA, Dec, d) = (%.2f, %.2f); r = %.2f deg; d = %.1f, mu = %.2f mag)'%(sig_peak_array[ii], 
+    print('%.2f sigma; (RA, Dec, d) = (%.2f, %.2f); r = %.2f deg; d = %.1f, mu = %.2f mag)'%(sig_peak_array[ii], 
                  ra_peak_array[ii], 
                  dec_peak_array[ii], 
                  r_peak_array[ii],
                  ugali.utils.projector.distanceModulusToDistance(distance_modulus_array[ii]),
-                 distance_modulus_array[ii])
+                 distance_modulus_array[ii]))
 
     if (sig_peak_array[ii] > 5.5) & (r_peak_array[ii] < 0.28):
         diagnostic(data, data_gal, ra_peak_array[ii], dec_peak_array[ii], r_peak_array[ii], sig_peak_array[ii], distance_modulus_array[ii])

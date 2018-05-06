@@ -22,7 +22,7 @@ import scipy.ndimage
 import utils
 
 import pylab as plt
-import pyfits
+import astropy.io.fits as pyfits
 import matplotlib
 from matplotlib import mlab
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -149,7 +149,7 @@ def analysis(targ_ra, targ_dec, mod):
     f_range = np.linspace(centers[0], centers[-1], 1000)
     f_val = f_interp(f_range)
 
-    pairs = zip(f_range, f_val)
+    pairs = list(zip(f_range, f_val))
 
     peak = max(pairs[:len(pairs)/4], key=lambda x: x[1]) # find peak within first quarter
 
@@ -413,7 +413,7 @@ def radialPlot(targ_ra, targ_dec, data, iso, g_radius, nbhd):
         return(val, yerr)
 
     f_range, f_val = interp_values('stars', 'f')
-    pairs = zip(f_range, f_val)
+    pairs = list(zip(f_range, f_val))
     peak = max(pairs[:len(pairs)/4], key=lambda x: x[1]) # find peak within first quarter
     def peak_index(pairs, peak):
         for i in range(len(pairs)):

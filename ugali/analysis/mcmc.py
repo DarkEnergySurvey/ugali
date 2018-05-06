@@ -40,6 +40,8 @@ try:
     rc.initialize = False
 except ImportError:
     pass
+
+#ADW: Why did I need to get rid of this?
 #import multiprocessing
 
 import emcee
@@ -70,10 +72,10 @@ class MCMC(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = None
 
-        self.priors = odict(zip(self.params,len(self.params)*[UniformPrior()]))
+        self.priors = odict(list(zip(self.params,len(self.params)*[UniformPrior()])))
         self.priors['extension'] = InversePrior()
 
         self.pool = None
@@ -109,8 +111,8 @@ class MCMC(object):
  
         std = odict([
             ('richness',0.1*mle['richness']), # delta_r (10% of max)
-            ('lon',0.01),                     # delta_l (deg)
-            ('lat',0.01),                     # delta_b (deg)
+            ('lon',0.01),                     # delta_lon (deg)
+            ('lat',0.01),                     # delta_lat (deg)
             ('distance_modulus',0.1),         # delta_mu                
             ('extension',0.01),               # delta_ext (deg)
             ('ellipticity',0.1),              # delta_e 
@@ -132,21 +134,21 @@ class MCMC(object):
     def lnlike(self, theta):
         """ Logarithm of the likelihood """
         params,loglike = self.params,self.loglike
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         try:
             lnlike = loglike.value(**kwargs)
-        except ValueError,AssertionError:
+        except ValueError as AssertionError:
             lnlike = -np.inf
         return lnlike
  
     def lnprior(self,theta):
         """ Logarithm of the prior """
         params,priors = self.params,self.priors
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         err = np.seterr(invalid='raise')
         try:
-            lnprior = np.sum(np.log([priors[k](v) for k,v in kwargs.items()]))
-        except FloatingPointError,ValueError:
+            lnprior = np.sum(np.log([priors[k](v) for k,v in list(kwargs.items())]))
+        except (FloatingPointError,ValueError):
             lnprior = -np.inf
         np.seterr(**err)
         return lnprior
@@ -187,6 +189,8 @@ class MCMC(object):
         logger.info(str(self.loglike))
  
         if params is not None: self.params = params
+        if len(self.params) == 0:
+            raise Exception("No free parameters to fit.")
             
         params   = self.params
         nwalkers = self.nwalkers
@@ -319,7 +323,12 @@ if __name__ == "__main__":
         source.load(opts.srcmdl,section=opts.name)
     if opts.coords:
         lon,lat,radius = opts.coords[0]
-        source.set_params(lon=lon,lat=lat)
+        if config['coords']['coordsys'].lower() == 'gal':
+            source.set_params(lon=lon,lat=lat)
+        else:
+            lon,lat = gal2cel(lon,lat)
+            source.set_params(lon=lon,lat=lat)
+
     if config['mcmc'].get('params'):
         params = config['mcmc'].get('params')
         source.set_free_params(params)
@@ -331,7 +340,7 @@ if __name__ == "__main__":
         grid.search()
         source.set_params(**grid.mle())
 
-    params = source.get_free_params().keys()
+    params = list(source.get_free_params().keys())
 
     mcmc = MCMC(config,like)
 

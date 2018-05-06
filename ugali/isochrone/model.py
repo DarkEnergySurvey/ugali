@@ -96,9 +96,9 @@ class IsochroneModel(Model):
 
     def _setup(self, **kwargs):
         defaults = odict([(d[0],d[1]) for d in self.defaults])
-        [defaults.update([i]) for i in kwargs.items() if i[0] in defaults]
+        [defaults.update([i]) for i in list(kwargs.items()) if i[0] in defaults]
 
-        for k,v in defaults.items():
+        for k,v in list(defaults.items()):
             setattr(self,k,v)
 
         self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
@@ -152,7 +152,9 @@ class IsochroneModel(Model):
             # Not generating points for the post-AGB stars,
             # but still count those stars towards the normalization
             select = slice(self.index)
-            
+
+        mass_steps = int(mass_steps)
+
         mass_init = self.mass_init[select]
         mass_act = self.mass_act[select]
         mag_1 = self.mag_1[select]
@@ -171,13 +173,13 @@ class IsochroneModel(Model):
             # Mass interpolation with uniform coverage between data points from isochrone file 
             mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
             mass_array = mass_interpolation(np.linspace(0, len(mass_init)-1, mass_steps+1))
-            d_mass = mass_array[1:] - mass_array[0:-1]
-            mass_init_array = np.sqrt(mass_array[1:] * mass_array[0:-1])
-            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode = False)
+            d_mass = mass_array[1:] - mass_array[:-1]
+            mass_init_array = np.sqrt(mass_array[1:] * mass_array[:-1])
+            mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode=False)
             mass_act_array = mass_act_interpolation(mass_init_array)
             mag_1_array = mag_1_interpolation(mass_init_array)
             mag_2_array = mag_2_interpolation(mass_init_array)
-            
+
         # Horizontal branch dispersion
         if self.hb_spread and (self.stage==self.hb_stage).any():
             logger.debug("Performing dispersion of horizontal branch...")
@@ -486,6 +488,7 @@ class IsochroneModel(Model):
         ADW: Could this function be even faster / more readable?
         ADW: Should this include magnitude error leakage?
         """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
         mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_min=mass_min,full_data_range=False)
 
         mag = mag_1 if self.band_1_detection else mag_2
@@ -503,10 +506,13 @@ class IsochroneModel(Model):
         # Create 2D arrays of cuts for each pixel
         mask_1_cut = (mag_1+distance_modulus)[:,np.newaxis] < mag_1_mask
         mask_2_cut = (mag_2+distance_modulus)[:,np.newaxis] < mag_2_mask
-        mask_cut_repeat = mask_1_cut & mask_2_cut
+        mask_cut_repeat = (mask_1_cut & mask_2_cut)
 
+        # Condense back into one per digi
         observable_fraction = (mass_pdf_cut[:,np.newaxis]*mask_cut_repeat).sum(axis=0)
-        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]]
+
+        # Expand to the roi and multiply by coverage fraction
+        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]] * mask.frac_interior_sparse
 
 
     def observableFractionCDF(self, mask, distance_modulus, mass_min=0.1):
