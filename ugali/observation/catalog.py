@@ -167,12 +167,12 @@ class Catalog:
             selection = self.config['catalog'].get('selection')
 
         if not selection: 
-            pass
+            return
         elif 'self.data' not in selection:
             msg = "Selection does not contain 'data'"
             raise Exception(msg)
         else:
-            logger.warning('Evaluating selection: \n"%s"'%selection)
+            logger.info('Evaluating selection: \n"%s"'%selection)
             sel = eval(selection)
             self.data = self.data[sel]
         
