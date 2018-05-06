@@ -213,6 +213,48 @@ class Mask(object):
             raise Exception(msg)
 
         return self.solid_angle_cmd
+
+
+    def _solidAngleCMD(self):
+        """
+        Compute solid angle within the mask annulus (deg^2) as a
+        function of color and magnitude.
+
+        Returns:
+        --------
+        solid_angle_cmd : 2d array
+        """
+
+        self.solid_angle_cmd = numpy.zeros([len(self.roi.centers_mag),
+                                            len(self.roi.centers_color)])
+
+        idx_mag,idx_color=np.where(self.solid_angle_cmd == 0)
+        mag = self.roi.centers_mag[idx_mag]
+        color = self.roi.centers_color[idx_color]
+
+        if self.config.params['catalog']['band_1_detection']:
+            # Evaluating at corner of the color-mag bin, be consistent!
+            mag_1 = mag + (0.5 * self.roi.delta_mag)
+            mag_2 = mag - color + (0.5 * self.roi.delta_color)
+        else:
+            # Evaluating at corner of the color-mag bin, be consistent!
+            mag_1 = mag + color + (0.5 * self.roi.delta_color)
+            mag_2 = mag + (0.5 * self.roi.delta_mag)
+
+        n_unmasked_pixels = np.zeros_like(mag)
+        for i in np.arange(len(mag_1)):
+            unmasked_mag_1 = (self.mask_1.mask_annulus_sparse >= mag_1[i])
+            unmasked_mag_2 = (self.mask_2.mask_annulus_sparse >= mag_2[i])
+            n_unmasked_pixels[i] = np.sum(unmasked_mag_1 * unmasked_mag_2 *
+                                          self.frac_annulus_sparse)
+
+        self.solid_angle_cmd[idx_mag, idx_color] = self.roi.area_pixel * n_unmasked_pixels
+        if self.solid_angle_cmd.sum() == 0:
+            msg = "Mask annulus contains no solid angle."
+            logger.error(msg)
+            raise Exception(msg)
+
+        return self.solid_angle_cmd
         
     def _pruneCMD(self, minimum_solid_angle):
         """
