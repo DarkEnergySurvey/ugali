@@ -776,7 +776,7 @@ class MaskBand(object):
             self.frac_roi_sparse = np.clip(frac[self.roi.pixels],0.0,1.0)
         except ValueError as e:
             # No detection fraction present
-            msg = "No 'FRACDET' column found in masks"
+            msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1"
             logger.warn(msg)
 
         # Explicitly zero the maglim of pixels with fracdet < fracmin
