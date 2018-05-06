@@ -973,12 +973,12 @@ def readMangleFile(infile, lon, lat, index = None):
         elif len(lines[ii].split()) == 2:
             maglim.append(0.) # Coordinates outside of the MANGLE ploygon
         elif len(lines[ii].split()) > 3:
-            #print 'WARNING: coordinate inside multiple polygons, using weight from first polygon'
-            #maglim.append(float(lines[ii].split()[2])) # Mask out the pixels inside multiple polygons
-            logger.warning('Coordinate inside multiple polygons, masking that coordinate.')
+            msg = 'Coordinate inside multiple polygons, masking that coordinate.'
+            logger.warning(msg)
             maglim.append(0.)
         else:
-            logger.warning('Cannot parse maglim file, unexpected number of columns, stop reading now.')
+            msg = 'Cannot parse maglim file, unexpected number of columns.'
+            logger.error(msg)
             break
             
     maglim = numpy.array(maglim)

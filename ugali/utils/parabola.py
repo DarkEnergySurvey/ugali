@@ -2,6 +2,7 @@
 Class to construct parabolas from 3 points.
 
 ADW: Need to move all of the plotting stuff
+ADW: Doesn't this all exist in np.poly?
 """
 
 import numpy
@@ -116,7 +117,6 @@ class Parabola:
 
         if b**2 - 4. * a * c < 0.:
             print('WARNING')
-
             print(a, b, c)
             
             #pylab.figure()
@@ -218,7 +218,7 @@ class Parabola:
             import pylab
 
             for ii in range(0, len(self.x)):
-                print '%.3f %.3f'%(self.x[ii], self.y[ii])
+                print('%.3f %.3f'%(self.x[ii], self.y[ii]))
             
             pylab.figure()
             pylab.scatter(self.x, self.y)
@@ -254,8 +254,8 @@ class Parabola:
         #if plot:
         #    cdf = numpy.cumsum(pdf)
         #    cdf /= cdf[-1]
-        #    print cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
-        #          - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])]
+        #    print( cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
+        #          - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])] )
         #    
         #    pylab.figure()
         #    pylab.plot(x, f(x))

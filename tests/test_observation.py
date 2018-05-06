@@ -4,6 +4,8 @@ Generic python script.
 """
 __author__ = "Alex Drlica-Wagner"
 import numpy as np
+from ugali.utils.logger import logger
+logger.setLevel(logger.WARN)
 
 CONFIG='ugali/config/config_test.yaml'
 LON = RA = 53.92
