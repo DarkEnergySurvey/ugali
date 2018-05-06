@@ -172,7 +172,7 @@ class IsochroneModel(Model):
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
             mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
-            mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
+            mass_array = mass_interpolation(np.linspace(0, len(mass_init)-1, mass_steps+1))
             d_mass = mass_array[1:] - mass_array[:-1]
             mass_init_array = np.sqrt(mass_array[1:] * mass_array[:-1])
             mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode=False)
@@ -933,6 +933,7 @@ class IsochroneModel(Model):
         
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
+
     def separation(self, mag_1, mag_2):
         """ 
         Calculate the separation between a specific point and the
@@ -988,7 +989,6 @@ class IsochroneModel(Model):
 
         #return dmag_1,dmag_2
         return np.sqrt(dmag_1**2 + dmag_2**2)
-
 
 class Isochrone(IsochroneModel):
     """ Abstract base class for isochrones """

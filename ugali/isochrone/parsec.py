@@ -168,7 +168,9 @@ class ParsecIsochrone(Isochrone):
             msg = "Output filename not found"
             raise RuntimeError(msg)
 
-        out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
+        #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
+        out = '{0}/tmp/{1}.dat'.format(server, fname[0])
+        
         cmd = 'wget %s -O %s'%(out,outfile)
         logger.debug(cmd)
         stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)

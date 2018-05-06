@@ -64,6 +64,13 @@ dict_clr = {
     'ps1' : 12,
     }
 
+dict_output = odict([
+        ('des','DECam'),
+        ('sdss','SDSSugriz'),
+        ('ps1','PanSTARRS'),
+        # Need to add acs_wfc
+])
+
 dict_hel = {'Y=0.245+1.5*Z' : 1,
             'Y=0.33'        : 2,
             'Y=0.40'        : 3}
@@ -91,7 +98,6 @@ dartmouth_defaults = {
     'lns':'', 
     }
 
-
 class Dotter2008(Isochrone):
     """
     KCB: currently inheriting from PadovaIsochrone because there are 
@@ -109,7 +115,8 @@ class Dotter2008(Isochrone):
         )
 
     abins = np.arange(1., 13.5 + 0.1, 0.1)
-    zbins = np.arange(7e-5,1e-3 + 1e-5,1e-5)
+    #zbins = np.arange(7e-5,2e-3 + 1e-5,1e-5)
+    zbins = np.arange(1e-3, 2e-3 + 5e-5, 5e-5)
 
     download_defaults = copy.deepcopy(dartmouth_defaults)
 

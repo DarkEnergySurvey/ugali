@@ -19,6 +19,14 @@ def centers(array):
 def take2D(histogram, x, y, bins_x, bins_y):
     """
     Take the value from a two-dimensional histogram from the bin corresponding to (x, y).
+
+    Parameters:
+    -----------
+    histogram : The values in the histogram (n,m) (ADW: is this ordering right?)
+    x : the x-value to take from the hist
+    y : the y-value to take from the hist
+    bins_x : the xbin edges, including upper edge (n-dim)
+    bins_y : the ybin edges, including upper edge (m-dim)
     """
     histogram = numpy.array(histogram)
     
