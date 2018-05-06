@@ -76,7 +76,8 @@ class Analyzer(object):
         results = recfuncs.merge_arrays([population,results],flatten=True,asrecarray=False,usemask=False)
         self.results = results
 
-        if outfile: ugali.utils.fileio.write(outfile,results,clobber=True)
+        if outfile: 
+            ugali.utils.fileio.write(outfile,results,clobber=True)
 
         for i,d in enumerate(results): 
             params = dict(list(zip(results.dtype.names,d)))
