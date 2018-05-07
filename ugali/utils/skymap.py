@@ -6,8 +6,8 @@ import sys
 import re
 import gc
 
-import numpy
-import healpy
+import numpy as np
+import healpy as hp
 
 import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
@@ -21,7 +21,7 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
     Return the set of HEALPix pixels that cover the given coordinates at resolution nside.
     Optionally return the set of subpixels within those pixels at resolution nside_subpix
     """
-    pix = numpy.unique(ang2pix(nside_pix, lon, lat))
+    pix = np.unique(ang2pix(nside_pix, lon, lat))
     if nside_subpix is None:
         return pix
     else:
@@ -29,7 +29,7 @@ def surveyPixel(lon, lat, nside_pix, nside_subpix = None):
         for ii in range(0, len(pix)):
             subpix = subpixel(pix[ii], nside_pix, nside_subpix)
             subpix_array.append(subpix)
-        return pix, numpy.array(subpix_array)
+        return pix, np.array(subpix_array)
 
 def inFootprint(config, pixels, nside=None):
     """
@@ -41,18 +41,18 @@ def inFootprint(config, pixels, nside=None):
     nside_likelihood = config['coords']['nside_likelihood']
     nside_pixel      = config['coords']['nside_pixel']
 
-    if numpy.isscalar(pixels): pixels = numpy.array([pixels])
+    if np.isscalar(pixels): pixels = np.array([pixels])
     if nside is None: nside = nside_likelihood
 
     filenames = config.getFilenames()
     catalog_pixels = filenames['pix'].compressed()
 
-    inside = numpy.zeros(len(pixels), dtype=bool)
+    inside = np.zeros(len(pixels), dtype=bool)
     if not nside_catalog:
         catalog_pix = [0]
     else:
         catalog_pix = superpixel(pixels,nside,nside_catalog)
-        catalog_pix = numpy.intersect1d(catalog_pix,catalog_pixels)
+        catalog_pix = np.intersect1d(catalog_pix,catalog_pixels)
 
     for fnames in filenames[catalog_pix]:
         logger.debug("Loading %s"%filenames['mask_1'])
@@ -61,9 +61,9 @@ def inFootprint(config, pixels, nside=None):
         logger.debug("Loading %s"%fnames['mask_2'])
         #subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_2'],'MAGLIM',construct_map=False)
         _nside,subpix_2,val_2 = ugali.utils.healpix.read_partial_map(fnames['mask_2'],'MAGLIM',fullsky=False)
-        subpix = numpy.intersect1d(subpix_1,subpix_2)
-        superpix = numpy.unique(superpixel(subpix,nside_pixel,nside))
-        inside |= numpy.in1d(pixels, superpix)
+        subpix = np.intersect1d(subpix_1,subpix_2)
+        superpix = np.unique(superpixel(subpix,nside_pixel,nside))
+        inside |= np.in1d(pixels, superpix)
         
     return inside
 
@@ -79,7 +79,7 @@ def footprint(config, nside=None):
         raise Exception('Requested nside=%i is greater than catalog_nside'%nside)
     elif nside > config['coords']['nside_pixel']:
         raise Exception('Requested nside=%i is less than pixel_nside'%nside)
-    pix = numpy.arange(healpy.nside2npix(nside), dtype=int)
+    pix = np.arange(hp.nside2npix(nside), dtype=int)
     return inFootprint(config,pix)
 
 
@@ -89,7 +89,7 @@ def allSkyCoordinates(nside):
     """
     Generate a set of coordinates at the centers of pixels of resolutions nside across the full sky. 
     """
-    lon,lat = pix2ang(nside, np.arange(0, healpy.nside2npix(nside)))
+    lon,lat = pix2ang(nside, np.arange(0, hp.nside2npix(nside)))
     return lon, lat
 
 #############################################################
@@ -154,7 +154,7 @@ def allSkyCoordinates(nside):
 #    
 #############################################################
 # 
-#def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
+#def readSparseHealpixMap(infile, field, extension='PIX_DATA', default_value=hp.UNSEEN, construct_map=True):
 #    """
 #    Open a sparse HEALPix map fits file.
 #    Convert the contents into a HEALPix map or simply return the contents.
@@ -167,20 +167,20 @@ def allSkyCoordinates(nside):
 # 
 #    # Trying to fix avoid a memory leak
 #    try:
-#        pix = numpy.array(reader[extension].data.field('PIX'),copy=True)
+#        pix = np.array(reader[extension].data.field('PIX'),copy=True)
 #    except:
-#        pix = numpy.array(reader[extension].data.field('PIXEL'),copy=True)
-#    value = numpy.array(reader[extension].data.field(field),copy=True)
+#        pix = np.array(reader[extension].data.field('PIXEL'),copy=True)
+#    value = np.array(reader[extension].data.field(field),copy=True)
 #    reader.close()
 #    
 #    if construct_map:
 #        if len(value.shape) == 1:
-#            map = default_value * numpy.ones(healpy.nside2npix(nside))
+#            map = default_value * np.ones(hp.nside2npix(nside))
 #            map[pix] = value
 #        else:
-#            map = default_value * numpy.ones([value.shape[1], healpy.nside2npix(nside)])
+#            map = default_value * np.ones([value.shape[1], hp.nside2npix(nside)])
 #            for ii in range(0, value.shape[1]):
-#                map[ii][pix] = numpy.take(value, [ii], axis=1)
+#                map[ii][pix] = np.take(value, [ii], axis=1)
 #        ret = map
 #    else:
 #        if len(value.shape) == 1:
@@ -191,7 +191,7 @@ def allSkyCoordinates(nside):
 # 
 #############################################################
 # 
-#def readSparseHealpixMaps(infiles, field, extension='PIX_DATA', default_value=healpy.UNSEEN, construct_map=True):
+#def readSparseHealpixMaps(infiles, field, extension='PIX_DATA', default_value=hp.UNSEEN, construct_map=True):
 #    """
 #    Read multiple sparse healpix maps and output the results
 #    identically to a single file read.
@@ -204,7 +204,7 @@ def allSkyCoordinates(nside):
 #    value_array = []
 # 
 #    # Create a map based on the first file in the list
-#    map = readSparseHealpixMap(infiles[0], field, extension=extension, default_value=healpy.UNSEEN, construct_map=True)
+#    map = readSparseHealpixMap(infiles[0], field, extension=extension, default_value=hp.UNSEEN, construct_map=True)
 # 
 #    for ii in range(0, len(infiles)):
 #        logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
@@ -216,10 +216,10 @@ def allSkyCoordinates(nside):
 #        map[pix_array[ii]] = value_array[ii]
 # 
 #    # Check to see whether there are any conflicts
-#    pix_master = numpy.concatenate(pix_array)
-#    value_master = numpy.concatenate(value_array)
+#    pix_master = np.concatenate(pix_array)
+#    value_master = np.concatenate(value_array)
 # 
-#    n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
+#    n_conflicting_pixels = len(pix_master) - len(np.unique(pix_master)) 
 #    if n_conflicting_pixels != 0:
 #        logger.warning('%i conflicting pixels during merge.'%(n_conflicting_pixels))
 # 
@@ -227,10 +227,10 @@ def allSkyCoordinates(nside):
 #        return map
 #    else:
 #        if n_conflicting_pixels == 0:
-#            pix_master = numpy.sort(pix_master)
+#            pix_master = np.sort(pix_master)
 #            return pix_master, map[pix_master]
 #        else:
-#            pix_valid = numpy.nonzero(map != default_value)[0]
+#            pix_valid = np.nonzero(map != default_value)[0]
 #            return pix_valid, map[pix_valid]
 # 
 #############################################################
@@ -240,7 +240,7 @@ def allSkyCoordinates(nside):
 #                           pix_field='PIX',
 #                           distance_modulus_extension='DISTANCE_MODULUS',
 #                           distance_modulus_field='DISTANCE_MODULUS',
-#                           default_value=healpy.UNSEEN):
+#                           default_value=hp.UNSEEN):
 #    """
 #    Use the first infile to determine the basic contents to expect for the other files.
 #    """
@@ -265,10 +265,10 @@ def allSkyCoordinates(nside):
 #            continue
 #        data_dict[key] = []
 #        #if distance_modulus_array is None:
-#        #    data_dict[key] = default_value * numpy.ones(healpy.nside2npix(nside))
+#        #    data_dict[key] = default_value * np.ones(hp.nside2npix(nside))
 #        #else:
-#        #    data_dict[key] = default_value * numpy.ones([len(distance_modulus_array),
-#        #                                                 healpy.nside2npix(nside)])
+#        #    data_dict[key] = default_value * np.ones([len(distance_modulus_array),
+#        #                                                 hp.nside2npix(nside)])
 #    reader.close()
 # 
 #    # Now loop over the infiles
@@ -277,8 +277,8 @@ def allSkyCoordinates(nside):
 #        logger.debug('(%i/%i) %s'%(ii+1, len(infiles), infiles[ii]))
 # 
 #        reader = pyfits.open(infiles[ii])
-#        distance_modulus_array_current = numpy.array(reader[distance_modulus_extension].data.field(distance_modulus_field),copy=True)
-#        if not numpy.array_equal(distance_modulus_array_current,distance_modulus_array):
+#        distance_modulus_array_current = np.array(reader[distance_modulus_extension].data.field(distance_modulus_field),copy=True)
+#        if not np.array_equal(distance_modulus_array_current,distance_modulus_array):
 #            logger.warning("Distance moduli do not match; skipping...")
 #            continue
 #        reader.close()
@@ -299,16 +299,16 @@ def allSkyCoordinates(nside):
 # 
 #        gc.collect()
 # 
-#    pix_master = numpy.concatenate(pix_array)
-#    n_conflicting_pixels = len(pix_master) - len(numpy.unique(pix_master)) 
+#    pix_master = np.concatenate(pix_array)
+#    n_conflicting_pixels = len(pix_master) - len(np.unique(pix_master)) 
 #    if n_conflicting_pixels != 0:
 #        logger.warning('%i conflicting pixels during merge.'%(n_conflicting_pixels))
 # 
 #    for key in data_dict.keys():
 #        if distance_modulus_array is not None:
-#            data_dict[key] = numpy.concatenate(data_dict[key], axis=1).transpose()
+#            data_dict[key] = np.concatenate(data_dict[key], axis=1).transpose()
 #        else:
-#            data_dict[key] = numpy.concatenate(data_dict[key])
+#            data_dict[key] = np.concatenate(data_dict[key])
 # 
 #    if outfile is not None:
 #        writeSparseHealpixMap(pix_master, data_dict, nside, outfile,
@@ -338,9 +338,9 @@ def allSkyCoordinates(nside):
 #        for key in data_dict.keys():
 #            data_dict[key].append(reader[ext].header[key])
 #        
-#    pix_array = numpy.array(pix_array)
+#    pix_array = np.array(pix_array)
 #    for key in data_dict.keys():
-#        data_dict[key] = numpy.array(data_dict[key])
+#        data_dict[key] = np.array(data_dict[key])
 #    writeSparseHealpixMap(pix_array, data_dict, nside, roifile)
 # 
 #############################################################
@@ -357,12 +357,12 @@ def randomPositions(input, nside_pix, n=1):
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
     Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
     """
-    input = numpy.array(input)
+    input = np.array(input)
     if len(input.shape) == 1:
-        if healpy.npix2nside(len(input)) < nside_pix:
+        if hp.npix2nside(len(input)) < nside_pix:
             logger.warning('Expected coarser resolution nside_pix in skymap.randomPositions')
-        subpix = numpy.nonzero(input)[0] # All the valid pixels in the mask at the NSIDE for the input mask
-        lon, lat = pix2ang(healpy.npix2nside(len(input)), subpix)
+        subpix = np.nonzero(input)[0] # All the valid pixels in the mask at the NSIDE for the input mask
+        lon, lat = pix2ang(hp.npix2nside(len(input)), subpix)
     elif len(input.shape) == 2:
         lon, lat = input[0], input[1] # All catalog object positions
     else:
@@ -370,28 +370,28 @@ def randomPositions(input, nside_pix, n=1):
     pix = surveyPixel(lon, lat, nside_pix)
 
     # Area with which the random points are thrown
-    area = len(pix) * healpy.nside2pixarea(nside_pix, degrees=True)
+    area = len(pix) * hp.nside2pixarea(nside_pix, degrees=True)
 
     # Create mask at the coarser resolution
-    mask = numpy.tile(False, healpy.nside2npix(nside_pix))
+    mask = np.tile(False, hp.nside2npix(nside_pix))
     mask[pix] = True
 
     # Estimate the number of points that need to be thrown based off
     # coverage fraction of the HEALPix mask
-    coverage_fraction = float(numpy.sum(mask)) / len(mask) 
+    coverage_fraction = float(np.sum(mask)) / len(mask) 
     n_throw = int(n / coverage_fraction)
         
     lon, lat = [], []
     count = 0
     while len(lon) < n:
-        lon_throw = numpy.random.uniform(0., 360., n_throw)
-        lat_throw = numpy.degrees(numpy.arcsin(numpy.random.uniform(-1., 1., n_throw)))
+        lon_throw = np.random.uniform(0., 360., n_throw)
+        lat_throw = np.degrees(np.arcsin(np.random.uniform(-1., 1., n_throw)))
 
         pix_throw = ugali.utils.healpix.angToPix(nside_pix, lon_throw, lat_throw)
         cut = mask[pix_throw].astype(bool)
 
-        lon = numpy.append(lon, lon_throw[cut])
-        lat = numpy.append(lat, lat_throw[cut])
+        lon = np.append(lon, lon_throw[cut])
+        lat = np.append(lat, lat_throw[cut])
 
         count += 1
         if count > 10:
@@ -409,25 +409,25 @@ def randomPositionsMask(mask, nside_pix, n):
     """
     
     npix = len(mask)
-    nside = healpy.npix2nside(npix)
+    nside = hp.npix2nside(npix)
 
     # Estimate the number of points that need to be thrown based off
     # coverage fraction of the HEALPix mask
-    coverage_fraction = float(numpy.sum(mask)) / len(mask) 
+    coverage_fraction = float(np.sum(mask)) / len(mask) 
     n_throw = int(n / coverage_fraction)
         
     lon, lat = [], []
     latch = True
     count = 0
     while len(lon) < n:
-        lon_throw = numpy.random.uniform(0., 360., n_throw)
-        lat_throw = numpy.degrees(numpy.arcsin(numpy.random.uniform(-1., 1., n_throw)))
+        lon_throw = np.random.uniform(0., 360., n_throw)
+        lat_throw = np.degrees(np.arcsin(np.random.uniform(-1., 1., n_throw)))
 
         pix = ugali.utils.healpix.angToPix(nside, lon_throw, lat_throw)
         cut = mask[pix].astype(bool)
 
-        lon = numpy.append(lon, lon_throw[cut])
-        lat = numpy.append(lat, lat_throw[cut])
+        lon = np.append(lon, lon_throw[cut])
+        lat = np.append(lat, lat_throw[cut])
 
         count += 1
         if count > 10:
