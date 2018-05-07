@@ -5,7 +5,7 @@ import inspect
 from collections import OrderedDict as odict
 
 import numpy as np
-from np.lib.recfunctions import stack_arrays
+from numpy.lib.recfunctions import stack_arrays
 import fitsio
 
 import ugali.utils.projector

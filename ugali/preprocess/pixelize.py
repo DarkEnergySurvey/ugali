@@ -12,7 +12,7 @@ import collections
 
 import fitsio
 import numpy as np
-import np.lib.recfunctions as recfuncs
+import numpy.lib.recfunctions as recfuncs
 import healpy as hp
 from matplotlib import mlab
 

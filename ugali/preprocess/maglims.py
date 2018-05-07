@@ -12,7 +12,7 @@ from collections import OrderedDict as odict
 
 import fitsio
 import numpy as np
-import np.lib.recfunctions as recfuncs
+import numpy.lib.recfunctions as recfuncs
 import healpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
