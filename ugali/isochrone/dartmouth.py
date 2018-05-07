@@ -232,7 +232,7 @@ class Dotter2008(Isochrone):
         query = url + '?' + urlencode(params)
         logger.debug(query)
         response = urlopen(query)
-        page_source = response.read()
+        page_source = str(response.read())
         try:
             file_id = int(page_source.split('tmp/tmp')[-1].split('.iso')[0])
         except Exception as e:
@@ -242,7 +242,7 @@ class Dotter2008(Isochrone):
 
         infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(file_id)
         command = 'wget -q %s -O %s'%(infile, outfile)
-        subprocess.call(command,shell=True)        
+        subprocess.call(command,shell=True)
 
         ## ADW: Old code to rename the output file based on Zeff ([a/Fe] corrected)
         #tmpfile = tempfile.NamedTemporaryFile().name

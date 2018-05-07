@@ -188,12 +188,11 @@ class Dotter2016(Isochrone):
         urlopen(url,timeout=2)
 
         #response = requests.post(url,data=params)
-        q = urlencode(params)
+        q = urlencode(params).encode('utf-8')
         request = Request(url,data=q)
         response = urlopen(request)
         try:
-            #fname = os.path.basename(response.text.split('"')[1])
-            fname = os.path.basename(response.read().split('"')[1])
+            fname = os.path.basename(str(response.read()).split('"')[1])
         except Exception as e:
             logger.debug(str(e))
             msg = 'Output filename not found'

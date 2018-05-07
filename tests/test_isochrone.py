@@ -137,7 +137,7 @@ def test_download():
     except ImportError:
         from urllib2 import URLError
 
-    for name in padova[1:]+dotter[1:]:
+    for name in dotter[1:]: #padova[1:]+dotter[1:]:
         iso = isochrone.factory(name,**default_kwargs)
         try:
             iso.download(outdir='./tmp/'+name.lower(),force=True)

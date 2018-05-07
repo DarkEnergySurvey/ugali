@@ -172,9 +172,9 @@ class ParsecIsochrone(Isochrone):
         logger.debug("Accessing %s..."%url)
         urlopen(url,timeout=2)
 
-        q = urlencode(params)
+        q = urlencode(params).encode('utf-8')
         logger.debug(url+'?'+q)
-        c = urlopen(url, q).read()
+        c = str(urlopen(url, q).read())
         aa = re.compile('output\d+')
         fname = aa.findall(c)
         
