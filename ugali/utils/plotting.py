@@ -10,11 +10,8 @@ try:             os.environ['DISPLAY']
 except KeyError: matplotlib.use('Agg')
 
 import yaml
-import numpy
 import numpy as np
-import pylab
 import pylab as plt
-import healpy
 import healpy as hp
 import fitsio
 import scipy.ndimage as nd
@@ -66,11 +63,11 @@ def histogram(title, title_x, title_y,
     """
     Plot a basic histogram.
     """
-    pylab.figure()
-    pylab.hist(x, bins_x)
-    pylab.xlabel(title_x)
-    pylab.ylabel(title_y)
-    pylab.title(title)
+    plt.figure()
+    plt.hist(x, bins_x)
+    plt.xlabel(title_x)
+    plt.ylabel(title_y)
+    plt.title(title)
 
 ############################################################
 
@@ -81,27 +78,27 @@ def twoDimensionalHistogram(title, title_x, title_y,
     """
     Create a two-dimension histogram plot or binned map.
 
-    If using the outputs of numpy.histogram2d, remember to transpose the histogram.
+    If using the outputs of np.histogram2d, remember to transpose the histogram.
 
     INPUTS
     """
-    pylab.figure()
+    plt.figure()
 
-    mesh_x, mesh_y = numpy.meshgrid(bins_x, bins_y)
+    mesh_x, mesh_y = np.meshgrid(bins_x, bins_y)
 
     if vmin != None and vmin == vmax:
-        pylab.pcolor(mesh_x, mesh_y, z)
+        plt.pcolor(mesh_x, mesh_y, z)
     else:
-        pylab.pcolor(mesh_x, mesh_y, z, vmin=vmin, vmax=vmax)
-    pylab.xlabel(title_x)
-    pylab.ylabel(title_y)
-    pylab.title(title)
-    pylab.colorbar()
+        plt.pcolor(mesh_x, mesh_y, z, vmin=vmin, vmax=vmax)
+    plt.xlabel(title_x)
+    plt.ylabel(title_y)
+    plt.title(title)
+    plt.colorbar()
 
     if lim_x:
-        pylab.xlim(lim_x[0], lim_x[1])
+        plt.xlim(lim_x[0], lim_x[1])
     if lim_y:
-        pylab.ylim(lim_y[0], lim_y[1])
+        plt.ylim(lim_y[0], lim_y[1])
         
 ############################################################
 
@@ -114,20 +111,20 @@ def twoDimensionalScatter(title, title_x, title_y,
 
     INPUTS
     """
-    pylab.figure()
+    plt.figure()
 
-    pylab.scatter(x, y, c=color, s=size, alpha=alpha, edgecolors='none')
+    plt.scatter(x, y, c=color, s=size, alpha=alpha, edgecolors='none')
     
-    pylab.xlabel(title_x)
-    pylab.ylabel(title_y)
-    pylab.title(title)
+    plt.xlabel(title_x)
+    plt.ylabel(title_y)
+    plt.title(title)
     if type(color) is not str:
-        pylab.colorbar()
+        plt.colorbar()
 
     if lim_x:
-        pylab.xlim(lim_x[0], lim_x[1])
+        plt.xlim(lim_x[0], lim_x[1])
     if lim_y:
-        pylab.ylim(lim_y[0], lim_y[1])
+        plt.ylim(lim_y[0], lim_y[1])
 
 ############################################################
 
@@ -137,7 +134,7 @@ def zoomedHealpixMap(title, map, lon, lat, radius,
     Inputs: lon (deg), lat (deg), radius (deg)
     """
     reso = 60. * 2. * radius / xsize # Deg to arcmin
-    healpy.gnomview(map=map, rot=[lon, lat, 0], title=title, xsize=xsize, reso=reso, degree=False, **kwargs)
+    hp.gnomview(map=map, rot=[lon, lat, 0], title=title, xsize=xsize, reso=reso, degree=False, **kwargs)
 
 ############################################################
 
@@ -146,7 +143,7 @@ def projScatter(lon, lat, **kwargs):
     Create a scatter plot on HEALPix projected axes.
     Inputs: lon (deg), lat (deg)
     """
-    healpy.projscatter(lon, lat, lonlat=True, **kwargs)
+    hp.projscatter(lon, lat, lonlat=True, **kwargs)
 
 ############################################################
 
@@ -157,7 +154,7 @@ def sparseHealpixFiles(title, infiles, field='MAGLIM',**kwargs):
     """
     #map = ugali.utils.skymap.readSparseHealpixMaps(infiles,field)
     map = ugali.utils.skymap.read_partial_map(infiles,field)
-    ax = healpy.mollview(map=map, title=title, **kwargs)
+    ax = hp.mollview(map=map, title=title, **kwargs)
     return ax, map
     
 ############################################################
@@ -187,7 +184,7 @@ def drawHealpixMap(hpxmap, lon, lat, size=1.0, xsize=501, coord='GC', **kwargs):
         pix = ang2pix(get_nside(hpxmap),llon,llat)
 
     values = hpxmap[pix].reshape(xx.shape)
-    zz = np.ma.array(values,mask=(values==healpy.UNSEEN),fill_value=np.nan)
+    zz = np.ma.array(values,mask=(values==hp.UNSEEN),fill_value=np.nan)
 
     return drawProjImage(xx,yy,zz,coord=coord,**kwargs)
 
@@ -236,7 +233,7 @@ def getSDSSImage(ra,dec,radius=1.0,xsize=800,opt='GML',**kwargs):
     tmp = tempfile.NamedTemporaryFile(suffix='.jpeg')
     cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
-    im = pylab.imread(tmp.name)
+    im = plt.imread(tmp.name)
     tmp.close()
     return im
 
@@ -294,7 +291,7 @@ def getDSSImage(ra,dec,radius=1.0,xsize=800,**kwargs):
     tmp = tempfile.NamedTemporaryFile(suffix='.gif')
     cmd='wget --progress=dot:mega -O %s "%s"'%(tmp.name,url+query)
     subprocess.call(cmd,shell=True)
-    im = pylab.imread(tmp.name)
+    im = plt.imread(tmp.name)
     tmp.close()
     if service == 'stsci' and xsize: 
         im = scipy.misc.imresize(im,size=(xsize,xsize))
@@ -369,8 +366,8 @@ class BasePlotter(object):
 
         delta_x = self.radius/100.
         smoothing = 2*delta_x
-        bins = numpy.arange(-self.radius, self.radius + 1.e-10, delta_x)
-        h, xbins, ybins = numpy.histogram2d(x, y, bins=[bins, bins])
+        bins = np.arange(-self.radius, self.radius + 1.e-10, delta_x)
+        h, xbins, ybins = np.histogram2d(x, y, bins=[bins, bins])
         blur = nd.filters.gaussian_filter(h.T, smoothing / delta_x)
 
         defaults = dict(cmap='gray_r',rasterized=True)
@@ -381,12 +378,12 @@ class BasePlotter(object):
         
         if label:
             plt.text(0.05, 0.95, label, fontsize=10, ha='left', va='top', 
-                     color='k', transform=pylab.gca().transAxes,
+                     color='k', transform=plt.gca().transAxes,
                      bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
 
     def drawROI(self, ax=None, value=None, pixel=None):
         if not ax: ax = plt.gca()
-        roi_map = np.array(healpy.UNSEEN*np.ones(healpy.nside2npix(self.nside)))
+        roi_map = np.array(hp.UNSEEN*np.ones(hp.nside2npix(self.nside)))
         
         if value is None:
             roi_map[self.roi.pixels] = 1
@@ -398,7 +395,7 @@ class BasePlotter(object):
             roi_map[pixel] = value
         else:
             logger.warning('Unable to parse input')
-        #im = healpy.gnomview(roi_map,**self.gnom_kwargs)
+        #im = hp.gnomview(roi_map,**self.gnom_kwargs)
         im = drawHealpixMap(roi_map,self.lon,self.lat,self.radius,coord=self.coord)
         return im
 
@@ -442,19 +439,19 @@ class BasePlotter(object):
         #catalog=ugali.observation.catalog.Catalog(self.config,roi=self.roi)
         pix = ang2pix(nside, catalog.lon, catalog.lat)
         counts = collections.Counter(pix)
-        pixels, number = numpy.array(sorted(counts.items())).T
-        star_map = hp.UNSEEN * numpy.ones(hp.nside2npix(nside))
+        pixels, number = np.array(sorted(counts.items())).T
+        star_map = hp.UNSEEN * np.ones(hp.nside2npix(nside))
         star_map[pixels] = number
-        star_map[star_map == 0] = healpy.UNSEEN
+        star_map[star_map == 0] = hp.UNSEEN
     
-        #im = healpy.gnomview(star_map,**self.gnom_kwargs)
-        #healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        #pylab.close()
+        #im = hp.gnomview(star_map,**self.gnom_kwargs)
+        #hp.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
+        #plt.close()
 
         im = drawHealpixMap(star_map,self.lon,self.lat,self.radius,coord=self.coord)
         #im = ax.imshow(im,origin='bottom')
         try:    ax.cax.colorbar(im)
-        except: pylab.colorbar(im,ax=ax)
+        except: plt.colorbar(im,ax=ax)
         ax.annotate("Stars",**self.label_kwargs)
         return im
 
@@ -477,7 +474,7 @@ class BasePlotter(object):
         im = drawHealpixMap(mask_map,self.lon,self.lat,self.radius,coord=self.coord)
 
         try: cbar = ax.cax.colorbar(im)
-        except: cbar = pylab.colorbar(im)
+        except: cbar = plt.colorbar(im)
         cbar.ax.set_xticklabels(cbar.ax.get_xticklabels(),rotation=90)
         ax.annotate(mtype,**self.label_kwargs)
         return im
@@ -503,22 +500,22 @@ class BasePlotter(object):
         values = 2*data['LOG_LIKELIHOOD']
 
         if values.ndim == 1: values = values.reshape(-1,1)
-        ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
+        ts_map = hp.UNSEEN * np.ones(hp.nside2npix(self.nside))
         # Sum through all distance_moduli
         #ts_map[pixels] = values.sum(axis=1)
         # Just at maximum slice from object
 
         ts_map[pixels] = values[:,zidx]
 
-        #im = healpy.gnomview(ts_map,**self.gnom_kwargs)
-        #healpy.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        #pylab.close()
+        #im = hp.gnomview(ts_map,**self.gnom_kwargs)
+        #hp.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
+        #plt.close()
         #im = ax.imshow(im,origin='bottom')
 
         im = drawHealpixMap(ts_map,self.lon,self.lat,self.radius,coord=self.coord)
 
         try: ax.cax.colorbar(im)
-        except: pylab.colorbar(im)
+        except: plt.colorbar(im)
         ax.annotate("TS",**self.label_kwargs)
         return im
 
@@ -526,7 +523,7 @@ class BasePlotter(object):
         if not ax: ax = plt.gca()
         # Stellar Catalog
         self._create_catalog()
-        healpy.projscatter(self.catalog.lon,self.catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
+        hp.projscatter(self.catalog.lon,self.catalog.lat,c='k',marker='.',lonlat=True,coord=self.gnom_kwargs['coord'])
         ax.annotate("Stars",**self.label_kwargs)
 
     def drawSpatial(self, ax=None):
@@ -621,7 +618,7 @@ class BasePlotter(object):
         ax.set_xlabel('Color (mag)')
         ax.set_ylabel('Magnitude (mag)')
         try: ax.cax.colorbar(sc)
-        except: pylab.colorbar(sc)
+        except: plt.colorbar(sc)
 
     def plotDistance(self):
         filename = self.config.mergefile
@@ -632,27 +629,27 @@ class BasePlotter(object):
         if values.ndim == 1: values = values.reshape(-1,1)
         distances = f[2].read()['DISTANCE_MODULUS']
         if distances.ndim == 1: distances = distances.reshape(-1,1)
-        ts_map = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
+        ts_map = hp.UNSEEN * np.ones(hp.nside2npix(self.nside))
 
         ndim = len(distances)
-        nrows = int(numpy.sqrt(ndim))
+        nrows = int(np.sqrt(ndim))
         ncols = ndim // nrows + (ndim%nrows > 0)
 
         # Create the healpy images, but close the figures
         images = []
         for i,val in enumerate(values.T):
             ts_map[pixels] = val
-            im = healpy.gnomview(ts_map,**self.gnom_kwargs)
-            pylab.close()
+            im = hp.gnomview(ts_map,**self.gnom_kwargs)
+            plt.close()
             images.append(im)
 
-        data = numpy.array(images); mask = (data == healpy.UNSEEN)
-        images = numpy.ma.array(data=data,mask=mask)
-        vmin = numpy.ma.min(images)
-        vmax = numpy.ma.max(images)
+        data = np.array(images); mask = (data == hp.UNSEEN)
+        images = np.ma.array(data=data,mask=mask)
+        vmin = np.ma.min(images)
+        vmax = np.ma.max(images)
 
         # Create the image grid
-        fig = pylab.figure()
+        fig = plt.figure()
         axes  = AxesGrid(fig, 111, nrows_ncols = (nrows, ncols),
                          axes_pad=0,label_mode='1',
                          cbar_mode='single',cbar_pad=0,cbar_size='5%',
@@ -675,7 +672,7 @@ class BasePlotter(object):
 
 
     def plot3(self):
-        fig = pylab.figure(figsize=(8,4))
+        fig = plt.figure(figsize=(8,4))
         axes = AxesGrid(fig, 111,nrows_ncols = (1, 3),axes_pad=0.1,
                         cbar_mode='each',cbar_pad=0,cbar_size='5%',
                         cbar_location='top',share_all=True)
@@ -691,7 +688,7 @@ class BasePlotter(object):
 
 
     def plot4(self):
-        fig = pylab.figure(figsize=(10,8))
+        fig = plt.figure(figsize=(10,8))
         axes = AxesGrid(fig, 111,nrows_ncols=(2, 2), axes_pad=0.35,
                         cbar_mode='each',cbar_pad=0,cbar_size='5%',
                         share_all=True,aspect=True,
@@ -825,14 +822,14 @@ class SourcePlotter(BasePlotter):
         color = catalog.color[cut_annulus]
         mag = catalog.mag[cut_annulus]
 
-        h, xbins, ybins = numpy.histogram2d(color, mag, bins=[cbins,mbins])
+        h, xbins, ybins = np.histogram2d(color, mag, bins=[cbins,mbins])
         blur = nd.filters.gaussian_filter(h.T, 2)
         kwargs = dict(extent=[xbins.min(),xbins.max(),ybins.min(),ybins.max()],
                       cmap='gray_r', aspect='auto', origin='lower', 
                       rasterized=True, interpolation='none')
         ax.imshow(blur, **kwargs)
 
-        pylab.scatter(catalog.color[cut_inner], catalog.mag[cut_inner], 
+        plt.scatter(catalog.color[cut_inner], catalog.mag[cut_inner], 
                       c='red', s=7, edgecolor='none')# label=r'$r < %.2f$ deg'%(r_peak))
         ugali.utils.plotting.drawIsochrone(self.isochrone, c='b', zorder=10)
         ax.set_xlim(-0.5, 1.)
@@ -840,12 +837,12 @@ class SourcePlotter(BasePlotter):
         plt.xlabel(r'$g - r$')
         plt.ylabel(r'$g$')
         plt.xticks([-0.5, 0., 0.5, 1.])
-        plt.yticks(numpy.arange(mmax - 1., mmin - 1., -1.))
+        plt.yticks(np.arange(mmax - 1., mmin - 1., -1.))
 
         radius_string = (r'${\rm r}<%.1f$ arcmin'%( 60 * r_peak))
-        pylab.text(0.05, 0.95, radius_string, 
+        plt.text(0.05, 0.95, radius_string, 
                    fontsize=10, ha='left', va='top', color='red', 
-                   transform=pylab.gca().transAxes,
+                   transform=plt.gca().transAxes,
                    bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
 
 
@@ -863,7 +860,7 @@ class SourcePlotter(BasePlotter):
 
         sel = (x_prob > xmin)&(x_prob < xmax) & (y_prob > ymin)&(y_prob < ymax)
         sel_prob = data['PROB'][sel] > 5.e-2
-        index_sort = numpy.argsort(data['PROB'][sel][sel_prob])
+        index_sort = np.argsort(data['PROB'][sel][sel_prob])
 
         plt.scatter(x_prob[sel][~sel_prob], y_prob[sel][~sel_prob], 
                       marker='o', s=2, c='0.75', edgecolor='none')
@@ -884,7 +881,7 @@ class SourcePlotter(BasePlotter):
         divider = make_axes_locatable(ax)
         ax_cb = divider.new_horizontal(size="7%", pad=0.1)
         plt.gcf().add_axes(ax_cb)
-        pylab.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
+        plt.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
         ax_cb.yaxis.tick_right()
 
     def drawMembersCMD(self,data):
@@ -907,39 +904,39 @@ class SourcePlotter(BasePlotter):
 
         sel = (x_prob > xmin)&(x_prob < xmax) & (y_prob > ymin)&(y_prob < ymax)
         sel_prob = data['PROB'][sel] > 5.e-2
-        index_sort = numpy.argsort(data['PROB'][sel][sel_prob])
+        index_sort = np.argsort(data['PROB'][sel][sel_prob])
 
         plt.scatter(data['COLOR'][sel][~sel_prob], mag_1[sel][~sel_prob],
               marker='o',s=2,c='0.75',edgecolor='none')
-        sc = pylab.scatter(data['COLOR'][sel][sel_prob][index_sort], mag_1[sel][sel_prob][index_sort], 
+        sc = plt.scatter(data['COLOR'][sel][sel_prob][index_sort], mag_1[sel][sel_prob][index_sort], 
                    c=data['PROB'][sel][sel_prob][index_sort], 
                    marker='o', s=10, edgecolor='none', cmap='jet', vmin=0., vmax=1) 
-        pylab.xlim(cmin, cmax)
-        pylab.ylim(mmax, mmin)
-        pylab.xlabel(r'$g - r$')
-        pylab.ylabel(r'$g$')
+        plt.xlim(cmin, cmax)
+        plt.ylim(mmax, mmin)
+        plt.xlabel(r'$g - r$')
+        plt.ylabel(r'$g$')
         #axes[1].yaxis.set_major_locator(MaxNLocator(prune='lower'))
-        pylab.xticks([-0.5, 0., 0.5, 1.])
-        pylab.yticks(numpy.arange(mmax - 1., mmin - 1., -1.))
+        plt.xticks([-0.5, 0., 0.5, 1.])
+        plt.yticks(np.arange(mmax - 1., mmin - 1., -1.))
 
         ugali.utils.plotting.drawIsochrone(self.isochrone, c='k', zorder=10)
 
-        pylab.text(0.05, 0.95, r'$\Sigma p_{i} = %i$'%(data['PROB'].sum()),
-                   fontsize=10, horizontalalignment='left', verticalalignment='top', color='k', transform=pylab.gca().transAxes,
+        plt.text(0.05, 0.95, r'$\Sigma p_{i} = %i$'%(data['PROB'].sum()),
+                   fontsize=10, horizontalalignment='left', verticalalignment='top', color='k', transform=plt.gca().transAxes,
                    bbox=dict(facecolor='white', alpha=1., edgecolor='none'))
 
-        divider = make_axes_locatable(pylab.gca())
+        divider = make_axes_locatable(plt.gca())
         ax_cb = divider.new_horizontal(size="7%", pad=0.1)
         plt.gcf().add_axes(ax_cb)
-        pylab.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
+        plt.colorbar(sc, cax=ax_cb, orientation='vertical', ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], label='Membership Probability')
         ax_cb.yaxis.tick_right()
 
     def drawDensityProfile(self, catalog=None):
 
         rmax = 24. # arcmin
-        bins = numpy.arange(0, rmax + 1.e-10, 2.)
+        bins = np.arange(0, rmax + 1.e-10, 2.)
         centers = 0.5 * (bins[1:] + bins[0:-1])
-        area = numpy.pi * (bins[1:]**2 - bins[0:-1]**2)
+        area = np.pi * (bins[1:]**2 - bins[0:-1]**2)
 
         r_peak = self.kernel.extension 
 
@@ -949,8 +946,8 @@ class SourcePlotter(BasePlotter):
 
         angsep_arcmin = angsep * 60 # arcmin
         cut_iso = self.isochrone_selection(stars)
-        h = numpy.histogram(angsep_arcmin[(angsep_arcmin < rmax) & cut_iso], bins=bins)[0]
-        h_out = numpy.histogram(angsep_arcmin[(angsep_arcmin < rmax) & (~cut_iso)], bins=bins)[0]
+        h = np.histogram(angsep_arcmin[(angsep_arcmin < rmax) & cut_iso], bins=bins)[0]
+        h_out = np.histogram(angsep_arcmin[(angsep_arcmin < rmax) & (~cut_iso)], bins=bins)[0]
 
         gals = self.get_galaxies()
         if len(gals):
@@ -963,25 +960,25 @@ class SourcePlotter(BasePlotter):
             h_gal_out = np.histogram(angsep_gal_arcmin[(angsep_gal_arcmin < rmax) & (~cut_iso_gal)], bins=bins)[0]
 
         plt.plot(centers, h/area, c='red', label='Filtered Stars')
-        plt.errorbar(centers, h/area, yerr=(numpy.sqrt(h) / area), ecolor='red', c='red')
+        plt.errorbar(centers, h/area, yerr=(np.sqrt(h) / area), ecolor='red', c='red')
         plt.scatter(centers, h/area, edgecolor='none', c='red', zorder=22)
 
         plt.plot(centers, h_out/area, c='gray', label='Unfiltered Stars')
-        plt.errorbar(centers, h_out/area, yerr=(numpy.sqrt(h_out) / area), ecolor='gray', c='gray')
+        plt.errorbar(centers, h_out/area, yerr=(np.sqrt(h_out) / area), ecolor='gray', c='gray')
         plt.scatter(centers, h_out/area, edgecolor='none', c='gray', zorder=21)
 
         if len(gals):
             plt.plot(centers, h_gal/area, c='black', label='Filtered Galaxies')
-            plt.errorbar(centers, h_gal/area, yerr=(numpy.sqrt(h_gal) / area), ecolor='black', c='black')
+            plt.errorbar(centers, h_gal/area, yerr=(np.sqrt(h_gal) / area), ecolor='black', c='black')
             plt.scatter(centers, h_gal/area, edgecolor='none', c='black', zorder=20)
 
         plt.xlabel('Angular Separation (arcmin)')
         plt.ylabel(r'Density (arcmin$^{-2}$)')
         plt.xlim(0., rmax)
-        ymax = pylab.ylim()[1]
-        #pylab.ylim(0, ymax)
-        pylab.ylim(0, 4)
-        pylab.legend(loc='upper right', frameon=False, fontsize=10)
+        ymax = plt.ylim()[1]
+        #plt.ylim(0, ymax)
+        plt.ylim(0, 4)
+        plt.legend(loc='upper right', frameon=False, fontsize=10)
 
 
     def plot6(self, filename, title=None):
@@ -1001,11 +998,11 @@ class SourcePlotter(BasePlotter):
         self.drawSmoothStars()
 
         logger.debug("Drawing density profile...")
-        pylab.subplot(2, 3, 2)
+        plt.subplot(2, 3, 2)
         self.drawDensityProfile()
          
         logger.debug("Drawing spatial distribution of members...")
-        pylab.subplot(2, 3, 3)
+        plt.subplot(2, 3, 3)
         self.drawMembersSpatial(filename)
 
         logger.debug("Drawing smooth galaxies...")
@@ -1017,7 +1014,7 @@ class SourcePlotter(BasePlotter):
         self.drawHessDiagram()
 
         logger.debug("Drawing CMD of members...")                  
-        pylab.subplot(2, 3, 6)
+        plt.subplot(2, 3, 6)
         self.drawMembersCMD(filename)
 
 def plot_candidates(candidates, config, ts_min=50, outdir='./'):
@@ -1127,7 +1124,7 @@ def drawKernelHist(ax, kernel):
     ax.set_xlim(0,len(x))
 
     #try: ax.cax.colorbar(im)
-    #except: pylab.colorbar(im)
+    #except: plt.colorbar(im)
 
     #a0 = np.array([0.,0.])
     #a1 =kernel.a*np.array([np.sin(np.deg2rad(theta)),-np.cos(np.deg2rad(theta))])
@@ -1441,9 +1438,9 @@ def drawSkymapCatalog(ax,lon,lat,**kwargs):
 def plotSkymap(skymap, proj='mol', **kwargs):
     kwargs.setdefault('xsize',1000)
     if proj.upper() == 'MOL':
-        im = healpy.mollview(skymap,**kwargs)
+        im = hp.mollview(skymap,**kwargs)
     elif proj.upper() == 'CAR':
-        im = healpy.cartview(skymap,**kwargs)
+        im = hp.cartview(skymap,**kwargs)
     return im
 
 def plotTriangle(srcfile,samples,burn=0,**kwargs):
@@ -1503,8 +1500,8 @@ def makePath(x_path, y_path, epsilon=1.e-10):
     """
     Create closed path.
     """
-    x_path_closed = numpy.concatenate([x_path, x_path[::-1]])
-    y_path_closed = numpy.concatenate([y_path, epsilon + y_path[::-1]])
+    x_path_closed = np.concatenate([x_path, x_path[::-1]])
+    y_path_closed = np.concatenate([y_path, epsilon + y_path[::-1]])
     path = matplotlib.path.Path(list(zip(x_path_closed, y_path_closed)))
     return path
 
@@ -1526,12 +1523,12 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
         return np.array([],dtype=bool)
 
     try:
-        if numpy.all(isochrone.stage == 'Main'):
+        if np.all(isochrone.stage == 'Main'):
             # Dotter case
             index_transition = len(isochrone.stage)
         else:
             # Other cases
-            index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1    
+            index_transition = np.nonzero(isochrone.stage > 3)[0][0] + 1    
     except AttributeError:
         index_transition = 1
 
@@ -1542,34 +1539,34 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
     
     # Cut one way...
     f_isochrone = scipy.interpolate.interp1d(mag_2_rgb, mag_1_rgb - mag_2_rgb, bounds_error=False, fill_value = 999.)
-    color_diff = numpy.fabs((g - r) - f_isochrone(r))
-    cut_2 = (color_diff < numpy.sqrt(0.1**2 + r_err**2 + g_err**2))
+    color_diff = np.fabs((g - r) - f_isochrone(r))
+    cut_2 = (color_diff < np.sqrt(0.1**2 + r_err**2 + g_err**2))
 
      # ...and now the other
     f_isochrone = scipy.interpolate.interp1d(mag_1_rgb, mag_1_rgb - mag_2_rgb, bounds_error=False, fill_value = 999.)
-    color_diff = numpy.fabs((g - r) - f_isochrone(g))
-    cut_1 = (color_diff < numpy.sqrt(0.1**2 + r_err**2 + g_err**2))
+    color_diff = np.fabs((g - r) - f_isochrone(g))
+    cut_1 = (color_diff < np.sqrt(0.1**2 + r_err**2 + g_err**2))
 
-    cut = numpy.logical_or(cut_1, cut_2)
+    cut = np.logical_or(cut_1, cut_2)
     
     # If using Padova isochrone, also include horizontal branch
-    if not numpy.all(isochrone.stage == 'Main'):
-        index_transition = numpy.nonzero(isochrone.stage > 3)[0][0] + 1
+    if not np.all(isochrone.stage == 'Main'):
+        index_transition = np.nonzero(isochrone.stage > 3)[0][0] + 1
         mag_1_hb = isochrone.mag_1[index_transition:] + isochrone.distance_modulus
         mag_2_hb = isochrone.mag_2[index_transition:] + isochrone.distance_modulus
         path_hb = makePath(mag_1_hb, mag_2_hb)
         cut_hb = path_hb.contains_points(list(zip(g, r)), radius=0.1)
         logger.debug('Applying HB selection')
-        logger.debug(numpy.sum(cut))
-        cut = numpy.logical_or(cut, cut_hb)
-        logger.debug(numpy.sum(cut))
+        logger.debug(np.sum(cut))
+        cut = np.logical_or(cut, cut_hb)
+        logger.debug(np.sum(cut))
 
-    mag_bins = numpy.arange(16., 24.1, 0.1)
+    mag_bins = np.arange(16., 24.1, 0.1)
     mag_centers = 0.5 * (mag_bins[1:] + mag_bins[0:-1])
-    magerr = numpy.tile(0., len(mag_centers))
+    magerr = np.tile(0., len(mag_centers))
     for ii in range(0, len(mag_bins) - 1):
         cut_mag_bin = (g > mag_bins[ii]) & (g < mag_bins[ii + 1])
-        magerr[ii] = numpy.median(numpy.sqrt(0.1**2 + r_err[cut_mag_bin]**2 + g_err[cut_mag_bin]**2))
+        magerr[ii] = np.median(np.sqrt(0.1**2 + r_err[cut_mag_bin]**2 + g_err[cut_mag_bin]**2))
 
     if return_all:
         return cut, mag_centers[f_isochrone(mag_centers) < 100], (f_isochrone(mag_centers) + magerr)[f_isochrone(mag_centers) < 100], (f_isochrone(mag_centers) - magerr)[f_isochrone(mag_centers) < 100]
