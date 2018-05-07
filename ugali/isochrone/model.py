@@ -37,7 +37,6 @@ import inspect
 import glob
 from functools import wraps
 
-import numpy
 import numpy as np
 import scipy.interpolate
 import scipy.stats
@@ -163,7 +162,7 @@ class IsochroneModel(Model):
         # ADW: Assume that the isochrones are pre-sorted by mass_init
         # This avoids some numerical instability from points that have the same
         # mass_init value (discontinuities in the isochrone).
-        # ADW: Might consider using numpy.interp for speed
+        # ADW: Might consider using np.interp for speed
         mass_act_interpolation = scipy.interpolate.interp1d(mass_init, mass_act,assume_sorted=True)
         mag_1_interpolation = scipy.interpolate.interp1d(mass_init, mag_1,assume_sorted=True)
         mag_2_interpolation = scipy.interpolate.interp1d(mass_init, mag_2,assume_sorted=True)
@@ -406,12 +405,12 @@ class IsochroneModel(Model):
         # Analytic part
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps = steps)
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
-        #cut = numpy.logical_not((g > mag_bright) & (g < mag_faint) & (r > mag_bright) & (r < mag_faint))
+        #cut = np.logical_not((g > mag_bright) & (g < mag_faint) & (r > mag_bright) & (r < mag_faint))
         cut = ((g + self.distance_modulus) > mag_faint) if self.band_1 == 'g' else ((r + self.distance_modulus) > mag_faint)
         mag_unobs = visual(g[cut], r[cut], richness * mass_pdf[cut])
 
         # Stochastic part
-        abs_mag_obs_array = numpy.zeros(n_trials)
+        abs_mag_obs_array = np.zeros(n_trials)
         for ii in range(0, n_trials):
             if ii%100==0: logger.debug('%i absolute magnitude trials'%ii)
             g, r = self.simulate(richness * self.stellar_mass())
@@ -421,11 +420,11 @@ class IsochroneModel(Model):
             abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
 
         # ADW: This shouldn't be necessary
-        #abs_mag_obs_array = numpy.sort(abs_mag_obs_array)[::-1]
+        #abs_mag_obs_array = np.sort(abs_mag_obs_array)[::-1]
 
         # ADW: Careful, fainter abs mag is larger (less negative) number
         q = [100*alpha/2., 50, 100*(1-alpha/2.)]
-        hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
+        hi,med,lo = np.percentile(abs_mag_obs_array,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
     def simulate(self, stellar_mass, distance_modulus=None, **kwargs):

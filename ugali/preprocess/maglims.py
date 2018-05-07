@@ -5,17 +5,15 @@ For creating healpix maps from catalogs.
 import os
 from os.path import join
 import shutil
-
-import fitsio
-import numpy
-import numpy as np
-
-import numpy.lib.recfunctions as recfuncs
 import tempfile
 import subprocess
-import healpy
 from collections import Counter
 from collections import OrderedDict as odict
+
+import fitsio
+import numpy as np
+import np.lib.recfunctions as recfuncs
+import healpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
@@ -98,18 +96,18 @@ class Maglims(object):
 
         data = fitsio.read(infile,columns=[pixel_pix_name])
 
-        #mask_pixels = numpy.arange( healpy.nside2npix(self.nside_mask), dtype='int')
-        mask_maglims = numpy.zeros(healpy.nside2npix(self.nside_mask))
+        #mask_pixels = np.arange( hp.nside2npix(self.nside_mask), dtype='int')
+        mask_maglims = np.zeros(hp.nside2npix(self.nside_mask))
          
-        out_pixels = numpy.zeros(0,dtype='int')
-        out_maglims = numpy.zeros(0)
+        out_pixels = np.zeros(0,dtype='int')
+        out_maglims = np.zeros(0)
          
         # Find the objects in each pixel
         pixel_pix = data[pixel_pix_name]
         mask_pix = ugali.utils.skymap.superpixel(pixel_pix,self.nside_pixel,self.nside_mask)
         count = Counter(mask_pix)
         pixels = sorted(count.keys())
-        pix_digi = numpy.digitize(mask_pix,pixels).argsort()
+        pix_digi = np.digitize(mask_pix,pixels).argsort()
         idx = 0
         min_num = 500
         signal_to_noise = 10.
@@ -132,15 +130,15 @@ class Maglims(object):
                 # Estimate the magnitude limit as suggested by:
                 # https://deswiki.cosmology.illinois.edu/confluence/display/DO/SVA1+Release+Document
                 # (https://desweb.cosmology.illinois.edu/confluence/display/Operations/SVA1+Doc)
-                maglim = numpy.median(mag[(magerr>0.9*magerr_lim)&(magerr<1.1*magerr_lim)])
+                maglim = np.median(mag[(magerr>0.9*magerr_lim)&(magerr<1.1*magerr_lim)])
          
                 # Alternative method to estimate the magnitude limit by fitting median
                 #mag_min, mag_max = mag.min(),mag.max()
-                #mag_bins = numpy.arange(mag_min,mag_max,0.1) #0.1086?
+                #mag_bins = np.arange(mag_min,mag_max,0.1) #0.1086?
                 #x,y = ugali.utils.binning.binnedMedian(mag,magerr,mag_bins)
-                #x,y = x[~numpy.isnan(y)],y[~numpy.isnan(y)]
+                #x,y = x[~np.isnan(y)],y[~np.isnan(y)]
                 #magerr_med = interp1d(x,y)
-                #mag0 = numpy.median(x) 
+                #mag0 = np.median(x) 
                 #maglim = brentq(lambda a: magerr_med(a)-magerr_lim,x.min(),x.max(),disp=False)
                 # Median from just objects near magerr cut
          
@@ -148,13 +146,13 @@ class Maglims(object):
 
             logger.debug("%i (n=%i): maglim=%g"%(pix,num,mask_maglims[pix]))
             subpix = ugali.utils.skymap.subpixel(pix, self.nside_mask, self.nside_pixel)
-            maglims = numpy.zeros(len(subpix)) + mask_maglims[pix] 
-            out_pixels = numpy.append(out_pixels,subpix)
-            out_maglims = numpy.append(out_maglims,maglims)
+            maglims = np.zeros(len(subpix)) + mask_maglims[pix] 
+            out_pixels = np.append(out_pixels,subpix)
+            out_maglims = np.append(out_maglims,maglims)
          
         # Remove empty pixels
         logger.info("Removing empty pixels")
-        idx = numpy.nonzero(out_maglims > 0)[0]
+        idx = np.nonzero(out_maglims > 0)[0]
         out_pixels  = out_pixels[idx]
         out_maglims = out_maglims[idx]
          
@@ -164,11 +162,11 @@ class Maglims(object):
             glon,glat = pix2ang(self.nside_pixel,out_pixels)
             ra,dec = gal2cel(glon,glat)
             footprint = inFootprint(self.footprint,ra,dec)
-            idx = numpy.nonzero(footprint)[0]
+            idx = np.nonzero(footprint)[0]
             out_pixels = out_pixels[idx]
             out_maglims = out_maglims[idx]
          
-        logger.info("MAGLIM = %.3f +/- %.3f"%(numpy.mean(out_maglims),numpy.std(out_maglims)))         
+        logger.info("MAGLIM = %.3f +/- %.3f"%(np.mean(out_maglims),np.std(out_maglims)))         
         return out_pixels,out_maglims
 
 def inFootprint(footprint,ra,dec):
@@ -188,9 +186,9 @@ def inFootprint(footprint,ra,dec):
     try:
         if isinstance(footprint,str) and os.path.exists(footprint):
             filename = footprint
-            #footprint = healpy.read_map(filename,verbose=False)
+            #footprint = hp.read_map(filename,verbose=False)
             footprint = fitsio.read(filename)['I'].ravel()
-        nside = healpy.npix2nside(len(footprint))
+        nside = hp.npix2nside(len(footprint))
         pix = ang2pix(nside,ra,dec)
         inside = (footprint[pix] > 0)
     except IOError:
@@ -201,7 +199,7 @@ def inFootprint(footprint,ra,dec):
 def inMangle(polyfile,ra,dec):
     coords = tempfile.NamedTemporaryFile(suffix='.txt',delete=False)
     logger.debug("Writing coordinates to %s"%coords.name)
-    numpy.savetxt(coords, numpy.array( [ra,dec] ).T, fmt='%.6g' )
+    np.savetxt(coords, np.array( [ra,dec] ).T, fmt='%.6g' )
     coords.close()
 
     weights = tempfile.NamedTemporaryFile(suffix='.txt',delete=False)
@@ -214,7 +212,7 @@ def inMangle(polyfile,ra,dec):
     logger.debug(cmd)
     subprocess.call(cmd,shell=True)
 
-    data = numpy.loadtxt(tmp.name,unpack=True,skiprows=1)[-1]
+    data = np.loadtxt(tmp.name,unpack=True,skiprows=1)[-1]
     for f in [coords,weights,tmp]:
         logger.debug("Removing %s"%f.name)
         os.remove(f.name)
@@ -278,23 +276,23 @@ def split(config,dirname='split',force=False):
 
     manglefile_1 = join(mangledir,config['mangle']['filename_1'])
     logger.info("Reading %s..."%manglefile_1)
-    mangle1 = healpy.read_map(manglefile_1)
+    mangle1 = hp.read_map(manglefile_1)
     
     manglefile_2 = join(mangledir,config['mangle']['filename_2'])
     logger.info("Reading %s..."%manglefile_2)
-    mangle2 = healpy.read_map(manglefile_2)
+    mangle2 = hp.read_map(manglefile_2)
 
     # Read the footprint
     footfile = config['data']['footprint']
     logger.info("Reading %s..."%footfile)
-    footprint = healpy.read_map(footfile)
+    footprint = hp.read_map(footfile)
 
     # Output mask names
     mask1 = os.path.basename(config['mask']['basename_1'])
     mask2 = os.path.basename(config['mask']['basename_2'])
 
     for band,mangle,base in [(band1,mangle1,mask1),(band2,mangle2,mask2)]:
-        nside_mangle = healpy.npix2nside(len(mangle))
+        nside_mangle = hp.npix2nside(len(mangle))
         if nside_mangle != nside_pixel:
             msg = "Mask nside different from pixel nside"
             logger.warning(msg)

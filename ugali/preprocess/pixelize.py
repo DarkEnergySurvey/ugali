@@ -7,15 +7,13 @@ For pixelizing catalogs and masks.
 
 import os
 from os.path import join
+import glob
+import collections
 
 import fitsio
-import numpy
 import numpy as np
-import numpy.lib.recfunctions as recfuncs
-import collections
-import healpy
+import np.lib.recfunctions as recfuncs
 import healpy as hp
-import glob
 from matplotlib import mlab
 
 #import ugali.utils.binning
@@ -138,14 +136,14 @@ def pixelizeDensity(config, nside=None, force=False):
 
 
 def stellarDensity(infile, nside=256, lon_field='RA', lat_field='DEC'): 
-    area = healpy.nside2pixarea(nside,degrees=True)
+    area = hp.nside2pixarea(nside,degrees=True)
     logger.debug("Reading %s"%infile)
     data = fitsio.read(infile,columns=[lon_field,lat_field])
 
     lon,lat = data[lon_field],data[lat_field]
     pix = ang2pix(nside,lon,lat)
     counts = collections.Counter(pix)
-    pixels, number = numpy.array(sorted(counts.items())).T
+    pixels, number = np.array(sorted(counts.items())).T
     density = number/area
 
     return pixels, density

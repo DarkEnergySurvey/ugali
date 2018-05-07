@@ -1,11 +1,11 @@
 """
 Class to construct parabolas from 3 points.
 
-ADW: Need to move all of the plotting stuff
+ADW: Need to get rid of all of the plotting stuff
 ADW: Doesn't this all exist in np.poly?
 """
 
-import numpy
+import numpy as np
 import scipy.stats
 import scipy.interpolate
 
@@ -21,11 +21,11 @@ class Parabola:
         """
 
         # Sort the input
-        argsort = numpy.argsort(x)
-        self.x = numpy.array(x)[argsort]
-        self.y = numpy.array(y)[argsort]
+        argsort = np.argsort(x)
+        self.x = np.array(x)[argsort]
+        self.y = np.array(y)[argsort]
 
-        index = numpy.argmax(self.y)
+        index = np.argmax(self.y)
         if index == 0:
             index_0 = 0
             index_1 = 1
@@ -47,12 +47,12 @@ class Parabola:
         y_2 = self.y[index_2]
 
         # Invert matrix
-        a = numpy.matrix([[x_0**2, x_0, 1.],
+        a = np.matrix([[x_0**2, x_0, 1.],
                           [x_1**2, x_1, 1.],
                           [x_2**2, x_2, 1.]])
-        a_inverse = numpy.linalg.inv(a)
-        b = numpy.array([y_0, y_1, y_2])
-        p = numpy.dot(numpy.array(a_inverse), b)
+        a_inverse = np.linalg.inv(a)
+        b = np.array([y_0, y_1, y_2])
+        p = np.dot(np.array(a_inverse), b)
 
         self.p_2 = p[0]
         self.p_1 = p[1]
@@ -63,7 +63,7 @@ class Parabola:
         self.vertex_y = self.p_0 - (self.p_1**2 / (4. * self.p_2))
 
     def __eq__(self,other):
-        return numpy.allclose([self.p_0,self.p_1,self.p_2],[other.p_0,other.p_1,other.p_2])
+        return np.allclose([self.p_0,self.p_1,self.p_2],[other.p_0,other.p_1,other.p_2])
 
     def __ne__(self,other):
         return not self.__eq__(other)
@@ -88,21 +88,21 @@ class Parabola:
         y = []
         for ii in range(0, len(self.x) - 2):
             p = Parabola(self.x[ii: ii + 3], self.y[ii: ii + 3])
-            x.append(numpy.linspace(self.x[ii], self.x[ii + 1], factor)[0: -1])
+            x.append(np.linspace(self.x[ii], self.x[ii + 1], factor)[0: -1])
             y.append(p(x[-1]))
 
         p = Parabola(self.x[len(self.x) - 3:], self.y[len(self.y) - 3:])
-        x.append(numpy.linspace(self.x[-2], self.x[-1], factor)[0: -1])
+        x.append(np.linspace(self.x[-2], self.x[-1], factor)[0: -1])
         y.append(p(x[-1]))
 
         x.append([self.x[-1]])
         y.append([self.y[-1]])
 
-        #f = scipy.interpolate.interp1d(numpy.concatenate(x), numpy.concatenate(y))
-        #x = numpy.linspace(self.x[0], self.x[-1], len(x) * factor)   
+        #f = scipy.interpolate.interp1d(np.concatenate(x), np.concatenate(y))
+        #x = np.linspace(self.x[0], self.x[-1], len(x) * factor)   
         #return x, f(x)
         
-        return numpy.concatenate(x), numpy.concatenate(y)
+        return np.concatenate(x), np.concatenate(y)
 
     def profileUpperLimit(self, delta = 2.71):
         """
@@ -126,20 +126,20 @@ class Parabola:
 
         
             
-        return max((numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * numpy.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
+        return max((np.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * np.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
 
     #def bayesianUpperLimit3(self, alpha, steps = 1.e5):
     #    """
     #    Compute one-sided upper limit using Bayesian Method of Helene.
     #    """
     #    # Need a check to see whether limit is reliable
-    #    pdf = scipy.interpolate.interp1d(self.x, numpy.exp(self.y / 2.)) # Convert from 2 * log(likelihood) to likelihood
-    #    x_pdf = numpy.linspace(self.x[0], self.x[-1], steps)
-    #    cdf = numpy.cumsum(pdf(x_pdf))
+    #    pdf = scipy.interpolate.interp1d(self.x, np.exp(self.y / 2.)) # Convert from 2 * log(likelihood) to likelihood
+    #    x_pdf = np.linspace(self.x[0], self.x[-1], steps)
+    #    cdf = np.cumsum(pdf(x_pdf))
     #    cdf /= cdf[-1]
     #    cdf_reflect = scipy.interpolate.interp1d(cdf, x_pdf)
     #    return cdf_reflect(alpha)
-    #    #return self.x[numpy.argmin((cdf - alpha)**2)]
+    #    #return self.x[np.argmin((cdf - alpha)**2)]
 
     def bayesianUpperLimit(self, alpha, steps=1.e5, plot=False):
         """
@@ -147,20 +147,20 @@ class Parabola:
         Several methods of increasing numerical stability have been implemented.
         """
         x_dense, y_dense = self.densify()
-        y_dense -= numpy.max(y_dense) # Numeric stability
+        y_dense -= np.max(y_dense) # Numeric stability
         f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
-        x = numpy.linspace(0., numpy.max(x_dense), steps)
-        pdf = numpy.exp(f(x) / 2.)
-        cut = (pdf / numpy.max(pdf)) > 1.e-10
+        x = np.linspace(0., np.max(x_dense), steps)
+        pdf = np.exp(f(x) / 2.)
+        cut = (pdf / np.max(pdf)) > 1.e-10
         x = x[cut]
         pdf = pdf[cut]
         #pdf /= pdf[0]
-        #forbidden = numpy.nonzero(pdf < 1.e-10)[0]
+        #forbidden = np.nonzero(pdf < 1.e-10)[0]
         #if len(forbidden) > 0:
         #    index = forbidden[0] # Numeric stability
         #    x = x[0: index]
         #    pdf = pdf[0: index]
-        cdf = numpy.cumsum(pdf)
+        cdf = np.cumsum(pdf)
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
@@ -186,15 +186,15 @@ class Parabola:
             f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='cubic')
         except:
             f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='linear')
-        x = numpy.linspace(0., numpy.max(self.x[cut]), steps)
-        y = numpy.exp(f(x) / 2.)
-        #forbidden = numpy.nonzero((y / numpy.exp(self.vertex_y / 2.)) < 1.e-10)[0]
-        forbidden = numpy.nonzero((y / self.vertex_y) < 1.e-10)[0]
+        x = np.linspace(0., np.max(self.x[cut]), steps)
+        y = np.exp(f(x) / 2.)
+        #forbidden = np.nonzero((y / np.exp(self.vertex_y / 2.)) < 1.e-10)[0]
+        forbidden = np.nonzero((y / self.vertex_y) < 1.e-10)[0]
         if len(forbidden) > 0:
             index = forbidden[0] # Numeric stability
             x = x[0: index]
             y = y[0: index]
-        cdf = numpy.cumsum(y)
+        cdf = np.cumsum(y)
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
@@ -214,7 +214,7 @@ class Parabola:
         return cdf_reflect(alpha)
 
         """
-        if numpy.isnan(result):
+        if np.isnan(result):
             import pylab
 
             for ii in range(0, len(self.x)):
@@ -234,28 +234,28 @@ class Parabola:
         Compute two-sided confidence interval by taking x-values corresponding to the largest PDF-values first.
         """
         x_dense, y_dense = self.densify()
-        y_dense -= numpy.max(y_dense) # Numeric stability
+        y_dense -= np.max(y_dense) # Numeric stability
         f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
-        x = numpy.linspace(0., numpy.max(x_dense), steps)
+        x = np.linspace(0., np.max(x_dense), steps)
         # ADW: Why does this start at 0, which often outside the input range?
         # Wouldn't starting at xmin be better:
-        #x = numpy.linspace(numpy.min(x_dense), numpy.max(x_dense), steps)
-        pdf = numpy.exp(f(x) / 2.)
-        cut = (pdf / numpy.max(pdf)) > 1.e-10
+        #x = np.linspace(np.min(x_dense), np.max(x_dense), steps)
+        pdf = np.exp(f(x) / 2.)
+        cut = (pdf / np.max(pdf)) > 1.e-10
         x = x[cut]
         pdf = pdf[cut]
 
-        sorted_pdf_indices = numpy.argsort(pdf)[::-1] # Indices of PDF in descending value
-        cdf = numpy.cumsum(pdf[sorted_pdf_indices])
+        sorted_pdf_indices = np.argsort(pdf)[::-1] # Indices of PDF in descending value
+        cdf = np.cumsum(pdf[sorted_pdf_indices])
         cdf /= cdf[-1]
-        sorted_pdf_index_max = numpy.argmin((cdf - alpha)**2)
+        sorted_pdf_index_max = np.argmin((cdf - alpha)**2)
         x_select = x[sorted_pdf_indices[0: sorted_pdf_index_max]]
 
         #if plot:
-        #    cdf = numpy.cumsum(pdf)
+        #    cdf = np.cumsum(pdf)
         #    cdf /= cdf[-1]
-        #    print( cdf[numpy.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
-        #          - cdf[numpy.min(sorted_pdf_indices[0: sorted_pdf_index_max])] )
+        #    print( cdf[np.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
+        #          - cdf[np.min(sorted_pdf_indices[0: sorted_pdf_index_max])] )
         #    
         #    pylab.figure()
         #    pylab.plot(x, f(x))
@@ -264,7 +264,7 @@ class Parabola:
         #    pylab.figure()
         #    pylab.plot(x, pdf)
             
-        return numpy.min(x_select), numpy.max(x_select) 
+        return np.min(x_select), np.max(x_select) 
 
 ############################################################
 
@@ -277,8 +277,8 @@ def upperLimitsDeltaTS(confidence_level, one_sided=True, degrees_of_freedom=1):
     ts_min = 0 # TS = Test Statistic
     ts_max = 5
     ts_steps = 1000
-    x = numpy.linspace(ts_min, ts_max, ts_steps)
+    x = np.linspace(ts_min, ts_max, ts_steps)
     y = (0.5 * scipy.stats.chi2.sf(x, degrees_of_freedom) - (1. - confidence_level))**2
-    return x[numpy.argmin(y)]
+    return x[np.argmin(y)]
         
 ############################################################

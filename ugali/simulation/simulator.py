@@ -6,12 +6,11 @@ Module for simulation.
 import copy
 import os
 
-import numpy
 import numpy as np
 import scipy.interpolate
 import astropy.io.fits as pyfits
-import healpy
-import numpy.lib.recfunctions as recfuncs
+import healpy as hp
+import np.lib.recfunctions as recfuncs
 import fitsio
 
 import ugali.observation.catalog
@@ -249,39 +248,39 @@ class Simulator(object):
 
         # Band 1
         mag_1_thresh = self.mask.mask_1.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_1
-        sorting_indices = numpy.argsort(mag_1_thresh)
+        sorting_indices = np.argsort(mag_1_thresh)
         mag_1_thresh_sort = mag_1_thresh[sorting_indices]
         mag_err_1_sort = self.catalog.mag_err_1[sorting_indices]
 
-        # ADW: Can't this be done with numpy.median(axis=?)
+        # ADW: Can't this be done with np.median(axis=?)
         mag_1_thresh_medians = []
         mag_err_1_medians = []
         for i in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
-            mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-            mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_1_thresh_medians.append(np.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_1_medians.append(np.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
         
         if mag_1_thresh_medians[0] > 0.:
-            mag_1_thresh_medians = numpy.insert(mag_1_thresh_medians, 0, -99.)
-            mag_err_1_medians = numpy.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
+            mag_1_thresh_medians = np.insert(mag_1_thresh_medians, 0, -99.)
+            mag_err_1_medians = np.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
         
         self.photo_err_1 = scipy.interpolate.interp1d(mag_1_thresh_medians, mag_err_1_medians,
                                                       bounds_error=False, fill_value=mag_err_1_medians[-1])
 
         # Band 2
         mag_2_thresh = self.mask.mask_2.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_2
-        sorting_indices = numpy.argsort(mag_2_thresh)
+        sorting_indices = np.argsort(mag_2_thresh)
         mag_2_thresh_sort = mag_2_thresh[sorting_indices]
         mag_err_2_sort = self.catalog.mag_err_2[sorting_indices]
 
         mag_2_thresh_medians = []
         mag_err_2_medians = []
         for i in range(0, int(len(mag_2_thresh) / float(n_per_bin))):
-            mag_2_thresh_medians.append(numpy.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-            mag_err_2_medians.append(numpy.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_2_thresh_medians.append(np.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_2_medians.append(np.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
 
         if mag_2_thresh_medians[0] > 0.:
-            mag_2_thresh_medians = numpy.insert(mag_2_thresh_medians, 0, -99.)
-            mag_err_2_medians = numpy.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
+            mag_2_thresh_medians = np.insert(mag_2_thresh_medians, 0, -99.)
+            mag_err_2_medians = np.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
         
         self.photo_err_2 = scipy.interpolate.interp1d(mag_2_thresh_medians, mag_err_2_medians,
                                                       bounds_error=False, fill_value=mag_err_2_medians[-1])
@@ -301,7 +300,7 @@ class Simulator(object):
         logger.info("Setup subpixels...")
         self.nside_pixel = self.config['coords']['nside_pixel']
         self.nside_subpixel = self.nside_pixel * 2**4 # Could be config parameter
-        epsilon = np.degrees(healpy.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
+        epsilon = np.degrees(hp.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
         subpix = ugali.utils.healpix.query_disc(self.nside_subpixel,self.roi.vec,self.roi_radius+epsilon)
         superpix = ugali.utils.healpix.superpixel(subpix,self.nside_subpixel,self.nside_pixel)
         self.subpix = subpix[np.in1d(superpix,self.roi.pixels)]
@@ -376,10 +375,10 @@ class Simulator(object):
         mag_2 = mag_1 - color
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(self.nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(self.nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
         
@@ -387,7 +386,7 @@ class Simulator(object):
         #mag_err_2 = 1.0*np.ones(len(pix))
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
 
         select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
         
@@ -429,7 +428,7 @@ class Simulator(object):
         self._setup_cmd()
 
         # Randomize the number of stars per bin according to Poisson distribution
-        nstar_per_bin = numpy.random.poisson(lam=self.bkg_lambda)
+        nstar_per_bin = np.random.poisson(lam=self.bkg_lambda)
         nstar = nstar_per_bin.sum()
 
         logger.info("Simulating %i background stars..."%nstar)
@@ -443,10 +442,10 @@ class Simulator(object):
 
             # Distribute points within each color-mag bins
             xx,yy = np.meshgrid(self.bkg_centers_color,self.bkg_centers_mag)
-            color = numpy.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
-            color += numpy.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
-            mag_1 = numpy.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
-            mag_1 += numpy.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
+            color = np.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
+            color += np.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
+            mag_1 = np.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
+            mag_1 += np.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
         else:
             # Uniform color-magnitude distribution
             logger.info("Generating uniform CMD.")
@@ -464,20 +463,20 @@ class Simulator(object):
         pix = ang2pix(nside_pixel, lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
 
         # ADW: Should magnitudes be randomized by the erros?
-        #mag_1 += (numpy.random.normal(size=len(mag_1)) * mag_err_1)
-        #mag_2 += (numpy.random.normal(size=len(mag_2)) * mag_err_2)
+        #mag_1 += (np.random.normal(size=len(mag_1)) * mag_err_1)
+        #mag_2 += (np.random.normal(size=len(mag_2)) * mag_err_2)
 
         select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
 
@@ -512,10 +511,10 @@ class Simulator(object):
         pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
@@ -523,12 +522,12 @@ class Simulator(object):
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
 
         # Randomize magnitudes by their errors
-        mag_obs_1 = mag_1+numpy.random.normal(size=len(mag_1))*mag_err_1
-        mag_obs_2 = mag_2+numpy.random.normal(size=len(mag_2))*mag_err_2
+        mag_obs_1 = mag_1+np.random.normal(size=len(mag_1))*mag_err_1
+        mag_obs_2 = mag_2+np.random.normal(size=len(mag_2))*mag_err_2
         #mag_obs_1 = mag_1
         #mag_obs_2 = mag_2
 
-        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        #select = np.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
         select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
 
         # Make sure objects lie within the original cmd (should also be done later...)
@@ -536,7 +535,7 @@ class Simulator(object):
 
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
         
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
                                                 mag_obs_2[select],mag_err_2[select], 
@@ -564,10 +563,10 @@ class Simulator(object):
         pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
@@ -589,10 +588,10 @@ class Simulator(object):
         accept = comp > 1 - np.random.uniform(size=len(mag_1))
 
         # Randomize magnitudes by their errors
-        mag_obs_1 = mag_1 + (numpy.random.normal(size=len(mag_1))*mag_err_1)
-        mag_obs_2 = mag_2 + (numpy.random.normal(size=len(mag_2))*mag_err_2)
+        mag_obs_1 = mag_1 + (np.random.normal(size=len(mag_1))*mag_err_1)
+        mag_obs_2 = mag_2 + (np.random.normal(size=len(mag_2))*mag_err_2)
 
-        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        #select = np.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
         select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)&accept
 
         ### # Make sure objects lie within the original cmd (should also be done later...)
@@ -601,7 +600,7 @@ class Simulator(object):
 
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
         
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
                                                 mag_obs_2[select],mag_err_2[select], 

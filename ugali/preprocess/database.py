@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-import numpy
-import numpy as np
-import sys
-import subprocess
+import os, sys
 import re
-import os
 import io
+import subprocess
+
+import numpy as np
 
 try:
     import http.client as httpcl
@@ -303,8 +302,8 @@ class SDSSDatabase(Database):
         import healpy
         import ugali.utils.projector
         if nside > 2**9: raise Exception("Overflow error: nside must be <=2**9")
-        pix = numpy.arange(healpy.nside2npix(nside),dtype='int')
-        footprint = numpy.zeros(healpy.nside2npix(nside),dtype='bool')
+        pix = np.arange(healpy.nside2npix(nside),dtype='int')
+        footprint = np.zeros(healpy.nside2npix(nside),dtype='bool')
         ra,dec = ugali.utils.projector.pixToAng(nside,pix)
         table_name = 'Pix%i'%nside
         self.upload(np.array([pix,ra,dec]).T, ['pix','ra','dec'], name=table_name)
