@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Module for wrapping Dartmouth isochrones.
+http://stellar.dartmouth.edu/models/isolf_new.php
+"""
 import os
 import sys
 import glob
