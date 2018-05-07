@@ -3,29 +3,38 @@ language: python
 python:
   - "2.7"
   - "3.6"
-#  - "nightly" # currently points to 3.6-dev
 
 sudo: false
 
 notifications:
   email: false
- 
-# Setup dependencies and install package
-# -c jochym is needed for pyfits
-install:
+
+before_install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  #- conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio corner -c conda-forge -c jochym -c kadrlica
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib astropy healpy pyyaml emcee nose fitsio corner -c conda-forge -c kadrlica
   - source activate travis-env
+ 
+# Setup dependencies and install package
+install:
   - export UGALIDIR="$HOME/.ugali"
   - python setup.py -q install --isochrones --catalogs
+
+before_script:
+  - export MPLBACKEND=Agg
+  - conda install ipython notebook;
+  - wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
+  - tar -xzf ugali-test-data.tar.gz
 
 # command to run tests
 script: 
   #- nosetests -v --nocapture
-  - nosetests -v
+  - if [[ $TRAVIS_PYTHON_VERSION < 3.0 ]]; then
+      nosetests -v;
+    else 
+      nosetests -v -I test_notebook.py;
+    fi

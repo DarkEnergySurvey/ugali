@@ -40,6 +40,8 @@ try:
     rc.initialize = False
 except ImportError:
     pass
+
+#ADW: Why did I need to get rid of this?
 #import multiprocessing
 
 import emcee
@@ -109,8 +111,8 @@ class MCMC(object):
  
         std = odict([
             ('richness',0.1*mle['richness']), # delta_r (10% of max)
-            ('lon',0.01),                     # delta_l (deg)
-            ('lat',0.01),                     # delta_b (deg)
+            ('lon',0.01),                     # delta_lon (deg)
+            ('lat',0.01),                     # delta_lat (deg)
             ('distance_modulus',0.1),         # delta_mu                
             ('extension',0.01),               # delta_ext (deg)
             ('ellipticity',0.1),              # delta_e 
@@ -187,7 +189,7 @@ class MCMC(object):
         logger.info(str(self.loglike))
  
         if params is not None: self.params = params
-        if len(params) == 0:
+        if len(self.params) == 0:
             raise Exception("No free parameters to fit.")
             
         params   = self.params
@@ -321,7 +323,12 @@ if __name__ == "__main__":
         source.load(opts.srcmdl,section=opts.name)
     if opts.coords:
         lon,lat,radius = opts.coords[0]
-        source.set_params(lon=lon,lat=lat)
+        if config['coords']['coordsys'].lower() == 'gal':
+            source.set_params(lon=lon,lat=lat)
+        else:
+            lon,lat = gal2cel(lon,lat)
+            source.set_params(lon=lon,lat=lat)
+
     if config['mcmc'].get('params'):
         params = config['mcmc'].get('params')
         source.set_free_params(params)

@@ -331,7 +331,6 @@ class DESDatabase(Database):
         import warnings
         warnings.warn("desdbi is deprecated", DeprecationWarning)
         import despydb.desdbi
-        import astropy.io.fits as pyfits
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
         # Preliminary and untested
@@ -378,8 +377,6 @@ class DESDatabase(Database):
         #return ret
 
     def download(self, pixel, outdir=None, force=False):
-        import pyfits 
-
         if outdir is None: outdir = './'
         else:              mkdir(outdir)
         sqldir = mkdir(os.path.join(outdir,'sql'))

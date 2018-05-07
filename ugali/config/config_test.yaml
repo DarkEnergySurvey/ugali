@@ -1,0 +1,195 @@
+### ### ### ### ### ### ### ### ### ### 
+### Options for building analysis   ### 
+### ### ### ### ### ### ### ### ### ### 
+
+# HEALPix nside choices
+# 2^4  -> 219. arcmin,  13.43 deg^2, 
+# 2^5  -> 109. arcmin,   3.36 deg^2,
+# 2^6  -> 55.0 arcmin,   0.84 deg^2, 3021 arcmin^2
+# 2^7  -> 27.5 arcmin,   0.21 deg^2,  755 arcmin^2
+# 2^8  -> 13.7 arcmin,  0.052 deg^2,  189 arcmin^2
+# 2^9  -> 6.87 arcmin,  0.013 deg^2, 47.2 arcmin^2
+# 2^10 -> 3.44 arcmin, 3.3e-3 deg^2, 11.8 arcmin^2
+# 2^11 -> 1.72 arcmin, 8.2e-4 deg^2, 2.95 arcmin^2
+# 2^12 -> 0.86 arcmin, 2.0e-4 deg^2, 0.74 arcmin^2
+# 2^13 -> 0.43 arcmin, 5.1e-5 deg^2, 0.18 arcmin^2
+  
+coords:
+  nside_catalog   : 8      # Size of patches for catalog binning
+  nside_mask      : 64     # Size of patches for mask creation
+  nside_likelihood: 256    # Size of target pixel
+  nside_pixel     : 4096   # Size of pixels within target region
+  roi_radius      : 2.0    # Outer radius of background annulus
+  roi_radius_annulus: 0.5  # Inner radius of background annulus
+  roi_radius_interior: 0.5 # Radius of interior region for likelihood analysis
+  coordsys : cel           # Coordinate system ['CEL','GAL']
+  proj_type: ait
+
+catalog:
+  dirname: ./healpix
+  basename: "catalog_hpx%04i.fits"
+  lon_field: RA
+  lat_field: DEC
+  # Color always defined as mag_1 - mag_2
+  objid_field       : COADD_OBJECT_ID
+  mag_1_band        : &band1 g
+  mag_1_field       : WAVG_MAG_PSF_G
+  mag_err_1_field   : WAVG_MAGERR_PSF_G
+  mag_2_band        : &band2 r
+  mag_2_field       : WAVG_MAG_PSF_R
+  mag_err_2_field   : WAVG_MAGERR_PSF_R
+  # True = band 1 is detection band; False = band 2 is detection band     
+  band_1_detection  : &detection True
+  mc_source_id_field: MC_SOURCE_ID
+  selection         : "(np.abs(self.data['WAVG_SPREAD_MODEL_I']) < 0.003)"
+  #selection         : null
+
+data: 
+  dirname: ./raw
+  script : ./ugali/preprocess/database.py
+  survey : des
+  release: y3a2
+  density: ./density/density_hpx%04i.fits
+  footprint: null 
+
+mask:
+  dirname    : ./mask
+  basename_1 : "maglim_g_hpx%04i.fits"
+  basename_2 : "maglim_r_hpx%04i.fits"
+  minimum_solid_angle: 0.1 # deg^2
+
+mangle:
+  dirname    : ./maps
+  filename_1 : 'y3a2_g_o.4096_t.32768_maglim_EQU.fits.gz'
+  filename_2 : 'y3a2_r_o.4096_t.32768_maglim_EQU.fits.gz'
+
+#ADW: Depricated in favor of 'binning'
+color:
+  min   : &cmin -0.5
+  max   : &cmax 1.0 # 1.0
+  n_bins: &cbins 12  # 15
+ 
+mag:
+  min   : &mmin  16    # 18
+  max   : &mmax  24.0  # 25
+  n_bins: &mbins 100 # 0.1, 0.02
+
+# DEPRECATED?: ADW 2017-09-22
+binning: 
+  ###type: [min, max, nbins]
+  color  : [ *cmin, *cmax, *cbins]
+  mag    : [ *mmin, *mmax, *mbins] 
+  age    : [     1,  13.5, 125] # Age (Gyr)   [max a=13.5]
+  z      : [0.0001,  0.01,  32] # Metallicity [max z=0.07]
+ 
+# Default kernel specification
+kernel: &kernel
+  name: RadialPlummer
+  r_h: 0.03
+  proj: 'ait'
+
+# Default isochrone specifications
+isochrone: &isochrone
+   name: Bressan2012
+   age: 12.0
+   z: 0.0001
+   distance_modulus : 17.0
+   band_1 : *band1
+   band_2 : *band2
+   band_1_detection : *detection
+  
+likelihood:
+  #delta_mag: 0.01 # 1.e-3 
+  delta_mag: 0.01 # 1.e-3 
+
+### ### ### ### ### ### ### ### ### ### 
+### Options for analysis components ###
+### ### ### ### ### ### ### ### ### ### 
+
+output:
+  likedir    : ./scan
+  searchdir  : ./search
+  mcmcdir    : ./mcmc
+  simdir     : ./sims
+  resultdir  : ./results
+  plotdir    : ./plots
+  likefile   : "scan_%08i_%s.fits"
+  mergefile  :  merged_scan.fits
+  roifile    :  merged_roi.fits
+  labelfile  :  merged_labels.fits
+  objectfile :  ugali_objects.fits
+  assocfile  :  ugali_assocs.fits
+  candfile   :  ugali_candidates.fits
+  mcmcfile   : "%s_mcmc.npy"
+  simfile    : "sims_%04i.fits"
+
+# Default batch queue options
+# https://confluence.slac.stanford.edu/x/moNdCw
+batch: &batch
+  #ADW: Depricated?
+  cluster: slac
+  #cluster: local
+  #ADW: Depricated?
+  jobname: ugali
+  # Nothing special for local
+  local: {}
+  # This works on the kipac-ibq (now deprecated)
+  kipac-ibq : &kipac-ibq {"W":"8:00", "R":"rusage[mem=16G]","M":"16G"}
+  # This works to get 4GB on the general queues
+  medium    : &medium {"W":"4:00", "n":4, "R":"span[hosts=1]"}
+  # This works for mpi jobs
+  #bulletmpi : &bulletmpi {"W":"8:00","n":8,}
+  # ADW: should become deprecated or changed to 'default'...
+  opts      : *medium  # needs to be medium now
+  max_jobs  : 300
+  chunk     : 25
+  
+scan:
+  script : ./ugali/analysis/scan.py
+  distance_modulus_array: [17.5]
+  full_pdf: False
+  color_lut_infile: null
+  source:
+    kernel:    *kernel
+    isochrone: *isochrone
+  
+search:
+  obj_threshold  : 10  # TS threshold for object selection
+  cand_threshold : 45 # TS threshold for object selection
+  xsize    : 1.0e+4
+  minpix   : 1
+  catalogs: [ [McConnachie12, ExtraDwarfs],                           # ASSOC1
+              [Rykoff14, Harris96, Corwen04, Nilson73,                # ASSOC2
+              Webbink85, Kharchenko13, WEBDA14, ExtraClusters]
+              ]
+  proximity: 0.1 # deg
+  
+mcmc:
+  script  : ./ugali/analysis/mcmc.py
+  params  : ['richness','lon','lat','extension','position_angle']
+  srcmdl  : 'srcmdl.yaml'
+  nsamples: 100
+  nwalkers: 20
+  nthreads: 4
+  nburn   : 10
+  nchunk  : 10
+
+results:
+  martin  : 100
+  nburn   : 10
+  alpha   : 0.10
+
+simulate:
+  script : ./ugali/simulation/simulator.py
+  njobs  : 200
+  size   : 10000
+  save   : 1
+  isochrone : null # default to using 'isochrone'
+  kernel  : null
+  params: 
+    lon              : 266.3065
+    lat              : -49.7437
+    stellar_mass     : [5500,5500,'log']
+    distance_modulus : [17.5,17.5,'linear']
+    extension        : [0.1,0.1,'linear']
+    ellipticity      : [0.0,0.0,'linear']

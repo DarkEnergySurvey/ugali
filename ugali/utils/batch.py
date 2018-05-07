@@ -26,26 +26,38 @@ QUEUES = odict([
     ('condor',['local','vanilla','universe','grid']),
 ])
 
+# https://confluence.slac.stanford.edu/x/OaUlCw
 RUNLIMITS = odict([              #Hard limits
         (None       ,'4:00'),    # Default value
-        ('express'  ,'0:01'),    # 0:01
-        ('short'    ,'0:30'),    # 0:30
-        ('medium'   ,'1:00'),    # 4:00
-        ('long'     ,'4:00'),    # 32:00
+        ('express'  ,'0:04'),    # 0:04
+        ('short'    ,'0:30'),    # 1:00
+        ('medium'   ,'1:00'),    # 48:00
+        ('long'     ,'4:00'),    # 120:00
         ('xlong'    ,'72:00'),   # 72:00
         ('xxl'      ,'168:00'),
-        ('kipac-ibq','24:00'),   # MPI queues
-        ('bulletmpi','72:00'),
+        # MPI queues
+        ('kipac-ibq','36:00'),   # 24:00 (deprecated)
+        ('bulletmpi','36:00'),   # 72:00
         ])
 
+# SLAC updated how memory was handled on the batch system  
+# General queues now only have 4GB of RAM per CPU
+# To get more memory for a general job, you need to request more cores:
+# i.e., '-n 2 -R "span[hosts=1]"' for 8GB of RAM
+# https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
+
+# These are options for MPI jobs
 MPIOPTS = odict([
         (None       ,' -R "span[ptile=4]"'),
         ('local'    ,''),
+        ('short'    ,''),
+        ('medium'   ,''),
         ('kipac-ibq',' -R "span[ptile=8]"'),
         ('bulletmpi',' -R "span[ptile=16]"'),
         ])
 
 def factory(queue,**kwargs):
+    # The default for the factory
     if queue is None: queue = 'local'
 
     name = queue.lower()
@@ -68,6 +80,7 @@ def factory(queue,**kwargs):
     return batch
 
 batchFactory = factory
+batch_factory = factory
 
 class Batch(object):
     # Default options for batch submission
@@ -128,6 +141,9 @@ class Local(Batch):
         if opts.get('logfile'): return ' 2>&1 | tee %(logfile)s'%opts
         return ''
 
+    def njobs(self):
+        return 0
+
 class LSF(Batch):
     _defaults = odict([
         ('R','"scratch > 1 && rhel60"'),
@@ -171,7 +187,7 @@ class LSF(Batch):
         # User specified options
         options.update(opts)
         if 'n' in list(options.keys()): 
-            options['a'] = 'mpirun'
+            #options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())

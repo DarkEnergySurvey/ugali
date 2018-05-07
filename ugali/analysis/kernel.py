@@ -400,17 +400,22 @@ class RadialKernel(EllipticalKernel):
     Radial kernel subclass fixing ellipticity and 
     position angle to zero.
     """
-    _fixed_params = ['ellipticity','position_angle']
+    _frozen_params = ['ellipticity','position_angle']
 
     def __init__(self,**kwargs):
         # This is a bit messy because the defaults are set
         # at the instance level not at the class level
         self._params = copy.deepcopy(self._params)
-        self._params['ellipticity'].set(0, [0, 0])
-        self._params['position_angle'].set(0, [0, 0])
+
+        def frozen(x): 
+            if x: raise Exception("Parameter is frozen")
+                
+        self._params['ellipticity'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
+        self._params['position_angle'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
         #logger.warning("Setting bounds on extension")
         #self._params['extension'].set(0.1, [1e-4, 0.1])
-
         super(RadialKernel,self).__init__(**kwargs)
         
     def pdf(self, lon, lat):

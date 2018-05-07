@@ -48,12 +48,15 @@ class Catalog:
     def __len__(self):
         return len(self.objid)
 
+    def __eq__(self, other):
+        return bool((self.data == other.data).all())
+        
     def applyCut(self, cut):
         """
         Return a new catalog which is a subset of objects selected
         using the input cut array.
 
-        NOTE: This should really be a selection.
+        NOTE: This is really a *selection* (i.e., objects are retained if the value of 'cut' is True)
         """
         return Catalog(self.config, data=self.data[cut])
 
@@ -75,6 +78,8 @@ class Catalog:
         """
         Project coordinates on sphere to image plane using Projector class.
         """
+        msg = "'%s.project': ADW 2018-05-05"%self.__class__.__name__
+        DeprecationWarning(msg)
         if projector is None:
             try:
                 self.projector = ugali.utils.projector.Projector(self.config['coords']['reference'][0],
@@ -162,12 +167,12 @@ class Catalog:
             selection = self.config['catalog'].get('selection')
 
         if not selection: 
-            pass
+            return
         elif 'self.data' not in selection:
             msg = "Selection does not contain 'data'"
             raise Exception(msg)
         else:
-            logger.warning('Evaluating selection: \n"%s"'%selection)
+            logger.info('Evaluating selection: \n"%s"'%selection)
             sel = eval(selection)
             self.data = self.data[sel]
         
@@ -182,7 +187,7 @@ class Catalog:
         mc_source_id_field = self.config['catalog']['mc_source_id_field']
         if mc_source_id_field is not None:
             if mc_source_id_field not in self.data.dtype.names:
-                array = np.zeros(len(self.data),dtype=int)
+                array = np.zeros(len(self.data),dtype='>i8') # FITS byte-order convention
                 self.data = mlab.rec_append_fields(self.data,
                                                    names=mc_source_id_field,
                                                    arrs=array)
@@ -195,6 +200,9 @@ class Catalog:
     def lon(self): return self.data[self.config['catalog']['lon_field']]
     @property 
     def lat(self): return self.data[self.config['catalog']['lat_field']]
+    @property
+    def coordsys(self): 
+        return self.config['coords']['coordsys'].lower()
 
     @property
     def mag_1(self): return self.data[self.config['catalog']['mag_1_field']]
@@ -221,22 +229,26 @@ class Catalog:
     def color_err(self): return np.sqrt(self.mag_err_1**2 + self.mag_err_2**2)
     @property
     def mc_source_id(self):
-        return self.data.field(self.config['catalog']['mc_source_id_field'])
+        return self.data[self.config['catalog']['mc_source_id_field']]
 
     # This assumes Galactic coordinates
     @property
-    def ra_dec(self): return gal2cel(self.lon,self.lat)
+    def ra_dec(self): 
+        if self.coordsys == 'cel': return self.lon, self.lat
+        else:                      return gal2cel(self.lon,self.lat)
     @property
     def ra(self): return self.ra_dec[0]
     @property
     def dec(self): return self.ra_dec[1]
 
     @property
-    def glon_glat(self): return self.lon,self.lat
+    def glon_glat(self): 
+        if self.coordsys == 'gal': return self.lon,self.lat
+        else:                      return cel2gal(self.lon,self.lat)
     @property
-    def glon(self): return self.lon
+    def glon(self): return self.glon_glat[0]
     @property
-    def glat(self): return self.lat
+    def glat(self): return self.glon_glat[1]
 
 ############################################################
 
@@ -252,11 +264,11 @@ def mergeCatalogs(catalog_list):
     --------
     catalog      : Combined Catalog object 
     """
-    config = catalog_list[0]
     # Check the columns
     for c in catalog_list:
         if c.data.dtype.names != catalog_list[0].data.dtype.names:
             msg = "Catalog data columns not the same."
             raise Exception(msg)
     data = np.concatenate([c.data for c in catalog_list])
+    config = catalog_list[0].config
     return Catalog(config,data=data)

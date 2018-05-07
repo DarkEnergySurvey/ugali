@@ -74,8 +74,6 @@ def do_plot(args):
     import pylab as plt
 
     config,name,label,coord = args
-    print(args)
-
     filenames = make_filenames(config,label)
     srcfile = filenames['srcfile']
     samfile = filenames['samfile']
@@ -102,7 +100,7 @@ def do_plot(args):
 
     plotter = ugali.utils.plotting.SourcePlotter(source,config,radius=0.5)
 
-    data = fitsio.read(memfile) if exists(memfile) else None
+    data = fitsio.read(memfile,trim_strings=True) if exists(memfile) else None
     if data is not None:
         plt.figure()
         kernel,isochrone = source.kernel,source.isochrone
@@ -111,7 +109,7 @@ def do_plot(args):
         logger.info("  Writing %s..."%outfile)
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
         plt.close()
-
+            
         plotter.plot6(data)
 
         outfile = samfile.replace('.npy','_6panel.png')
@@ -125,9 +123,11 @@ def do_plot(args):
         plt.close()
 
     try:
+        title = name
         plotter.plot4()
         outfile = samfile.replace('.npy','_4panel.png')
         logger.info("  Writing %s..."%outfile)
+        plt.suptitle(title)
         plt.savefig(outfile,bbox_inches='tight',dpi=60)
         plt.close()
     except:
@@ -172,7 +172,7 @@ def run(self):
                 cmd='%s %s --name %s --gal %.4f %.4f --grid %s'% (
                     script,self.opts.config,name,glon,glat,outfile)
             logger.info(cmd)
-            self.batch.submit(cmd,jobname,logfile,n=nthreads)
+            self.batch.submit(cmd,jobname,logfile,n=nthreads,a='mpirun')
 
     if 'results' in self.opts.run:
         logger.info("Running 'results'...")
@@ -192,7 +192,7 @@ def run(self):
 
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
-        if len(args) > 0:
+        if len(args) > 1:
             pool = Pool(maxtasksperchild=1)
             pool.map(do_plot,args)
             #map(do_plot,args)
