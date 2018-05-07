@@ -1134,6 +1134,11 @@ class Isochrone(IsochroneModel):
         Check valid parameter range and download isochrones from:
         http://stev.oapd.inaf.it/cgi-bin/cmd
         """
+        try:
+            from urllib.error import URLError
+        except ImportError:
+            from urllib2 import URLError
+
         if age is None: age = float(self.age)
         if metallicity is None: metallicity = float(self.metallicity)
 
@@ -1149,17 +1154,12 @@ class Isochrone(IsochroneModel):
             except Exception as e:
                 msg = "Overwriting corrupted %s..."%(outfile)
                 logger.warn(msg)
-                #os.remove(outfile)
+                os.remove(outfile)
                 
         mkdir(outdir)
 
         self.print_info(age,metallicity)
-
-        try:
-            self.query_server(outfile,age,metallicity)
-        except Exception as e:
-            logger.debug(str(e))
-            raise RuntimeError('Bad server response')
+        self.query_server(outfile,age,metallicity)
 
         if not os.path.exists(outfile):
             raise RuntimeError('Download failed')
@@ -1170,6 +1170,7 @@ class Isochrone(IsochroneModel):
             msg = "Output file is corrupted."
             logger.error(msg)
             msg = "Removing %s."%outfile
+            logger.info(msg)
             os.remove(outfile)
             raise(e)
 

@@ -7,6 +7,8 @@ import os
 import numpy as np
 
 from ugali import isochrone
+from ugali.utils.logger import logger
+logger.setLevel(logger.WARN)
 
 # Default parameters
 default_kwargs = dict(age=12,metallicity=0.0002, distance_modulus=18)
@@ -115,11 +117,34 @@ def test_pdf():
 
 def test_simulate():
     """ 
-    Test that the isochrone can simulate.
+    Test isochrone simulation.
     """    
     iso = isochrone.Bressan2012(**default_kwargs)
     stellar_mass = 5.0e3
-    iso.simulate(stellar_mass)
+
+    np.random.seed(0)
+    mag_1, mag_2 = iso.simulate(stellar_mass)
+    np.testing.assert_equal(len(mag_1), 21105)
+    np.testing.assert_allclose(mag_1[:3], [28.606918, 27.670816, 28.302291])
+    np.testing.assert_allclose(mag_2[:3], [27.539174, 26.717612, 27.271779])
+
+def test_download():
+    """
+    Test isochrone download.
+    """
+    try:
+        from urllib.error import URLError
+    except ImportError:
+        from urllib2 import URLError
+
+    for name in dotter[1:]: #padova[1:]+dotter[1:]:
+        iso = isochrone.factory(name,**default_kwargs)
+        try:
+            iso.download(outdir='./tmp/'+name.lower(),force=True)
+        except URLError as e:
+            print("Server is down")
+            print(e)
+        
     
 if __name__ == "__main__":
     import argparse
