@@ -16,9 +16,9 @@ pylab.ion()
 ############################################################
 
 def satellitePopulation(mask, nside_pix, n,
-                        range_distance=[10., 600.],
+                        range_distance=[5., 500.],
                         range_stellar_mass=[1.e1, 1.e6],
-                        range_r_physical=[5.e-3, 1.],
+                        range_r_physical=[1.e-3, 2.],
                         plot=False):
     """
     Create a population of n randomly placed satellites within a survey mask.
