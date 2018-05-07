@@ -4,6 +4,7 @@ Currently this is more set up as a standalone script.
 
 import os
 import collections
+import yaml
 import numpy as np
 import scipy.interpolate
 import healpy
@@ -23,9 +24,10 @@ pylab.ion()
 
 ############################################################
 
-def getCompleteness():
+def getCompleteness(config):
     # This is an easy place to make an error - make sure to get the right version
-    infile = 'y3a2_stellar_classification_summary_ext2.csv'
+    #infile = 'y3a2_stellar_classification_summary_ext2.csv'
+    infile = config['completeness']
     d = np.recfromcsv(infile)
 
     x = d['mag_r']
@@ -40,8 +42,9 @@ def getCompleteness():
 
 ############################################################
 
-def getPhotoError():
-    infile = 'photo_error_model.csv'
+def getPhotoError(config):
+    #infile = 'photo_error_model.csv'
+    infile = config['photo_error']
     d = np.recfromcsv(infile)
 
     x = d['mag']
@@ -96,7 +99,7 @@ def meanFracdet(map_fracdet, lon_population, lat_population, radius_population):
 
 ############################################################
 
-def catsimSatellite(lon_centroid, lat_centroid, distance, stellar_mass, r_physical, 
+def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, r_physical, 
                     m_maglim_1, m_maglim_2, m_ebv,
                     plot=False, title='test'):
     """
@@ -105,8 +108,8 @@ def catsimSatellite(lon_centroid, lat_centroid, distance, stellar_mass, r_physic
     """
 
     # Probably don't want to parse every time
-    completeness = getCompleteness()
-    log_photo_error = getPhotoError()
+    completeness = getCompleteness(config)
+    log_photo_error = getPhotoError(config)
 
     s = ugali.analysis.source.Source()
 
@@ -120,11 +123,11 @@ def catsimSatellite(lon_centroid, lat_centroid, distance, stellar_mass, r_physic
     position_angle = np.random.uniform(0., 180.) # Random position angle (deg)
     a_h = r_h / np.sqrt(1. - ellipticity) # semi-major axis (deg)
     
-    flag_too_big = False
+    flag_too_extended = False
     if a_h >= 0.5:
         print 'Too big!'
         a_h = 0.5
-        flag_too_big = True
+        flag_too_extended = True
         
     # Elliptical kernels take the "extension" as the semi-major axis
     ker = ugali.analysis.kernel.EllipticalPlummer(lon=lon_centroid, lat=lat_centroid, extension=a_h, ellipticity=ellipticity, position_angle=position_angle)
@@ -209,15 +212,15 @@ def catsimSatellite(lon_centroid, lat_centroid, distance, stellar_mass, r_physic
         print 'n_Sigma_p = %i'%(n_sigma_p)
         raw_input('WAIT')
         
-    if flag_too_big:
-        # This is a kludge to remove these satellites. fragile!!
-        n_g24 = 1.e6
+    #if flag_too_extended:
+    #    # This is a kludge to remove these satellites. fragile!!
+    #    n_g24 = 1.e6
 
-    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z
+    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
 
 ############################################################
 
-def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
+def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population.yaml'):
     """
     n = Number of satellites to simulation
     n_chunk = Number of satellites in a file chunk
@@ -227,18 +230,25 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     assert n % n_chunk == 0, "Total number of satellites must be divisible by the chunk size"
     nside_pix = 256 # NSIDE = 128 -> 27.5 arcmin, NSIDE = 256 -> 13.7 arcmin 
     
-    infile_fracdet = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz'
+    config = yaml.load(open(config_file))
+
+    infile_fracdet = config['fracdet']
+    #infile_fracdet = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz'
     #infile_badregions = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_badregions_mask_v1.0.fits.gz'
-    infile_foreground = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_foreground_mask_v2.0.fits.gz'
+    #infile_foreground = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_foreground_mask_v2.0.fits.gz'
 
-    infile_maglim_g = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz'
-    infile_maglim_r = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz'
+    infile_maglim_g = config['maglim_g']
+    infile_maglim_r = config['maglim_r']
+    #infile_maglim_g = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz'
+    #infile_maglim_r = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz'
 
-    infile_density = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy'
+    infile_density = config['stellar_density']
+    #infile_density = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy'
     m_density = np.load(infile_density)
     nside_density = healpy.npix2nside(len(m_density))
 
-    infile_ebv = '/Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz' 
+    infile_ebv = config['ebv']
+    #infile_ebv = '/Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz' 
     
     m_fracdet = healpy.read_map(infile_fracdet, nest=False)
     nside_fracdet = healpy.npix2nside(len(m_fracdet))
@@ -254,15 +264,16 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
 
     # r_physical is azimuthally-averaged half-light radius, kpc
     simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n)
-    n_g24_population = np.empty(n)
-    abs_mag_population = np.empty(n)
-    surface_brightness_population = np.empty(n)
-    ellipticity_population = np.empty(n)
-    position_angle_population = np.empty(n)
-    age_population = np.empty(n)
-    metal_z_population = np.empty(n)
+    n_g24_population = np.tile(np.nan, n)
+    abs_mag_population = np.tile(np.nan, n)
+    surface_brightness_population = np.tile(np.nan, n)
+    ellipticity_population = np.tile(np.nan, n)
+    position_angle_population = np.tile(np.nan, n)
+    age_population = np.tile(np.nan, n)
+    metal_z_population = np.tile(np.nan, n)
     mc_source_id_population = np.arange(mc_source_id_start, mc_source_id_start + n)
-    cut_difficulty_population = np.tile(False, n)
+    #cut_difficulty_population = np.tile(False, n)
+    difficulty_population = np.tile(0, n)
 
     lon_array = []
     lat_array = []
@@ -273,14 +284,15 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(mc_source_id_population):
         print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
-        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z = catsimSatellite(lon_population[ii], 
-                                                                                                                                                          lat_population[ii], 
-                                                                                                                                                          distance_population[ii], 
-                                                                                                                                                          stellar_mass_population[ii], 
-                                                                                                                                                          r_physical_population[ii],
-                                                                                                                                                          m_maglim_g,
-                                                                                                                                                          m_maglim_r,
-                                                                                                                                                          m_ebv)
+        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
+                                                                                                                                                                             lon_population[ii], 
+                                                                                                                                                                             lat_population[ii], 
+                                                                                                                                                                             distance_population[ii], 
+                                                                                                                                                                             stellar_mass_population[ii], 
+                                                                                                                                                                             r_physical_population[ii],
+                                                                                                                                                                             m_maglim_g,
+                                                                                                                                                                             m_maglim_r,
+                                                                                                                                                                             m_ebv)
         print '  ', len(lon)
         
         n_g24_population[ii] = n_g24
@@ -296,9 +308,15 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
                    | ((surface_brightness_population[ii] < 30.) & (n_g24_population[ii] > 1.e4)) \
                    | (n_g24_population[ii] > 1.e5)
         cut_hard = (surface_brightness_population[ii] > 35.) | (n_g24_population[ii] < 1.)
-        cut_difficulty_population[ii] = ~cut_easy & ~cut_hard
+        #cut_difficulty_population[ii] = ~cut_easy & ~cut_hard
+        if cut_easy:
+            difficulty_population[ii] += 1 # TOO EASY
+        if cut_hard:
+            difficulty_population[ii] += 2 # TOO HARD
+        if flag_too_extended:
+            difficulty_population[ii] += 3 # TOO EXTENDED
 
-        if cut_difficulty_population[ii]:
+        if difficulty_population[ii] == 0:
             lon_array.append(lon)
             lat_array.append(lat)
             mag_1_array.append(mag_1)
@@ -333,14 +351,6 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     mc_source_id_array = mc_source_id_array[cut_fracdet]
 
     # Cut out the entries that are easily detectable
-    
-    print "Difficulty masking..."
-    """
-    cut_easy = ((surface_brightness_population < 25.) & (n_g24_population > 100.)) \
-               | ((surface_brightness_population < 30.) & (n_g24_population > 1.e4)) \
-               | (n_g24_population > 1.e5)
-    cut_hard = (surface_brightness_population > 35.) | (n_g24_population < 1.)
-    cut_difficulty = ~cut_easy & ~cut_hard
     """
     lon_population = lon_population[cut_difficulty_population]
     lat_population = lat_population[cut_difficulty_population]
@@ -355,20 +365,10 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     age_population = age_population[cut_difficulty_population]
     metal_z_population = metal_z_population[cut_difficulty_population]
     mc_source_id_population = mc_source_id_population[cut_difficulty_population]
-
     """
-    cut_difficulty = np.in1d(mc_source_id_array, mc_source_id_population)
-    lon_array = lon_array[cut_difficulty]
-    lat_array = lat_array[cut_difficulty]
-    mag_1_array = mag_1_array[cut_difficulty]
-    mag_2_array = mag_2_array[cut_difficulty]
-    mag_1_error_array = mag_1_error_array[cut_difficulty]
-    mag_2_error_array = mag_2_error_array[cut_difficulty]
-    mc_source_id_array = mc_source_id_array[cut_difficulty]
-    """
-
+    
     # Create bonus columns
-
+    
     print "Creating bonus columns..."
     distance_modulus_population = ugali.utils.projector.distanceToDistanceModulus(distance_population)
     hpix_32_population = ugali.utils.healpix.angToPix(32, lon_population, lat_population) # Make sure this matches the dataset
@@ -388,12 +388,15 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     nside_maglim = healpy.npix2nside(len(m_maglim_g))
     pix_population = ugali.utils.healpix.angToPix(nside_maglim, lon_population, lat_population)
     maglim_g_population = m_maglim_g[pix_population]
-    maglim_r_population = m_maglim_g[pix_population]
+    maglim_r_population = m_maglim_r[pix_population]
     
     # E(B-V)
     nside_ebv = healpy.npix2nside(len(m_ebv))
     pix_population = ugali.utils.healpix.angToPix(nside_ebv, lon_population, lat_population)
     ebv_population = m_ebv[pix_population]
+
+    # Number of surviving catalog stars
+    n_catalog_population = np.histogram(mc_source_id_array, bins=np.arange(mc_source_id_population[0] - 0.5, mc_source_id_population[-1] + 0.51))[0]
 
     # Faked-up coadd_object_ids
     coadd_object_id_array = []
@@ -483,7 +486,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
         print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
         cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
-        outfile = 'sim_catalog_%s_mc_source_id_%06i-%06i.fits'%(tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
+        outfile = 'sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
         header = tbhdu.header
         pyfits.writeto(outfile, tbhdu.data[cut_chunk], header, clobber=True)
 
@@ -498,6 +501,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100):
         pyfits.Column(name='STELLAR_MASS', format='E', array=stellar_mass_population, unit='m_solar'),
         pyfits.Column(name='R_PHYSICAL', format='E', array=r_physical_population, unit='kpc'),
         pyfits.Column(name='N_G24', format='J', array=n_g24_population, unit=''),
+        pyfits.Column(name='N_CATALOG', format='J', array=n_catalog_population, unit=''),
+        pyfits.Column(name='DIFFICULTY', format='J', array=difficulty_population, unit=''),
         pyfits.Column(name='ABS_MAG', format='E', array=abs_mag_population, unit='mag'),
         pyfits.Column(name='SURFACE_BRIGHTNESS', format='E', array=surface_brightness_population, unit='mag arcsec^-2'),
         pyfits.Column(name='ELLIPTICITY', format='E', array=ellipticity_population, unit=''),
