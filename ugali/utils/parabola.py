@@ -118,28 +118,9 @@ class Parabola:
         if b**2 - 4. * a * c < 0.:
             print('WARNING')
             print(a, b, c)
-            
-            #pylab.figure()
-            #pylab.scatter(self.x, self.y)
-            #raw_input('WAIT')
             return 0.
-
-        
             
         return max((np.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * np.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
-
-    #def bayesianUpperLimit3(self, alpha, steps = 1.e5):
-    #    """
-    #    Compute one-sided upper limit using Bayesian Method of Helene.
-    #    """
-    #    # Need a check to see whether limit is reliable
-    #    pdf = scipy.interpolate.interp1d(self.x, np.exp(self.y / 2.)) # Convert from 2 * log(likelihood) to likelihood
-    #    x_pdf = np.linspace(self.x[0], self.x[-1], steps)
-    #    cdf = np.cumsum(pdf(x_pdf))
-    #    cdf /= cdf[-1]
-    #    cdf_reflect = scipy.interpolate.interp1d(cdf, x_pdf)
-    #    return cdf_reflect(alpha)
-    #    #return self.x[np.argmin((cdf - alpha)**2)]
 
     def bayesianUpperLimit(self, alpha, steps=1.e5, plot=False):
         """
@@ -164,17 +145,6 @@ class Parabola:
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
-        #if plot:            
-        #    pylab.figure()
-        #    pylab.plot(x, f(x))
-        #    pylab.scatter(self.x, self.y, c='red')
-        #    
-        #    pylab.figure()
-        #    pylab.plot(x, pdf)
-        #    
-        #    pylab.figure()
-        #    pylab.plot(cdf, x)
-        
         return cdf_reflect(alpha)
 
     def bayesianUpperLimit2(self, alpha, steps=1.e5, plot=False):
@@ -198,36 +168,8 @@ class Parabola:
         cdf /= cdf[-1]
         cdf_reflect = scipy.interpolate.interp1d(cdf, x)
 
-        #if plot:
-        #    pylab.figure()
-        #    pylab.scatter(self.x, self.y)
-        # 
-        #    pylab.figure()
-        #    pylab.plot(x, f(x))
-        #    
-        #    pylab.figure()
-        #    pylab.plot(x, y)
-        #    
-        #    pylab.figure()
-        #    pylab.plot(cdf, x)
-        
         return cdf_reflect(alpha)
 
-        """
-        if np.isnan(result):
-            import pylab
-
-            for ii in range(0, len(self.x)):
-                print('%.3f %.3f'%(self.x[ii], self.y[ii]))
-            
-            pylab.figure()
-            pylab.scatter(self.x, self.y)
-            pylab.figure()
-            pylab.scatter(cdf, x)
-            raw_input('WAIT')
-        
-        return result
-        """
 
     def confidenceInterval(self, alpha=0.6827, steps=1.e5, plot=False):
         """
@@ -250,19 +192,6 @@ class Parabola:
         cdf /= cdf[-1]
         sorted_pdf_index_max = np.argmin((cdf - alpha)**2)
         x_select = x[sorted_pdf_indices[0: sorted_pdf_index_max]]
-
-        #if plot:
-        #    cdf = np.cumsum(pdf)
-        #    cdf /= cdf[-1]
-        #    print( cdf[np.max(sorted_pdf_indices[0: sorted_pdf_index_max])] \
-        #          - cdf[np.min(sorted_pdf_indices[0: sorted_pdf_index_max])] )
-        #    
-        #    pylab.figure()
-        #    pylab.plot(x, f(x))
-        #    pylab.scatter(self.x, self.y, c='red')
-        #    
-        #    pylab.figure()
-        #    pylab.plot(x, pdf)
             
         return np.min(x_select), np.max(x_select) 
 
