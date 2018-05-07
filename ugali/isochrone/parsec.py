@@ -11,10 +11,10 @@ from collections import OrderedDict as odict
 try:
     from urllib.parse import urlencode
     from urllib.request import urlopen
+    from urllib.error import URLError
 except ImportError:
     from urllib import urlencode
-    from urllib2 import urlopen
-
+    from urllib2 import urlopen, URLError
 
 import subprocess
 import re
@@ -97,6 +97,7 @@ defaults_30 = dict(defaults_cmd,cmd_version='3.0')
 class ParsecIsochrone(Isochrone):
     """ Base class for PARSEC-style isochrones. """
 
+    download_url = "http://stev.oapd.inaf.it"
     download_defaults = copy.deepcopy(defaults_27)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
@@ -134,8 +135,18 @@ class ParsecIsochrone(Isochrone):
         return (1 - Y_p)/( (1 + c) + X_solar/Z_solar * 10**(-feh))
 
     def query_server(self,outfile,age,metallicity):
-        """ Server query for the isochrone file. """
+        """ Server query for the isochrone file.
 
+        Parameters:
+        -----------
+        outfile     : name of output isochrone file
+        age         : isochrone age
+        metallicity : isochrone metallicity
+        
+        Returns:
+        --------
+        outfile     : name of output isochrone file
+        """
         params = copy.deepcopy(self.download_defaults)
 
         epsilon = 1e-4
@@ -154,9 +165,11 @@ class ParsecIsochrone(Isochrone):
         params['isoc_age']     = age * 1e9
         params['isoc_zeta']    = metallicity
 
-        server = 'http://stev.oapd.inaf.it'
+        server = self.download_url
         url = server + '/cgi-bin/cmd_%s'%params['cmd_version']
         logger.debug("Accessing %s..."%url)
+        # First check that the server is alive
+        urlopen(server)
 
         q = urlencode(params)
         logger.debug(url+'?'+q)
@@ -171,7 +184,7 @@ class ParsecIsochrone(Isochrone):
         #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
         out = '{0}/tmp/{1}.dat'.format(server, fname[0])
         
-        cmd = 'wget %s -O %s'%(out,outfile)
+        cmd = 'wget --progress dot:binary %s -O %s'%(out,outfile)
         logger.debug(cmd)
         stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)
         logger.debug(stdout)
