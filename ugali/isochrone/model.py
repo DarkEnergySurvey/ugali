@@ -1169,9 +1169,6 @@ class Isochrone(IsochroneModel):
         except Exception as e:
             msg = "Output file is corrupted."
             logger.error(msg)
-<<<<<<< Updated upstream
-            msg = "Removing %s."%outfile
-            os.remove(outfile)
             msg = "Removing %s."%outfile
             logger.info(msg)
             os.remove(outfile)

@@ -167,9 +167,9 @@ class ParsecIsochrone(Isochrone):
 
         server = self.download_url
         url = server + '/cgi-bin/cmd_%s'%params['cmd_version']
-        logger.debug("Accessing %s..."%url)
         # First check that the server is alive
-        urlopen(server)
+        logger.debug("Accessing %s..."%url)
+        urlopen(url,timeout=2)
 
         q = urlencode(params)
         logger.debug(url+'?'+q)
@@ -181,7 +181,6 @@ class ParsecIsochrone(Isochrone):
             msg = "Output filename not found"
             raise RuntimeError(msg)
 
-        #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
         out = '{0}/tmp/{1}.dat'.format(server, fname[0])
         
         cmd = 'wget --progress dot:binary %s -O %s'%(out,outfile)

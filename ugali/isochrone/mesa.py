@@ -183,7 +183,10 @@ class Dotter2016(Isochrone):
 
         server = self.download_url
         url = server + '/iso_form.php'
+        # First check that the server is alive
         logger.debug("Accessing %s..."%url)
+        urlopen(url,timeout=2)
+
         #response = requests.post(url,data=params)
         q = urlencode(params)
         request = Request(url,data=q)
