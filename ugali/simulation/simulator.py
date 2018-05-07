@@ -10,7 +10,7 @@ import numpy as np
 import scipy.interpolate
 import astropy.io.fits as pyfits
 import healpy as hp
-import np.lib.recfunctions as recfuncs
+import numpy.lib.recfunctions as recfuncs
 import fitsio
 
 import ugali.observation.catalog

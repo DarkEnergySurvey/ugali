@@ -6,7 +6,7 @@ Module for various statistics utilities.
 import copy
 
 import numpy as np
-import np.lib.recfunctions as recfuncs
+import numpy.lib.recfunctions as recfuncs
 from matplotlib import mlab
 import scipy.special
 import scipy.stats
