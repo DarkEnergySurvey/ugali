@@ -441,6 +441,81 @@ def merge_likelihood_headers(filenames, outfile):
     write_partial_map(outfile, data_dict, nside)
     return data_dict
 
+
+def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
+    """Read a healpix map from a fits file.  Partial-sky files,
+    if properly identified, are expanded to full size and filled with UNSEEN.
+    Uses fitsio to mirror much (but not all) of the functionality of healpy.read_map
+    
+    Parameters:
+    -----------
+    filename : str 
+      the fits file name
+    nest : bool, optional
+      If True return the map in NEST ordering, otherwise in RING ordering;
+      use fits keyword ORDERING to decide whether conversion is needed or not
+      If None, no conversion is performed.
+    hdu : int, optional
+      the header number to look at (start at 0)
+    h : bool, optional
+      If True, return also the header. Default: False.
+    verbose : bool, optional
+      If True, print a number of diagnostic messages
+    
+    Returns
+    -------
+    m [, header] : array, optionally with header appended
+      The map read from the file, and the header if *h* is True.
+    """
+    
+    data,hdr = fitsio.read(filename,header=True,ext=hdu)
+
+    nside = int(hdr.get('NSIDE'))
+    if verbose: print('NSIDE = {0:d}'.format(nside))
+
+    if not healpy.isnsideok(nside):
+        raise ValueError('Wrong nside parameter.')
+    sz=healpy.nside2npix(nside)
+
+    ordering = hdr.get('ORDERING','UNDEF').strip()
+    if verbose: print('ORDERING = {0:s} in fits file'.format(ordering))
+
+    schm = hdr.get('INDXSCHM', 'UNDEF').strip()
+    if verbose: print('INDXSCHM = {0:s}'.format(schm))
+    if schm == 'EXPLICIT':
+        partial = True
+    elif schm == 'IMPLICIT':
+        partial = False
+
+    # monkey patch on a field method
+    fields = data.dtype.names
+
+    # Could be done more efficiently (but complicated) by reordering first
+    if hdr['INDXSCHM'] == 'EXPLICIT':
+        m = healpy.UNSEEN*np.ones(sz,dtype=data[fields[1]].dtype)
+        m[data[fields[0]]] = data[fields[1]]
+    else:
+        m = data[fields[0]].ravel()
+
+    if (not healpy.isnpixok(m.size) or (sz>0 and sz != m.size)) and verbose:
+        print('nside={0:d}, sz={1:d}, m.size={2:d}'.format(nside,sz,m.size))
+        raise ValueError('Wrong nside parameter.')
+    if not nest is None:
+        if nest and ordering.startswith('RING'):
+            idx = healpy.nest2ring(nside,np.arange(m.size,dtype=np.int32))
+            if verbose: print('Ordering converted to NEST')
+            m = m[idx]
+            return  m[idx]
+        elif (not nest) and ordering.startswith('NESTED'):
+            idx = healpy.ring2nest(nside,np.arange(m.size,dtype=np.int32))
+            m = m[idx]
+            if verbose: print('Ordering converted to RING')
+
+    if h:
+        return m, header
+    else:
+        return m
+
 if __name__ == "__main__":
     import argparse
     description = __doc__
