@@ -9,11 +9,9 @@ Functions
 """
 
 import os
-import numpy
 import numpy as np
-import scipy.signal
-import healpy
 import healpy as hp
+import scipy.signal
 
 #import ugali.utils.plotting
 import ugali.utils.binning
@@ -154,14 +152,14 @@ class Mask(object):
         self.solid_angle_mmd = solid_angle_mmd
 
         # Compute which magnitudes the clipping correspond to
-        index_mag_1, index_mag_2 = numpy.nonzero(self.solid_angle_mmd)
+        index_mag_1, index_mag_2 = np.nonzero(self.solid_angle_mmd)
         self.mag_1_clip = self.roi.bins_mag[1:][np.max(index_mag_1)]
         self.mag_2_clip = self.roi.bins_mag[1:][np.max(index_mag_2)]
 
         logger.info('Clipping mask 1 at %.2f mag'%(self.mag_1_clip) )
         logger.info('Clipping mask 2 at %.2f mag'%(self.mag_2_clip) )
-        self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
-        self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
+        self.mask_1.mask_roi_sparse = np.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
+        self.mask_2.mask_roi_sparse = np.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
 
     def _solidAngleCMD(self):
         """
@@ -169,7 +167,7 @@ class Mask(object):
         function of color and magnitude.
         """
 
-        self.solid_angle_cmd = numpy.zeros([len(self.roi.centers_mag),
+        self.solid_angle_cmd = np.zeros([len(self.roi.centers_mag),
                                             len(self.roi.centers_color)])
 
         for index_mag in np.arange(len(self.roi.centers_mag)):
@@ -196,7 +194,7 @@ class Mask(object):
                     mag_2 = mag + (0.5 * self.roi.delta_mag)
 
                 # ADW: Is there a problem here?
-                #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * numpy.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
+                #self.solid_angle_cmd[index_mag, index_color] = self.roi.area_pixel * np.sum((self.mask_1.mask > mag_1) * (self.mask_2.mask > mag_2))
 
                 # ADW: I think we want to keep pixels that are >= mag
                 unmasked_mag_1 = (self.mask_1.mask_annulus_sparse >= mag_1)
@@ -225,7 +223,7 @@ class Mask(object):
         solid_angle_cmd : 2d array
         """
 
-        self.solid_angle_cmd = numpy.zeros([len(self.roi.centers_mag),
+        self.solid_angle_cmd = np.zeros([len(self.roi.centers_mag),
                                             len(self.roi.centers_color)])
 
         idx_mag,idx_color=np.where(self.solid_angle_cmd == 0)
@@ -287,13 +285,13 @@ class Mask(object):
         else:
             mag_2 = mag
             mag_1 = color + mag_2
-            self.mag_1_clip = numpy.max(mag_1) + (0.5 * self.roi.delta_color)
-            self.mag_2_clip = numpy.max(mag_2) + (0.5 * self.roi.delta_mag)
+            self.mag_1_clip = np.max(mag_1) + (0.5 * self.roi.delta_color)
+            self.mag_2_clip = np.max(mag_2) + (0.5 * self.roi.delta_mag)
 
         logger.info('Clipping mask 1 at %.2f mag'%(self.mag_1_clip) )
         logger.info('Clipping mask 2 at %.2f mag'%(self.mag_2_clip) )
-        self.mask_1.mask_roi_sparse = numpy.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
-        self.mask_2.mask_roi_sparse = numpy.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
+        self.mask_1.mask_roi_sparse = np.clip(self.mask_1.mask_roi_sparse, 0., self.mag_1_clip)
+        self.mask_2.mask_roi_sparse = np.clip(self.mask_2.mask_roi_sparse, 0., self.mag_2_clip)
         
 
     def completeness(self, delta, method='step'):
@@ -363,39 +361,39 @@ class Mask(object):
              
             # Band 1
             mag_1_thresh = self.mask_1.mask_roi_sparse[catalog.pixel_roi_index] - catalog.mag_1
-            sorting_indices = numpy.argsort(mag_1_thresh)
+            sorting_indices = np.argsort(mag_1_thresh)
             mag_1_thresh_sort = mag_1_thresh[sorting_indices]
             mag_err_1_sort = catalog.mag_err_1[sorting_indices]
              
-            # ADW: Can't this be done with numpy.median(axis=?)
+            # ADW: Can't this be done with np.median(axis=?)
             mag_1_thresh_medians = []
             mag_err_1_medians = []
             for i in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
-                mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-                mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+                mag_1_thresh_medians.append(np.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+                mag_err_1_medians.append(np.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
              
             if mag_1_thresh_medians[0] > 0.:
-                mag_1_thresh_medians = numpy.insert(mag_1_thresh_medians, 0, -99.)
-                mag_err_1_medians = numpy.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
+                mag_1_thresh_medians = np.insert(mag_1_thresh_medians, 0, -99.)
+                mag_err_1_medians = np.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
              
             photo_err_1 = scipy.interpolate.interp1d(mag_1_thresh_medians, mag_err_1_medians,
                                                      bounds_error=False, fill_value=mag_err_1_medians[-1])
              
             # Band 2
             mag_2_thresh = self.mask_2.mask_roi_sparse[catalog.pixel_roi_index] - catalog.mag_2
-            sorting_indices = numpy.argsort(mag_2_thresh)
+            sorting_indices = np.argsort(mag_2_thresh)
             mag_2_thresh_sort = mag_2_thresh[sorting_indices]
             mag_err_2_sort = catalog.mag_err_2[sorting_indices]
              
             mag_2_thresh_medians = []
             mag_err_2_medians = []
             for i in range(0, int(len(mag_2_thresh) / float(n_per_bin))):
-                mag_2_thresh_medians.append(numpy.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-                mag_err_2_medians.append(numpy.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+                mag_2_thresh_medians.append(np.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+                mag_err_2_medians.append(np.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
              
             if mag_2_thresh_medians[0] > 0.:
-                mag_2_thresh_medians = numpy.insert(mag_2_thresh_medians, 0, -99.)
-                mag_err_2_medians = numpy.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
+                mag_2_thresh_medians = np.insert(mag_2_thresh_medians, 0, -99.)
+                mag_err_2_medians = np.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
              
             photo_err_2 = scipy.interpolate.interp1d(mag_2_thresh_medians, mag_err_2_medians,
                                                      bounds_error=False, fill_value=mag_err_2_medians[-1])
@@ -478,8 +476,8 @@ class Mask(object):
         elif method == 'bootstrap':
             # Not implemented
             raise ValueError("Bootstrap method not implemented")
-            mag_1 + (mag_1_err * numpy.random.normal(0, 1., len(mag_1)))
-            mag_2 + (mag_2_err * numpy.random.normal(0, 1., len(mag_2)))
+            mag_1 + (mag_1_err * np.random.normal(0, 1., len(mag_1)))
+            mag_2 + (mag_2_err * np.random.normal(0, 1., len(mag_2)))
 
         elif method == 'histogram':
             # Apply raw histogram
@@ -516,12 +514,12 @@ class Mask(object):
         # ADW: This accounts for leakage to faint magnitudes
         # But what about the objects that spill out to red colors??
         # Maximum obsevable magnitude index for each color (uses the fact that
-        # numpy.argmin returns first minimum (zero) instance found.
+        # np.argmin returns first minimum (zero) instance found.
         # NOTE: More complicated maps may have holes causing problems
 
         observable = (self.solid_angle_mmd > self.minimum_solid_angle)
         index_mag_1 = observable.argmin(axis=0) - 1
-        index_mag_2 = numpy.arange(len(self.roi.centers_mag))
+        index_mag_2 = np.arange(len(self.roi.centers_mag))
         # Add the cumulative leakage back into the last bin of the CMD
         leakage = (mmd_background * ~observable).sum(axis=0)
         ### mmd_background[[index_mag_1,index_mag_2]] += leakage
@@ -584,8 +582,8 @@ class Mask(object):
             mag_1_array = catalog.mag_1
             mag_2_array = catalog.mag_2
 
-            catalog.mag_1 + (catalog.mag_1_err * numpy.random.normal(0, 1., len(catalog.mag_1)))
-            catalog.mag_2 + (catalog.mag_2_err * numpy.random.normal(0, 1., len(catalog.mag_2)))
+            catalog.mag_1 + (catalog.mag_1_err * np.random.normal(0, 1., len(catalog.mag_1)))
+            catalog.mag_2 + (catalog.mag_2_err * np.random.normal(0, 1., len(catalog.mag_2)))
 
         elif mode == 'histogram':
             # Apply raw histogram
@@ -621,12 +619,12 @@ class Mask(object):
         # ADW: This accounts for leakage to faint magnitudes
         # But what about the objects that spill out to red colors??
         # Maximum obsevable magnitude index for each color (uses the fact that
-        # numpy.argmin returns first minimum (zero) instance found.
+        # np.argmin returns first minimum (zero) instance found.
         # NOTE: More complicated maps may have holes causing problems
 
         observable = (self.solid_angle_cmd > self.minimum_solid_angle)
         index_mag = observable.argmin(axis=0) - 1
-        index_color = numpy.arange(len(self.roi.centers_color))
+        index_color = np.arange(len(self.roi.centers_color))
         # Add the cumulative leakage back into the last bin of the CMD
         leakage = (cmd_background * ~observable).sum(axis=0)
         cmd_background[[index_mag,index_color]] += leakage
@@ -682,7 +680,7 @@ class Mask(object):
                                              catalog.mag_2, catalog.mag_1,
                                              self.roi.bins_mag, self.roi.bins_mag) > 0.
 
-        sel = numpy.all([sel_roi,sel_mag_1,sel_mag_2,sel_mmd], axis=0)
+        sel = np.all([sel_roi,sel_mag_1,sel_mag_2,sel_mmd], axis=0)
         return sel
 
     def restrictCatalogToObservableSpaceCMD(self, catalog):
@@ -712,9 +710,9 @@ class Mask(object):
 
         ### # Check that the objects fall in the color-magnitude space of the ROI
         ### # ADW: I think this is degenerate with the cut_cmd
-        ### sel_mag = numpy.logical_and(catalog.mag > self.roi.bins_mag[0],
+        ### sel_mag = np.logical_and(catalog.mag > self.roi.bins_mag[0],
         ###                             catalog.mag < self.roi.bins_mag[-1])
-        ### sel_color = numpy.logical_and(catalog.color > self.roi.bins_color[0],
+        ### sel_color = np.logical_and(catalog.color > self.roi.bins_color[0],
         ###                               catalog.color < self.roi.bins_color[-1])
 
         # and are observable in the ROI-specific mask for both bands
@@ -730,7 +728,7 @@ class Mask(object):
                                              catalog.color, catalog.mag,
                                              self.roi.bins_color, self.roi.bins_mag) > 0.
 
-        sel = numpy.all([sel_roi,sel_mag_1,sel_mag_2,sel_cmd], axis=0)
+        sel = np.all([sel_roi,sel_mag_1,sel_mag_2,sel_cmd], axis=0)
         return sel
     
     # FIXME: Need to parallelize CMD and MMD formulation
@@ -847,9 +845,9 @@ class MaskBand(object):
 
         import ugali.utils.plotting
 
-        mask = healpy.UNSEEN * numpy.ones(healpy.nside2npix(self.nside))
+        mask = hp.UNSEEN * np.ones(hp.nside2npix(self.nside))
         mask[self.roi.pixels] = self.mask_roi_sparse
-        mask[mask == 0.] = healpy.UNSEEN
+        mask[mask == 0.] = hp.UNSEEN
         ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
                                               mask,
                                               self.roi.lon, self.roi.lat,
@@ -867,7 +865,7 @@ class CoverageBand(object):
         """
         self.roi = roi
         mask = ugali.utils.skymap.readSparseHealpixMaps(infiles, field='COVERAGE')
-        self.nside = healpy.npix2nside(len(mask))
+        self.nside = hp.npix2nside(len(mask))
         # Sparse maps of pixels in various ROI regions
         self.mask_roi_sparse = mask[self.roi.pixels] 
 
@@ -909,7 +907,7 @@ class SimpleMaskBand(MaskBand):
         """
         self.roi = roi
         mask = maglim*np.ones(hp.nside2npix(self.roi.config['coords']['nside_pixel']))
-        self.nside = healpy.npix2nside(len(mask))
+        self.nside = hp.npix2nside(len(mask))
         # Sparse maps of pixels in various ROI regions
         self.mask_roi_sparse = mask[self.roi.pixels] 
 
@@ -922,13 +920,13 @@ def simpleMask(config):
 
     # De-project the bin centers to get magnitude depths
 
-    mesh_x, mesh_y = numpy.meshgrid(roi.centers_x, roi.centers_y)
-    r = numpy.sqrt(mesh_x**2 + mesh_y**2) # Think about x, y conventions here
+    mesh_x, mesh_y = np.meshgrid(roi.centers_x, roi.centers_y)
+    r = np.sqrt(mesh_x**2 + mesh_y**2) # Think about x, y conventions here
 
     #z = (0. * (r > 1.)) + (21. * (r < 1.))
     #z = 21. - r
     #z = (21. - r) * (mesh_x > 0.) * (mesh_y < 0.)
-    z = (21. - r) * numpy.logical_or(mesh_x > 0., mesh_y > 0.)
+    z = (21. - r) * np.logical_or(mesh_x > 0., mesh_y > 0.)
 
     return MaskBand(z, roi)
     
@@ -945,7 +943,7 @@ def readMangleFile(infile, lon, lat, index = None):
     DeprecationWarning(msg)
 
     if index is None:
-        index = numpy.random.randint(0, 1.e10)
+        index = np.random.randint(0, 1.e10)
     
     coordinate_file = 'temp_coordinate_%010i.dat'%(index)
     maglim_file = 'temp_maglim_%010i.dat'%(index)
@@ -981,7 +979,7 @@ def readMangleFile(infile, lon, lat, index = None):
             logger.error(msg)
             break
             
-    maglim = numpy.array(maglim)
+    maglim = np.array(maglim)
     return maglim
 
 ############################################################
@@ -1003,14 +1001,14 @@ def scale(mask, mag_scale, outfile=None):
     """
     msg = "'mask.scale': ADW 2018-05-05"
     DeprecationWarning(msg)
-    mask_new = healpy.UNSEEN * numpy.ones(len(mask))
+    mask_new = hp.UNSEEN * np.ones(len(mask))
     mask_new[mask == 0.] = 0.
     mask_new[mask > 0.] = mask[mask > 0.] + mag_scale
 
     if outfile is not None:
-        pix = numpy.nonzero(mask_new > 0.)[0]
+        pix = np.nonzero(mask_new > 0.)[0]
         data_dict = {'MAGLIM': mask_new[pix]}
-        nside = healpy.npix2nside(len(mask_new))
+        nside = hp.npix2nside(len(mask_new))
         ugali.utils.skymap.writeSparseHealpixMap(pix, data_dict, nside, outfile)
 
     return mask_new

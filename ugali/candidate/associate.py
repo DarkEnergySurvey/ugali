@@ -4,10 +4,9 @@ from os.path import join,abspath,split
 import inspect
 from collections import OrderedDict as odict
 
-import numpy
 import numpy as np
-import fitsio
 from numpy.lib.recfunctions import stack_arrays
+import fitsio
 
 import ugali.utils.projector
 from ugali.utils.projector import gal2cel, cel2gal
@@ -16,7 +15,7 @@ from ugali.utils.healpix import ang2pix
 from ugali.utils.shell import get_ugali_dir
 from ugali.utils.logger import logger
 
-#class Catalog(numpy.recarray):
+#class Catalog(np.recarray):
 # 
 #    DATADIR=os.path.join(os.path.split(os.path.abspath(__file__))[0],"../data/catalogs/")
 # 
@@ -27,23 +26,23 @@ from ugali.utils.logger import logger
 #               ('dec',float),
 #               ('glon',float),
 #               ('glat',float)]
-#        self = numpy.recarray(0,dtype=dtype).view(cls)
+#        self = np.recarray(0,dtype=dtype).view(cls)
 #        self._load(filename)
 #        return self
 # 
 #    def __add__(self, other):
-#        return numpy.concatenate([self,other])
+#        return np.concatenate([self,other])
 # 
 #    def __getitem__(self, key):
 #        """ 
 #        Support indexing, slicing and direct access.
 #        """
 #        try:
-#            return numpy.recarray.__getitem__(key)
+#            return np.recarray.__getitem__(key)
 #        except ValueError, message:
 #            if key in self.name:
 #                idx = (self.name == key)
-#                return numpy.recarray.__getitem__(idx)
+#                return np.recarray.__getitem__(idx)
 #            else:
 #                raise ValueError(message)
 # 
@@ -75,7 +74,7 @@ class SourceCatalog(object):
                    ('dec',float),
                    ('glon',float),
                    ('glat',float)]
-        self.data = numpy.recarray(0,dtype=columns)
+        self.data = np.recarray(0,dtype=columns)
         self._load(filename)
         if np.isnan([self.data['glon'],self.data['glat']]).any():
             raise ValueError("Incompatible values")
@@ -94,7 +93,7 @@ class SourceCatalog(object):
  
     def __add__(self, other):
         ret = SourceCatalog()
-        ret.data = numpy.concatenate([self.data,other.data])
+        ret.data = np.concatenate([self.data,other.data])
         return ret
         
     def __len__(self):
@@ -126,10 +125,10 @@ class McConnachie12(SourceCatalog):
             filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies2012.dat")
         self.filename = filename
  
-        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
+        raw = np.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=range(7),dtype=['|S19']+6*[float],skip_header=36)
  
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        self.data['name'] = np.char.strip(raw['f0'])
  
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
@@ -152,7 +151,7 @@ class McConnachie15(SourceCatalog):
             filename = os.path.join(self.DATADIR,"J_AJ_144_4/NearbyGalaxies.dat")
         self.filename = filename
  
-        raw = numpy.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=list(range(7)),dtype=['|S19']+6*[float],skip_header=36)
+        raw = np.genfromtxt(filename,delimiter=[19,3,3,5,3,3,3],usecols=list(range(7)),dtype=['|S19']+6*[float],skip_header=36)
 
         self.data.resize(len(raw))
         self.data['name'] = np.char.lstrip(np.char.strip(raw['f0']),'*')
@@ -180,7 +179,7 @@ class Rykoff14(SourceCatalog):
         raw = fitsio.read(filename,lower=True)
 
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.mod("RedMaPPer %d",raw['mem_match_id'])
+        self.data['name'] = np.char.mod("RedMaPPer %d",raw['mem_match_id'])
         self.data['ra'] = raw['ra']
         self.data['dec'] = raw['dec']
         glon,glat = cel2gal(raw['ra'],raw['dec'])
@@ -203,10 +202,10 @@ class Harris96(SourceCatalog):
         self.filename = filename
 
         kwargs = dict(delimiter=[12,12,3,3,6,5,3,6,8,8,6],dtype=2*['S12']+7*[float],skip_header=72,skip_footer=363)
-        raw = numpy.genfromtxt(filename,**kwargs)
+        raw = np.genfromtxt(filename,**kwargs)
 
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        self.data['name'] = np.char.strip(raw['f0'])
 
         ra = raw[['f2','f3','f4']].view(float).reshape(len(raw),-1)
         dec = raw[['f5','f6','f7']].view(float).reshape(len(raw),-1)
@@ -228,18 +227,18 @@ class Corwen04(SourceCatalog):
             for basename in ['VII_239A/ngcpos.dat','VII_239A/icpos.dat']:
                 filename = os.path.join(self.DATADIR,basename)
                 raw.append(np.genfromtxt(filename,**kwargs))
-            raw = numpy.concatenate(raw)
+            raw = np.concatenate(raw)
         else:
-            raw = numpy.genfromtxt(filename,**kwargs)
+            raw = np.genfromtxt(filename,**kwargs)
         self.filename = filename
 
         # Some entries are missing...
-        raw['f4'] = numpy.where(numpy.isnan(raw['f4']),0,raw['f4'])
-        raw['f7'] = numpy.where(numpy.isnan(raw['f7']),0,raw['f7'])
+        raw['f4'] = np.where(np.isnan(raw['f4']),0,raw['f4'])
+        raw['f7'] = np.where(np.isnan(raw['f7']),0,raw['f7'])
 
         self.data.resize(len(raw))
-        names = numpy.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
-        self.data['name'] = numpy.char.mod(names,raw['f1'])
+        names = np.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
+        self.data['name'] = np.char.mod(names,raw['f1'])
 
         ra = raw[['f2','f3','f4']].view(float).reshape(len(raw),-1)
         dec = raw[['f5','f6','f7']].view(float).reshape(len(raw),-1)
@@ -258,16 +257,16 @@ class Corwen04(SourceCatalog):
 #        if filename is None: 
 #            filename = os.path.join(self.DATADIR,"NI2013.csv")
 # 
-#        raw = numpy.genfromtxt(filename,delimiter=',',usecols=[5,6]+range(13,20),dtype=['S1',int]+3*[float]+['S1']+3*[float])
+#        raw = np.genfromtxt(filename,delimiter=',',usecols=[5,6]+range(13,20),dtype=['S1',int]+3*[float]+['S1']+3*[float])
 # 
 #        self.data.resize(len(raw))
-#        names = numpy.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
-#        self.data['name'] = numpy.char.mod(names,raw['f1'])
+#        names = np.where(raw['f0'] == 'N', 'NGC %04i', 'IC %04i')
+#        self.data['name'] = np.char.mod(names,raw['f1'])
 # 
-#        sign = numpy.where(raw['f5'] == '-',-1,1)
+#        sign = np.where(raw['f5'] == '-',-1,1)
 #        ra = raw[['f2','f3','f4']].view(float).reshape(len(raw),-1)
 #        dec = raw[['f6','f7','f8']].view(float).reshape(len(raw),-1)
-#        dec[:,0] = numpy.copysign(dec[:,0], sign)
+#        dec[:,0] = np.copysign(dec[:,0], sign)
 # 
 #        self.data['ra'] = ugali.utils.projector.hms2dec(ra)
 #        self.data['dec'] = ugali.utils.projector.dms2dec(dec)
@@ -288,7 +287,7 @@ class Nilson73(SourceCatalog):
         raw = np.genfromtxt(filename,delimiter=[3,7,2,4,3,2],dtype=['S3']+['S7']+4*[float])
         
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.mod('UGC %s',numpy.char.strip(raw['f1']))
+        self.data['name'] = np.char.mod('UGC %s',np.char.strip(raw['f1']))
 
         ra = raw[['f2','f3']].view(float).reshape(len(raw),-1)
         ra = np.vstack([ra.T,np.zeros(len(raw))]).T
@@ -318,7 +317,7 @@ class Webbink85(SourceCatalog):
             for basename in ['VII_151/table1a.dat','VII_151/table1c.dat']:
                 filename = os.path.join(self.DATADIR,basename)
                 raw.append(np.genfromtxt(filename,**kwargs))
-            raw = numpy.concatenate(raw)
+            raw = np.concatenate(raw)
         else:
             raw = np.genfromtxt(filename,**kwargs)
         self.filename = filename
@@ -355,7 +354,7 @@ class Kharchenko13(SourceCatalog):
         raw = np.genfromtxt(filename,**kwargs)
         
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        self.data['name'] = np.char.strip(raw['f0'])
 
         self.data['glon'] = raw['f1']
         self.data['glat'] = raw['f2']
@@ -378,7 +377,7 @@ class Bica08(SourceCatalog):
         raw = np.genfromtxt(filename,**kwargs)
 
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        self.data['name'] = np.char.strip(raw['f0'])
  
         ra = raw[['f1','f2','f3']].view(float).reshape(len(raw),-1)
         dec = raw[['f4','f5','f6']].view(float).reshape(len(raw),-1)
@@ -402,7 +401,7 @@ class WEBDA14(SourceCatalog):
         raw = np.genfromtxt(filename,**kwargs)
         
         self.data.resize(len(raw))
-        self.data['name'] = numpy.char.strip(raw['f0'])
+        self.data['name'] = np.char.strip(raw['f0'])
 
         self.data['glon'] = raw['f1']
         self.data['glat'] = raw['f2']

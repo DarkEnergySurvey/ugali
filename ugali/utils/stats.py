@@ -5,13 +5,13 @@ Module for various statistics utilities.
 
 import copy
 
-import numpy
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
 from matplotlib import mlab
 import scipy.special
 import scipy.stats
 
+# These should probably live in this file
 from ugali.utils.bayesian_efficiency import bayesianInterval, binomialInterval
 
 _alpha   = 0.32
@@ -45,7 +45,7 @@ def median_interval(data, alpha=_alpha):
     Median including bayesian credible interval.
     """
     q = [100*alpha/2., 50, 100*(1-alpha/2.)]
-    lo,med,hi = numpy.percentile(data,q)
+    lo,med,hi = np.percentile(data,q)
     return interval(med,lo,hi)
     
 def peak(data, bins=_nbins):

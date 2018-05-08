@@ -2,7 +2,6 @@
 Tools for binning data.
 """
 
-import numpy
 import numpy as np
 import collections
 
@@ -28,27 +27,27 @@ def take2D(histogram, x, y, bins_x, bins_y):
     bins_x : the xbin edges, including upper edge (n-dim)
     bins_y : the ybin edges, including upper edge (m-dim)
     """
-    histogram = numpy.array(histogram)
+    histogram = np.array(histogram)
     
-    if numpy.isscalar(x):
+    if np.isscalar(x):
         x = [x]
-    if numpy.isscalar(y):
+    if np.isscalar(y):
         y = [y]
 
     bins_x[-1] += 1.e-10 * (bins_x[-1] - bins_x[-2]) # Numerical stability
     bins_y[-1] += 1.e-10 * (bins_y[-1] - bins_y[-2])
 
-    #return numpy.take(histogram, (histogram.shape[1] * (numpy.digitize(y, bins_y) - 1)) + (numpy.digitize(x, bins_x) - 1))
+    #return np.take(histogram, (histogram.shape[1] * (np.digitize(y, bins_y) - 1)) + (np.digitize(x, bins_x) - 1))
 
-    # Return numpy.nan for entries which are outside the binning range on either axis
-    index = (histogram.shape[1] * (numpy.digitize(y, bins_y) - 1)) + (numpy.digitize(x, bins_x) - 1)
-    index_clipped = numpy.clip(index, 0, (histogram.shape[0] * histogram.shape[1]) - 1)
-    val = numpy.take(histogram, index_clipped)
+    # Return np.nan for entries which are outside the binning range on either axis
+    index = (histogram.shape[1] * (np.digitize(y, bins_y) - 1)) + (np.digitize(x, bins_x) - 1)
+    index_clipped = np.clip(index, 0, (histogram.shape[0] * histogram.shape[1]) - 1)
+    val = np.take(histogram, index_clipped)
 
-    outlier_x = numpy.logical_or(x < bins_x[0], x > bins_x[-1])
-    outlier_y = numpy.logical_or(y < bins_y[0], y > bins_y[-1])
-    outlier = numpy.logical_or(outlier_x, outlier_y)
-    val[outlier] = numpy.nan
+    outlier_x = np.logical_or(x < bins_x[0], x > bins_x[-1])
+    outlier_y = np.logical_or(y < bins_y[0], y > bins_y[-1])
+    outlier = np.logical_or(outlier_x, outlier_y)
+    val[outlier] = np.nan
 
     return val 
     
@@ -73,27 +72,27 @@ def cloudInCells(x, y, bins, weights=None):
 
     # For consistency, the variable names should be changed in this function, but low priority...
     
-    x_bins = numpy.array(bins[0])
+    x_bins = np.array(bins[0])
     delta_x = x_bins[1] - x_bins[0]
     # Overflow and underflow bins
-    x_bins = numpy.insert(x_bins, 0, x_bins[0] - delta_x)
-    x_bins = numpy.append(x_bins, x_bins[-1] + delta_x)
-    y_bins = numpy.array(bins[1])
+    x_bins = np.insert(x_bins, 0, x_bins[0] - delta_x)
+    x_bins = np.append(x_bins, x_bins[-1] + delta_x)
+    y_bins = np.array(bins[1])
     delta_y = y_bins[1] - y_bins[0]
-    y_bins = numpy.insert(y_bins, 0, y_bins[0] - delta_y)
-    y_bins = numpy.append(y_bins, y_bins[-1] + delta_y)
+    y_bins = np.insert(y_bins, 0, y_bins[0] - delta_y)
+    y_bins = np.append(y_bins, y_bins[-1] + delta_y)
 
-    x_bound_cut = numpy.logical_and(x >= x_bins[0], x <= x_bins[-1])
-    y_bound_cut = numpy.logical_and(y >= y_bins[0], y <= y_bins[-1])
-    bound_cut = numpy.logical_and(x_bound_cut, y_bound_cut)
+    x_bound_cut = np.logical_and(x >= x_bins[0], x <= x_bins[-1])
+    y_bound_cut = np.logical_and(y >= y_bins[0], y <= y_bins[-1])
+    bound_cut = np.logical_and(x_bound_cut, y_bound_cut)
 
-    if not numpy.any(weights):
-        bound_weights = numpy.ones(len(x))[bound_cut]
+    if not np.any(weights):
+        bound_weights = np.ones(len(x))[bound_cut]
     else:
-        bound_weights = numpy.array(weights)[bound_cut]
+        bound_weights = np.array(weights)[bound_cut]
 
-    x_vals = numpy.array(x)[bound_cut]
-    y_vals = numpy.array(y)[bound_cut]
+    x_vals = np.array(x)[bound_cut]
+    y_vals = np.array(y)[bound_cut]
 
     x_width = x_bins[1] - x_bins[0]
     y_width = y_bins[1] - y_bins[0]
@@ -101,8 +100,8 @@ def cloudInCells(x, y, bins, weights=None):
     x_centers = x_bins[0: -1] + (0.5 * x_width)  
     y_centers = y_bins[0: -1] + (0.5 * y_width)
 
-    dx = x_vals - x_centers[numpy.digitize(x_vals, x_bins) - 1]
-    dy = y_vals - y_centers[numpy.digitize(y_vals, y_bins) - 1]
+    dx = x_vals - x_centers[np.digitize(x_vals, x_bins) - 1]
+    dy = y_vals - y_centers[np.digitize(y_vals, y_bins) - 1]
 
     ux = ((dx / x_width) * (dx >= 0)) +\
          ((1. + (dx / x_width)) * (dx < 0))
@@ -133,15 +132,15 @@ def cloudInCells(x, y, bins, weights=None):
     new_y_vals.append(y_vals - (0.5 * y_width))
     cell_weights.append(bound_weights * lx * ly)
 
-    new_x_vals = numpy.concatenate(new_x_vals)
-    new_y_vals = numpy.concatenate(new_y_vals)
-    cell_weights = numpy.concatenate(cell_weights)
+    new_x_vals = np.concatenate(new_x_vals)
+    new_y_vals = np.concatenate(new_y_vals)
+    cell_weights = np.concatenate(cell_weights)
 
-    result = numpy.histogram2d(new_x_vals, new_y_vals,
+    result = np.histogram2d(new_x_vals, new_y_vals,
                                bins = [x_bins, y_bins],
                                weights = cell_weights)[0]
  
-    result = numpy.transpose(result[1: result.shape[0] - 1])[1: result.shape[1] - 1]
+    result = np.transpose(result[1: result.shape[0] - 1])[1: result.shape[1] - 1]
 
     return result, x_bins, y_bins
 
@@ -300,14 +299,14 @@ def sum_chunks(data,fx=4,fy=4):
 
 def reverseHistogram(data,bins=None):
     """             
-    Bins data using numpy.histogram and calculates the
+    Bins data using np.histogram and calculates the
     reverse indices for the entries like IDL.
     Parameters:
-    data  : data to pass to numpy.histogram
-    bins  : bins to pass to numpy.histogram 
+    data  : data to pass to np.histogram
+    bins  : bins to pass to np.histogram 
     Returns: 
-    hist  : bin content output by numpy.histogram 
-    edges : edges output from numpy.histogram 
+    hist  : bin content output by np.histogram 
+    edges : edges output from np.histogram 
     rev   : reverse indices of entries in each bin 
     Using Reverse Indices: 
         h,e,rev = histogram(data, bins=bins) 
@@ -317,10 +316,10 @@ def reverseHistogram(data,bins=None):
                 indices = rev[ rev[i]:rev[i+1] ] 
                 # do calculations with data[indices] ...  
     """
-    if bins is None: bins = numpy.arange(data.max()+2)
-    hist, edges = numpy.histogram(data, bins=bins)
-    digi = numpy.digitize(data.flat,bins=numpy.unique(data)).argsort()
-    rev = numpy.hstack( (len(edges), len(edges) + numpy.cumsum(hist), digi) )
+    if bins is None: bins = np.arange(data.max()+2)
+    hist, edges = np.histogram(data, bins=bins)
+    digi = np.digitize(data.flat,bins=np.unique(data)).argsort()
+    rev = np.hstack( (len(edges), len(edges) + np.cumsum(hist), digi) )
     return hist,edges,rev
     
 def binnedMedian(x,y,xbins=None):
@@ -329,5 +328,5 @@ def binnedMedian(x,y,xbins=None):
     med_y = []
     for i,n in enumerate(hist):
         indices = rev[ rev[i]:rev[i+1] ] 
-        med_y.append( numpy.median(y[indices]) )
-    return avg_x, numpy.array(med_y)
+        med_y.append( np.median(y[indices]) )
+    return avg_x, np.array(med_y)

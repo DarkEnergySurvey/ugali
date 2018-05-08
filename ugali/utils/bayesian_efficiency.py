@@ -1,9 +1,13 @@
 """
-Documentation.
+Utility functions for calculating efficiency uncertainties in a bayesian manner.
+
+A good reference is probably:
+http://home.fnal.gov/~paterno/images/effic.pdf
+
+ADW: This should be moved into stats.py
 """
 
 import scipy.special
-import numpy
 import numpy as np
  
 ############################################################
@@ -12,8 +16,8 @@ def gammalnStirling(z):
     """
     Uses Stirling's approximation for the log-gamma function suitable for large arguments.
     """
-    return (0.5 * (numpy.log(2. * numpy.pi) - numpy.log(z))) \
-           + (z * (numpy.log(z + (1. / ((12. * z) - (1. / (10. * z))))) - 1.))
+    return (0.5 * (np.log(2. * np.pi) - np.log(z))) \
+           + (z * (np.log(z + (1. / ((12. * z) - (1. / (10. * z))))) - 1.))
 
 ############################################################
 
@@ -24,12 +28,12 @@ def confidenceInterval(n, k, alpha = 0.68, errorbar=False):
     try:
         e = float(k) / float(n)
     except ZeroDivisionError:
-        return numpy.nan, [numpy.nan, numpy.nan]
+        return np.nan, [np.nan, np.nan]
 
     bins = 1000001
     dx = 1. / bins
 
-    efficiency = numpy.linspace(0, 1, bins)
+    efficiency = np.linspace(0, 1, bins)
 
     # MODIFIED FOR LARGE NUMBERS
     if n + 2 > 1000:
@@ -46,25 +50,25 @@ def confidenceInterval(n, k, alpha = 0.68, errorbar=False):
         c = scipy.special.gammaln(n - k + 1)
 
     if k == 0:
-        p = numpy.concatenate([[numpy.exp(a - b - c)],
-                               numpy.exp(a - b - c + (k * numpy.log(efficiency[1: -1])) + (n - k) * numpy.log(1. - efficiency[1: -1])),
+        p = np.concatenate([[np.exp(a - b - c)],
+                               np.exp(a - b - c + (k * np.log(efficiency[1: -1])) + (n - k) * np.log(1. - efficiency[1: -1])),
                                [0.]])
     elif k == n:
-        p = numpy.concatenate([[0.],
-                               numpy.exp(a - b - c + (k * numpy.log(efficiency[1: -1])) + (n - k) * numpy.log(1. - efficiency[1: -1])),
-                               [numpy.exp(a - b - c)]])
+        p = np.concatenate([[0.],
+                               np.exp(a - b - c + (k * np.log(efficiency[1: -1])) + (n - k) * np.log(1. - efficiency[1: -1])),
+                               [np.exp(a - b - c)]])
     else:
-        p = numpy.concatenate([[0.],
-                               numpy.exp(a - b - c + (k * numpy.log(efficiency[1: -1])) + (n - k) * numpy.log(1. - efficiency[1: -1])),
+        p = np.concatenate([[0.],
+                               np.exp(a - b - c + (k * np.log(efficiency[1: -1])) + (n - k) * np.log(1. - efficiency[1: -1])),
                                [0.]])
 
-    i = numpy.argsort(p)[::-1]
-    p_i = numpy.take(p, i)
+    i = np.argsort(p)[::-1]
+    p_i = np.take(p, i)
 
-    s = i[numpy.cumsum(p_i * dx) < alpha]
+    s = i[np.cumsum(p_i * dx) < alpha]
 
-    low = min(numpy.min(s) * dx, e)
-    high = max(numpy.max(s) * dx, e)
+    low = min(np.min(s) * dx, e)
+    high = max(np.max(s) * dx, e)
 
     if not errorbar:
         return e, [low, high]
@@ -82,7 +86,7 @@ def binomialInterval(n, k, alpha = 0.68):
     Given n tests and k successes, return efficiency and confidence interval.
     """
     e = float(k)/n
-    delta_e = 1/float(n) * numpy.sqrt(e * (1 - e) * float(n)) * alpha/0.68
+    delta_e = 1/float(n) * np.sqrt(e * (1 - e) * float(n)) * alpha/0.68
     return e, [e - delta_e, e + delta_e]
 
 ############################################################
