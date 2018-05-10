@@ -30,10 +30,10 @@ logdir = '%s/log'%args.tag
 if not os.path.exists(logdir): os.makedirs(logdir)
 
 for index_batch in np.arange(args.nbatch):
-    mc_source_id_start = args.mc_source_id + (args.size_batch * index_batch)
-    command = 'simulate_population.py --tag %s --start %i --size %i --chunk %i'%(args.tag, mc_source_id_start, args.size_batch, args.nchunk)
+    seed = mc_source_id_start = args.mc_source_id + (args.size_batch * index_batch)
+    command = 'simulate_population.py --tag %s --start %i --size %i --chunk %i --seed %i'%(args.tag, mc_source_id_start, args.size_batch, args.nchunk, seed)
 
-    logfile = os.path.join(logdir,'%s.log'%mc_source_id_start)
+    logfile = os.path.join(logdir,'%07i.log'%mc_source_id_start)
     submit = 'csub -q %s -o %s -n 20 '%(args.queue,logfile) + command
     subprocess.call(submit,shell=True)
 
