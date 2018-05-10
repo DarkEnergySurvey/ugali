@@ -222,6 +222,8 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
 
 ############################################################
 
+from memory_profiler import profile
+@profile
 def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population.yaml'):
     """
     n = Number of satellites to simulation
@@ -253,13 +255,13 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     infile_ebv = config['ebv']
     #infile_ebv = '/Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz' 
     
-    m_fracdet = read_map(infile_fracdet, nest=False).astype(np.float32)
+    m_fracdet = read_map(infile_fracdet, nest=False) #.astype(np.float16)
     nside_fracdet = healpy.npix2nside(len(m_fracdet))
 
-    m_maglim_g = read_map(infile_maglim_g, nest=False).astype(np.float32)
-    m_maglim_r = read_map(infile_maglim_r, nest=False).astype(np.float32)
+    m_maglim_g = read_map(infile_maglim_g, nest=False) #.astype(np.float16)
+    m_maglim_r = read_map(infile_maglim_r, nest=False) #.astype(np.float16)
 
-    m_ebv = read_map(infile_ebv, nest=False).astype(np.float32)
+    m_ebv = read_map(infile_ebv, nest=False) #.astype(np.float16)
     
     #m_foreground = healpy.read_map(infile_foreground)
 
@@ -381,11 +383,12 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     density_population = m_density[ugali.utils.healpix.angToPix(nside_density, lon_population, lat_population)] / pixarea # arcmin^-2
 
     # Average fracdet within the azimuthally averaged half-light radius
-    m_fracdet_zero = np.where(m_fracdet >= 0., m_fracdet, 0.)
+    #m_fracdet_zero = np.where(m_fracdet >= 0., m_fracdet, 0.)
+    #m_fracdet_zero = m_fracdet
     r_half = np.degrees(np.arctan2(r_physical_population, distance_population)) # Azimuthally averaged half-light radius in degrees
-    fracdet_half_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, r_half)
-    fracdet_core_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, 0.1)
-    fracdet_wide_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, 0.5)
+    fracdet_half_population = meanFracdet(m_fracdet, lon_population, lat_population, r_half)
+    fracdet_core_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.1)
+    fracdet_wide_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.5)
 
     # Magnitude limits
     nside_maglim = healpy.npix2nside(len(m_maglim_g))
@@ -523,7 +526,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
         pyfits.Column(name='EBV', format='E', array=ebv_population, unit='mag')
     ])
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-    tbhdu.writeto('%s/sim_population_%s_mc_source_id_%06i-%06i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
+    tbhdu.writeto('%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
 
     # 5284.2452461023322
 
@@ -549,10 +552,14 @@ if __name__ == "__main__":
                         help='Number of satellites to start')
     parser.add_argument('--chunk', dest='n_chunk', type=int, default=100,
                         help="Number of MC_SOURCE_ID's per catalog output file")
+    parser.add_argument('--seed', dest='seed', type=int, default=None,
+                        help="Random seed")
     args = parser.parse_args()
 
     print args
-
+    if args.seed is not None: 
+        print("Setting random seed: %i"%args.seed)
+        np.random.seed(args.seed)
     #tag = '_v2_n_%i'%(n)
     #tag = '_v3'
     #tag = 'v5'
