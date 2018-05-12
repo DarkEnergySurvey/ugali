@@ -375,6 +375,9 @@ class Marigo2017(ParsecIsochrone):
 
         kwargs = dict(usecols=list(columns.keys()),dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
+        # cut out anomalous point:
+        # https://github.com/DarkEnergySurvey/ugali/issues/29
+        self.data = self.data[self.data['stage'] != 9]
 
         self.mass_init = self.data['mass_init']
         self.mass_act  = self.data['mass_act']
