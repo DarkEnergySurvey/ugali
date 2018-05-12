@@ -30,9 +30,11 @@ def test_loglike():
                                [5.29605173e-03, 1.80040569e-03, 5.52283081e-09],
                                rtol=1e-6)
     np.testing.assert_allclose(loglike.b[IDX],
-                               [4215.31143651, 9149.29106545, 1698.22182173])
+                               [4215.31143651, 9149.29106545, 1698.22182173],
+                               rtol=1e-6)
     np.testing.assert_allclose(loglike.p[IDX],
-                               [1.25480793e-03, 1.96742181e-04, 3.25212568e-09])
+                               [1.25480793e-03, 1.96742181e-04, 3.25212568e-09],
+                               rtol=1e-6)
     np.testing.assert_allclose(loglike(),3947.9703876)
     np.testing.assert_allclose(loglike.ts(),7895.94077)
     np.testing.assert_allclose(loglike.nobs,86.1411187)
