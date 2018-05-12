@@ -25,9 +25,10 @@ def test_loglike():
 
     # Probability calculations
     np.testing.assert_allclose(loglike.f,0.08614111,rtol=1e-6)
-    
+
     np.testing.assert_allclose(loglike.u[IDX],
-                               [5.29605173e-03, 1.80040569e-03, 5.52283081e-09])
+                               [5.29605173e-03, 1.80040569e-03, 5.52283081e-09],
+                               rtol=1e-6)
     np.testing.assert_allclose(loglike.b[IDX],
                                [4215.31143651, 9149.29106545, 1698.22182173])
     np.testing.assert_allclose(loglike.p[IDX],
