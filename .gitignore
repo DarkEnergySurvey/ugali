@@ -10,4 +10,6 @@ dist/
 
 ### ugali data files
 ugali/data/*/
+healpix
+mask
 *.tar.gz
