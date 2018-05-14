@@ -84,7 +84,7 @@ class IsochroneModel(Model):
         ('band_1','g','Field name for magnitude one'),
         ('band_2','r','Field name for magnitude two'),
         ('band_1_detection',True,'Band one is detection band'),
-        ('imf_type','chabrier','Initial mass function'),
+        ('imf_type','Chabrier2003','Initial mass function'),
         ('hb_stage',None,'Horizontal branch stage name'),
         ('hb_spread',0.0,'Intrinisic spread added to horizontal branch'),
         )
@@ -100,7 +100,7 @@ class IsochroneModel(Model):
         for k,v in list(defaults.items()):
             setattr(self,k,v)
 
-        self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
+        self.imf = ugali.analysis.imf.factory(defaults['imf_type'])
         self.index = None
 
     def _parse(self,filename):
