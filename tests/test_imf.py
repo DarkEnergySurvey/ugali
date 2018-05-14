@@ -33,8 +33,6 @@ def test_imf():
     integral = iso.imf.integrate(0.1,2.0)
     np.testing.assert_allclose(integral,0.94961632593)
 
-    import pdb; pdb.set_trace()
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
