@@ -90,10 +90,7 @@ class MCMC(object):
         self.lnprob(theta)
 
     def get_mle(self):
-        """
-        Get the values of the source parameters.
-        """
-        
+        """ Get the values of the source parameters. """
         #return self.grid.mle()
         mle = self.source.get_params()
         # FIXME: For composite isochrones
@@ -129,7 +126,6 @@ class MCMC(object):
                                              
         p0 = np.array([mle[k] for k in params])
         s0 = np.array([std[k] for k in params])
-        s0 = np.array([1.0 for k in params])
         ball = emcee.utils.sample_ball(p0,s0,size) 
 
         # Set points outside the bounds to the mle estimate
