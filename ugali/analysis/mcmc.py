@@ -75,7 +75,8 @@ class MCMC(object):
         self.params = list(self.source.get_free_params().keys())
         self.samples = None
 
-        self.priors = odict(list(zip(self.params,len(self.params)*[UniformPrior()])))
+        self.priors = odict(list(zip(self.params,
+                                     len(self.params)*[UniformPrior()])))
         self.priors['extension'] = InversePrior()
 
         self.pool = None
@@ -89,10 +90,7 @@ class MCMC(object):
         self.lnprob(theta)
 
     def get_mle(self):
-        """
-        Get the values of the source parameters.
-        """
-        
+        """ Get the values of the source parameters. """
         #return self.grid.mle()
         mle = self.source.get_params()
         # FIXME: For composite isochrones
@@ -128,9 +126,27 @@ class MCMC(object):
                                              
         p0 = np.array([mle[k] for k in params])
         s0 = np.array([std[k] for k in params])
- 
-        return emcee.utils.sample_ball(p0,s0,size)
- 
+        ball = emcee.utils.sample_ball(p0,s0,size) 
+
+        # Set points outside the bounds to the mle estimate
+        for i,param in enumerate(params):
+            bounds = self.source.params[param].bounds
+            outside = (ball[:,i] < bounds[0]) | (ball[:,i] > bounds[1])
+            ball[:,i][outside] = p0[i]
+
+        return ball
+
+    def get_uniform(self, params, size=1):
+        # Placeholder for starting walkers over a uniform distribution
+        raise Exception("'get_uniform' is not implemented")
+
+        ball = np.ones((len(params),size),dtype=float)
+        for i,param in enumerate(params):
+            bounds = self.source.params[param].bounds
+            # How do we want to deal with unbounded (inf) parameters?
+            ball[:,i] = np.random.uniform(bounds[0],bounds[1],size)
+        return ball
+
     def lnlike(self, theta):
         """ Logarithm of the likelihood """
         params,loglike = self.params,self.loglike

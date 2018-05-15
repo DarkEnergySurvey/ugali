@@ -109,12 +109,13 @@ class Source(object):
 
     @property
     def params(self):
-        # DANGEROUS: Altering properties directly doesn't call model._cache
+        """ Return a *copy* (we hope) of the parameters.
+        DANGER: Altering properties directly doesn't call model._cache
+        """
         params = odict([])
         for key,model in self.models.items():
             params.update(model.params)
         return params
-
 
     def load(self,srcmdl,section=None):
         if isinstance(srcmdl,str): 
