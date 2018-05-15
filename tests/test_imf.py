@@ -37,7 +37,7 @@ def test_imf():
 def test_imf_norm():
     # All of the IMFs have normalized integrals from 0.1 to 100 Msun
     for n in IMFS:
-        print n
+        print(n)
         imf = ugali.analysis.imf.factory(name=n)
         np.testing.assert_allclose(imf.integrate(0.1,100,steps=int(1e4)),
                                    1.0,rtol=1e-3)
