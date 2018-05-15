@@ -1,14 +1,13 @@
 """
 Classes to handle initial mass functions (IMFs).
+
+https://github.com/keflavich/imf
 """
 from abc import abstractmethod
 import numpy as np
 import scipy.interpolate
 
 from ugali.utils.logger import logger
-
-# ADW: TODO - This needs to be modernized
-#      Also add Kroupa and Salpeter IMFs...
 
 ############################################################
 
@@ -17,8 +16,12 @@ class IMF(object):
     Base class for initial mass functions (IMFs).
     """
 
+    def __call__(self, mass, **kwargs):
+        """ Call the pdf of the mass function """
+        return self.pdf(mass,**kwargs)
+
     def integrate(self, mass_min, mass_max, log_mode=True, weight=False, steps=1e4):
-        """ Numerically integrate the IMF.
+        """ Numerical Riemannn integral of the IMF (stupid simple).
 
         Parameters:
         -----------
@@ -78,7 +81,7 @@ class IMF(object):
         return f(np.random.uniform(size=n))
 
     @abstractmethod
-    def pdf(cls): pass
+    def pdf(cls, mass, **kwargs): pass
         
 
 class Chabrier2003(IMF):
@@ -89,7 +92,7 @@ class Chabrier2003(IMF):
     """
 
     @classmethod
-    def pdf(cls, mass, log_mode=True, a=1.31357499301):
+    def pdf(cls, mass, log_mode=True):
         """ PDF for the Chabrier IMF.
          
         The functional form and coefficients are described in Eq 17
@@ -105,14 +108,14 @@ class Chabrier2003(IMF):
           x = 1.3
           
         We redefine a = A1, A2 = a * b;
-          
-        Chabrier set's his normalization 
-         
+
+        The normalization is set so that the IMF integrates to 1 over
+        the mass range from 0.1 Msun to 100 Msun
+
         Parameters:
         -----------
         mass: stellar mass (solar masses)
         log_mode[True]: return number per logarithmic mass range, i.e., dN/dlog(M)
-        a[1.31357499301]: normalization; normalized by default to the mass interval 0.1--100 solar masses
          
         Returns:
         --------
@@ -123,31 +126,91 @@ class Chabrier2003(IMF):
         # Constants from Chabrier 2003
         m_c = 0.079
         sigma = 0.69
-        x = 1.3
+        x = 1.3 
 
+        # This value is set to normalize integral from 0.1 to 100 Msun
+        a=1.31357499301
         # This value is required so that the two components match at 1 Msun
         b = 0.279087531047 
 
-        dn_dlogm = ((log_mass <= 0) * a * np.exp(-(log_mass - np.log10(m_c))**2 / (2 * (sigma**2)))) + ((log_mass  > 0) * a * b * mass**(-x))
-            
+        dn_dlogm = ((log_mass <= 0) * a * np.exp(-(log_mass - np.log10(m_c))**2 / (2 * (sigma**2)))) 
+        dn_dlogm += ((log_mass  > 0) * a * b * mass**(-x))
+        
         if log_mode:
             # Number per logarithmic mass range, i.e., dN/dlog(M)
             return dn_dlogm
         else:
             # Number per linear mass range, i.e., dN/dM
             return dn_dlogm / (mass * np.log(10))
+
+class Kroupa2001(IMF):
+    """ IMF from Kroupa (2001):
+
+    "On the variation of the initial mass function"
+    MNRAS 322:231 (2001)
+    https://arxiv.org/abs/astro-ph/0009005
+    """
+
+    @classmethod
+    def pdf(cls, mass, log_mode=True):
+        """ PDF for the Kroupa IMF.
+
+        Normalization is set over the mass range from 0.1 Msun to 100 Msun
+        """
+        log_mass = np.log10(mass)
+        # From Eq 2
+        mb = mbreak  = [0.08, 0.5] # Msun
+        a = alpha = [0.3, 1.3, 2.3] # alpha
+
+        # Normalization set from 0.1 -- 100 Msun
+        norm = 0.27947743949440446
+
+        b = 1./norm
+        c = b * mbreak[0]**(alpha[1]-alpha[0])
+        d = c * mbreak[1]**(alpha[2]-alpha[1])
+
+        dn_dm  = b * (mass < 0.08) * mass**(-alpha[0])
+        dn_dm += c * (0.08 <= mass) * (mass < 0.5) * mass**(-alpha[1])
+        dn_dm += d * (0.5  <= mass) * mass**(-alpha[2])
+
+        if log_mode:
+            # Number per logarithmic mass range, i.e., dN/dlog(M)
+            return dn_dm * (mass * np.log(10))
+        else:
+            # Number per linear mass range, i.e., dN/dM
+            return dn_dm
+    
+class Salpeter1955(IMF): 
+    """ IMF from Salpeter (1955):
+    "The Luminosity Function and Stellar Evolution"
+    ApJ 121, 161S (1955)
+    http://adsabs.harvard.edu/abs/1955ApJ...121..161S
+    """
+
+    @classmethod
+    def pdf(cls, mass, log_mode=True):
+        """ PDF for the Salpeter IMF.
+
+        Value of 'a' is set to normalize the IMF to 1 between 0.1 and 100 Msun
+        """
+        alpha = 2.35
+
+        a = 0.060285569480482866
+        dn_dm  = a * mass**(-alpha)
+
+        if log_mode:
+            # Number per logarithmic mass range, i.e., dN/dlog(M)
+            return dn_dm * (mass * np.log(10))
+        else:
+            # Number per linear mass range, i.e., dN/dM
+            return dn_dm
         
-
-class Kroupa2002(IMF): pass
-class Salpeter2002(IMF): pass
-
 def factory(name, **kwargs):
     from ugali.utils.factory import factory
     return factory(name, module=__name__, **kwargs)
 
-kernelFactory = factory
+imfFactory = factory
 
-    
 ############################################################
 
 def chabrierIMF(mass, log_mode=True, a=1.31357499301):

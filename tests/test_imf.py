@@ -10,6 +10,7 @@ import ugali.isochrone
 
 MASSES = np.array([0.1, 0.5, 1.0, 10.0])
 SEED = 1
+IMFS = ['Salpeter1955','Kroupa2001','Chabrier2003']
 
 def test_imf():
     dn_dm = ugali.analysis.imf.chabrierIMF(MASSES)
@@ -33,9 +34,18 @@ def test_imf():
     integral = iso.imf.integrate(0.1,2.0)
     np.testing.assert_allclose(integral,0.94961632593)
 
+def test_imf_norm():
+    # All of the IMFs have normalized integrals from 0.1 to 100 Msun
+    for n in IMFS:
+        print n
+        imf = ugali.analysis.imf.factory(name=n)
+        np.testing.assert_allclose(imf.integrate(0.1,100,steps=int(1e4)),
+                                   1.0,rtol=1e-3)
+    
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     args = parser.parse_args()
     
-    test_imf()
+    #test_imf()
+    test_imf_norm()
