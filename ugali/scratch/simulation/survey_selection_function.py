@@ -9,8 +9,15 @@ import yaml
 import numpy as np
 import healpy as hp
 import astropy.io.fits as pyfits
-import sklearn.gaussian_process
+import matplotlib.pyplot as plt
 import pylab
+
+import sklearn
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import confusion_matrix
 
 #import ugali.utils.bayesian_efficiency # Replace with standalone util
 
@@ -137,8 +144,8 @@ class surveySelectionFunction:
         self.m_fracdet = None
         self.classifier = None
 
-        #self.loadFracdet()
-        #self.loadRealResults()
+        self.loadFracdet()
+        self.loadRealResults()
         #self.loadClassifier()
 
     def loadFracdet(self):
@@ -172,37 +179,49 @@ class surveySelectionFunction:
         self.loadSimResults()
         
         cut_geometry, flags_geometry = self.applyGeometry(self.data_population['RA'], self.data_population['DEC'])
+        
+        cut_detect_sim_results_sig = (np.logical_or(np.logical_and(self.data_sim['SIG'] >=  self.config[self.algorithm]['sig_threshold'], 
+                                      self.data_sim['DIFFICULTY'] == 0), np.logical_or(self.data_sim['DIFFICULTY'] == 1, self.data_sim['DIFFICULTY'] == 4)))
+        cut_detect_sim_results_ts = (np.logical_or(np.logical_and(self.data_sim['TS'] >=  self.config[self.algorithm]['ts_threshold'], 
+                                      self.data_sim['DIFFICULTY'] == 0), np.logical_or(self.data_sim['DIFFICULTY'] == 1, self.data_sim['DIFFICULTY'] == 4)))
+        
+        mc_source_id_detect = self.data_sim['MC_SOURCE_ID'][cut_detect_sim_results_sig & cut_detect_sim_results_ts]
+        cut_detect = np.in1d(self.data_population['MC_SOURCE_ID'], mc_source_id_detect)
 
-        x_train = []
+        features = []
         for key, operation in self.config['operation']['params_intrinsic']:
             assert operation.lower() in ['linear', 'log'], 'ERROR'
             if operation.lower() == 'linear':
-                x_train.append(self.data_population[key])
+                features.append(self.data_population[key])
             else:
-                x_train.append(np.log10(self.data_population[key]))
+                features.append(np.log10(self.data_population[key]))
 
-        x_train = np.vstack(x_train).T
-        
-        cut_detect_sim_results = (self.data_sim['SIG'] >=  self.config[self.algorithm]['sig_threshold'])
-        mc_source_id_detect = self.data_sim['MC_SOURCE_ID'][cut_detect_sim_results]
-        cut_detect = np.in1d(self.data_population['MC_SOURCE_ID'], mc_source_id_detect)
-        y_train = cut_detect
+        X = np.vstack(features).T
+        X = X[cut_geometry]
+        Y = cut_detect[cut_geometry]
 
-        # Prior to training, remove those objects that would be removed by geometric cuts
-        cut_train = np.arange(len(x_train)) < 0.5 * len(x_train) # 0.8, 130 sec
-        #cut_train = np.tile(True, len(x_train))
+        # Create training and test sets
+        indices = np.arange(len(X))
+        X_train, X_test, Y_train, Y_test, cut_train, cut_test = train_test_split(X,Y,indices,test_size=0.2)
 
-        print np.sum(cut_detect), np.sum(~cut_detect), len(self.data_population)
-
-
+        # Train random forest classifier
         if True:
             print 'Training the machine learning classifier. This may take a while ...'
             t_start = time.time()
-            self.classifier = sklearn.gaussian_process.GaussianProcessClassifier(1.0 * sklearn.gaussian_process.kernels.RBF(0.5))
-            #classifier = sklearn.neighbors.KNeighborsClassifier(3, weights='uniform')
-            #classifier = sklearn.neighbors.KNeighborsClassifier(2, weights='distance') 
-            #classifier = sklearn.svm.SVC(gamma=2, C=1)
-            self.classifier.fit(x_train[cut_train & cut_geometry], y_train[cut_train & cut_geometry])
+            parameters = {'n_estimators':(500,1000)}#, 'criterion':["gini","entropy"], "min_samples_leaf": [1,2,4]}
+            rf = RandomForestClassifier(oob_score=True)
+            rf_tuned = GridSearchCV(rf, parameters, cv=10, verbose=1)
+            self.classifier = rf_tuned.fit(X_train, Y_train)
+            
+            #self.classifier = sklearn.gaussian_process.GaussianProcessClassifier(1.0 * sklearn.gaussian_process.kernels.RBF(0.5))
+            #self.classifier = sklearn.neighbors.KNeighborsClassifier(3, weights='uniform')
+            #self.classifier = sklearn.neighbors.KNeighborsClassifier(2, weights='distance') 
+            #self.classifier = sklearn.svm.SVC(gamma=2, C=1)
+            
+            # Print the best score and estimator:
+            print('Best Score:', self.classifier.best_score_)
+            print(self.classifier.best_estimator_)
+            print(self.classifier.best_params_)
             t_end = time.time()
             print '  ... training took %.2f seconds'%(t_end - t_start)
 
@@ -215,7 +234,48 @@ class surveySelectionFunction:
         else:
             self.loadClassifier()
 
-        y_pred = self.classifier.predict_proba(x_train[~cut_train & cut_geometry])[:,1]
+        y_pred = self.classifier.predict_proba(X_test)[:,1]
+        
+        #Confusion matrix
+        y_pred_label = self.classifier.predict(X_test)
+        cm = confusion_matrix(Y_test, y_pred_label)
+        nondet_frac = cm[0][0]/(1.0*cm[0][0]+1.0*cm[0][1])
+        det_frac = cm[1][1]/(1.0*cm[1][0]+1.0*cm[1][1])
+
+        print('Fraction of non-detections test set labeled correctly: %0.2f' % nondet_frac)
+        print('Fraction of detections in test set labeled correctly: %0.2f' % det_frac)
+
+        plt.figure(figsize=(8,6))
+        plt.matshow(cm)
+        plt.title('Confusion Matrix', fontsize=18, position = (0.5,1.1))
+        plt.colorbar()
+        plt.ylabel('True label', fontsize=16)
+        plt.xlabel('Predicted label', fontsize=16, position = (0.5, -10.5))
+        plt.tick_params(labelsize=12)
+        plt.show()
+        
+        # Compute ROC curve and area under curve (AUC) for each class:
+        BestRFselector = self.classifier.best_estimator_
+        y_pred_best = BestRFselector.predict_proba(X_test)
+        labels = BestRFselector.classes_
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        for i,label in enumerate(labels):
+            fpr[label], tpr[label], _ = roc_curve(Y_test, y_pred_best[:, i], pos_label=label)
+            roc_auc[label] = auc(fpr[label], tpr[label])
+            
+        plt.figure(figsize=(8,6))
+        plt.plot([0, 1], [1, 1], color='red', linestyle='-', linewidth=3, label='Perfect Classifier (AUC = %0.2f)' % (1.0))
+        plt.plot(fpr[1], tpr[1], lw=3, label='Random Forest (AUC = %0.2f)' % (roc_auc[1]), color='blue')
+        plt.plot([0, 1], [0, 1], color='black', linestyle=':', linewidth=2.5, label='Random Classifier (AUC = %0.2f)' % (0.5))
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.025])
+        plt.tick_params(labelsize=16)
+        plt.xlabel('False Positive Rate', fontsize=20, labelpad=8)
+        plt.ylabel('True Positive Rate', fontsize=20, labelpad=8)
+        plt.legend(loc="lower right", fontsize=16)
+        plt.show()
 
         self.validateClassifier(cut_detect, cut_train, cut_geometry, y_pred)
         
@@ -250,8 +310,7 @@ class surveySelectionFunction:
                      'actual': 'black',
                      'hsc': 'black'}
 
-        title = 'N_train = %i ; N_test = %i'%(np.sum(cut_train), np.sum(~cut_train))
-        import matplotlib
+        title = 'N_train = %i ; N_test = %i'%(len(cut_train),len(cut_test))        import matplotlib
         cmap = matplotlib.colors.ListedColormap(['Gold', 'Orange', 'DarkOrange', 'OrangeRed', 'Red'])
 
         pylab.figure()
