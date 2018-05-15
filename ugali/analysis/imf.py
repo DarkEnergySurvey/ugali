@@ -213,8 +213,8 @@ imfFactory = factory
 
 ############################################################
 
-def chabrierIMF(mass, log_mode=True, a=1.31357499301):
+def chabrierIMF(mass, log_mode=True):
     """ Backward compatible wrapper around Chabrier2003.pdf """
-    return Chabrier2003.pdf(mass,log_mode=log_mode,a=a)
+    return Chabrier2003.pdf(mass,log_mode=log_mode)
 
 ############################################################
