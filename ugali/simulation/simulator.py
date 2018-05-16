@@ -389,7 +389,7 @@ class Simulator(object):
         mc_source_id = mc_source_id * np.ones(len(mag_1))
 
         select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
-        
+
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_1[select],mag_err_1[select],
                                                 mag_2[select],mag_err_2[select],
                                                 lon[select],lat[select],mc_source_id[select])
@@ -629,7 +629,8 @@ class Simulator(object):
         """
         Create a catalog fits file object based on input data.
 
-        ADW: This should be combined with the write_membership function of loglike.
+        ADW: This should be combined with the write_membership
+        function of loglike.
         """
         if self.config['catalog']['coordsys'].lower() == 'cel' \
            and self.config['coords']['coordsys'].lower() == 'gal':

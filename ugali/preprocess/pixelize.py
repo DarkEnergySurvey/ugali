@@ -14,12 +14,11 @@ import fitsio
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import healpy as hp
-from matplotlib import mlab
 
 #import ugali.utils.binning
 #import ugali.utils.skymap
 from ugali.utils.projector import cel2gal, gal2cel
-from ugali.utils import healpix
+from ugali.utils import healpix, mlab
 from ugali.utils.healpix import ang2pix, pix2ang, superpixel
 
 from ugali.utils.shell import mkdir
