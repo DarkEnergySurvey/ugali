@@ -7,12 +7,12 @@ import copy
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-from matplotlib import mlab
 import scipy.special
 import scipy.stats
 
 # These should probably live in this file
 from ugali.utils.bayesian_efficiency import bayesianInterval, binomialInterval
+from ugali.utils import mlab
 
 _alpha   = 0.32
 _nbins   = 300
