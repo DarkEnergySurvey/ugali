@@ -3,6 +3,7 @@
 Currently this is more set up as a standalone script.
 """
 import os
+import copy
 import collections
 import yaml
 import numpy as np
@@ -486,11 +487,14 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
         columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
     tbhdu = pyfits.BinTableHDU.from_columns(columns)
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
+
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
         print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
         cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
         outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag,tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
-        header = tbhdu.header
+        header = copy.deepcopy(tbhdu.header)
+        header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
+        header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
         pyfits.writeto(outfile, tbhdu.data[cut_chunk], header, clobber=True)
 
     # Population metadata output file
