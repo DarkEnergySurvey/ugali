@@ -54,10 +54,6 @@ class Analyzer(object):
     def run(self, population=None, catalog=None, outfile=None, mc_source_id=None):
         if not population: population = self.population
         if not catalog:    catalog = self.catalog
-        
-        # Select only systems that are in the catalog
-        sel = np.in1d(population['MC_SOURCE_ID'],catalog.mc_source_id)
-        population = population[sel]
 
         if mc_source_id is not None:
             sel = np.in1d(population['MC_SOURCE_ID'],mc_source_id)
@@ -65,8 +61,10 @@ class Analyzer(object):
                 msg = "Requested MC_SOURCE_ID not found: %i"%mc_source_id
                 logger.warn(msg)
                 return
-            population = population[sel]
-
+        else:
+            # Select only systems that are in the catalog
+            sel = np.in1d(population['MC_SOURCE_ID'],catalog.mc_source_id)
+        population = population[sel]
             
         size = len(population)
         dtype=[('KERNEL','S18'),('TS','>f4'),('FIT_KERNEL','S18'),('FIT_TS','>f4'),
@@ -157,4 +155,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     analyzer = Analyzer(args.config,args.catfile,args.popfile)
+    
+    if args.mc_source_id is None:
+        basename = os.path.splitext(args.catfile)[0]
+        imin,imax = list(map(int,basename.rsplit('_',1)[-1].split('-')))
+        args.mc_source_id = np.arange(imin,imax+1)
+
     analyzer.run(outfile=args.outfile,mc_source_id=args.mc_source_id)

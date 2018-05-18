@@ -8,6 +8,9 @@ import getpass
 from collections import OrderedDict as odict
 from itertools import chain
 import copy
+import time
+
+import numpy as np
 
 from ugali.utils.logger import logger
 
@@ -90,6 +93,7 @@ class Batch(object):
 
     def __init__(self, **kwargs):
         self.username = getpass.getuser()
+        self.max_jobs = kwargs.pop('max_jobs',None)
         self.default_opts = copy.deepcopy(self._defaults)
         self.default_opts.update(**kwargs)
         self.submit_cmd = "submit %(opts)s %(command)s"
@@ -104,6 +108,17 @@ class Batch(object):
         # Remove header line
         jobs = self.jobs()
         return len(jobs.strip().split('\n'))-1 if jobs else 0
+
+    def throttle(self,max_jobs=None,sleep=60):
+        if max_jobs is None: max_jobs = self.max_jobs
+        if max_jobs is None: return
+        while True:
+            njobs = self.njobs()
+            if njobs < max_jobs:
+                return
+            else:
+                logger.info('%i jobs already in queue, waiting...'%(njobs))
+                time.sleep(sleep)
 
     def popen(self, command):
         return sub.Popen(command,shell=True,
@@ -128,6 +143,7 @@ class Batch(object):
 
     def submit(self, command, jobname=None, logfile=None, **opts):
         cmd = self.batch(command, jobname, logfile, **opts)
+        self.throttle()
         self.call(cmd)
         return cmd
 

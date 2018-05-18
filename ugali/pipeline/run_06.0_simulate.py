@@ -61,6 +61,7 @@ def run(self):
             jobname=base
             script = self.config['simulate']['script']
             cmd='%s %s -p %s -c %s -o %s'%(script,self.opts.config,popfile,catfile,outfile)
+            self.batch.max_jobs = batch.get('max_jobs',200)
             opts = batch.get(self.opts.queue,dict())
             self.batch.submit(cmd,jobname,logfile,**opts)
             time.sleep(0.1)
