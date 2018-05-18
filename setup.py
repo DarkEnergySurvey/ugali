@@ -284,7 +284,7 @@ setup(
         'numpy >= 1.9.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
-        'pyfits >= 3.1',
+        'fitsio >= 0.9.10',
         'emcee >= 2.1.0',
         'corner >= 1.0.0',
         'pyyaml >= 3.10',

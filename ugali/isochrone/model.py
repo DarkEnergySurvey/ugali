@@ -37,7 +37,6 @@ import inspect
 import glob
 from functools import wraps
 
-import numpy
 import numpy as np
 import scipy.interpolate
 import scipy.stats
@@ -85,7 +84,7 @@ class IsochroneModel(Model):
         ('band_1','g','Field name for magnitude one'),
         ('band_2','r','Field name for magnitude two'),
         ('band_1_detection',True,'Band one is detection band'),
-        ('imf_type','chabrier','Initial mass function'),
+        ('imf_type','Chabrier2003','Initial mass function'),
         ('hb_stage',None,'Horizontal branch stage name'),
         ('hb_spread',0.0,'Intrinisic spread added to horizontal branch'),
         )
@@ -101,7 +100,7 @@ class IsochroneModel(Model):
         for k,v in list(defaults.items()):
             setattr(self,k,v)
 
-        self.imf = ugali.analysis.imf.IMF(defaults['imf_type'])
+        self.imf = ugali.analysis.imf.factory(defaults['imf_type'])
         self.index = None
 
     def _parse(self,filename):
@@ -163,7 +162,7 @@ class IsochroneModel(Model):
         # ADW: Assume that the isochrones are pre-sorted by mass_init
         # This avoids some numerical instability from points that have the same
         # mass_init value (discontinuities in the isochrone).
-        # ADW: Might consider using numpy.interp for speed
+        # ADW: Might consider using np.interp for speed
         mass_act_interpolation = scipy.interpolate.interp1d(mass_init, mass_act,assume_sorted=True)
         mag_1_interpolation = scipy.interpolate.interp1d(mass_init, mag_1,assume_sorted=True)
         mag_2_interpolation = scipy.interpolate.interp1d(mass_init, mag_2,assume_sorted=True)
@@ -172,7 +171,7 @@ class IsochroneModel(Model):
         if mode=='data':
             # Mass interpolation with uniform coverage between data points from isochrone file 
             mass_interpolation = scipy.interpolate.interp1d(np.arange(len(mass_init)), mass_init)
-            mass_array = mass_interpolation(np.linspace(0, len(mass_init) - 1, mass_steps + 1))
+            mass_array = mass_interpolation(np.linspace(0, len(mass_init)-1, mass_steps+1))
             d_mass = mass_array[1:] - mass_array[:-1]
             mass_init_array = np.sqrt(mass_array[1:] * mass_array[:-1])
             mass_pdf_array = d_mass * self.imf.pdf(mass_init_array, log_mode=False)
@@ -406,12 +405,12 @@ class IsochroneModel(Model):
         # Analytic part
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps = steps)
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
-        #cut = numpy.logical_not((g > mag_bright) & (g < mag_faint) & (r > mag_bright) & (r < mag_faint))
+        #cut = np.logical_not((g > mag_bright) & (g < mag_faint) & (r > mag_bright) & (r < mag_faint))
         cut = ((g + self.distance_modulus) > mag_faint) if self.band_1 == 'g' else ((r + self.distance_modulus) > mag_faint)
         mag_unobs = visual(g[cut], r[cut], richness * mass_pdf[cut])
 
         # Stochastic part
-        abs_mag_obs_array = numpy.zeros(n_trials)
+        abs_mag_obs_array = np.zeros(n_trials)
         for ii in range(0, n_trials):
             if ii%100==0: logger.debug('%i absolute magnitude trials'%ii)
             g, r = self.simulate(richness * self.stellar_mass())
@@ -421,11 +420,11 @@ class IsochroneModel(Model):
             abs_mag_obs_array[ii] = sumMag(mag_obs, mag_unobs)
 
         # ADW: This shouldn't be necessary
-        #abs_mag_obs_array = numpy.sort(abs_mag_obs_array)[::-1]
+        #abs_mag_obs_array = np.sort(abs_mag_obs_array)[::-1]
 
         # ADW: Careful, fainter abs mag is larger (less negative) number
         q = [100*alpha/2., 50, 100*(1-alpha/2.)]
-        hi,med,lo = numpy.percentile(abs_mag_obs_array,q)
+        hi,med,lo = np.percentile(abs_mag_obs_array,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
     def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
@@ -488,6 +487,7 @@ class IsochroneModel(Model):
         ADW: Could this function be even faster / more readable?
         ADW: Should this include magnitude error leakage?
         """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
         mass_init,mass_pdf,mass_act,mag_1,mag_2 = self.sample(mass_min=mass_min,full_data_range=False)
 
         mag = mag_1 if self.band_1_detection else mag_2
@@ -505,10 +505,13 @@ class IsochroneModel(Model):
         # Create 2D arrays of cuts for each pixel
         mask_1_cut = (mag_1+distance_modulus)[:,np.newaxis] < mag_1_mask
         mask_2_cut = (mag_2+distance_modulus)[:,np.newaxis] < mag_2_mask
-        mask_cut_repeat = mask_1_cut & mask_2_cut
+        mask_cut_repeat = (mask_1_cut & mask_2_cut)
 
+        # Condense back into one per digi
         observable_fraction = (mass_pdf_cut[:,np.newaxis]*mask_cut_repeat).sum(axis=0)
-        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]]
+
+        # Expand to the roi and multiply by coverage fraction
+        return observable_fraction[mask.mask_roi_digi[mask.roi.pixel_interior_cut]] * mask.frac_interior_sparse
 
 
     def observableFractionCDF(self, mask, distance_modulus, mass_min=0.1):
@@ -929,6 +932,7 @@ class IsochroneModel(Model):
         
         return np.min(np.sqrt(dist_mag_1**2 + dist_mag_2**2),axis=1)
 
+
     def separation(self, mag_1, mag_2):
         """ 
         Calculate the separation between a specific point and the
@@ -984,7 +988,6 @@ class IsochroneModel(Model):
 
         #return dmag_1,dmag_2
         return np.sqrt(dmag_1**2 + dmag_2**2)
-
 
 class Isochrone(IsochroneModel):
     """ Abstract base class for isochrones """
@@ -1130,6 +1133,11 @@ class Isochrone(IsochroneModel):
         Check valid parameter range and download isochrones from:
         http://stev.oapd.inaf.it/cgi-bin/cmd
         """
+        try:
+            from urllib.error import URLError
+        except ImportError:
+            from urllib2 import URLError
+
         if age is None: age = float(self.age)
         if metallicity is None: metallicity = float(self.metallicity)
 
@@ -1145,17 +1153,12 @@ class Isochrone(IsochroneModel):
             except Exception as e:
                 msg = "Overwriting corrupted %s..."%(outfile)
                 logger.warn(msg)
-                #os.remove(outfile)
+                os.remove(outfile)
                 
         mkdir(outdir)
 
         self.print_info(age,metallicity)
-
-        try:
-            self.query_server(outfile,age,metallicity)
-        except Exception as e:
-            logger.debug(str(e))
-            raise RuntimeError('Bad server response')
+        self.query_server(outfile,age,metallicity)
 
         if not os.path.exists(outfile):
             raise RuntimeError('Download failed')
@@ -1166,6 +1169,7 @@ class Isochrone(IsochroneModel):
             msg = "Output file is corrupted."
             logger.error(msg)
             msg = "Removing %s."%outfile
+            logger.info(msg)
             os.remove(outfile)
             raise(e)
 
