@@ -162,6 +162,7 @@ class Farm:
 
         # Need to develop some way to take command line arguments...
         self.batch = ugali.utils.batch.batchFactory(queue,**batch['opts'])
+        self.batch.max_jobs = batch.get('max_jobs',200)
 
         if np.isscalar(pixels): pixels = np.array([pixels])
 
@@ -220,14 +221,6 @@ class Farm:
                 logger.info(self.skip)
                 continue
             else:
-                while True:
-                    njobs = self.batch.njobs()
-                    if njobs < batch['max_jobs']:
-                        break
-                    else:
-                        logger.info('%i jobs already in queue, waiting...'%(njobs))
-                        time.sleep(5*chunk)
-
                 job = self.batch.submit(command,jobname,logfile)
                 logger.info("  "+job)
                 time.sleep(0.5)
