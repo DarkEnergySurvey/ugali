@@ -7,7 +7,7 @@ import os
 import numpy as np
 import ugali.utils.config
 
-CONFIG='ugali/config/config_test.yaml'
+CONFIG='tests/config.yaml'
 
 def test_config():
     config = ugali.utils.config.Config(CONFIG)

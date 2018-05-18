@@ -7,7 +7,7 @@ import numpy as np
 from ugali.utils.logger import logger
 logger.setLevel(logger.WARN)
 
-CONFIG='ugali/config/config_test.yaml'
+CONFIG='tests/config.yaml'
 LON = RA = 53.92
 LAT = DEC = -54.05
 POINTS = np.array([(LON,LAT), (53.81,-54.02), (54.17,-53.88), (52.59,-55.39)]).T
