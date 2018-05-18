@@ -105,8 +105,7 @@ class Catalog:
         self.pixel = ang2pix(self.config['coords']['nside_pixel'],self.lon,self.lat)
         self.pixel_roi_index = roi.indexROI(self.lon,self.lat)
 
-        if np.any(self.pixel_roi_index < 0):
-            logger.warning("Objects found outside ROI")
+        logger.info("Found %i objects outside ROI"%(self.pixel_roi_index < 0).sum())
 
     def write(self, outfile, clobber=True, **kwargs):
         """
