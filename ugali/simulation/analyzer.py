@@ -12,7 +12,6 @@ import scipy.interpolate
 import healpy
 import numpy.lib.recfunctions as recfuncs
 import fitsio
-from matplotlib import mlab
 
 import ugali.observation.catalog
 import ugali.observation.mask
@@ -25,6 +24,7 @@ from ugali.utils.projector import gal2cel, cel2gal, sr2deg, mod2dist
 from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
+from ugali.utils import mlab
 
 class Analyzer(object):
     """

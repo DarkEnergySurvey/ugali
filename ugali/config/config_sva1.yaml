@@ -172,7 +172,7 @@ isochrone:
   mag_1_field: g
   mag_2_field: r
   stage_field: stage
-  imf: chabrier
+  imf: Chabrier2003
   horizontal_branch_stage     : 'BHeb'
   #horizontal_branch_dispersion: null
   #horizontal_branch_dispersion: [0.0] # mag

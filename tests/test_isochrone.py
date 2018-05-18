@@ -142,9 +142,9 @@ def test_download():
         try:
             iso.download(outdir='./tmp/'+name.lower(),force=True)
         except URLError as e:
-            print("Server is down")
-            print(e)
-        
+            logger.error("%s: Server is down.\n%s"%(name,str(e)))
+        except RuntimeError as e:
+            logger.error("%s: %s"%(name,str(e)))
     
 if __name__ == "__main__":
     import argparse

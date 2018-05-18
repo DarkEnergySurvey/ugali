@@ -19,30 +19,34 @@ def test_loglike():
     loglike = ugali.analysis.loglike.createLoglike(CONFIG,lon=LON,lat=LAT)
 
     source = loglike.source
+    np.testing.assert_equal(source.isochrone.name,'Bressan2012')
+    np.testing.assert_equal(source.kernel.name,'RadialPlummer')
     np.testing.assert_equal(source.richness,1000.)
 
     # Probability calculations
-    np.testing.assert_allclose(loglike.f,0.1945461,rtol=1e-6)
+    np.testing.assert_allclose(loglike.f,0.08614111,rtol=1e-6)
+
     np.testing.assert_allclose(loglike.u[IDX],
-                               [1.11721569e-11, 3.67872840e-03, 3.25216604e-02],
+                               [5.29605173e-03, 1.80040569e-03, 5.52283081e-09],
                                rtol=1e-6)
     np.testing.assert_allclose(loglike.b[IDX],
                                [4215.31143651, 9149.29106545, 1698.22182173],
                                rtol=1e-6)
     np.testing.assert_allclose(loglike.p[IDX],
-                               [2.65037519e-12, 4.01916371e-04, 1.87905722e-02],
+                               [1.25480793e-03, 1.96742181e-04, 3.25212568e-09],
                                rtol=1e-6)
-    np.testing.assert_allclose(loglike(),390.153891)
-    np.testing.assert_allclose(loglike.ts(),780.30778)
-    np.testing.assert_allclose(loglike.nobs,194.546134)
+    np.testing.assert_allclose(loglike(),3947.9703876)
+    np.testing.assert_allclose(loglike.ts(),7895.94077)
+    np.testing.assert_allclose(loglike.nobs,86.1411187)
 
     # Fit the richness
     interval = loglike.richness_interval()
-    np.testing.assert_allclose(interval,(1713.4082, 1969.1216))
+    np.testing.assert_allclose(interval,(31516.82584, 32836.37888))
+                                        
     lnl,rich,para = loglike.fit_richness()
-    np.testing.assert_allclose(lnl,418.666213)
-    np.testing.assert_allclose(rich,1839.005237)
-    np.testing.assert_allclose(loglike.source.richness,1839.005237)
+    np.testing.assert_allclose(lnl,8443.79621)
+    np.testing.assert_allclose(rich,32171.788052)
+    np.testing.assert_allclose(loglike.source.richness,32171.78805)
 
     # Write membership
     filename = 'test-membership.fits'

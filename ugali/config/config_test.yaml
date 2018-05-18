@@ -92,18 +92,23 @@ kernel: &kernel
 isochrone: &isochrone
    name: Bressan2012
    age: 12.0
-   z: 0.0001
+   z: 0.00010
    distance_modulus : 17.0
    band_1 : *band1
    band_2 : *band2
    band_1_detection : *detection
+
+# Default source specification
+source: &source
+  kernel   : *kernel
+  isochrone: *isochrone
   
 likelihood:
   #delta_mag: 0.01 # 1.e-3 
   delta_mag: 0.01 # 1.e-3 
 
 ### ### ### ### ### ### ### ### ### ### 
-### Options for analysis components ###
+### Options for pipeline components ###
 ### ### ### ### ### ### ### ### ### ### 
 
 output:

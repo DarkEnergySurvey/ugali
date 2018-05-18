@@ -14,13 +14,12 @@ import numpy as np
 import numpy
 import numpy.lib.recfunctions as recfuncs
 import scipy.ndimage as ndimage
-from matplotlib import mlab
 
 from ugali.utils.shell import mkdir, which
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
 from ugali.utils.projector import Projector,gal2cel,cel2gal,dec2hms,dec2dms,mod2dist
-from ugali.utils import healpix
+from ugali.utils import healpix, mlab
 from ugali.utils.healpix import pix2ang, ang2pix
 from ugali.candidate.associate import SourceCatalog, catalogFactory
 from ugali.utils.config import Config
