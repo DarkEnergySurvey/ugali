@@ -61,7 +61,7 @@ def run(self):
         candidates = candidates[candidates['ts'] >= threshold]
 
         for i,c in enumerate(candidates):
-            msg = "(%i/%i) Plotting %s (%.2f,%.2f)..."%(i,len(candidates),c['name'],c['glon'],c['glat'])
+            msg = "(%i/%i) Plotting %s (%.2f,%.2f)..."%(i,len(candidates),c['name'],c['ra'],c['dec'])
             logger.info(msg)
             params = (self.opts.config,outdir,c['name'],c['ra'],
                       c['dec'],0.5,c['modulus'])
@@ -70,8 +70,9 @@ def run(self):
             logger.info(cmd)
             jobname = c['name'].lower().replace(' ','_')
             logfile = os.path.join(logdir,jobname+'.log')
-            self.batch.submit(cmd,jobname,logfile)
-            time.sleep(5)
+            batch = self.config['search'].get('batch',self.config['batch'])
+            self.batch.submit(cmd,jobname,logfile,**batch['opts'])
+            time.sleep(3)
 
 Pipeline.run = run
 pipeline = Pipeline(__doc__,components)

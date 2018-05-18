@@ -9,11 +9,10 @@ from abc import abstractmethod
 from collections import OrderedDict as odict
 import copy
 
-import numpy
 import numpy as np
+import healpy as hp
 import scipy.integrate
 import scipy.interpolate
-import healpy
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
@@ -69,7 +68,7 @@ class Kernel(Model):
         else:
             return Projector(self.lon, self.lat, self.proj)
 
-    def integrate(self, rmin=0, rmax=numpy.inf):
+    def integrate(self, rmin=0, rmax=np.inf):
         """
         Calculate the 2D integral of the 1D surface brightness profile 
         (i.e, the flux) between rmin and rmax (elliptical radii). 
@@ -84,7 +83,7 @@ class Kernel(Model):
         integral : Solid angle integral (deg^2)
         """
         if rmin < 0: raise Exception('rmin must be >= 0')
-        integrand = lambda r: self._pdf(r) * 2*numpy.pi * r
+        integrand = lambda r: self._pdf(r) * 2*np.pi * r
         return scipy.integrate.quad(integrand,rmin,rmax,full_output=True,epsabs=0)[0]
 
 class ToyKernel(Kernel):
@@ -101,7 +100,7 @@ class ToyKernel(Kernel):
         ])
 
     def _cache(self, name=None):
-        pixel_area = healpy.nside2pixarea(self.nside,degrees=True)
+        pixel_area = hp.nside2pixarea(self.nside,degrees=True)
         vec = ang2vec(self.lon, self.lat)
         self.pix = query_disc(self.nside,vec,self.extension)
         self._norm = 1./(len(self.pix)*pixel_area)
@@ -190,7 +189,7 @@ class EllipticalKernel(Kernel):
         cdf = np.cumsum(pdf)
         cdf /= cdf[-1]
         fn = scipy.interpolate.interp1d(cdf, list(range(0, len(cdf))))
-        index = numpy.floor(fn(numpy.random.uniform(size=n))).astype(int)
+        index = np.floor(fn(np.random.uniform(size=n))).astype(int)
         return radius[index]
  
     def sample_lonlat(self, n):
@@ -206,7 +205,7 @@ class EllipticalKernel(Kernel):
         radius = self.sample_radius(n)
         a = radius; b = self.jacobian * radius
 
-        t = 2. * np.pi * numpy.random.rand(n)
+        t = 2. * np.pi * np.random.rand(n)
         cost,sint = np.cos(t),np.sin(t)
         phi = np.pi/2. - np.deg2rad(self.theta)
         cosphi,sinphi = np.cos(phi),np.sin(phi)
@@ -326,7 +325,7 @@ class EllipticalPlummer(EllipticalKernel):
         ])
  
     def _kernel(self, radius):
-        return 1./(numpy.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
+        return 1./(np.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
 
     def _cache(self, name=None):
         if name in [None,'extension','ellipticity','truncate']:
@@ -400,17 +399,22 @@ class RadialKernel(EllipticalKernel):
     Radial kernel subclass fixing ellipticity and 
     position angle to zero.
     """
-    _fixed_params = ['ellipticity','position_angle']
+    _frozen_params = ['ellipticity','position_angle']
 
     def __init__(self,**kwargs):
         # This is a bit messy because the defaults are set
         # at the instance level not at the class level
         self._params = copy.deepcopy(self._params)
-        self._params['ellipticity'].set(0, [0, 0])
-        self._params['position_angle'].set(0, [0, 0])
+
+        def frozen(x): 
+            if x: raise Exception("Parameter is frozen")
+                
+        self._params['ellipticity'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
+        self._params['position_angle'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
         #logger.warning("Setting bounds on extension")
         #self._params['extension'].set(0.1, [1e-4, 0.1])
-
         super(RadialKernel,self).__init__(**kwargs)
         
     def pdf(self, lon, lat):

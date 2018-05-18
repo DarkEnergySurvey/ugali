@@ -12,7 +12,6 @@ from scipy.stats import norm
 
 import healpy
 import healpy as hp
-import astropy.io.fits as pyfits
 import fitsio
 
 import ugali.utils.binning
@@ -174,10 +173,10 @@ class LogLikelihood(object):
         # The signal probability for each object
         self._p = (self.source.richness * self.u)/((self.source.richness * self.u) + self.b)
 
-        #print 'b',np.unique(self.b)[:20]
-        #print 'u',np.unique(self.u)[:20]
-        #print 'f',np.unique(self.f)[:20]
-        #print 'p',np.unique(self.p)[:20] 
+        #logging.debug('b: %s'%np.unique(self.b)[:20])
+        #logging.debug('u: %s'%np.unique(self.u)[:20])
+        #logging.debug('f: %s'%np.unique(self.f)[:20])
+        #logging.debug('p: %s'%np.unique(self.p)[:20])
 
         # Reset the sync toggle
         #for k in self._sync.keys(): self._sync[k]=False 
@@ -415,44 +414,46 @@ class LogLikelihood(object):
         return parabola.confidenceInterval(alpha)
 
 
-    def write_membership2(self,filename):
-        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
-        
-        name_objid = self.config['catalog']['objid_field']
-        name_mag_1 = self.config['catalog']['mag_1_field']
-        name_mag_2 = self.config['catalog']['mag_2_field']
-        name_mag_err_1 = self.config['catalog']['mag_err_1_field']
-        name_mag_err_2 = self.config['catalog']['mag_err_2_field']
-
-        # Angular and isochrone separations
-        sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
-        isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
-
-        columns = [
-            pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
-            pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
-            pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
-            pyfits.Column(name='RA',format='D',array=ra),
-            pyfits.Column(name='DEC',format='D',array=dec),
-            pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
-            pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
-            pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
-            pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
-            pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
-            pyfits.Column(name='ANGSEP',format='E',array=sep),
-            pyfits.Column(name='ISOSEP',format='E',array=isosep),
-            pyfits.Column(name='PROB',format='E',array=self.p),
-        ]
-        hdu = pyfits.new_table(columns)
-        for param,value in self.source.params.items():
-            # HIERARCH allows header keywords longer than 8 characters
-            name = 'HIERARCH %s'%param.upper()
-            hdu.header.set(name,value.value,param)
-        name = 'HIERARCH %s'%'TS'
-        hdu.header.set(name,self.ts())
-        name = 'HIERARCH %s'%'TIMESTAMP'
-        hdu.header.set(name,time.asctime())
-        hdu.writeto(filename,clobber=True)
+    #def write_membership2(self,filename):
+    #    import astropy.io.fits as pyfits
+    # 
+    #    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+    #    
+    #    name_objid = self.config['catalog']['objid_field']
+    #    name_mag_1 = self.config['catalog']['mag_1_field']
+    #    name_mag_2 = self.config['catalog']['mag_2_field']
+    #    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
+    #    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
+    # 
+    #    # Angular and isochrone separations
+    #    sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
+    #    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
+    # 
+    #    columns = [
+    #        pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
+    #        pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
+    #        pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
+    #        pyfits.Column(name='RA',format='D',array=ra),
+    #        pyfits.Column(name='DEC',format='D',array=dec),
+    #        pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
+    #        pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
+    #        pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
+    #        pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
+    #        pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
+    #        pyfits.Column(name='ANGSEP',format='E',array=sep),
+    #        pyfits.Column(name='ISOSEP',format='E',array=isosep),
+    #        pyfits.Column(name='PROB',format='E',array=self.p),
+    #    ]
+    #    hdu = pyfits.new_table(columns)
+    #    for param,value in self.source.params.items():
+    #        # HIERARCH allows header keywords longer than 8 characters
+    #        name = 'HIERARCH %s'%param.upper()
+    #        hdu.header.set(name,value.value,param)
+    #    name = 'HIERARCH %s'%'TS'
+    #    hdu.header.set(name,self.ts())
+    #    name = 'HIERARCH %s'%'TIMESTAMP'
+    #    hdu.header.set(name,time.asctime())
+    #    hdu.writeto(filename,clobber=True)
 
     # Writing membership files
     def write_membership(self,filename):
@@ -476,7 +477,9 @@ class LogLikelihood(object):
         name_mag_err_2 = self.config['catalog']['mag_err_2_field']
 
         # Coordinate conversion
-        ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        #ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
+        glon,glat = self.catalog.glon_glat
+        ra,dec    = self.catalog.ra_dec
 
         # Angular and isochrone separations
         sep = angsep(self.source.lon,self.source.lat,
@@ -486,8 +489,8 @@ class LogLikelihood(object):
         # If size becomes an issue we can make everything float32
         data = odict()
         data[name_objid]     = self.catalog.objid
-        data['GLON']         = self.catalog.lon
-        data['GLAT']         = self.catalog.lat
+        data['GLON']         = glon
+        data['GLAT']         = glat
         data['RA']           = ra
         data['DEC']          = dec
         data[name_mag_1]     = self.catalog.mag_1

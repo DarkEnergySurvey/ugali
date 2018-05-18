@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 """
 Module for simulation.
-
 """
 
 import copy
+import os
 
-import numpy
 import numpy as np
 import scipy.interpolate
-import pyfits
-import healpy
+import astropy.io.fits as pyfits
+import healpy as hp
 import numpy.lib.recfunctions as recfuncs
-
+import fitsio
 
 import ugali.observation.catalog
 import ugali.observation.mask
@@ -101,8 +100,8 @@ class Generator:
             hdu.writeto(filename,clobber=True)
         elif filename.endswith('.txt') or filename.endswith('.dat'):
             np.savetxt(filename,data)
-        elif filename.endswith('.txt') or filename.endswith('.dat'):
-            np.savetxt(filename,data)
+        elif filename.endswith('.csv'):
+            np.savetxt(filename,data,delimiter=',')
         else:
             raise Exception('Unrecognized file extension: %s'%filename)
 
@@ -215,7 +214,7 @@ class Simulator(object):
             params['simulate']['kernel'] = params['kernel']
 
         self.isochrone = ugali.analysis.loglike.createIsochrone(params)
-        self.kernel = ugali.analysis.loglike.createKernel(params['simulate'],self.roi.lon,self.roi.lat)
+        self.kernel = ugali.analysis.loglike.createKernel(params['simulate'],lon=self.roi.lon,lat=self.roi.lat)
 
         self.mask = ugali.analysis.loglike.createMask(self.config,self.roi)
 
@@ -249,39 +248,39 @@ class Simulator(object):
 
         # Band 1
         mag_1_thresh = self.mask.mask_1.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_1
-        sorting_indices = numpy.argsort(mag_1_thresh)
+        sorting_indices = np.argsort(mag_1_thresh)
         mag_1_thresh_sort = mag_1_thresh[sorting_indices]
         mag_err_1_sort = self.catalog.mag_err_1[sorting_indices]
 
-        # ADW: Can't this be done with numpy.median(axis=?)
+        # ADW: Can't this be done with np.median(axis=?)
         mag_1_thresh_medians = []
         mag_err_1_medians = []
         for i in range(0, int(len(mag_1_thresh) / float(n_per_bin))):
-            mag_1_thresh_medians.append(numpy.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-            mag_err_1_medians.append(numpy.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_1_thresh_medians.append(np.median(mag_1_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_1_medians.append(np.median(mag_err_1_sort[n_per_bin * i: n_per_bin * (i + 1)]))
         
         if mag_1_thresh_medians[0] > 0.:
-            mag_1_thresh_medians = numpy.insert(mag_1_thresh_medians, 0, -99.)
-            mag_err_1_medians = numpy.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
+            mag_1_thresh_medians = np.insert(mag_1_thresh_medians, 0, -99.)
+            mag_err_1_medians = np.insert(mag_err_1_medians, 0, mag_err_1_medians[0])
         
         self.photo_err_1 = scipy.interpolate.interp1d(mag_1_thresh_medians, mag_err_1_medians,
                                                       bounds_error=False, fill_value=mag_err_1_medians[-1])
 
         # Band 2
         mag_2_thresh = self.mask.mask_2.mask_roi_sparse[self.catalog.pixel_roi_index] - self.catalog.mag_2
-        sorting_indices = numpy.argsort(mag_2_thresh)
+        sorting_indices = np.argsort(mag_2_thresh)
         mag_2_thresh_sort = mag_2_thresh[sorting_indices]
         mag_err_2_sort = self.catalog.mag_err_2[sorting_indices]
 
         mag_2_thresh_medians = []
         mag_err_2_medians = []
         for i in range(0, int(len(mag_2_thresh) / float(n_per_bin))):
-            mag_2_thresh_medians.append(numpy.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
-            mag_err_2_medians.append(numpy.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_2_thresh_medians.append(np.median(mag_2_thresh_sort[n_per_bin * i: n_per_bin * (i + 1)]))
+            mag_err_2_medians.append(np.median(mag_err_2_sort[n_per_bin * i: n_per_bin * (i + 1)]))
 
         if mag_2_thresh_medians[0] > 0.:
-            mag_2_thresh_medians = numpy.insert(mag_2_thresh_medians, 0, -99.)
-            mag_err_2_medians = numpy.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
+            mag_2_thresh_medians = np.insert(mag_2_thresh_medians, 0, -99.)
+            mag_err_2_medians = np.insert(mag_err_2_medians, 0, mag_err_2_medians[0])
         
         self.photo_err_2 = scipy.interpolate.interp1d(mag_2_thresh_medians, mag_err_2_medians,
                                                       bounds_error=False, fill_value=mag_err_2_medians[-1])
@@ -301,7 +300,7 @@ class Simulator(object):
         logger.info("Setup subpixels...")
         self.nside_pixel = self.config['coords']['nside_pixel']
         self.nside_subpixel = self.nside_pixel * 2**4 # Could be config parameter
-        epsilon = np.degrees(healpy.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
+        epsilon = np.degrees(hp.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
         subpix = ugali.utils.healpix.query_disc(self.nside_subpixel,self.roi.vec,self.roi_radius+epsilon)
         superpix = ugali.utils.healpix.superpixel(subpix,self.nside_subpixel,self.nside_pixel)
         self.subpix = subpix[np.in1d(superpix,self.roi.pixels)]
@@ -376,10 +375,10 @@ class Simulator(object):
         mag_2 = mag_1 - color
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(self.nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(self.nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
         
@@ -387,10 +386,10 @@ class Simulator(object):
         #mag_err_2 = 1.0*np.ones(len(pix))
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
 
         select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
-        
+
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_1[select],mag_err_1[select],
                                                 mag_2[select],mag_err_2[select],
                                                 lon[select],lat[select],mc_source_id[select])
@@ -429,7 +428,7 @@ class Simulator(object):
         self._setup_cmd()
 
         # Randomize the number of stars per bin according to Poisson distribution
-        nstar_per_bin = numpy.random.poisson(lam=self.bkg_lambda)
+        nstar_per_bin = np.random.poisson(lam=self.bkg_lambda)
         nstar = nstar_per_bin.sum()
 
         logger.info("Simulating %i background stars..."%nstar)
@@ -443,10 +442,10 @@ class Simulator(object):
 
             # Distribute points within each color-mag bins
             xx,yy = np.meshgrid(self.bkg_centers_color,self.bkg_centers_mag)
-            color = numpy.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
-            color += numpy.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
-            mag_1 = numpy.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
-            mag_1 += numpy.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
+            color = np.repeat(xx.flatten(),repeats=nstar_per_bin.flatten())
+            color += np.random.uniform(-delta_color/2.,delta_color/2.,size=nstar)
+            mag_1 = np.repeat(yy.flatten(),repeats=nstar_per_bin.flatten())
+            mag_1 += np.random.uniform(-delta_mag/2.,delta_mag/2.,size=nstar)
         else:
             # Uniform color-magnitude distribution
             logger.info("Generating uniform CMD.")
@@ -464,20 +463,20 @@ class Simulator(object):
         pix = ang2pix(nside_pixel, lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(nside_pixel))
+        mask = -1. * np.ones(hp.nside2npix(nside_pixel))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
         mag_err_1 = self.photo_err_1(mag_lim_1 - mag_1)
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
 
         # ADW: Should magnitudes be randomized by the erros?
-        #mag_1 += (numpy.random.normal(size=len(mag_1)) * mag_err_1)
-        #mag_2 += (numpy.random.normal(size=len(mag_2)) * mag_err_2)
+        #mag_1 += (np.random.normal(size=len(mag_1)) * mag_err_1)
+        #mag_2 += (np.random.normal(size=len(mag_2)) * mag_err_2)
 
         select = (mag_lim_1>mag_1)&(mag_lim_2>mag_2)
 
@@ -512,10 +511,10 @@ class Simulator(object):
         pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
@@ -523,12 +522,12 @@ class Simulator(object):
         mag_err_2 = self.photo_err_2(mag_lim_2 - mag_2)
 
         # Randomize magnitudes by their errors
-        mag_obs_1 = mag_1+numpy.random.normal(size=len(mag_1))*mag_err_1
-        mag_obs_2 = mag_2+numpy.random.normal(size=len(mag_2))*mag_err_2
+        mag_obs_1 = mag_1+np.random.normal(size=len(mag_1))*mag_err_1
+        mag_obs_2 = mag_2+np.random.normal(size=len(mag_2))*mag_err_2
         #mag_obs_1 = mag_1
         #mag_obs_2 = mag_2
 
-        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        #select = np.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
         select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)
 
         # Make sure objects lie within the original cmd (should also be done later...)
@@ -536,7 +535,7 @@ class Simulator(object):
 
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
         
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
                                                 mag_obs_2[select],mag_err_2[select], 
@@ -564,10 +563,10 @@ class Simulator(object):
         pix = ang2pix(self.config['coords']['nside_pixel'], lon, lat)
 
         # There is probably a better way to do this step without creating the full HEALPix map
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_1.mask_roi_sparse
         mag_lim_1 = mask[pix]
-        mask = -1. * numpy.ones(healpy.nside2npix(self.config['coords']['nside_pixel']))
+        mask = -1. * np.ones(hp.nside2npix(self.config['coords']['nside_pixel']))
         mask[self.roi.pixels] = self.mask.mask_2.mask_roi_sparse
         mag_lim_2 = mask[pix]
 
@@ -589,10 +588,10 @@ class Simulator(object):
         accept = comp > 1 - np.random.uniform(size=len(mag_1))
 
         # Randomize magnitudes by their errors
-        mag_obs_1 = mag_1 + (numpy.random.normal(size=len(mag_1))*mag_err_1)
-        mag_obs_2 = mag_2 + (numpy.random.normal(size=len(mag_2))*mag_err_2)
+        mag_obs_1 = mag_1 + (np.random.normal(size=len(mag_1))*mag_err_1)
+        mag_obs_2 = mag_2 + (np.random.normal(size=len(mag_2))*mag_err_2)
 
-        #select = numpy.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
+        #select = np.logical_and(mag_obs_1 < mag_lim_1, mag_obs_2 < mag_lim_2)
         select = (mag_lim_1>mag_obs_1)&(mag_lim_2>mag_obs_2)&accept
 
         ### # Make sure objects lie within the original cmd (should also be done later...)
@@ -601,7 +600,7 @@ class Simulator(object):
 
         #return mag_1_obs[cut], mag_2_obs[cut], lon[cut], lat[cut]
         logger.info("Clipping %i simulated satellite stars..."%(~select).sum())
-        mc_source_id = mc_source_id * numpy.ones(len(mag_1))
+        mc_source_id = mc_source_id * np.ones(len(mag_1))
         
         hdu = ugali.observation.catalog.makeHDU(self.config,mag_obs_1[select],mag_err_1[select],
                                                 mag_obs_2[select],mag_err_2[select], 
@@ -630,9 +629,9 @@ class Simulator(object):
         """
         Create a catalog fits file object based on input data.
 
-        ADW: This should be combined with the write_membership function of loglike.
+        ADW: This should be combined with the write_membership
+        function of loglike.
         """
-
         if self.config['catalog']['coordsys'].lower() == 'cel' \
            and self.config['coords']['coordsys'].lower() == 'gal':
             lon, lat = ugali.utils.projector.gal2cel(lon, lat)
@@ -667,6 +666,145 @@ class Simulator(object):
         """
         """
         pass
+
+############################################################
+
+class Analyzer(object):
+    """
+    Class for generating the parameters of the simulation.
+    """
+    def __init__(self, config, seed=None):
+        self.config = Config(config)
+
+    def create_population(self):
+        if self.config['simulate']['popfile']:
+            filename = os.path.join(self.config['simulate']['dirname'],self.config['simulate']['popfile'])
+            population = fitsio.read(filename)
+        else:
+            size = self.config['simulate']['size']
+            population = self.generate(size)
+            
+        self.population = population
+
+        return self.population
+
+    def write(self, filename, data=None):
+        """ Write the output results """
+        if data is None: data = self.results
+        logger.info("Writing %s..."%filename)
+        if filename.endswith('.npy'):
+            np.save(filename,data)
+        elif filename.endswith('.fits'):
+            # Copies data, so be careful..
+            out = np.rec.array(data)
+            out.dtype.names = np.char.upper(out.dtype.names)
+            hdu = pyfits.new_table(out)
+            hdu.writeto(filename,clobber=True)
+        elif filename.endswith('.txt') or filename.endswith('.dat'):
+            np.savetxt(filename,data)
+        elif filename.endswith('.csv'):
+            np.savetxt(filename,data,delimiter=',')
+        else:
+            raise Exception('Unrecognized file extension: %s'%filename)
+
+    def run(self, catalog=None, outfile=None):
+        #if size is None: size = self.config['simulate']['size']
+        #data = self.generate(size)
+        data = self.create_population()
+        size = len(data)
+
+        dtype=[('kernel','S18'),('ts','>f4'),('fit_kernel','S18'),('fit_ts','>f4'),
+               ('fit_mass','>f4'),('fit_mass_err','>f4'),
+               ('fit_distance','>f4'),('fit_distance_err','>f4')]
+        results = np.array(np.nan*np.ones(size),dtype=dtype)
+        results = recfuncs.merge_arrays([data,results],flatten=True,asrecarray=False,usemask=False)
+        self.results = results
+
+        if outfile: self.write(outfile,results)
+
+        for i,d in enumerate(data): 
+            params = dict(list(zip(data.dtype.names,d)))
+            lon,lat = params['ra'],params['dec']
+            distance_modulus = params['distance_modulus']
+
+            logger.info('\n(%i/%i); (lon, lat) = (%.2f, %.2f)'%(i+1,len(data),lon,lat))
+            roi = ugali.analysis.loglike.createROI(self.config,lon,lat)
+            mask = ugali.analysis.loglike.createMask(self.config,roi)
+            isochrone = ugali.analysis.loglike.createIsochrone(self.config)
+            kernel = ugali.analysis.loglike.createKernel(self.config,lon=lon,lat=lat)
+            pix = roi.indexTarget(lon,lat)
+
+            if not config['simulate']['catfile']:
+                simulator = Simulator(self.config,roi)
+                #catalog   = simulator.simulate(seed=self.seed, **params)
+                catalog   = simulator.simulate(**params)
+                #print "Catalog annulus contains:",roi.inAnnulus(simulator.catalog.lon,simulator.catalog.lat).sum()
+            else:
+                
+                pass
+            import pdb; pdb.set_trace()
+            logger.info("Simulated catalog annulus contains %i stars"%roi.inAnnulus(catalog.lon,catalog.lat).sum())
+
+            if len(catalog.lon) < 1000:
+                logger.error("Simulation contains too few objects; skipping...")
+                continue
+
+            """
+            like = ugali.analysis.loglike.LogLikelihood(self.config, roi, mask, catalog, isochrone, kernel)
+            like.set_params(distance_modulus=params['distance_modulus'])
+            like.sync_params()
+            results[i]['ts'] = 2*like.fit_richness()[0]
+            print 'TS=',results[i]['ts'] 
+            
+            like2 = ugali.analysis.loglike.LogLikelihood(self.config, roi, mask, simulator.catalog, isochrone, kernel)
+            like2.set_params(distance_modulus=params['distance_modulus'])
+            like2.sync_params()
+            print 'TS=',2*like2.fit_richness()[0]
+            """
+            #return simulator,like,like2
+
+            # Index of closest distance modulus
+            grid = ugali.analysis.scan.GridSearch(self.config,roi,mask,catalog,isochrone,kernel)
+
+            self.catalog = catalog
+            self.simulator = simulator
+            self.grid = grid
+            self.loglike = self.grid.loglike
+
+            # ADW: Should allow fit_distance to float in order to model search procedure
+            #fit_distance = float(distance_modulus)
+            distance_idx = np.fabs(grid.distance_modulus_array-params['distance_modulus']).argmin()
+            fit_distance = grid.distance_modulus_array[distance_idx]
+            grid.search(coords=(lon,lat),distance_modulus=fit_distance)
+
+            logger.info(str(self.loglike))
+
+            mle = grid.mle()
+            results[i]['kernel'] = simulator.kernel.name
+            results[i]['fit_kernel'] = grid.loglike.kernel.name
+            results[i]['ts'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
+            results[i]['fit_ts'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
+            results[i]['fit_mass'] = grid.stellar_mass_conversion*mle['richness']
+            results[i]['fit_distance'] = fit_distance #mle['distance_modulus']
+
+            err = grid.err()
+            richness_err = (err['richness'][1]-err['richness'][0])/2.
+            results[i]['fit_mass_err'] = grid.stellar_mass_conversion*richness_err
+
+            distance_modulus_err = (err['distance_modulus'][1]-err['distance_modulus'][0])/2.
+            results[i]['fit_distance_err'] = distance_modulus_err
+
+            for d in dtype:
+                logger.info('\t%s: %s'%(d[0], results[i][d[0]]))
+
+            if i%self.config['simulate']['save']==0 and outfile: 
+                self.write(outfile,results)
+
+        if outfile: self.write(outfile,results)
+            
+        return results
+    
+
 
 ############################################################
 

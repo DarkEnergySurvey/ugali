@@ -1,15 +1,16 @@
+#!/usr/bin/env python
 """
 Currently this is more set up as a standalone script.
 """
-
 import os
+import copy
 import collections
 import yaml
 import numpy as np
 import scipy.interpolate
 import healpy
+import fitsio
 import astropy.io.fits as pyfits
-import pylab
 
 import ugali.utils.projector
 import ugali.utils.healpix
@@ -19,8 +20,7 @@ import ugali.analysis.imf
 import ugali.analysis.results
 import ugali.simulation.population
 from ugali.isochrone import factory as isochrone_factory
-
-pylab.ion()
+from ugali.utils.healpix import read_map
 
 ############################################################
 
@@ -198,6 +198,9 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     #print 'surface_brightness = %.3f mag arcsec^-2'%(surface_brightness)
     
     if plot:
+        import pylab
+        pylab.ion()
+
         n_sigma_p = np.sum(cut_detect & (mag_1 < 23.))
 
         pylab.figure(figsize=(6., 6.))
@@ -220,6 +223,8 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
 
 ############################################################
 
+from memory_profiler import profile
+@profile
 def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population.yaml'):
     """
     n = Number of satellites to simulation
@@ -231,6 +236,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     nside_pix = 256 # NSIDE = 128 -> 27.5 arcmin, NSIDE = 256 -> 13.7 arcmin 
     
     config = yaml.load(open(config_file))
+    if not os.path.exists(tag): os.makedirs(tag)
 
     infile_fracdet = config['fracdet']
     #infile_fracdet = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz'
@@ -250,13 +256,13 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     infile_ebv = config['ebv']
     #infile_ebv = '/Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz' 
     
-    m_fracdet = healpy.read_map(infile_fracdet, nest=False)
+    m_fracdet = read_map(infile_fracdet, nest=False) #.astype(np.float16)
     nside_fracdet = healpy.npix2nside(len(m_fracdet))
 
-    m_maglim_g = healpy.read_map(infile_maglim_g, nest=False)
-    m_maglim_r = healpy.read_map(infile_maglim_r, nest=False)
+    m_maglim_g = read_map(infile_maglim_g, nest=False) #.astype(np.float16)
+    m_maglim_r = read_map(infile_maglim_r, nest=False) #.astype(np.float16)
 
-    m_ebv = healpy.read_map(infile_ebv, nest=False)
+    m_ebv = read_map(infile_ebv, nest=False) #.astype(np.float16)
     
     #m_foreground = healpy.read_map(infile_foreground)
 
@@ -378,11 +384,12 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     density_population = m_density[ugali.utils.healpix.angToPix(nside_density, lon_population, lat_population)] / pixarea # arcmin^-2
 
     # Average fracdet within the azimuthally averaged half-light radius
-    m_fracdet_zero = np.where(m_fracdet >= 0., m_fracdet, 0.)
+    #m_fracdet_zero = np.where(m_fracdet >= 0., m_fracdet, 0.)
+    #m_fracdet_zero = m_fracdet
     r_half = np.degrees(np.arctan2(r_physical_population, distance_population)) # Azimuthally averaged half-light radius in degrees
-    fracdet_half_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, r_half)
-    fracdet_core_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, 0.1)
-    fracdet_wide_population = meanFracdet(m_fracdet_zero, lon_population, lat_population, 0.5)
+    fracdet_half_population = meanFracdet(m_fracdet, lon_population, lat_population, r_half)
+    fracdet_core_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.1)
+    fracdet_wide_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.5)
 
     # Magnitude limits
     nside_maglim = healpy.npix2nside(len(m_maglim_g))
@@ -483,11 +490,14 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
         columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
     tbhdu = pyfits.BinTableHDU.from_columns(columns)
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
+
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
         print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
         cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
-        outfile = 'sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
-        header = tbhdu.header
+        outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag,tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
+        header = copy.deepcopy(tbhdu.header)
+        header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
+        header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
         pyfits.writeto(outfile, tbhdu.data[cut_chunk], header, clobber=True)
 
     # Population metadata output file
@@ -520,16 +530,17 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
         pyfits.Column(name='EBV', format='E', array=ebv_population, unit='mag')
     ])
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-    tbhdu.writeto('sim_population_%s_mc_source_id_%06i-%06i.fits'%(tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
+    tbhdu.writeto('%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
 
     # 5284.2452461023322
 
     # Mask output file
 
     print "Writing population mask file..."
-    outfile_mask = 'sim_mask_%s_cel_nside_%i.fits'%(tag, healpy.npix2nside(len(mask)))
-    healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
-    os.system('gzip -f %s'%(outfile_mask))
+    outfile_mask = '%s/sim_mask_%s_cel_nside_%i.fits'%(tag, tag, healpy.npix2nside(len(mask)))
+    if not os.path.exists(outfile_mask):
+        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
+        os.system('gzip -f %s'%(outfile_mask))
 
 ############################################################
 
@@ -537,7 +548,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Simulate at Milky Way satellite population.')
     
-    parser.add_argument('--tag',
+    parser.add_argument('--tag',required=True,
                         help='Descriptive tag for the simulation run')
     parser.add_argument('--start', dest='mc_source_id_start', type=int, default=1,
                         help='MC_SOURCE_ID start')
@@ -545,10 +556,14 @@ if __name__ == "__main__":
                         help='Number of satellites to start')
     parser.add_argument('--chunk', dest='n_chunk', type=int, default=100,
                         help="Number of MC_SOURCE_ID's per catalog output file")
+    parser.add_argument('--seed', dest='seed', type=int, default=None,
+                        help="Random seed")
     args = parser.parse_args()
 
     print args
-
+    if args.seed is not None: 
+        print("Setting random seed: %i"%args.seed)
+        np.random.seed(args.seed)
     #tag = '_v2_n_%i'%(n)
     #tag = '_v3'
     #tag = 'v5'

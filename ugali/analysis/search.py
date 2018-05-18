@@ -14,13 +14,12 @@ import numpy as np
 import numpy
 import numpy.lib.recfunctions as recfuncs
 import scipy.ndimage as ndimage
-from matplotlib import mlab
 
 from ugali.utils.shell import mkdir, which
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
 from ugali.utils.projector import Projector,gal2cel,cel2gal,dec2hms,dec2dms,mod2dist
-from ugali.utils import healpix
+from ugali.utils import healpix, mlab
 from ugali.utils.healpix import pix2ang, ang2pix
 from ugali.candidate.associate import SourceCatalog, catalogFactory
 from ugali.utils.config import Config
@@ -307,11 +306,11 @@ class CandidateSearch(object):
 
         coordsys = self.config['coords']['coordsys']
         if coordsys.lower() == 'gal':
-            print "GAL coordintes"
+            print("GAL coordintes")
             objs['GLON'],objs['GLAT'] = lon,lat
             objs['RA'],objs['DEC'] = gal2cel(lon,lat)
         else:
-            print "CEL coordintes"
+            print("CEL coordintes")
             objs['RA'],objs['DEC'] = lon,lat
             objs['GLON'],objs['GLAT'] = cel2gal(lon,lat)
 
@@ -379,7 +378,7 @@ class CandidateSearch(object):
             i += 1
             catalog = SourceCatalog()
             for ref in refs:
-                print ref
+                print(ref)
                 catalog += catalogFactory(ref)
      
             # String length (should be greater than longest name)
