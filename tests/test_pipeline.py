@@ -11,7 +11,7 @@ def _test_pipeline(n=2,args=None):
     pipedir='./ugali/pipeline'
     
     script = glob.glob(os.path.join(pipedir,'run_%02d.0*.py'%n))[0]
-    cmd = script + ' ./ugali/config/config_test.yaml'
+    cmd = script + ' ./tests/config.yaml'
     if args: cmd += ' '+args
     subprocess.check_call(cmd,shell=True)
 
