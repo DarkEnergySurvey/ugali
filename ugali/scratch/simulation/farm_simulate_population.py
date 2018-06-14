@@ -2,7 +2,8 @@ import os
 import subprocess
 import numpy as np
 
-tag = 'v7'
+tag = 'ps1_v1' # PS1
+tag = 'v7' # DES
 n_chunk = 100
 mc_source_id_start_global = 1
 size_batch = 1000 
@@ -39,3 +40,5 @@ for index_batch in np.arange(args.nbatch):
 
     #print command
     #os.system(command)
+
+

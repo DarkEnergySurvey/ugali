@@ -136,7 +136,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     age = np.random.choice([10., 12.0, 13.5])
     metal_z = np.random.choice([0.0001, 0.0002])
     distance_modulus = ugali.utils.projector.distanceToDistanceModulus(distance)
-    iso = isochrone_factory('Bressan2012', survey='des', age=age, z=metal_z, distance_modulus=distance_modulus)
+    iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus)
     s.set_isochrone(iso)
 
     mag_1, mag_2 = s.isochrone.simulate(stellar_mass) # Simulate takes stellar mass as an argument, NOT richness
@@ -147,8 +147,15 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     pix = ugali.utils.healpix.angToPix(nside, lon, lat)
     maglim_1 = m_maglim_1[pix]
     maglim_2 = m_maglim_2[pix]
-    mag_extinction_1 = 3.186 * m_ebv[pix]
-    mag_extinction_2 = 2.140 * m_ebv[pix]
+    if config['survey'] == 'des':
+        # DES Y3 Gold fiducial
+        mag_extinction_1 = 3.186 * m_ebv[pix]
+        mag_extinction_2 = 2.140 * m_ebv[pix]
+    elif config['survey'] == 'ps1':
+        # From Table 6 in Schlafly 2011 with Rv = 3.1
+        # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
+        mag_extinction_1 = 3.172 * m_ebv[pix]
+        mag_extinction_2 = 2.271 * m_ebv[pix]
     
     # Photometric uncertainties are larger in the presence of interstellar dust reddening
     mag_1_error = 0.01 + 10**(log_photo_error((mag_1 + mag_extinction_1) - maglim_1))
@@ -170,7 +177,10 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     # np.median(m[ugali.utils.healpix.angToDisc(4096, 34.55, -4.83, 0.75)])
 
     # Includes penalty for interstellar extinction and also include variations in depth
-    cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (23.46 - np.clip(maglim_2, 20., 26.))))
+    if config['survey'] == 'des':
+        cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (23.46 - np.clip(maglim_2, 20., 26.))))
+    elif config['survey'] == 'ps1':
+        cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2))
 
     n_g24 = np.sum(cut_detect & (mag_1 < 24.))
     print '  n_sim = %i'%(len(mag_1))
@@ -183,7 +193,14 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     #print 'abs_mag_martin = %.2f mag'%(abs_mag_martin)
 
     # The more clever thing to do would be to sum up the actual simulated stars
-    v = mag_1 - 0.487*(mag_1 - mag_2) - 0.0249 # See https://github.com/DarkEnergySurvey/ugali/blob/master/ugali/isochrone/model.py
+    if config['survey'] == 'des':
+        v = mag_1 - 0.487*(mag_1 - mag_2) - 0.0249 # See https://github.com/DarkEnergySurvey/ugali/blob/master/ugali/isochrone/model.py
+    elif config['survey'] == 'ps1':
+        # https://arxiv.org/pdf/1706.06147.pdf
+        # V - g = C_0 + C_1 * (g - r)
+        C_0 = -0.017
+        C_1 = -0.508
+        v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
     flux = np.sum(10**(-v/2.5))
     abs_mag = -2.5*np.log10(flux) - distance_modulus
 
@@ -225,7 +242,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
 
 from memory_profiler import profile
 @profile
-def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population.yaml'):
+def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population_ps1.yaml'):
     """
     n = Number of satellites to simulation
     n_chunk = Number of satellites in a file chunk
@@ -237,6 +254,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     
     config = yaml.load(open(config_file))
     if not os.path.exists(tag): os.makedirs(tag)
+
+    assert config['survey'] in ['des', 'ps1']
 
     infile_fracdet = config['fracdet']
     #infile_fracdet = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz'
@@ -461,26 +480,70 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
                'WAVG_MAG_PSF_SFD_R': [mag_2_array, 'E']}
     """
     
-    # Y3 Gold v2.0
-    key_map = {'COADD_OBJECT_ID': [coadd_object_id_array, 'K'],
-               'RA': [lon_array, 'D'],
-               'DEC': [lat_array, 'D'],
-               'SOF_PSF_MAG_CORRECTED_G': [mag_1_array, 'D'],
-               'SOF_PSF_MAG_CORRECTED_R': [mag_2_array, 'D'],
-               'SOF_PSF_MAG_ERR_G': [mag_1_error_array, 'D'],
-               'SOF_PSF_MAG_ERR_R': [mag_2_error_array, 'D'],
-               'A_SED_SFD98_G': [default_array, 'E'],
-               'A_SED_SFD98_R': [default_array, 'E'],
-               'WAVG_MAG_PSF_G': [mag_1_array, 'E'],
-               'WAVG_MAG_PSF_R': [mag_2_array, 'E'],
-               'WAVG_MAGERR_PSF_G': [mag_1_error_array, 'E'],
-               'WAVG_MAGERR_PSF_R': [mag_2_error_array, 'E'],
-               'WAVG_SPREAD_MODEL_I': [default_array, 'E'],
-               'WAVG_SPREADERR_MODEL_I': [default_array, 'E'],
-               'SOF_CM_T': [default_array, 'D'],
-               'SOF_CM_T_ERR': [default_array, 'D'],
-               'FLAGS_GOLD': [np.tile(0, len(mc_source_id_array)), 'J'],
-               'EXTENDED_CLASS_MASH_SOF': [np.tile(0, len(mc_source_id_array)), 'I']}
+    if config['survey'] == 'des':
+        # Y3 Gold v2.0
+        key_map = {'COADD_OBJECT_ID': [coadd_object_id_array, 'K'],
+                   'RA': [lon_array, 'D'],
+                   'DEC': [lat_array, 'D'],
+                   'SOF_PSF_MAG_CORRECTED_G': [mag_1_array, 'D'],
+                   'SOF_PSF_MAG_CORRECTED_R': [mag_2_array, 'D'],
+                   'SOF_PSF_MAG_ERR_G': [mag_1_error_array, 'D'],
+                   'SOF_PSF_MAG_ERR_R': [mag_2_error_array, 'D'],
+                   'A_SED_SFD98_G': [default_array, 'E'],
+                   'A_SED_SFD98_R': [default_array, 'E'],
+                   'WAVG_MAG_PSF_G': [mag_1_array, 'E'],
+                   'WAVG_MAG_PSF_R': [mag_2_array, 'E'],
+                   'WAVG_MAGERR_PSF_G': [mag_1_error_array, 'E'],
+                   'WAVG_MAGERR_PSF_R': [mag_2_error_array, 'E'],
+                   'WAVG_SPREAD_MODEL_I': [default_array, 'E'],
+                   'WAVG_SPREADERR_MODEL_I': [default_array, 'E'],
+                   'SOF_CM_T': [default_array, 'D'],
+                   'SOF_CM_T_ERR': [default_array, 'D'],
+                   'FLAGS_GOLD': [np.tile(0, len(mc_source_id_array)), 'J'],
+                   'EXTENDED_CLASS_MASH_SOF': [np.tile(0, len(mc_source_id_array)), 'I']}
+    elif config['survey'] == 'ps1':
+        # PS1
+        key_map = {'RA': [lon_array, 'D'],
+                   'DEC': [lat_array, 'D'],
+                   'OBJID': [coadd_object_id_array, 'K'],
+                   'UNIQUEPSPSOBID': [coadd_object_id_array, 'K'],
+                   'OBJINFOFLAG': [default_array, 'E'],
+                   'QUALITYFLAG': [np.tile(16, len(mc_source_id_array)), 'I'],
+                   'NSTACKDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
+                   'NDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
+                   'NG': [default_array, 'E'],
+                   'NR': [default_array, 'E'],
+                   'NI': [default_array, 'E'],
+                   'GFPSFMAG': [mag_1_array, 'E'],
+                   'RFPSFMAG': [mag_2_array, 'E'],
+                   'IFPSFMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                   'GFPSFMAGERR': [mag_1_error_array, 'E'],
+                   'RFPSFMAGERR': [mag_2_error_array, 'E'],
+                   'IFPSFMAGERR': [default_array, 'E'],
+                   'GFKRONMAG': [mag_1_array, 'E'],
+                   'RFKRONMAG': [mag_2_array, 'E'],
+                   'IFKRONMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                   'GFKRONMAGERR': [mag_1_error_array, 'E'],
+                   'RFKRONMAGERR': [mag_2_error_array, 'E'],
+                   'IFKRONMAGERR': [default_array, 'E'],
+                   'GFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'RFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'IFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'GINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'RINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'IINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'GINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'RINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'IINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'GINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'RINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'IINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   'PRIMARYDETECTION': [default_array, 'E'],
+                   'BESTDETECTION': [default_array, 'E'],
+                   'EBV': [default_array, 'E'],
+                   'EXTSFD_G': [default_array, 'E'],
+                   'EXTSFD_R': [default_array, 'E'],
+                   'EXTSFD_I': [default_array, 'E']}
 
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
