@@ -182,10 +182,9 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     elif config['survey'] == 'ps1':
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2))
 
+    n_g22 = np.sum(cut_detect & (mag_1 < 22.))
     n_g24 = np.sum(cut_detect & (mag_1 < 24.))
-    print '  n_sim = %i'%(len(mag_1))
-    print '  n_detect = %i'%(np.sum(cut_detect))
-    print '  n_g24 = %i'%(n_g24)
+    print '  n_sim = %i, n_detect = %i, n_g24 = %i, n_g22 = %i'%(len(mag_1),np.sum(cut_detect),n_g24,n_g22)
     
     richness = stellar_mass / s.isochrone.stellarMass()
     #abs_mag = s.isochrone.absolute_magnitude()
@@ -236,7 +235,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     #    # This is a kludge to remove these satellites. fragile!!
     #    n_g24 = 1.e6
 
-    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], mag_extinction_1[cut_detect], mag_extinction_2[cut_detect], n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
+    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], mag_extinction_1[cut_detect], mag_extinction_2[cut_detect], n_g22, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
 
 ############################################################
 
@@ -279,6 +278,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
 
     # r_physical is azimuthally-averaged half-light radius, kpc
     simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n)
+    n_g22_population = np.tile(np.nan, n)
     n_g24_population = np.tile(np.nan, n)
     abs_mag_population = np.tile(np.nan, n)
     surface_brightness_population = np.tile(np.nan, n)
@@ -301,7 +301,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(mc_source_id_population):
         print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
-        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
+        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g22, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
                                                                                                                                                                              lon_population[ii], 
                                                                                                                                                                              lat_population[ii], 
                                                                                                                                                                              distance_population[ii], 
@@ -312,6 +312,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                                                                                                                                                                              m_ebv)
         print '  ', len(lon)
         
+        n_g22_population[ii] = n_g22
         n_g24_population[ii] = n_g24
         abs_mag_population[ii] = abs_mag
         surface_brightness_population[ii] = surface_brightness
@@ -321,17 +322,20 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         metal_z_population[ii] = metal_z
 
         #print "Difficulty masking..."
-        cut_easy = ((surface_brightness_population[ii] < 25.) & (n_g24_population[ii] > 100.)) \
-                   | ((surface_brightness_population[ii] < 30.) & (n_g24_population[ii] > 1.e4)) \
-                   | (n_g24_population[ii] > 1.e5)
-        cut_hard = (surface_brightness_population[ii] > 35.) | (n_g24_population[ii] < 1.)
+        #cut_easy = ((surface_brightness_population[ii] < 25.) & (n_g24_population[ii] > 100.)) \
+        #           | ((surface_brightness_population[ii] < 30.) & (n_g24_population[ii] > 1.e4)) \
+        #           | (n_g24_population[ii] > 1.e5)
+        #cut_hard = (surface_brightness_population[ii] > 35.) | (n_g24_population[ii] < 1.)
         #cut_difficulty_population[ii] = ~cut_easy & ~cut_hard
-        if cut_easy:
-            difficulty_population[ii] += 1 # TOO EASY
-        if cut_hard:
-            difficulty_population[ii] += 2 # TOO HARD
-        if flag_too_extended:
-            difficulty_population[ii] += 3 # TOO EXTENDED
+        #if cut_easy:
+        #    difficulty_population[ii] += 1 # TOO EASY
+        #if cut_hard:
+        #    difficulty_population[ii] += 2 # TOO HARD
+        #if flag_too_extended:
+        #    difficulty_population[ii] += 3 # TOO EXTENDED
+
+        # Satellites that produce too many stars
+        difficulty_population[ii] = (n_g24_population[ii] > 1.e5)
 
         if difficulty_population[ii] == 0:
             lon_array.append(lon)
@@ -574,6 +578,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         pyfits.Column(name='DISTANCE_MODULUS', format='E', array=distance_modulus_population, unit='kpc'),
         pyfits.Column(name='STELLAR_MASS', format='E', array=stellar_mass_population, unit='m_solar'),
         pyfits.Column(name='R_PHYSICAL', format='E', array=r_physical_population, unit='kpc'),
+        pyfits.Column(name='N_G22', format='J', array=n_g22_population, unit=''),
         pyfits.Column(name='N_G24', format='J', array=n_g24_population, unit=''),
         pyfits.Column(name='N_CATALOG', format='J', array=n_catalog_population, unit=''),
         pyfits.Column(name='DIFFICULTY', format='J', array=difficulty_population, unit=''),
