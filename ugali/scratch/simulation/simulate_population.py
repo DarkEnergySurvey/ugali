@@ -236,45 +236,35 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     #    # This is a kludge to remove these satellites. fragile!!
     #    n_g24 = 1.e6
 
-    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
+    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], mag_extinction_1[cut_detect], mag_extinction_2[cut_detect], n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
 
 ############################################################
 
-from memory_profiler import profile
-@profile
-def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file='simulate_population_ps1.yaml'):
+#from memory_profiler import profile
+#@profile
+def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='simulate_population.yaml'):
     """
     n = Number of satellites to simulation
     n_chunk = Number of satellites in a file chunk
     """
 
-    assert mc_source_id_start >= 1, "Starting mc_source_id must be greater than or equal to 1" 
+    assert mc_source_id_start >= 1, "Starting mc_source_id must be >= 1" 
     assert n % n_chunk == 0, "Total number of satellites must be divisible by the chunk size"
     nside_pix = 256 # NSIDE = 128 -> 27.5 arcmin, NSIDE = 256 -> 13.7 arcmin 
     
-    config = yaml.load(open(config_file))
     if not os.path.exists(tag): os.makedirs(tag)
 
+    if isinstance(config,str): config = yaml.load(open(config))
     assert config['survey'] in ['des', 'ps1']
 
+    infile_ebv = config['ebv']
     infile_fracdet = config['fracdet']
-    #infile_fracdet = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz'
-    #infile_badregions = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_badregions_mask_v1.0.fits.gz'
-    #infile_foreground = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_foreground_mask_v2.0.fits.gz'
-
     infile_maglim_g = config['maglim_g']
     infile_maglim_r = config['maglim_r']
-    #infile_maglim_g = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz'
-    #infile_maglim_r = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz'
-
     infile_density = config['stellar_density']
-    #infile_density = '/Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy'
+
     m_density = np.load(infile_density)
     nside_density = healpy.npix2nside(len(m_density))
-
-    infile_ebv = config['ebv']
-    #infile_ebv = '/Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz' 
-    
     m_fracdet = read_map(infile_fracdet, nest=False) #.astype(np.float16)
     nside_fracdet = healpy.npix2nside(len(m_fracdet))
 
@@ -306,10 +296,12 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     mag_2_array = []
     mag_1_error_array = []
     mag_2_error_array = []
+    mag_extinction_1_array = []
+    mag_extinction_2_array = []
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(mc_source_id_population):
         print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
-        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
+        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
                                                                                                                                                                              lon_population[ii], 
                                                                                                                                                                              lat_population[ii], 
                                                                                                                                                                              distance_population[ii], 
@@ -348,6 +340,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
             mag_2_array.append(mag_2)
             mag_1_error_array.append(mag_1_error)
             mag_2_error_array.append(mag_2_error)
+            mag_extinction_1_array.append(mag_extinction_1)
+            mag_extinction_2_array.append(mag_extinction_2)
             mc_source_id_array.append(np.tile(mc_source_id, len(lon)))
 
     # Concatenate all the arrays
@@ -359,6 +353,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     mag_2_array = np.concatenate(mag_2_array)
     mag_1_error_array = np.concatenate(mag_1_error_array)
     mag_2_error_array = np.concatenate(mag_2_error_array)
+    mag_extinction_1_array = np.concatenate(mag_extinction_1_array)
+    mag_extinction_2_array = np.concatenate(mag_extinction_2_array)
     mc_source_id_array = np.concatenate(mc_source_id_array)
 
     # Now do the masking all at once
@@ -373,6 +369,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     mag_2_array = mag_2_array[cut_fracdet]
     mag_1_error_array = mag_1_error_array[cut_fracdet]
     mag_2_error_array = mag_2_error_array[cut_fracdet]
+    mag_extinction_1_array = mag_extinction_1_array[cut_fracdet]
+    mag_extinction_2_array = mag_extinction_2_array[cut_fracdet]
     mc_source_id_array = mc_source_id_array[cut_fracdet]
 
     # Cut out the entries that are easily detectable
@@ -489,10 +487,10 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
                    'SOF_PSF_MAG_CORRECTED_R': [mag_2_array, 'D'],
                    'SOF_PSF_MAG_ERR_G': [mag_1_error_array, 'D'],
                    'SOF_PSF_MAG_ERR_R': [mag_2_error_array, 'D'],
-                   'A_SED_SFD98_G': [default_array, 'E'],
-                   'A_SED_SFD98_R': [default_array, 'E'],
-                   'WAVG_MAG_PSF_G': [mag_1_array, 'E'],
-                   'WAVG_MAG_PSF_R': [mag_2_array, 'E'],
+                   'A_SED_SFD98_G': [mag_extinction_1_array, 'E'],
+                   'A_SED_SFD98_R': [mag_extinction_2_array, 'E'],
+                   'WAVG_MAG_PSF_G': [mag_1_array+mag_extinction_1_array, 'E'],
+                   'WAVG_MAG_PSF_R': [mag_2_array+mag_extinction_2_array, 'E'],
                    'WAVG_MAGERR_PSF_G': [mag_1_error_array, 'E'],
                    'WAVG_MAGERR_PSF_R': [mag_2_error_array, 'E'],
                    'WAVG_SPREAD_MODEL_I': [default_array, 'E'],
@@ -506,45 +504,48 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
         key_map = {'RA': [lon_array, 'D'],
                    'DEC': [lat_array, 'D'],
                    'OBJID': [coadd_object_id_array, 'K'],
-                   'UNIQUEPSPSOBID': [coadd_object_id_array, 'K'],
-                   'OBJINFOFLAG': [default_array, 'E'],
-                   'QUALITYFLAG': [np.tile(16, len(mc_source_id_array)), 'I'],
-                   'NSTACKDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
-                   'NDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
-                   'NG': [default_array, 'E'],
-                   'NR': [default_array, 'E'],
-                   'NI': [default_array, 'E'],
-                   'GFPSFMAG': [mag_1_array, 'E'],
-                   'RFPSFMAG': [mag_2_array, 'E'],
-                   'IFPSFMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                   #'UNIQUEPSPSOBID': [coadd_object_id_array, 'K'],
+                   #'OBJINFOFLAG': [default_array, 'E'],
+                   #'QUALITYFLAG': [np.tile(16, len(mc_source_id_array)), 'I'],
+                   #'NSTACKDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
+                   #'NDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
+                   #'NG': [default_array, 'E'],
+                   #'NR': [default_array, 'E'],
+                   #'NI': [default_array, 'E'],
+                   'GFPSFMAG': [mag_1_array+mag_extinction_1_array, 'E'],
+                   'RFPSFMAG': [mag_2_array+mag_extinction_2_array, 'E'],
+                   #'IFPSFMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
                    'GFPSFMAGERR': [mag_1_error_array, 'E'],
                    'RFPSFMAGERR': [mag_2_error_array, 'E'],
-                   'IFPSFMAGERR': [default_array, 'E'],
-                   'GFKRONMAG': [mag_1_array, 'E'],
-                   'RFKRONMAG': [mag_2_array, 'E'],
-                   'IFKRONMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
-                   'GFKRONMAGERR': [mag_1_error_array, 'E'],
-                   'RFKRONMAGERR': [mag_2_error_array, 'E'],
-                   'IFKRONMAGERR': [default_array, 'E'],
-                   'GFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'RFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'IFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'GINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'RINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'IINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'GINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'RINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'IINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'GINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'RINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'IINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   'PRIMARYDETECTION': [default_array, 'E'],
-                   'BESTDETECTION': [default_array, 'E'],
-                   'EBV': [default_array, 'E'],
-                   'EXTSFD_G': [default_array, 'E'],
-                   'EXTSFD_R': [default_array, 'E'],
-                   'EXTSFD_I': [default_array, 'E']}
-
+                   #'IFPSFMAGERR': [default_array, 'E'],
+                   #'GFKRONMAG': [mag_1_array, 'E'],
+                   #'RFKRONMAG': [mag_2_array, 'E'],
+                   #'IFKRONMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                   #'GFKRONMAGERR': [mag_1_error_array, 'E'],
+                   #'RFKRONMAGERR': [mag_2_error_array, 'E'],
+                   #'IFKRONMAGERR': [default_array, 'E'],
+                   #'GFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'RFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'IFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'GINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'RINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'IINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'GINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'RINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'IINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'GINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'RINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'IINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   #'PRIMARYDETECTION': [default_array, 'E'],
+                   #'BESTDETECTION': [default_array, 'E'],
+                   #'EBV': [default_array, 'E'],
+                   #'EXTSFD_G': [mag_extinction_1_array 'E'],
+                   #'EXTSFD_R': [mag_extinction_2_array, 'E'],
+                   #'EXTSFD_I': [default_array, 'E'],
+                   'GFPSFMAG_SFD': [mag_1_array, 'E'],
+                   'RFPSFMAG_SFD': [mag_2_array, 'E'],
+                   'EXTENDED_CLASS': [np.tile(0, len(mc_source_id_array)), 'I'],
+                   }
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
     print "Writing catalog files..."
@@ -557,7 +558,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
         print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
         cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
-        outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag,tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
+        outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
         header = copy.deepcopy(tbhdu.header)
         header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
         header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
@@ -610,7 +611,10 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config_file
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Simulate at Milky Way satellite population.')
-    
+    parser.add_argument('config',
+                        help='Configuration file')
+    parser.add_argument('-s','--section',required=True,choices=['des','ps1'],
+                        help='Config section for simulation parameters')
     parser.add_argument('--tag',required=True,
                         help='Descriptive tag for the simulation run')
     parser.add_argument('--start', dest='mc_source_id_start', type=int, default=1,
@@ -623,19 +627,16 @@ if __name__ == "__main__":
                         help="Random seed")
     args = parser.parse_args()
 
-    print args
+    #print args
     if args.seed is not None: 
         print("Setting random seed: %i"%args.seed)
         np.random.seed(args.seed)
-    #tag = '_v2_n_%i'%(n)
-    #tag = '_v3'
-    #tag = 'v5'
-    #mc_source_id_start=1
-    #n = 5000 #; e.g., 100 for testing, 1000 for partial testing, 5000 for bulk production
-    #n_chunk = 100
+
+    # Load the config and select the survey section
+    config = yaml.load(open(args.config))[args.section]
     
     #catsimPopulation(tag, mc_source_id_start=mc_source_id_start, n=n, n_chunk=n_chunk)
-    catsimPopulation(args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk)
+    catsimPopulation(args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk,config=config)
 
 ############################################################
 

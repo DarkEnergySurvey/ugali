@@ -5,7 +5,7 @@ import numpy as np
 tag = 'ps1_v1' # PS1
 tag = 'v7' # DES
 n_chunk = 100
-mc_source_id_start_global = 1
+mc_source_id_start_global = 0
 size_batch = 1000 
 number_of_batches = 10
 

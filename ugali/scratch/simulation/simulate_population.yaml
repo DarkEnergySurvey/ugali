@@ -1,7 +1,39 @@
-stellar_density: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy
-fracdet: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz
-maglim_g: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz
-maglim_r: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz
-ebv: /Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
-completeness: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/y3a2_stellar_classification_summary_ext2.csv
-photo_error: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/photo_error_model.csv
+des:
+  survey: des
+  stellar_density: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy
+  fracdet: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_griz_o.4096_t.32768_coverfoot_EQU_ring.fits
+  maglim_g: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_gold_1.0_cmv02-001_v1_nside4096_ring_g_depth.fits
+  maglim_r: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_gold_1.0_cmv02-001_v1_nside4096_ring_r_depth.fits
+  ebv: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits
+  completeness: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_stellar_classification_summary_ext2.csv
+  photo_error: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/photo_error_model.csv
+
+ps1:
+  survey: ps1
+  stellar_density: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_pseudo_stellar_density.npy
+  fracdet: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/panstarrs_pseudo_fracdet.fits.gz
+  maglim_g: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_g_maglim.fits
+  maglim_r: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_r_maglim.fits
+  ebv: /home/s1/bechtol/des60.b/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+  completeness: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_stellar_classification_summary_r.csv
+  photo_error: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_photo_error_model_r.csv
+
+kbechtol_des:
+  survey: des
+  stellar_density: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy
+  fracdet: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz
+  maglim_g: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz
+  maglim_r: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz
+  ebv: /Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+  completeness: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/y3a2_stellar_classification_summary_ext2.csv
+  photo_error: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/photo_error_model.csv
+
+kbechtol_ps1:
+  survey: ps1
+  stellar_density: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_pseudo_stellar_density.npy
+  fracdet: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/panstarrs_pseudo_fracdet.fits.gz
+  maglim_g: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_nside32_nest_g_maglim.fits
+  maglim_r: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_nside32_nest_r_maglim.fits
+  ebv: /Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+  completeness: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_stellar_classification_summary_r.csv
+  photo_error: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_photo_error_model_r.csv
