@@ -123,14 +123,16 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     position_angle = np.random.uniform(0., 180.) # Random position angle (deg)
     a_h = r_h / np.sqrt(1. - ellipticity) # semi-major axis (deg)
     
-    flag_too_extended = False
-    if a_h >= 0.5:
-        print 'Too big!'
-        a_h = 0.5
-        flag_too_extended = True
         
     # Elliptical kernels take the "extension" as the semi-major axis
-    ker = ugali.analysis.kernel.EllipticalPlummer(lon=lon_centroid, lat=lat_centroid, extension=a_h, ellipticity=ellipticity, position_angle=position_angle)
+    ker = ugali.analysis.kernel.EllipticalPlummer(lon=lon_centroid, lat=lat_centroid, ellipticity=ellipticity, position_angle=position_angle)
+
+    flag_too_extended = False
+    if a_h >= 1.0:
+        print 'Too extended: a_h = %.2f'%(a_h)
+        a_h = 1.0
+        flag_too_extended = True
+    ker.setp('extension', value=a_h, bounds=[0.0,1.0])
     s.set_kernel(ker)
     
     age = np.random.choice([10., 12.0, 13.5])
@@ -321,10 +323,24 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         age_population[ii] = age
         metal_z_population[ii] = metal_z
 
-        #print "Difficulty masking..."
-        #cut_easy = ((surface_brightness_population[ii] < 25.) & (n_g24_population[ii] > 100.)) \
+        #print "Difficulty masking..."  
+
+        # These objects are too extended and are not simulated
+        if (flag_too_extended):
+            difficulty_population[ii] |= 0b0001
+
+        # We assume that these objects would be easily detected and
+        # remove them to reduce data volume
+        if (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1e2):
+            difficulty_population[ii] |= 0b0010
+        if (surface_brightness_population[ii]<28.)&(n_g22_population[ii]>1e4):
+            difficulty_population[ii] |= 0b0100
+        if (surface_brightness_population[ii]<30.)&(n_g22_population[ii]>1e5):
+            difficulty_population[ii] |= 0b1000
+        
+        #cut_easy = (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1.e2) \
         #           | ((surface_brightness_population[ii] < 30.) & (n_g24_population[ii] > 1.e4)) \
-        #           | (n_g24_population[ii] > 1.e5)
+        #           | ((surface_brightness_population[ii] < 31.) & (n_g24_population[ii] > 1.e5))
         #cut_hard = (surface_brightness_population[ii] > 35.) | (n_g24_population[ii] < 1.)
         #cut_difficulty_population[ii] = ~cut_easy & ~cut_hard
         #if cut_easy:
@@ -333,9 +349,6 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         #    difficulty_population[ii] += 2 # TOO HARD
         #if flag_too_extended:
         #    difficulty_population[ii] += 3 # TOO EXTENDED
-
-        # Satellites that produce too many stars
-        difficulty_population[ii] = (n_g24_population[ii] > 1.e5)
 
         if difficulty_population[ii] == 0:
             lon_array.append(lon)
