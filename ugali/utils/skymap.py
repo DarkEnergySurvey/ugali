@@ -95,13 +95,16 @@ def randomPositions(input, nside_pix, n=1):
     """
     Generate n random positions within a full HEALPix mask of booleans, or a set of (lon, lat) coordinates.
 
-    input is either a
-    (1) full HEALPix mask of booleans, or
-    (2) a set of (lon, lat) coordinates for catalog objects that define the occupied pixels.
-    
-    nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
+    Parameters:
+    -----------
+    input :     (1) full HEALPix mask of booleans, or (2) a set of (lon, lat) coordinates for catalog objects that define the occupied pixels.
+    nside_pix : nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
-    Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
+
+    Returns:
+    --------
+    lon,lat,area : Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
+
     """
     input = np.array(input)
     if len(input.shape) == 1:
