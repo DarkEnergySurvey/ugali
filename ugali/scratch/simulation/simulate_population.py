@@ -5,6 +5,7 @@ Currently this is more set up as a standalone script.
 import os
 import copy
 import collections
+from collections import OrderedDict as odict
 import yaml
 import numpy as np
 import scipy.interpolate
@@ -303,6 +304,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(mc_source_id_population):
         print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
+        print '  distance=%.2e, stellar_mass=%.2e, rhalf=%.2e'%(distance_population[ii],stellar_mass_population[ii],r_physical_population[ii])
         lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g22, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
                                                                                                                                                                              lon_population[ii], 
                                                                                                                                                                              lat_population[ii], 
@@ -436,6 +438,9 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     pix_population = ugali.utils.healpix.angToPix(nside_ebv, lon_population, lat_population)
     ebv_population = m_ebv[pix_population]
 
+    # Survey
+    survey_population = np.tile(config['survey'], len(lon_population))
+
     # Number of surviving catalog stars
     n_catalog_population = np.histogram(mc_source_id_array, bins=np.arange(mc_source_id_population[0] - 0.5, mc_source_id_population[-1] + 0.51))[0]
 
@@ -497,72 +502,75 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     
     if config['survey'] == 'des':
         # Y3 Gold v2.0
-        key_map = {'COADD_OBJECT_ID': [coadd_object_id_array, 'K'],
-                   'RA': [lon_array, 'D'],
-                   'DEC': [lat_array, 'D'],
-                   'SOF_PSF_MAG_CORRECTED_G': [mag_1_array, 'D'],
-                   'SOF_PSF_MAG_CORRECTED_R': [mag_2_array, 'D'],
-                   'SOF_PSF_MAG_ERR_G': [mag_1_error_array, 'D'],
-                   'SOF_PSF_MAG_ERR_R': [mag_2_error_array, 'D'],
-                   'A_SED_SFD98_G': [mag_extinction_1_array, 'E'],
-                   'A_SED_SFD98_R': [mag_extinction_2_array, 'E'],
-                   'WAVG_MAG_PSF_G': [mag_1_array+mag_extinction_1_array, 'E'],
-                   'WAVG_MAG_PSF_R': [mag_2_array+mag_extinction_2_array, 'E'],
-                   'WAVG_MAGERR_PSF_G': [mag_1_error_array, 'E'],
-                   'WAVG_MAGERR_PSF_R': [mag_2_error_array, 'E'],
-                   'WAVG_SPREAD_MODEL_I': [default_array, 'E'],
-                   'WAVG_SPREADERR_MODEL_I': [default_array, 'E'],
-                   'SOF_CM_T': [default_array, 'D'],
-                   'SOF_CM_T_ERR': [default_array, 'D'],
-                   'FLAGS_GOLD': [np.tile(0, len(mc_source_id_array)), 'J'],
-                   'EXTENDED_CLASS_MASH_SOF': [np.tile(0, len(mc_source_id_array)), 'I']}
+        key_map = odict([
+                ('COADD_OBJECT_ID', [coadd_object_id_array, 'K']),
+                ('RA', [lon_array, 'D']),
+                ('DEC', [lat_array, 'D']),
+                ('SOF_PSF_MAG_CORRECTED_G', [mag_1_array, 'D']),
+                ('SOF_PSF_MAG_CORRECTED_R', [mag_2_array, 'D']),
+                ('SOF_PSF_MAG_ERR_G', [mag_1_error_array, 'D']),
+                ('SOF_PSF_MAG_ERR_R', [mag_2_error_array, 'D']),
+                ('A_SED_SFD98_G', [mag_extinction_1_array, 'E']),
+                ('A_SED_SFD98_R', [mag_extinction_2_array, 'E']),
+                ('WAVG_MAG_PSF_G', [mag_1_array+mag_extinction_1_array, 'E']),
+                ('WAVG_MAG_PSF_R', [mag_2_array+mag_extinction_2_array, 'E']),
+                ('WAVG_MAGERR_PSF_G', [mag_1_error_array, 'E']),
+                ('WAVG_MAGERR_PSF_R', [mag_2_error_array, 'E']),
+                ('WAVG_SPREAD_MODEL_I', [default_array, 'E']),
+                ('WAVG_SPREADERR_MODEL_I', [default_array, 'E']),
+                ('SOF_CM_T', [default_array, 'D']),
+                ('SOF_CM_T_ERR', [default_array, 'D']),
+                ('FLAGS_GOLD', [np.tile(0, len(mc_source_id_array)), 'J']),
+                ('EXTENDED_CLASS_MASH_SOF', [np.tile(0, len(mc_source_id_array)), 'I']),
+                ])
     elif config['survey'] == 'ps1':
         # PS1
-        key_map = {'RA': [lon_array, 'D'],
-                   'DEC': [lat_array, 'D'],
-                   'OBJID': [coadd_object_id_array, 'K'],
-                   #'UNIQUEPSPSOBID': [coadd_object_id_array, 'K'],
-                   #'OBJINFOFLAG': [default_array, 'E'],
-                   #'QUALITYFLAG': [np.tile(16, len(mc_source_id_array)), 'I'],
-                   #'NSTACKDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
-                   #'NDETECTIONS': [np.tile(99, len(mc_source_id_array)), 'I'],
-                   #'NG': [default_array, 'E'],
-                   #'NR': [default_array, 'E'],
-                   #'NI': [default_array, 'E'],
-                   'GFPSFMAG': [mag_1_array+mag_extinction_1_array, 'E'],
-                   'RFPSFMAG': [mag_2_array+mag_extinction_2_array, 'E'],
-                   #'IFPSFMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
-                   'GFPSFMAGERR': [mag_1_error_array, 'E'],
-                   'RFPSFMAGERR': [mag_2_error_array, 'E'],
-                   #'IFPSFMAGERR': [default_array, 'E'],
-                   #'GFKRONMAG': [mag_1_array, 'E'],
-                   #'RFKRONMAG': [mag_2_array, 'E'],
-                   #'IFKRONMAG': [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
-                   #'GFKRONMAGERR': [mag_1_error_array, 'E'],
-                   #'RFKRONMAGERR': [mag_2_error_array, 'E'],
-                   #'IFKRONMAGERR': [default_array, 'E'],
-                   #'GFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'RFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'IFLAGS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'GINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'RINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'IINFOFLAG': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'GINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'RINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'IINFOFLAG2': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'GINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'RINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'IINFOFLAG3': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   #'PRIMARYDETECTION': [default_array, 'E'],
-                   #'BESTDETECTION': [default_array, 'E'],
-                   #'EBV': [default_array, 'E'],
-                   #'EXTSFD_G': [mag_extinction_1_array 'E'],
-                   #'EXTSFD_R': [mag_extinction_2_array, 'E'],
-                   #'EXTSFD_I': [default_array, 'E'],
-                   'GFPSFMAG_SFD': [mag_1_array, 'E'],
-                   'RFPSFMAG_SFD': [mag_2_array, 'E'],
-                   'EXTENDED_CLASS': [np.tile(0, len(mc_source_id_array)), 'I'],
-                   }
+        key_map = odict([
+                ('OBJID', [coadd_object_id_array, 'K']),
+                ('RA', [lon_array, 'D']),
+                ('DEC', [lat_array, 'D']),
+                #('UNIQUEPSPSOBID', [coadd_object_id_array, 'K']),
+                #('OBJINFOFLAG', [default_array, 'E']),
+                #('QUALITYFLAG', [np.tile(16, len(mc_source_id_array)), 'I']),
+                #('NSTACKDETECTIONS', [np.tile(99, len(mc_source_id_array)), 'I']),
+                #('NDETECTIONS', [np.tile(99, len(mc_source_id_array)), 'I']),
+                #('NG', [default_array, 'E']),
+                #('NR', [default_array, 'E']),
+                #('NI', [default_array, 'E']),
+                ('GFPSFMAG', [mag_1_array+mag_extinction_1_array, 'E']),
+                ('RFPSFMAG', [mag_2_array+mag_extinction_2_array, 'E']),
+                #('IFPSFMAG', [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                ('GFPSFMAGERR', [mag_1_error_array, 'E']),
+                ('RFPSFMAGERR', [mag_2_error_array, 'E']),
+                #('IFPSFMAGERR', [default_array, 'E']),
+                #('GFKRONMAG', [mag_1_array, 'E']),
+                #('RFKRONMAG', [mag_2_array, 'E']),
+                #('IFKRONMAG', [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
+                #('GFKRONMAGERR', [mag_1_error_array, 'E']),
+                #('RFKRONMAGERR', [mag_2_error_array, 'E']),
+                #('IFKRONMAGERR', [default_array, 'E']),
+                #('GFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('PRIMARYDETECTION', [default_array, 'E']),
+                #('BESTDETECTION', [default_array, 'E']),
+                #('EBV', [default_array, 'E']),
+                #('EXTSFD_G', [mag_extinction_1_array 'E']),
+                #('EXTSFD_R', [mag_extinction_2_array, 'E']),
+                #('EXTSFD_I', [default_array, 'E']),
+                ('GFPSFMAG_SFD', [mag_1_array, 'E']),
+                ('RFPSFMAG_SFD', [mag_2_array, 'E']),
+                ('EXTENDED_CLASS', [np.tile(0, len(mc_source_id_array)), 'I']),
+                ])
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
     print "Writing catalog files..."
@@ -609,7 +617,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         pyfits.Column(name='FRACDET_WIDE', format='E', array=fracdet_wide_population, unit=''),
         pyfits.Column(name='MAGLIM_G', format='E', array=maglim_g_population, unit='mag'),
         pyfits.Column(name='MAGLIM_R', format='E', array=maglim_r_population, unit='mag'),
-        pyfits.Column(name='EBV', format='E', array=ebv_population, unit='mag')
+        pyfits.Column(name='EBV', format='E', array=ebv_population, unit='mag'),
+        pyfits.Column(name='SURVEY', format='A12', array=survey_population, unit=''),
     ])
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
     tbhdu.writeto('%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
