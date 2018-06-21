@@ -10,7 +10,7 @@ des:
 
 ps1:
   survey: ps1
-  stellar_density: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_pseudo_stellar_density.npy
+  stellar_density: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ps1_dr1_stellar_density_map_cel_nside_256.npy
   fracdet: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/panstarrs_pseudo_fracdet.fits.gz
   maglim_g: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_g_maglim.fits
   maglim_r: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_r_maglim.fits
