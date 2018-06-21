@@ -27,9 +27,17 @@ def satellitePopulation(mask, nside_pix, n,
 
     Returns the simulated area (deg^2) as well as the
     lon (deg), lat (deg), distance modulus, stellar mass (M_sol), and half-light radius (deg) for each satellite
+
+    Parameters:
+    -----------
+    mask : the survey mask of available area
+    nside_pix : coarse resolution npix for avoiding small gaps in survey
+    n : number of satellites to simulate
+
+    Returns:
+    --------
+    area, lon, lat, distance, stellar_mass, r_physical    
     """
-    
-    lon, lat, simulation_area = ugali.utils.skymap.randomPositions(mask, nside_pix, n=n)
     
     distance = 10**np.random.uniform(np.log10(range_distance[0]),
                                      np.log10(range_distance[1]),
@@ -43,6 +51,9 @@ def satellitePopulation(mask, nside_pix, n,
     r_physical = 10**np.random.uniform(np.log10(range_r_physical[0]), 
                                        np.log10(range_r_physical[1]), 
                                        n)
+
+    # Call positions last because while loop has a variable number of calls to np.random (thus not preserving seed information)
+    lon, lat, simulation_area = ugali.utils.skymap.randomPositions(mask, nside_pix, n=n)
 
     #half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \
     #                                         / ugali.utils.projector.distanceModulusToDistance(distance_modulus)))
