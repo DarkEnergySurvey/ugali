@@ -141,8 +141,8 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     distance_modulus = ugali.utils.projector.distanceToDistanceModulus(distance)
     iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus)
     s.set_isochrone(iso)
-
-    mag_1, mag_2 = s.isochrone.simulate(stellar_mass) # Simulate takes stellar mass as an argument, NOT richness
+    # Simulate takes stellar mass as an argument, NOT richness
+    mag_1, mag_2 = s.isochrone.simulate(stellar_mass) 
 
     lon, lat = s.kernel.sample_lonlat(len(mag_2))
 
@@ -265,6 +265,10 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     infile_maglim_r = config['maglim_r']
     infile_density = config['stellar_density']
 
+    range_distance = config.get('range_distance',[5., 500.])
+    range_stellar_mass = config.get('range_stellar_mass',[1.e1, 1.e6])
+    range_r_physical = config.get('range_r_physical',[1.e-3, 2.0])
+    
     m_density = np.load(infile_density)
     nside_density = healpy.npix2nside(len(m_density))
     m_fracdet = read_map(infile_fracdet, nest=False) #.astype(np.float16)
@@ -279,8 +283,12 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
 
     mask = (m_fracdet > 0.5)
 
+    kwargs = dict(range_distance = range_distance,
+                  range_stellar_mass = range_stellar_mass,
+                  range_r_physical = range_r_physical)
+    print kwargs
     # r_physical is azimuthally-averaged half-light radius, kpc
-    simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n)
+    simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n, **kwargs)
     n_g22_population = np.tile(np.nan, n)
     n_g24_population = np.tile(np.nan, n)
     abs_mag_population = np.tile(np.nan, n)
