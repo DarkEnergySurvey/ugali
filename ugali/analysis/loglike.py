@@ -24,6 +24,8 @@ from ugali.utils.logger import logger
 from ugali.utils.config import Config
 from ugali.analysis.source import Source
 
+from ugali.analysis.kernel import EllipticalDisk, ToyKernel
+
 class Observation(object):
     """
     Dummy class for storing catalog, roi, mask and other quantities
@@ -71,7 +73,7 @@ class LogLikelihood(object):
         # The signal probability for each object
         #self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
         # The total model predicted counts
-        #return -1. * numpy.sum(numpy.log(1.-self.p)) - (self.f * self.source.richness)
+        #return -1. * np.sum(np.log(1.-self.p)) - (self.f * self.source.richness)
         return -1. * np.log(1.-self.p).sum() - (self.f * self.source.richness)
         
     def __str__(self):
@@ -199,7 +201,7 @@ class LogLikelihood(object):
 
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog...")
-        cut_interior = numpy.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
+        cut_interior = np.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
                                   self.roi.pixels_interior)
         #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
@@ -324,14 +326,16 @@ class LogLikelihood(object):
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
         nside = self.config['coords']['nside_pixel']
-        #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
-        #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+        pixrad = np.degrees(healpy.max_pixrad(nside))
 
-        # For small kernels, use the single pixel where they reside; otherwise, calculate over roi
-        if self.kernel.extension < 2*np.degrees(healpy.max_pixrad(nside)):
-            #msg =  "small kernel"
-            #msg += ("\n"+str(self.params))
-            #logger.warning(msg)
+        # For small kernels, use the single pixel where they reside;
+        # otherwise, calculate over roi. This discrepancy exceeds 10%
+        # for kernels that are smaller than 75% of the pixel radius.
+        if (isinstance(self.kernel,(EllipticalDisk,ToyKernel)) \
+                and self.kernel.extension < 2*pixrad) \
+                or self.kernel.extension < 0.8 * pixrad:
+            msg = "Calculating single-pixel surface intensity"
+            logger.warning(msg)
             idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
             self.surface_intensity_sparse = np.zeros(len(pix_lon))
             self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
@@ -358,23 +362,35 @@ class LogLikelihood(object):
     def fit_richness(self, atol=1.e-3, maxiter=50):
         """
         Maximize the log-likelihood as a function of richness.
+
+        ADW 2018-06-04: Does it make sense to set the richness to the mle?
+
+        Parameters:
+        -----------
+        atol : absolute tolerence for conversion
+        maxiter : maximum number of iterations
+
+        Returns:
+        --------
+        loglike, richness, parabola : the maximum loglike, the mle, and the parabola
         """
         # Check whether the signal probability for all objects are zero
         # This can occur for finite kernels on the edge of the survey footprint
-        if numpy.isnan(self.u).any():
+        if np.isnan(self.u).any():
             logger.warning("NaN signal probability found")
             return 0., 0., None
         
-        if not numpy.any(self.u):
+        if not np.any(self.u):
             logger.warning("Signal probability is zero for all objects")
+            return 0., 0., None
+
+        if self.f == 0:
+            logger.warning("Observable fraction is zero")
             return 0., 0., None
 
         # Richness corresponding to 0, 1, and 10 observable stars
         richness = np.array([0., 1./self.f, 10./self.f])
-        loglike = []
-        for r in richness:
-            loglike.append(self.value(richness=r))
-        loglike = np.array(loglike)
+        loglike = np.array([self.value(richness=r) for r in richness])
 
         found_maximum = False
         iteration = 0
@@ -383,31 +399,31 @@ class LogLikelihood(object):
             if parabola.vertex_x < 0.:
                 found_maximum = True
             else:
-                richness = numpy.append(richness, parabola.vertex_x)
-                loglike  = numpy.append(loglike, self.value(richness=richness[-1]))    
+                richness = np.append(richness, parabola.vertex_x)
+                loglike  = np.append(loglike, self.value(richness=richness[-1]))
 
-                if numpy.fabs(loglike[-1] - numpy.max(loglike[0: -1])) < atol:
+                if np.fabs(loglike[-1] - np.max(loglike[0: -1])) < atol:
                     found_maximum = True
             iteration+=1
             if iteration > maxiter:
                 logger.warning("Maximum number of iterations reached")
                 break
             
-        index = numpy.argmax(loglike)
+        index = np.argmax(loglike)
         return loglike[index], richness[index], parabola
 
     def richness_interval(self, alpha=0.6827, n_pdf_points=100):
         loglike_max, richness_max, parabola = self.fit_richness()
 
         richness_range = parabola.profileUpperLimit(delta=25.) - richness_max
-        richness = numpy.linspace(max(0., richness_max - richness_range),
+        richness = np.linspace(max(0., richness_max - richness_range),
                                   richness_max + richness_range,
                                   n_pdf_points)
         if richness[0] > 0.:
-            richness = numpy.insert(richness, 0, 0.)
+            richness = np.insert(richness, 0, 0.)
             n_pdf_points += 1
         
-        log_likelihood = numpy.zeros(n_pdf_points)
+        log_likelihood = np.zeros(n_pdf_points)
         for kk in range(0, n_pdf_points):
             log_likelihood[kk] = self.value(richness=richness[kk])
         parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
@@ -528,7 +544,7 @@ def write_membership(filename,config,srcfile,section=None):
 
 # This should probably be moved into ugali.analysis.source...
 def createSource(config, section=None, **kwargs):
-    config = Config(config)    
+    config = Config(config)
     source = Source()
 
     if config.get(section) is not None:
