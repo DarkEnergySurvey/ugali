@@ -37,7 +37,7 @@ for index_batch in np.arange(args.nbatch):
     command = 'simulate_population.py %s -s %s --tag %s --start %i --size %i --chunk %i --seed %i'%(args.config, args.section, args.tag, mc_source_id_start, args.size_batch, args.nchunk, seed)
 
     logfile = os.path.join(logdir,'%07i.log'%mc_source_id_start)
-    submit = 'csub -q %s -o %s -n 20 '%(args.queue,logfile) + command
+    submit = 'csub -q %s -o %s -n 10 '%(args.queue,logfile) + command
     subprocess.call(submit,shell=True)
 
     #print command
