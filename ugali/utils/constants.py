@@ -85,6 +85,10 @@ MAGLIMS = dict(
         'g': 24.0, 
         'r': 24.0,
         },
+    ps1_dr1 = {
+        'g': 23.0,
+        'r': 23.0,
+        },
 )
 
 
@@ -143,6 +147,12 @@ MAGERR_PARAMS = dict(
         'r': [ -8.86883525e-01,  -2.38329071e+00,   4.56457328e-04], 
         },
 
+    # This is fit from some curves that Keith made
+    ps1_dr1 = {
+        'g' : [-0.84967134, -2.27897518,  0.00304501],
+        'r' : [-0.92218737, -2.34012887,  0.00451849],
+        }
+
 )
 
 # Calibration uncertainty
@@ -153,4 +163,5 @@ CALIB_ERR = dict(
     y2u1 = 0.015,
     y2q1 = 0.015,
     y3a2 = 0.015, # Y3 FGCM should be closer to 0.007...
+    ps1_dr1 = 0.03, # Made up
 )
