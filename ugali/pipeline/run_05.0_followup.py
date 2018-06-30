@@ -27,6 +27,7 @@ from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
 components = ['mcmc','membership','results','plot','collect','scan']
+components = ['mcmc','membership','results','plot']
 
 def make_filenames(config,label):
     config = ugali.utils.config.Config(config)
