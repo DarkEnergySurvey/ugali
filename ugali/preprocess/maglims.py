@@ -94,8 +94,18 @@ class Maglims(object):
         band    = self.config['catalog']['mag_%i_band'%field]
         pixel_pix_name = 'PIX%i'%self.nside_pixel         
 
-        data = fitsio.read(infile,columns=[pixel_pix_name])
-
+        # If the data already has a healpix pixel assignment then use it
+        # Otherwise recalculate...
+        try:
+            data = fitsio.read(infile,columns=[pixel_pix_name])
+        except ValueError as e:
+            logger.info(str(e))
+            columns=[self.config['catalog']['lon_field'],
+                     self.config['catalog']['lat_field']]
+            data = fitsio.read(infile,columns=columns)[columns]
+            pix = ang2pix(self.nside_pixel,data[columns[0]],data[columns[1]])
+            data = recfuncs.rec_append_fields(data,pixel_pix_name,pix)
+            
         #mask_pixels = np.arange( hp.nside2npix(self.nside_mask), dtype='int')
         mask_maglims = np.zeros(hp.nside2npix(self.nside_mask))
          
@@ -159,8 +169,11 @@ class Maglims(object):
         # Remove pixels outside the footprint
         if self.footfile:
             logger.info("Checking footprint against %s"%self.footfile)
-            glon,glat = pix2ang(self.nside_pixel,out_pixels)
-            ra,dec = gal2cel(glon,glat)
+            lon,lat = pix2ang(self.nside_pixel,out_pixels)
+            if self.config['coords']['coordsys'] == 'gal':
+                ra,dec = gal2cel(lon,lat)
+            else:    
+                ra,dec = lon,lat
             footprint = inFootprint(self.footprint,ra,dec)
             idx = np.nonzero(footprint)[0]
             out_pixels = out_pixels[idx]

@@ -85,6 +85,8 @@ class Parser(argparse.ArgumentParser):
             logger.setLevel(logger.DEBUG)
 
     def _parse_coords(self,opts):
+        """ Parse target coordinates in various ways...
+        """
         # The coordinates are mutually exclusive, so
         # shouldn't have to worry about over-writing them.
         if 'coords' in vars(opts): return
@@ -127,13 +129,21 @@ class Parser(argparse.ArgumentParser):
         if (ext=='.fits'):
             import fitsio
             data = fitsio.read(filename)
-        else:
+        elif (ext=='.txt'):
             from numpy.lib import NumpyVersion
             if NumpyVersion(np.__version__) < '1.14.0':
                 data = np.genfromtxt(filename,names=True,dtype=None)
             else:
                 data = np.genfromtxt(filename,names=True,dtype=None,encoding=None)
             #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
+        elif (ext=='.yaml'):
+            import yaml
+            data = [(k,v['kernel']['lon']['value'],v['kernel']['lat']['value'],0.5,'CEL') for k,v in yaml.load(open(filename)).items()]
+            data = np.rec.fromrecords(data,names=['name','lon','lat','radius','coord'])
+        else:
+            msg = "Unrecognized file type: %s"%filename
+            raise IOError(msg)
+
         data = np.atleast_1d(data)
         data.dtype.names = list(map(str.lower,data.dtype.names))
 
