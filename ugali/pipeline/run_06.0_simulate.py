@@ -53,7 +53,7 @@ def run(self):
             outfile = join(outdir,basename)
 
             if exists(outfile) and not self.opts.force:
-                logger.info("  Found %s; skipping..."%outfile)
+                logger.info("Found %s; skipping..."%outfile)
                 continue
 
             base = splitext(os.path.basename(outfile))[0]
