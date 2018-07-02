@@ -335,7 +335,7 @@ class LogLikelihood(object):
                 and self.kernel.extension < 2*pixrad) \
                 or self.kernel.extension < 0.8 * pixrad:
             msg = "Calculating single-pixel surface intensity"
-            logger.warning(msg)
+            logger.debug(msg)
             idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
             self.surface_intensity_sparse = np.zeros(len(pix_lon))
             self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
