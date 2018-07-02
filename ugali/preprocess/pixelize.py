@@ -80,9 +80,14 @@ def pixelizeCatalog(infiles, config, force=False):
         cat_pix_name = 'PIX%i'%nside_catalog
         pix_pix_name = 'PIX%i'%nside_pixel
 
-        names += [cat_pix_name,pix_pix_name]
-        arrs  += [cat_pix,pix_pix]
-        data=mlab.rec_append_fields(data,names=names,arrs=arrs)
+        try:
+            names += [cat_pix_name,pix_pix_name]
+            arrs  += [cat_pix,pix_pix]
+            data=mlab.rec_append_fields(data,names=names,arrs=arrs)
+        except ValueError as e:
+            logger.warn(str(e)+'; not adding column.')
+            #data[cat_pix_name] = cat_pix
+            #data[pix_pix_name] = pix_pix
                                
         for pix in np.unique(cat_pix):
             logger.debug("Processing pixel %s"%pix)
