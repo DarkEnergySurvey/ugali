@@ -1,0 +1,19 @@
+# At FNAL
+#survey: ps1
+#stellar_density: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_pseudo_stellar_density.npy
+#fracdet: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/panstarrs_pseudo_fracdet.fits.gz
+#maglim_g: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_g_maglim.fits
+#maglim_r: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_r_maglim.fits
+#ebv: /home/s1/bechtol/des60.b/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+#completeness: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_stellar_classification_summary_r.csv
+#photo_error: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_photo_error_model_r.csv
+
+# Keith
+survey: ps1
+stellar_density: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_pseudo_stellar_density.npy
+fracdet: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/panstarrs_pseudo_fracdet.fits.gz
+maglim_g: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_nside32_nest_g_maglim.fits
+maglim_r: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_nside32_nest_r_maglim.fits
+ebv: /Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+completeness: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_stellar_classification_summary_r.csv
+photo_error: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_photo_error_model_r.csv
