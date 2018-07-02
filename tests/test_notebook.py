@@ -53,6 +53,8 @@ class TestNotebook(unittest.TestCase):
     def test_kernel(self):
         return self._test_notebook('kernel_example.ipynb')
 
+    #def test_pipeline(self):
+    #    return self._test_notebook('pipeline_example.ipynb')
 
 if __name__ == "__main__":
     unittest.main()

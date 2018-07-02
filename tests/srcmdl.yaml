@@ -1,0 +1,16 @@
+reticulum_ii:
+  richness:
+    name: Richness
+    richness: {value: 1000, bounds: [0,.inf], free: True}
+  kernel:
+    name: EllipticalPlummer
+    lon:            {value: 53.92,  bounds: [0,360],     free: True}
+    lat:            {value: -54.05, bounds: [-90,90],    free: True}
+    extension:      {value: 0.1,    bounds: [0.001,0.2], free: True}
+    ellipticity:    {value: 0.6,    bounds: [0.0,0.8],   free: True}
+    position_angle: {value: 72,     bounds: [0,180],     free: True}
+  isochrone:
+    name: Bressan2012
+    mod: {value: 17.5,  bounds: [16.0,20.0],       free: False}
+    age: {value: 12.0,  bounds: [10.0,13.0],       free: False}
+    z: {value: 0.00020, bounds: [0.00010,0.00050], free: False}
