@@ -97,9 +97,10 @@ class Source(object):
         return params
 
     def load(self,srcmdl,section=None):
-        if isinstance(srcmdl,str): 
+        # This is to get around string checking python2/3 issues
+        try: 
             params = yaml.load(open(srcmdl))
-        else:
+        except TypeError:
             params = copy.deepcopy(srcmdl)
 
         if section is not None: 
