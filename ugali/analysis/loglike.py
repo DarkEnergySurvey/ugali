@@ -10,7 +10,6 @@ import numpy
 import numpy as np
 from scipy.stats import norm
 
-import healpy
 import healpy as hp
 import fitsio
 
@@ -311,7 +310,82 @@ class LogLikelihood(object):
     # FIXME: Need to parallelize CMD and MMD formulation
     calc_signal_color = calc_signal_color1
 
-    def calc_signal_spatial(self):
+    def calc_surface_intensity_sparse(self, factor=4):
+        """Calculate the surface intensity subsampling each pixel.
+        
+        Parameters:
+        -----------
+        factor : the subsampling factor (must be multiple of 2)
+
+        Returns:
+        --------
+        surface_intensity : the surface intensity at each pixel
+        """
+        # At the pixel level over the ROI
+        pixels = self.roi.pixels_interior
+        nside_in = self.config['coords']['nside_pixel']
+        nside_out = factor * nside_in
+
+        subpix = ugali.utils.healpix.ud_grade_ipix(pixels,nside_in,nside_out)
+        pix_lon,pix_lat = pix2ang(nside_out,subpix)
+        surface_intensity = self.kernel.pdf(pix_lon,pix_lat)
+
+        if surface_intensity.ndim == 2: 
+            surface_intensity = np.mean(surface_intensity,axis=1)
+        
+        # Index of the centroid
+        pix = ang2pix(nside_in,self.kernel.lon,self.kernel.lat)
+        #pix = hp.get_all_neighbours(nside_in,pix)
+
+        # Index of pixels in interior region
+        idx = ugali.utils.healpix.index_pix_in_pixels(pix,pixels)
+        sel = (idx >= 0)
+        import pdb; pdb.set_trace()
+        if np.any(sel):
+            # Subsample the centroid pixel(s) to calculate the central intensity
+            nside_out = 2**5 * nside_in
+            subpix = ugali.utils.healpix.ud_grade_ipix(pix,nside_in,nside_out)
+            pix_lon,pix_lat = pix2ang(nside_out,subpix)
+            central_intensity = np.mean(self.kernel.pdf(pix_lon,pix_lat),axis=1)
+             
+            # Reset the surface intensity for the centroid pixels
+            surface_intensity[idx[sel]] = central_intensity[sel]
+        
+        return surface_intensity
+
+    def calc_surface_intensity_sparse2(self, factor=4):
+        """Calculate the surface intensity subsampling each pixel.
+        
+        Parameters:
+        -----------
+        factor : the subsampling factor (must be multiple of 2)
+
+        Returns:
+        --------
+        surface_intensity : the surface intensity at each pixel
+        """
+        # At the pixel level over the ROI
+        pixels = self.roi.pixels_interior
+        nside_in = self.config['coords']['nside_pixel']
+        nside_out = factor * nside_in
+
+        subpix = ugali.utils.healpix.ud_grade_ipix(pixels,nside_in,nside_out)
+        pix_lon,pix_lat = pix2ang(nside_out,subpix)
+        surface_intensity = self.kernel.pdf(pix_lon,pix_lat)
+
+        if surface_intensity.ndim == 2: 
+            surface_intensity = np.mean(surface_intensity,axis=1)
+
+        if (self.kernel.extension < 10*self.roi.max_pixrad):
+            delta = surface_intensity.sum() - 1.0/self.roi.area_pixel
+            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
+            surface_intensity[idx] -= delta
+
+        return surface_intensity
+
+
+    # Original calculation
+    def calc_signal_spatial1(self):
         """
         Calculate the spatial signal probability for each catalog object.
 
@@ -325,9 +399,55 @@ class LogLikelihood(object):
         """
         # At the pixel level over the ROI
         pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-        nside = self.config['coords']['nside_pixel']
-        pixrad = np.degrees(healpy.max_pixrad(nside))
+        pixrad = self.roi.max_pixrad
+        roi_radius_internal = self.config['coords']['roi_radius_interior']
 
+        #self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
+        self.surface_intensity_sparse = self.calc_surface_intensity_sparse(4)
+
+        # For small kernels, the surface intensity for the central pixel 
+        # cannot be accurately calculated.  This discrepancy
+        # exceeds 10% for kernels that are smaller than 75% of the
+        # pixel radius. However, we don't want to artificially
+        # renormalize kernels that are actually loosing surface
+        # intensity outside the interior radius.
+
+        #if (self.kernel.extension < 0.5 * roi_radius_internal):
+        #    delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
+        #    idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
+        #    self.surface_intensity_sparse[idx] -= delta
+
+        if 10*pixrad > 0.5*roi_radius_internal:
+            msg = "Renormalizing kernel with large extension"
+            logger.warn(msg)
+
+        if (self.kernel.extension < 10*pixrad):
+            delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
+            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
+            self.surface_intensity_sparse[idx] -= delta
+
+
+        ### We run into a problem for small kernels where the surface
+        ### intensity for the pixel that the source resides in cannot be
+        ### calculated from evaluating the kernel a just the center of
+        ### the pixel.  This discrepancy exceeds 10% for kernels that
+        ### are smaller than 75% of the pixel radius.
+        ##if (isinstance(self.kernel,(EllipticalDisk,ToyKernel)) \
+        ##        and self.kernel.extension < 2*pixrad) \
+        ##        or self.kernel.extension < 0.8 * pixrad:
+        ##    msg = "Calculating single-pixel surface intensity"
+        ##    logger.debug(msg)
+        ##    # Assuming that the kernel is normalized, we can adjust
+        ##    # the value of the central pixel to retain the proper
+        ##    # normalization of 1 per deg^2
+        ##    delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
+        ##    
+        ##    # Adjust the value of the central pixel
+        ##    idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
+        ##    import pdb;pdb.set_trace()
+        ##    self.surface_intensity_sparse[idx] -= delta
+
+        """
         # For small kernels, use the single pixel where they reside;
         # otherwise, calculate over roi. This discrepancy exceeds 10%
         # for kernels that are smaller than 75% of the pixel radius.
@@ -335,12 +455,13 @@ class LogLikelihood(object):
                 and self.kernel.extension < 2*pixrad) \
                 or self.kernel.extension < 0.8 * pixrad:
             msg = "Calculating single-pixel surface intensity"
-            logger.warning(msg)
+            logger.debug(msg)
             idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
             self.surface_intensity_sparse = np.zeros(len(pix_lon))
             self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
         else:
             self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
+        """
 
         # On the object-by-object level
         #self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
@@ -348,9 +469,33 @@ class LogLikelihood(object):
         self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,self.catalog.lat)
         
         # Spatial component of signal probability
-        #u_spatial = self.roi.area_pixel * self.surface_intensity_object
         u_spatial = self.surface_intensity_object
         return u_spatial
+
+    def calc_signal_spatial2(self):
+        """
+        Calculate the spatial signal probability for each catalog object.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        u_spatial : array of spatial probabilities per object
+        """
+        # Calculate the surface intensity
+        self.surface_intensity_sparse = self.calc_surface_intensity_sparse(4)
+
+        # On the object-by-object level
+        self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,
+                                                        self.catalog.lat)
+        
+        # Spatial component of signal probability
+        u_spatial = self.surface_intensity_object
+        return u_spatial
+
+    calc_signal_spatial = calc_signal_spatial2
 
     ############################################################################
     # Methods for fitting and working with the likelihood

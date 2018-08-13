@@ -26,6 +26,7 @@ from ugali.utils.healpix import query_disc, ang2pix, pix2ang, ang2vec
 # ADW: Should really write some "PixelSet" object that contains the pixels for each region...
 
 class PixelRegion(np.ndarray):
+    # https://docs.scipy.org/doc/numpy-1.13.0/user/basics.subclassing.html
 
     def __new__(cls, nside, pixels):
         # Input array is an already formed ndarray instance
@@ -41,6 +42,9 @@ class PixelRegion(np.ndarray):
     def __array_finalize__(self, obj):
         # see InfoArray.__array_finalize__ for comments
         if obj is None: return
+
+        # NOTE: the _nside, _pix etc. attributes don't get set on
+        # slicing because we are worried it will be too slow
 
     @property
     def lon(self):
@@ -95,33 +99,12 @@ class ROI(object):
         # Boolean arrays for selecting given pixels 
         # (Careful, this works because pixels are pre-sorted by query_disc before in1d)
         self.pixel_interior_cut = np.in1d(self.pixels, self.pixels_interior)
-
-        # ADW: Updated for more general ROI shapes
-        #self.pixel_annulus_cut  = ~self.pixel_interior_cut
         self.pixel_annulus_cut  = np.in1d(self.pixels, self.pixels_annulus)
 
-        # # These should be unnecessary now
-        # self.centers_lon, self.centers_lat = self.pixels.lon, self.pixels.lat
-        # self.centers_lon_interior,self.centers_lat_interior = self.pixels_interior.lon,self.pixels_interior.lat
-        # self.centers_lon_target, self.centers_lat_target = self.pixels_target.lon, self.pixels_target.lat
-
+        # Some pixel properties
         self.area_pixel = hp.nside2pixarea(self.config.params['coords']['nside_pixel'],degrees=True) # deg^2
+        self.max_pixrad = np.degrees(hp.max_pixrad(self.config['coords']['nside_pixel'])) # deg
                                      
-        """
-        self.centers_x = self._centers(self.bins_x)
-        self.centers_y = self._centers(self.bins_y)
-
-        self.delta_x = self.config.params['coords']['pixel_size']
-        self.delta_y = self.config.params['coords']['pixel_size']
-        
-        # Should actually try to take projection effects into account for better accuracy
-        # MC integration perhaps?
-        # Throw points in a cone around full ROI and see what fraction fall in
-        self.area_pixel = self.config.params['coords']['pixel_size']**2
-        
-        self.centers_lon, self.centers_lat = self.projector.imageToSphere(self.centers_x, self.centers_y)
-        """
-
         # ADW: These are really bin edges, should be careful and consistent
         # It would be cleaner to separate the CMD from ROI
         self.bins_mag = np.linspace(self.config.params['mag']['min'],
@@ -138,18 +121,16 @@ class ROI(object):
         self.delta_mag = self.bins_mag[1] - self.bins_mag[0]
         self.delta_color = self.bins_color[1] - self.bins_color[0]
 
-        # Axis labels (DEPRECATED)
-        self.label_x = 'x (deg)'
-        self.label_y = 'y (deg)'
-        
-        if self.config.params['catalog']['band_1_detection']:
-            self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_1_field'])
-        else:
-            self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_2_field'])
-        self.label_color = '%s - %s (mag)'%(self.config.params['catalog']['mag_1_field'],
-                                            self.config.params['catalog']['mag_2_field'])
-
-        #self.precomputeAngsep()
+        ## Axis labels (DEPRECATED)
+        #self.label_x = 'x (deg)'
+        #self.label_y = 'y (deg)'
+        # 
+        #if self.config.params['catalog']['band_1_detection']:
+        #    self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_1_field'])
+        #else:
+        #    self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_2_field'])
+        #self.label_color = '%s - %s (mag)'%(self.config.params['catalog']['mag_1_field'],
+        #                                    self.config.params['catalog']['mag_2_field'])
 
     def plot(self, value=None, pixel=None):
         """
