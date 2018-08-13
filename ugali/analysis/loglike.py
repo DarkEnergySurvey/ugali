@@ -17,7 +17,7 @@ import ugali.utils.binning
 import ugali.utils.parabola
 
 from ugali.utils.projector import angsep, gal2cel
-from ugali.utils.healpix import ang2pix,pix2ang
+from ugali.utils.healpix import ang2pix,pix2ang,ang2disc
 from ugali.utils.logger import logger
 
 from ugali.utils.config import Config
@@ -310,79 +310,43 @@ class LogLikelihood(object):
     # FIXME: Need to parallelize CMD and MMD formulation
     calc_signal_color = calc_signal_color1
 
-    def calc_surface_intensity_sparse(self, factor=4):
-        """Calculate the surface intensity subsampling each pixel.
-        
+    def calc_surface_intensity(self, factor=10):
+        """Calculate the surface intensity for each pixel in the interior
+        region of the ROI. Pixels are adaptively subsampled around the
+        kernel centroid out to a radius of 'factor * max_pixrad'.
+
         Parameters:
         -----------
-        factor : the subsampling factor (must be multiple of 2)
+        factor : the radius of the oversample region in units of max_pixrad
 
         Returns:
         --------
         surface_intensity : the surface intensity at each pixel
         """
-        # At the pixel level over the ROI
+        # First we calculate the surface intensity at native resolution
         pixels = self.roi.pixels_interior
         nside_in = self.config['coords']['nside_pixel']
-        nside_out = factor * nside_in
+        surface_intensity = self.kernel.pdf(pixels.lon,pixels.lat)
 
-        subpix = ugali.utils.healpix.ud_grade_ipix(pixels,nside_in,nside_out)
-        pix_lon,pix_lat = pix2ang(nside_out,subpix)
-        surface_intensity = self.kernel.pdf(pix_lon,pix_lat)
+        # Then we recalculate the surface intensity around the kernel
+        # centroid at higher resolution
+        for i in np.arange(1,5):
+            # Select pixels within the region of interest
+            nside_out = 2**i * nside_in
+            radius = factor*np.degrees(hp.max_pixrad(nside_out))
+            pix = ang2disc(nside_in,self.kernel.lon,self.kernel.lat,
+                           radius,inclusive=True)
 
-        if surface_intensity.ndim == 2: 
-            surface_intensity = np.mean(surface_intensity,axis=1)
-        
-        # Index of the centroid
-        pix = ang2pix(nside_in,self.kernel.lon,self.kernel.lat)
-        #pix = hp.get_all_neighbours(nside_in,pix)
+            # Select pix within the interior region of the ROI
+            idx = ugali.utils.healpix.index_pix_in_pixels(pix,pixels)
+            pix = pix[(idx >= 0)]; idx = idx[(idx >= 0)]
 
-        # Index of pixels in interior region
-        idx = ugali.utils.healpix.index_pix_in_pixels(pix,pixels)
-        sel = (idx >= 0)
-        import pdb; pdb.set_trace()
-        if np.any(sel):
-            # Subsample the centroid pixel(s) to calculate the central intensity
-            nside_out = 2**5 * nside_in
+            # Reset the surface intensity for the subsampled pixels
             subpix = ugali.utils.healpix.ud_grade_ipix(pix,nside_in,nside_out)
             pix_lon,pix_lat = pix2ang(nside_out,subpix)
-            central_intensity = np.mean(self.kernel.pdf(pix_lon,pix_lat),axis=1)
-             
-            # Reset the surface intensity for the centroid pixels
-            surface_intensity[idx[sel]] = central_intensity[sel]
-        
-        return surface_intensity
-
-    def calc_surface_intensity_sparse2(self, factor=4):
-        """Calculate the surface intensity subsampling each pixel.
-        
-        Parameters:
-        -----------
-        factor : the subsampling factor (must be multiple of 2)
-
-        Returns:
-        --------
-        surface_intensity : the surface intensity at each pixel
-        """
-        # At the pixel level over the ROI
-        pixels = self.roi.pixels_interior
-        nside_in = self.config['coords']['nside_pixel']
-        nside_out = factor * nside_in
-
-        subpix = ugali.utils.healpix.ud_grade_ipix(pixels,nside_in,nside_out)
-        pix_lon,pix_lat = pix2ang(nside_out,subpix)
-        surface_intensity = self.kernel.pdf(pix_lon,pix_lat)
-
-        if surface_intensity.ndim == 2: 
-            surface_intensity = np.mean(surface_intensity,axis=1)
-
-        if (self.kernel.extension < 10*self.roi.max_pixrad):
-            delta = surface_intensity.sum() - 1.0/self.roi.area_pixel
-            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-            surface_intensity[idx] -= delta
+            surface_intensity[idx]=np.mean(self.kernel.pdf(pix_lon,pix_lat),axis=1)
 
         return surface_intensity
-
 
     # Original calculation
     def calc_signal_spatial1(self):
@@ -402,8 +366,7 @@ class LogLikelihood(object):
         pixrad = self.roi.max_pixrad
         roi_radius_internal = self.config['coords']['roi_radius_interior']
 
-        #self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
-        self.surface_intensity_sparse = self.calc_surface_intensity_sparse(4)
+        self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
 
         # For small kernels, the surface intensity for the central pixel 
         # cannot be accurately calculated.  This discrepancy
@@ -485,7 +448,7 @@ class LogLikelihood(object):
         u_spatial : array of spatial probabilities per object
         """
         # Calculate the surface intensity
-        self.surface_intensity_sparse = self.calc_surface_intensity_sparse(4)
+        self.surface_intensity_sparse = self.calc_surface_intensity()
 
         # On the object-by-object level
         self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,
