@@ -180,7 +180,6 @@ class LogLikelihood(object):
         #logging.debug('p: %s'%np.unique(self.p)[:20])
 
         # Reset the sync toggle
-        #for k in self._sync.keys(): self._sync[k]=False 
         self.source.reset_sync()
 
     ############################################################################
@@ -450,7 +449,7 @@ class LogLikelihood(object):
         # Calculate the surface intensity
         self.surface_intensity_sparse = self.calc_surface_intensity()
 
-        # On the object-by-object level
+        # Calculate the probability per object-by-object level
         self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,
                                                         self.catalog.lat)
         
