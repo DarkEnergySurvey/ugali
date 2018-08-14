@@ -347,94 +347,7 @@ class LogLikelihood(object):
 
         return surface_intensity
 
-    # Original calculation
-    def calc_signal_spatial1(self):
-        """
-        Calculate the spatial signal probability for each catalog object.
-
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        u_spatial : array of spatial probabilities per object
-        """
-        # At the pixel level over the ROI
-        pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-        pixrad = self.roi.max_pixrad
-        roi_radius_internal = self.config['coords']['roi_radius_interior']
-
-        self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
-
-        # For small kernels, the surface intensity for the central pixel 
-        # cannot be accurately calculated.  This discrepancy
-        # exceeds 10% for kernels that are smaller than 75% of the
-        # pixel radius. However, we don't want to artificially
-        # renormalize kernels that are actually loosing surface
-        # intensity outside the interior radius.
-
-        #if (self.kernel.extension < 0.5 * roi_radius_internal):
-        #    delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
-        #    idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-        #    self.surface_intensity_sparse[idx] -= delta
-
-        if 10*pixrad > 0.5*roi_radius_internal:
-            msg = "Renormalizing kernel with large extension"
-            logger.warn(msg)
-
-        if (self.kernel.extension < 10*pixrad):
-            delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
-            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-            self.surface_intensity_sparse[idx] -= delta
-
-
-        ### We run into a problem for small kernels where the surface
-        ### intensity for the pixel that the source resides in cannot be
-        ### calculated from evaluating the kernel a just the center of
-        ### the pixel.  This discrepancy exceeds 10% for kernels that
-        ### are smaller than 75% of the pixel radius.
-        ##if (isinstance(self.kernel,(EllipticalDisk,ToyKernel)) \
-        ##        and self.kernel.extension < 2*pixrad) \
-        ##        or self.kernel.extension < 0.8 * pixrad:
-        ##    msg = "Calculating single-pixel surface intensity"
-        ##    logger.debug(msg)
-        ##    # Assuming that the kernel is normalized, we can adjust
-        ##    # the value of the central pixel to retain the proper
-        ##    # normalization of 1 per deg^2
-        ##    delta = self.surface_intensity_sparse.sum() - 1.0/self.roi.area_pixel
-        ##    
-        ##    # Adjust the value of the central pixel
-        ##    idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-        ##    import pdb;pdb.set_trace()
-        ##    self.surface_intensity_sparse[idx] -= delta
-
-        """
-        # For small kernels, use the single pixel where they reside;
-        # otherwise, calculate over roi. This discrepancy exceeds 10%
-        # for kernels that are smaller than 75% of the pixel radius.
-        if (isinstance(self.kernel,(EllipticalDisk,ToyKernel)) \
-                and self.kernel.extension < 2*pixrad) \
-                or self.kernel.extension < 0.8 * pixrad:
-            msg = "Calculating single-pixel surface intensity"
-            logger.debug(msg)
-            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-            self.surface_intensity_sparse = np.zeros(len(pix_lon))
-            self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
-        else:
-            self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
-        """
-
-        # On the object-by-object level
-        #self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
-        #self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
-        self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,self.catalog.lat)
-        
-        # Spatial component of signal probability
-        u_spatial = self.surface_intensity_object
-        return u_spatial
-
-    def calc_signal_spatial2(self):
+    def calc_signal_spatial(self):
         """
         Calculate the spatial signal probability for each catalog object.
 
@@ -456,8 +369,6 @@ class LogLikelihood(object):
         # Spatial component of signal probability
         u_spatial = self.surface_intensity_object
         return u_spatial
-
-    calc_signal_spatial = calc_signal_spatial2
 
     ############################################################################
     # Methods for fitting and working with the likelihood
@@ -535,48 +446,6 @@ class LogLikelihood(object):
             log_likelihood[kk] = self.value(richness=richness[kk])
         parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
         return parabola.confidenceInterval(alpha)
-
-
-    #def write_membership2(self,filename):
-    #    import astropy.io.fits as pyfits
-    # 
-    #    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
-    #    
-    #    name_objid = self.config['catalog']['objid_field']
-    #    name_mag_1 = self.config['catalog']['mag_1_field']
-    #    name_mag_2 = self.config['catalog']['mag_2_field']
-    #    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
-    #    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
-    # 
-    #    # Angular and isochrone separations
-    #    sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
-    #    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
-    # 
-    #    columns = [
-    #        pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
-    #        pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
-    #        pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
-    #        pyfits.Column(name='RA',format='D',array=ra),
-    #        pyfits.Column(name='DEC',format='D',array=dec),
-    #        pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
-    #        pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
-    #        pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
-    #        pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
-    #        pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
-    #        pyfits.Column(name='ANGSEP',format='E',array=sep),
-    #        pyfits.Column(name='ISOSEP',format='E',array=isosep),
-    #        pyfits.Column(name='PROB',format='E',array=self.p),
-    #    ]
-    #    hdu = pyfits.new_table(columns)
-    #    for param,value in self.source.params.items():
-    #        # HIERARCH allows header keywords longer than 8 characters
-    #        name = 'HIERARCH %s'%param.upper()
-    #        hdu.header.set(name,value.value,param)
-    #    name = 'HIERARCH %s'%'TS'
-    #    hdu.header.set(name,self.ts())
-    #    name = 'HIERARCH %s'%'TIMESTAMP'
-    #    hdu.header.set(name,time.asctime())
-    #    hdu.writeto(filename,clobber=True)
 
     # Writing membership files
     def write_membership(self,filename):
