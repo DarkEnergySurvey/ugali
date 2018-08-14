@@ -19,7 +19,7 @@ There are several ways to install `ugali`.
 The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
 ```bash
 # Create and activate conda environment
-conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose pyfits fitsio -c conda-forge -c jochym -c kadrlica
+conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee fitsio -c conda-forge -c kadrlica
 source activate ugali-env
 
 # Clone source code from the parent repository
@@ -80,7 +80,8 @@ python setup.py catalogs
 
 Usage Examples
 --------------
-Examples go here...
+
+Several usage examples are available as jupyter notebooks in the [notebooks](notebooks/) directory.
 
 Additional Information
 ----------------------
@@ -90,7 +91,6 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [numpy](http://www.numpy.org/)
 * [scipy](https://www.scipy.org/)
 * [matplotlib](http://matplotlib.org/)
-* [pyfits](http://www.stsci.edu/institute/software_hardware/pyfits)
 * [healpy](https://github.com/healpy/healpy)
 * [astropy](http://www.astropy.org/)
 * [emcee](http://dan.iel.fm/emcee/current/)

@@ -1149,7 +1149,7 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     config = ugali.utils.config.Config(config)
-    if isinstance(data,basestring):
+    if isinstance(data,str):
         data,header = fitsio.read(data,header=True)
 
     defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)
