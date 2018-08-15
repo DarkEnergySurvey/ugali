@@ -13,14 +13,14 @@ from collections import OrderedDict as odict
 import fitsio
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
-import healpy as np
+import healpy as hp
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
 import ugali.utils.skymap
 import ugali.utils.binning
 from ugali.utils.projector import cel2gal, gal2cel
-from ugali.utils.healpix import ang2pix, pix2ang, superpixel
+from ugali.utils.healpix import ang2pix, pix2ang, superpixel, read_map
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
@@ -187,7 +187,8 @@ def inFootprint(footprint,ra,dec):
         if isinstance(footprint,str) and os.path.exists(footprint):
             filename = footprint
             #footprint = hp.read_map(filename,verbose=False)
-            footprint = fitsio.read(filename)['I'].ravel()
+            #footprint = fitsio.read(filename)['I'].ravel()
+            footprint = read_map(filename)
         nside = hp.npix2nside(len(footprint))
         pix = ang2pix(nside,ra,dec)
         inside = (footprint[pix] > 0)
@@ -272,34 +273,34 @@ def split(config,dirname='split',force=False):
     band2 = config['catalog']['mag_2_band']
 
     # Read the magnitude limits
-    mangledir = config['mangle']['dirname']
+    maglimdir = config['maglim']['dirname']
 
-    manglefile_1 = join(mangledir,config['mangle']['filename_1'])
-    logger.info("Reading %s..."%manglefile_1)
-    mangle1 = hp.read_map(manglefile_1)
+    maglimfile_1 = join(maglimdir,config['maglim']['filename_1'])
+    logger.info("Reading %s..."%maglimfile_1)
+    maglim1 = read_map(maglimfile_1)
     
-    manglefile_2 = join(mangledir,config['mangle']['filename_2'])
-    logger.info("Reading %s..."%manglefile_2)
-    mangle2 = hp.read_map(manglefile_2)
+    maglimfile_2 = join(maglimdir,config['maglim']['filename_2'])
+    logger.info("Reading %s..."%maglimfile_2)
+    maglim2 = read_map(maglimfile_2)
 
     # Read the footprint
     footfile = config['data']['footprint']
     logger.info("Reading %s..."%footfile)
-    footprint = hp.read_map(footfile)
+    footprint = read_map(footfile)
 
     # Output mask names
     mask1 = os.path.basename(config['mask']['basename_1'])
     mask2 = os.path.basename(config['mask']['basename_2'])
 
-    for band,mangle,base in [(band1,mangle1,mask1),(band2,mangle2,mask2)]:
-        nside_mangle = hp.npix2nside(len(mangle))
-        if nside_mangle != nside_pixel:
+    for band,maglim,base in [(band1,maglim1,mask1),(band2,maglim2,mask2)]:
+        nside_maglim = hp.npix2nside(len(maglim))
+        if nside_maglim != nside_pixel:
             msg = "Mask nside different from pixel nside"
             logger.warning(msg)
             #raise Exception(msg)
 
-        pixels = np.nonzero(mangle>0)[0]
-        superpix = superpixel(pixels,nside_mangle,nside_catalog)
+        pixels = np.nonzero(maglim>0)[0]
+        superpix = superpixel(pixels,nside_maglim,nside_catalog)
         healpix = np.unique(superpix)
         for hpx in healpix:
             outfile = join(outdir,base)%hpx
@@ -313,7 +314,7 @@ def split(config,dirname='split',force=False):
             logger.info('Writing %s...'%outfile)
             data = odict()
             data['PIXEL']=pix
-            data['MAGLIM']=mangle[pix].astype('f4')
+            data['MAGLIM']=maglim[pix].astype('f4')
             data['FRACDET']=footprint[pix].astype('f4')
             ugali.utils.healpix.write_partial_map(outfile,data,nside_pixel)
                                                   

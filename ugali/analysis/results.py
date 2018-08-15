@@ -32,16 +32,16 @@ class Results(object):
         self.alpha = self.config['results'].get('alpha',0.10)
         self.nwalkers = self.config['mcmc'].get('nwalkers',100)
         self.nburn = self.config['results'].get('nburn',10)
-
+        self.coordsys = self.config['coords']['coordsys'].lower()
+        
         self.loglike = loglike
         self.source = self.loglike.source
         self.params = list(self.source.get_free_params().keys())
         self.samples = samples
 
     def load_samples(self,filename):
-        coordsys = self.config['coords']['coordsys']
         samples = Samples(filename)
-        self.samples = samples.supplement(coordsys=coordsys)
+        self.samples = samples.supplement(coordsys=self.coordsys)
 
 
     def get_mle(self):
@@ -261,7 +261,7 @@ class Results(object):
         results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
  
         try: 
-            results['constellation'] = ugali.utils.projector.ang2const(lon,lat)[1]
+            results['constellation'] = ang2const(lon,lat,self.coordsys)[1]
         except:
             pass
         results['iau'] = ugali.utils.projector.ang2iau(lon,lat)

@@ -81,7 +81,11 @@ python setup.py catalogs
 Usage Examples
 --------------
 
+<<<<<<< HEAD
 Several examples can be found as jupyter notebooks in the [notebooks](notebooks/) directory.
+=======
+Several usage examples are available as jupyter notebooks in the [notebooks](notebooks/) directory.
+>>>>>>> 9deabbc6157a622853e835e882c9bf1c4899f967
 
 Additional Information
 ----------------------
@@ -91,6 +95,10 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [numpy](http://www.numpy.org/)
 * [scipy](https://www.scipy.org/)
 * [matplotlib](http://matplotlib.org/)
+<<<<<<< HEAD
+=======
+* [healpy](https://github.com/healpy/healpy)
+>>>>>>> 9deabbc6157a622853e835e882c9bf1c4899f967
 * [astropy](http://www.astropy.org/)
 * [healpy](https://github.com/healpy/healpy)
 * [emcee](http://dan.iel.fm/emcee/current/)

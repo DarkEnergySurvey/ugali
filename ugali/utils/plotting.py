@@ -1149,7 +1149,7 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     config = ugali.utils.config.Config(config)
-    if isinstance(data,basestring):
+    if isinstance(data,str):
         data,header = fitsio.read(data,header=True)
 
     defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)
@@ -1549,9 +1549,9 @@ def cutIsochronePath(g, r, g_err, r_err, isochrone, radius=0.1, return_all=False
 
     cut = np.logical_or(cut_1, cut_2)
     
-    # If using Padova isochrone, also include horizontal branch
-    if not np.all(isochrone.stage == 'Main'):
-        index_transition = np.nonzero(isochrone.stage > 3)[0][0] + 1
+    # Include horizontal branch if it exists
+    if not np.any(isochrone.stage == isochrone.hb_stage):
+        index_transition = np.nonzero(isochrone.stage==isochrone.hb_stage)[0][0]+1
         mag_1_hb = isochrone.mag_1[index_transition:] + isochrone.distance_modulus
         mag_2_hb = isochrone.mag_2[index_transition:] + isochrone.distance_modulus
         path_hb = makePath(mag_1_hb, mag_2_hb)

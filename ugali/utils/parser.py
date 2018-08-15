@@ -107,7 +107,7 @@ class Parser(argparse.ArgumentParser):
         if vars(opts).get('targets') is not None:
             opts.names,opts.coords = self.parse_targets(opts.targets)
             if vars(opts).get('radius') is not None:
-                opts.coords[:,2] = vars(opts).get('radius')
+                opts.coords['radius'] = vars(opts).get('radius')
             
     @staticmethod
     def parse_targets(filename):
@@ -128,8 +128,13 @@ class Parser(argparse.ArgumentParser):
             import fitsio
             data = fitsio.read(filename)
         else:
-            data = np.genfromtxt(filename,names=True,dtype=None,encoding=None)
+            from numpy.lib import NumpyVersion
+            if NumpyVersion(np.__version__) < '1.14.0':
+                data = np.genfromtxt(filename,names=True,dtype=None)
+            else:
+                data = np.genfromtxt(filename,names=True,dtype=None,encoding=None)
             #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
+        data = np.atleast_1d(data)
         data.dtype.names = list(map(str.lower,data.dtype.names))
 
         # Deal with one-line input files

@@ -78,6 +78,7 @@ class IsochroneModel(Model):
     # ADW: Careful, there are weird things going on with adding
     # defaults to subclasses...  When converted to a dict, the
     # last duplicate entry is filled.
+    # ADW: Need to explicitly call '_cache' when updating these parameters.
     defaults = (
         ('survey','des','Name of survey filter system'),
         ('dirname',get_iso_dir(),'Directory name for isochrone files'),
@@ -94,6 +95,8 @@ class IsochroneModel(Model):
         super(IsochroneModel,self).__init__(**kwargs)
 
     def _setup(self, **kwargs):
+        # ADW: Should we add a warning for kwargs not in defaults (and
+        # thus not set)?
         defaults = odict([(d[0],d[1]) for d in self.defaults])
         [defaults.update([i]) for i in list(kwargs.items()) if i[0] in defaults]
 

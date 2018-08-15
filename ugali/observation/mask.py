@@ -767,14 +767,25 @@ class MaskBand(object):
         # Try to get the detection fraction
         self.frac_roi_sparse = (self.mask_roi_sparse > 0)
         try: 
+            logger.debug("Reading FRACDET...")
             nside,pixel,frac=healpix.read_partial_map(infiles,column='FRACDET')
             # This clipping might gloss over bugs...
+            fractype = self.config['mask'].get('fractype','binary')
             fracmin = self.config['mask'].get('fracmin',0.5)
-            frac[frac < fracmin] = 0.0
+            if fractype == 'binary':
+                frac = np.where(frac < fracmin, 0.0, 1.0)
+            elif fractype == 'full':
+                frac = np.where(frac < fracmin, 0.0, frac)
+            elif not fractype:
+                pass
+            else:
+                msg = "Unrecognized fractype: %s"%fractype
+                logger.warn(msg)
+                
             self.frac_roi_sparse = np.clip(frac[self.roi.pixels],0.0,1.0)
         except ValueError as e:
             # No detection fraction present
-            msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1"
+            msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1.0"
             logger.info(msg)
 
         # Explicitly zero the maglim of pixels with fracdet < fracmin
