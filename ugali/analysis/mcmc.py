@@ -357,14 +357,37 @@ if __name__ == "__main__":
         source.set_params(**grid.mle())
 
     params = list(source.get_free_params().keys())
-
+    logger.info(source)
     mcmc = MCMC(config,like)
 
     logger.info("Writing %s..."%srcfile)
     mcmc.write_srcmdl(srcfile)
 
+    """
+    # DEBUGGING
+    loglike = mcmc.loglike
+    roi = loglike.roi
+    mask = loglike.mask
+    
+    ra = np.linspace(354.3,354.4)
+    dec = np.linspace(-63.274,-63.256)
+
+    rr,dd = np.meshgrid(ra,dec)
+    zz = [mcmc.lnprob([2500,r,d,0.02]) for r,d in zip(rr.flat,dd.flat)]
+    zz = np.array(zz).reshape(rr.shape)
+    import pylab as plt
+    plt.ion()
+    plt.pcolormesh(rr,dd,zz)
+    import skymap
+    smap =skymap.Skymap(projection='cass',lon_0=354.36,lat_0=-63.265,
+                        llcrnrlon=354.3,urcrnrlon=354.4,
+                        llcrnrlat=-63.2725,urcrnrlat=-63.2575,
+                        celestial=False)
+    smap.draw_hpxmap(mask.mask_1.frac_roi_sparse,
+    import pdb; pdb.set_trace()
+    """
+
     mcmc.run(params,samfile)
-    #MCMC.run(mcmc,params,samfile)
 
     logger.info("Writing %s..."%srcfile)
     from ugali.analysis.results import write_results

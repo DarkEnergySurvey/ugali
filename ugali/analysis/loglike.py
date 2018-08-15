@@ -10,7 +10,6 @@ import numpy
 import numpy as np
 from scipy.stats import norm
 
-import healpy
 import healpy as hp
 import fitsio
 
@@ -18,11 +17,13 @@ import ugali.utils.binning
 import ugali.utils.parabola
 
 from ugali.utils.projector import angsep, gal2cel
-from ugali.utils.healpix import ang2pix,pix2ang
+from ugali.utils.healpix import ang2pix,pix2ang,ang2disc
 from ugali.utils.logger import logger
 
 from ugali.utils.config import Config
 from ugali.analysis.source import Source
+
+from ugali.analysis.kernel import EllipticalDisk, ToyKernel
 
 class Observation(object):
     """
@@ -71,7 +72,7 @@ class LogLikelihood(object):
         # The signal probability for each object
         #self.p = (self.richness * self.u) / ((self.richness * self.u) + self.b)
         # The total model predicted counts
-        #return -1. * numpy.sum(numpy.log(1.-self.p)) - (self.f * self.source.richness)
+        #return -1. * np.sum(np.log(1.-self.p)) - (self.f * self.source.richness)
         return -1. * np.log(1.-self.p).sum() - (self.f * self.source.richness)
         
     def __str__(self):
@@ -179,7 +180,6 @@ class LogLikelihood(object):
         #logging.debug('p: %s'%np.unique(self.p)[:20])
 
         # Reset the sync toggle
-        #for k in self._sync.keys(): self._sync[k]=False 
         self.source.reset_sync()
 
     ############################################################################
@@ -199,7 +199,7 @@ class LogLikelihood(object):
 
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog...")
-        cut_interior = numpy.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
+        cut_interior = np.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
                                   self.roi.pixels_interior)
         #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)
@@ -309,6 +309,44 @@ class LogLikelihood(object):
     # FIXME: Need to parallelize CMD and MMD formulation
     calc_signal_color = calc_signal_color1
 
+    def calc_surface_intensity(self, factor=10):
+        """Calculate the surface intensity for each pixel in the interior
+        region of the ROI. Pixels are adaptively subsampled around the
+        kernel centroid out to a radius of 'factor * max_pixrad'.
+
+        Parameters:
+        -----------
+        factor : the radius of the oversample region in units of max_pixrad
+
+        Returns:
+        --------
+        surface_intensity : the surface intensity at each pixel
+        """
+        # First we calculate the surface intensity at native resolution
+        pixels = self.roi.pixels_interior
+        nside_in = self.config['coords']['nside_pixel']
+        surface_intensity = self.kernel.pdf(pixels.lon,pixels.lat)
+
+        # Then we recalculate the surface intensity around the kernel
+        # centroid at higher resolution
+        for i in np.arange(1,5):
+            # Select pixels within the region of interest
+            nside_out = 2**i * nside_in
+            radius = factor*np.degrees(hp.max_pixrad(nside_out))
+            pix = ang2disc(nside_in,self.kernel.lon,self.kernel.lat,
+                           radius,inclusive=True)
+
+            # Select pix within the interior region of the ROI
+            idx = ugali.utils.healpix.index_pix_in_pixels(pix,pixels)
+            pix = pix[(idx >= 0)]; idx = idx[(idx >= 0)]
+
+            # Reset the surface intensity for the subsampled pixels
+            subpix = ugali.utils.healpix.ud_grade_ipix(pix,nside_in,nside_out)
+            pix_lon,pix_lat = pix2ang(nside_out,subpix)
+            surface_intensity[idx]=np.mean(self.kernel.pdf(pix_lon,pix_lat),axis=1)
+
+        return surface_intensity
+
     def calc_signal_spatial(self):
         """
         Calculate the spatial signal probability for each catalog object.
@@ -321,30 +359,14 @@ class LogLikelihood(object):
         --------
         u_spatial : array of spatial probabilities per object
         """
-        # At the pixel level over the ROI
-        pix_lon,pix_lat = self.roi.pixels_interior.lon,self.roi.pixels_interior.lat
-        nside = self.config['coords']['nside_pixel']
-        #self.angsep_sparse = angsep(self.lon,self.lat,pix_lon,pix_lat)
-        #self.surface_intensity_sparse = self.kernel.surfaceIntensity(self.angsep_sparse)
+        # Calculate the surface intensity
+        self.surface_intensity_sparse = self.calc_surface_intensity()
 
-        # For small kernels, use the single pixel where they reside; otherwise, calculate over roi
-        if self.kernel.extension < 2*np.degrees(healpy.max_pixrad(nside)):
-            #msg =  "small kernel"
-            #msg += ("\n"+str(self.params))
-            #logger.warning(msg)
-            idx = self.roi.indexInterior(self.kernel.lon,self.kernel.lat)
-            self.surface_intensity_sparse = np.zeros(len(pix_lon))
-            self.surface_intensity_sparse[idx] = 1.0/self.roi.area_pixel
-        else:
-            self.surface_intensity_sparse = self.kernel.pdf(pix_lon,pix_lat)
-
-        # On the object-by-object level
-        #self.angsep_object = angsep(self.lon,self.lat,self.catalog.lon,self.catalog.lat)
-        #self.surface_intensity_object = self.kernel.surfaceIntensity(self.angsep_object)
-        self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,self.catalog.lat)
+        # Calculate the probability per object-by-object level
+        self.surface_intensity_object = self.kernel.pdf(self.catalog.lon,
+                                                        self.catalog.lat)
         
         # Spatial component of signal probability
-        #u_spatial = self.roi.area_pixel * self.surface_intensity_object
         u_spatial = self.surface_intensity_object
         return u_spatial
 
@@ -358,23 +380,35 @@ class LogLikelihood(object):
     def fit_richness(self, atol=1.e-3, maxiter=50):
         """
         Maximize the log-likelihood as a function of richness.
+
+        ADW 2018-06-04: Does it make sense to set the richness to the mle?
+
+        Parameters:
+        -----------
+        atol : absolute tolerence for conversion
+        maxiter : maximum number of iterations
+
+        Returns:
+        --------
+        loglike, richness, parabola : the maximum loglike, the mle, and the parabola
         """
         # Check whether the signal probability for all objects are zero
         # This can occur for finite kernels on the edge of the survey footprint
-        if numpy.isnan(self.u).any():
+        if np.isnan(self.u).any():
             logger.warning("NaN signal probability found")
             return 0., 0., None
         
-        if not numpy.any(self.u):
+        if not np.any(self.u):
             logger.warning("Signal probability is zero for all objects")
+            return 0., 0., None
+
+        if self.f == 0:
+            logger.warning("Observable fraction is zero")
             return 0., 0., None
 
         # Richness corresponding to 0, 1, and 10 observable stars
         richness = np.array([0., 1./self.f, 10./self.f])
-        loglike = []
-        for r in richness:
-            loglike.append(self.value(richness=r))
-        loglike = np.array(loglike)
+        loglike = np.array([self.value(richness=r) for r in richness])
 
         found_maximum = False
         iteration = 0
@@ -383,77 +417,35 @@ class LogLikelihood(object):
             if parabola.vertex_x < 0.:
                 found_maximum = True
             else:
-                richness = numpy.append(richness, parabola.vertex_x)
-                loglike  = numpy.append(loglike, self.value(richness=richness[-1]))    
+                richness = np.append(richness, parabola.vertex_x)
+                loglike  = np.append(loglike, self.value(richness=richness[-1]))
 
-                if numpy.fabs(loglike[-1] - numpy.max(loglike[0: -1])) < atol:
+                if np.fabs(loglike[-1] - np.max(loglike[0: -1])) < atol:
                     found_maximum = True
             iteration+=1
             if iteration > maxiter:
                 logger.warning("Maximum number of iterations reached")
                 break
             
-        index = numpy.argmax(loglike)
+        index = np.argmax(loglike)
         return loglike[index], richness[index], parabola
 
     def richness_interval(self, alpha=0.6827, n_pdf_points=100):
         loglike_max, richness_max, parabola = self.fit_richness()
 
         richness_range = parabola.profileUpperLimit(delta=25.) - richness_max
-        richness = numpy.linspace(max(0., richness_max - richness_range),
+        richness = np.linspace(max(0., richness_max - richness_range),
                                   richness_max + richness_range,
                                   n_pdf_points)
         if richness[0] > 0.:
-            richness = numpy.insert(richness, 0, 0.)
+            richness = np.insert(richness, 0, 0.)
             n_pdf_points += 1
         
-        log_likelihood = numpy.zeros(n_pdf_points)
+        log_likelihood = np.zeros(n_pdf_points)
         for kk in range(0, n_pdf_points):
             log_likelihood[kk] = self.value(richness=richness[kk])
         parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
         return parabola.confidenceInterval(alpha)
-
-
-    #def write_membership2(self,filename):
-    #    import astropy.io.fits as pyfits
-    # 
-    #    ra,dec = gal2cel(self.catalog.lon,self.catalog.lat)
-    #    
-    #    name_objid = self.config['catalog']['objid_field']
-    #    name_mag_1 = self.config['catalog']['mag_1_field']
-    #    name_mag_2 = self.config['catalog']['mag_2_field']
-    #    name_mag_err_1 = self.config['catalog']['mag_err_1_field']
-    #    name_mag_err_2 = self.config['catalog']['mag_err_2_field']
-    # 
-    #    # Angular and isochrone separations
-    #    sep = angsep(self.source.lon,self.source.lat,self.catalog.lon,self.catalog.lat)
-    #    isosep = self.isochrone.separation(self.catalog.mag_1,self.catalog.mag_2)
-    # 
-    #    columns = [
-    #        pyfits.Column(name=name_objid,format='K',array=self.catalog.objid),
-    #        pyfits.Column(name='GLON',format='D',array=self.catalog.lon),
-    #        pyfits.Column(name='GLAT',format='D',array=self.catalog.lat),
-    #        pyfits.Column(name='RA',format='D',array=ra),
-    #        pyfits.Column(name='DEC',format='D',array=dec),
-    #        pyfits.Column(name=name_mag_1,format='E',array=self.catalog.mag_1),
-    #        pyfits.Column(name=name_mag_err_1,format='E',array=self.catalog.mag_err_1),
-    #        pyfits.Column(name=name_mag_2,format='E',array=self.catalog.mag_2),
-    #        pyfits.Column(name=name_mag_err_2,format='E',array=self.catalog.mag_err_2),
-    #        pyfits.Column(name='COLOR',format='E',array=self.catalog.color),
-    #        pyfits.Column(name='ANGSEP',format='E',array=sep),
-    #        pyfits.Column(name='ISOSEP',format='E',array=isosep),
-    #        pyfits.Column(name='PROB',format='E',array=self.p),
-    #    ]
-    #    hdu = pyfits.new_table(columns)
-    #    for param,value in self.source.params.items():
-    #        # HIERARCH allows header keywords longer than 8 characters
-    #        name = 'HIERARCH %s'%param.upper()
-    #        hdu.header.set(name,value.value,param)
-    #    name = 'HIERARCH %s'%'TS'
-    #    hdu.header.set(name,self.ts())
-    #    name = 'HIERARCH %s'%'TIMESTAMP'
-    #    hdu.header.set(name,time.asctime())
-    #    hdu.writeto(filename,clobber=True)
 
     # Writing membership files
     def write_membership(self,filename):
@@ -528,7 +520,7 @@ def write_membership(filename,config,srcfile,section=None):
 
 # This should probably be moved into ugali.analysis.source...
 def createSource(config, section=None, **kwargs):
-    config = Config(config)    
+    config = Config(config)
     source = Source()
 
     if config.get(section) is not None:

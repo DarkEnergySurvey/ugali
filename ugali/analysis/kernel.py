@@ -17,7 +17,7 @@ import scipy.interpolate
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
 from ugali.analysis.model import Model, Parameter
-from ugali.utils.healpix import ang2vec, ang2pix, query_disc
+from ugali.utils.healpix import ang2vec, ang2pix, query_disc, ang2disc
 
 from ugali.utils.logger import logger
 
@@ -102,7 +102,8 @@ class ToyKernel(Kernel):
     def _cache(self, name=None):
         pixel_area = hp.nside2pixarea(self.nside,degrees=True)
         vec = ang2vec(self.lon, self.lat)
-        self.pix = query_disc(self.nside,vec,self.extension)
+        #self.pix = query_disc(self.nside,vec,self.extension)
+        self.pix = ang2disc(self.nside,self.lon,self.lat,self.extension,inclusive=True)
         self._norm = 1./(len(self.pix)*pixel_area)
 
     @property
@@ -127,7 +128,7 @@ class EllipticalKernel(Kernel):
     ### This is a depricated warning (2015/08/12)
     ### ADW: WARNING!!! This is actually the PA *WEST* of North!
     ### to get the conventional PA EAST of North take 90-PA
-    ### Documentation?
+    ### Documentation?!?!
     """
     _params = odict(
         list(Kernel._params.items()) + 

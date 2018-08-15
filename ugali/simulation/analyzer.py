@@ -26,6 +26,11 @@ from ugali.utils.logger import logger
 from ugali.utils.config import Config
 from ugali.utils import mlab
 
+# Analysis flags
+FLAG_EBV     = 0b001
+FLAG_DENSITY = 0b010
+FLAG_FRACDET = 0b100
+
 class Analyzer(object):
     """
     Class for analyzing simulated data
@@ -51,6 +56,8 @@ class Analyzer(object):
                                            arrs=np.zeros((2,len(catalog.lon)),dtype='>i8'))
         return catalog
 
+    #from memory_profiler import profile
+    #@profile
     def run(self, population=None, catalog=None, outfile=None, mc_source_id=None):
         if not population: population = self.population
         if not catalog:    catalog = self.catalog
@@ -67,11 +74,13 @@ class Analyzer(object):
         population = population[sel]
             
         size = len(population)
-        dtype=[('KERNEL','S18'),('TS','>f4'),('FIT_KERNEL','S18'),('FIT_TS','>f4'),
-               ('FIT_MASS','>f4'),('FIT_MASS_ERR','>f4'),
-               ('FIT_DISTANCE','>f4'),('FIT_DISTANCE_ERR','>f4')]
+        dtype=[('KERNEL','S18'),('TS','>f4'),('FIT_KERNEL','S18'),
+               ('FIT_EXTENSION','>f4'),('FIT_MASS','>f4'),('FIT_MASS_ERR','>f4'),
+               ('FIT_DISTANCE','>f4'),('FIT_DISTANCE_ERR','>f4'),('FLAG','>i8')]
         results = np.array(np.nan*np.ones(size),dtype=dtype)
         results = recfuncs.merge_arrays([population,results],flatten=True,asrecarray=False,usemask=False)
+        results['TS'] = -np.inf
+        results['FLAG'] = 0
         self.results = results
 
         if outfile: 
@@ -82,10 +91,18 @@ class Analyzer(object):
             lon,lat = params['RA'],params['DEC']
             distance_modulus = params['DISTANCE_MODULUS']
             mc_source_id = params['MC_SOURCE_ID']
-            logger.info('\n(%i/%i); (id, lon, lat) = (%i, %.2f, %.2f)'%(i+1,size,mc_source_id,lon,lat))
+            extension=np.degrees(np.arctan(params['R_PHYSICAL']/params['DISTANCE']))
+            logger.info('\n(%i/%i); (id, lon, lat, mod, ext) = (%i, %.2f, %.2f, %.1f, %.3f)'%(i+1,size,mc_source_id,lon,lat,distance_modulus,extension))
 
+            if params['EBV'] > 0.2:
+                msg = "High reddening region E(B-V) > 0.2; skipping..."
+                logger.info(msg)
+                results[i]['FLAG'] |= FLAG_EBV
+                results[i]['TS'] = np.nan
+                continue
+
+            source = ugali.analysis.loglike.createSource(self.config,section='scan',lon=lon,lat=lat)
             logger.info("Reading data catalog...")
-            source = ugali.analysis.loglike.createSource(self.config,lon=lon,lat=lat)
             obs = ugali.analysis.loglike.createObservation(self.config,lon=lon,lat=lat)
 
             # Select just the simulated target of interest
@@ -98,6 +115,14 @@ class Analyzer(object):
             loglike = ugali.analysis.loglike.LogLikelihood(self.config,obs,source)
             grid    = ugali.analysis.scan.GridSearch(self.config,loglike)
 
+            #if len(loglike.catalog) > 1.0e5:
+            if len(loglike.catalog) > 5.0e5:
+                msg = "High stellar density (N_CATALOG = %i); skipping..."%len(loglike.catalog)
+                logger.warn(msg)
+                results[i]['FLAG'] |= FLAG_DENSITY
+                results[i]['TS'] = np.nan
+                continue
+
             self.grid = grid
             self.loglike = self.grid.loglike
 
@@ -105,27 +130,38 @@ class Analyzer(object):
 
             # ADW: Should allow fit_distance to float in order to model search procedure?
             # Currently we are evaluating at the true distance.
-            #fit_distance = float(distance_modulus)
             distance_idx = np.fabs(grid.distance_modulus_array-distance_modulus).argmin()
             fit_distance = grid.distance_modulus_array[distance_idx]
-            grid.search(coords=(lon,lat),distance_modulus=fit_distance)
+            fit_extension = [0.02, 0.07, 0.15] # half light radii (deg)
 
-            logger.info(str(self.loglike))
+            for ext in fit_extension:
+                grid.loglike.set_params(extension = ext)
+                try:
+                    grid.search(coords=(lon,lat),distance_modulus=fit_distance)
+                    results[i]['FLAG'] &= ~FLAG_FRACDET
+                except ValueError as e:
+                    logger.error(str(e))
+                    results[i]['FLAG'] |= FLAG_FRACDET
+                    continue
+                mle = grid.mle()
+                
+                ts = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
+                if ts <= results[i]['TS']: 
+                    logger.info("No TS increase; continuing...")
+                    continue
 
-            mle = grid.mle()
-            #results[i]['kernel'] = simulator.kernel.name
-            results[i]['FIT_KERNEL'] = grid.loglike.kernel.name
-            results[i]['TS'] = 2*grid.log_likelihood_sparse_array[distance_idx][pix]
-            results[i]['FIT_TS'] = 2*np.max(grid.log_likelihood_sparse_array[:,pix])
-            results[i]['FIT_MASS'] = grid.stellar_mass_conversion*mle['richness']
-            results[i]['FIT_DISTANCE'] = fit_distance #mle['distance_modulus']
+                results[i]['FIT_KERNEL'] = grid.loglike.kernel.name
+                results[i]['TS'] = ts
+                results[i]['FIT_MASS'] = grid.stellar_mass_conversion*mle['richness']
+                results[i]['FIT_DISTANCE'] = fit_distance #mle['distance_modulus']
+                results[i]['FIT_EXTENSION'] = ext
 
-            err = grid.err()
-            richness_err = (err['richness'][1]-err['richness'][0])/2.
-            results[i]['FIT_MASS_ERR'] = grid.stellar_mass_conversion*richness_err
-
-            distance_modulus_err = (err['distance_modulus'][1]-err['distance_modulus'][0])/2.
-            results[i]['FIT_DISTANCE_ERR'] = distance_modulus_err
+                err = grid.err()
+                richness_err = (err['richness'][1]-err['richness'][0])/2.
+                results[i]['FIT_MASS_ERR'] = grid.stellar_mass_conversion*richness_err
+                 
+                distance_modulus_err = (err['distance_modulus'][1]-err['distance_modulus'][0])/2.
+                results[i]['FIT_DISTANCE_ERR'] = distance_modulus_err
 
             logger.info("Fit parameter values:")
             for d in dtype:
@@ -148,8 +184,9 @@ if __name__ == "__main__":
                         help='simulated catalog input file')
     parser.add_argument('-o','--outfile',default=None,
                         help='output results file')
-    parser.add_argument('-i','--mc-source-id',default=None,type=int,
-                        help='output results file')
+    parser.add_argument('-i','--mc-source-id',default=None,type=int,action='append',
+                        help='specific source id to run')
+    parser.add_force()
     parser.add_debug()
     parser.add_verbose()
     args = parser.parse_args()

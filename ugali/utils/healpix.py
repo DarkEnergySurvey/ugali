@@ -25,6 +25,7 @@ def superpixel(subpix, nside_subpix, nside_superpix):
     theta, phi =  hp.pix2ang(nside_subpix, subpix)
     return hp.ang2pix(nside_superpix, theta, phi)
 
+
 def subpixel(superpix, nside_superpix, nside_subpix):
     """
     Return the indices of sub-pixels (resolution nside_subpix) within
@@ -40,29 +41,93 @@ def subpixel(superpix, nside_superpix, nside_subpix):
     # Might be able to speed up array indexing...
     return subpix[pix_for_subpix == superpix]
 
-def subpixel2(superpix, nside_superpix, nside_subpix):
+def d_grade_ipix(ipix, nside_in, nside_out, nest=False):
+    """
+    Return the indices of the super-pixels which contain each of the
+    sub-pixels (nside_in > nside_out).
+
+    Parameters:
+    -----------
+    ipix      : index of the input subpixels
+    nside_in  : nside of the input subpix
+    nside_out : nside of the desired superpixels
+
+    Returns:
+    --------
+    ipix_out  : superpixels for each subpixel
+    """
+
+    if nside_in==nside_out: return ipix
+    if not (nside_in > nside_out): 
+        raise ValueError("nside_out must be less than nside_in")
+
+    return hp.vec2pix(nside_out, *hp.pix2vec(nside_in, ipix, nest), nest=nest)
+
+def u_grade_ipix(ipix, nside_in, nside_out, nest=False):
     """
     Return the indices of sub-pixels (resolution nside_subpix) within
     the super-pixel(s) (resolution nside_superpix).
     
     Parameters:
-    superpix : index of the superixel(s)
-    nside_superpix : nside of the superpixel
-    nside_subpix : nside of the desired subpixels
+    -----------
+    ipix      : index of the input superpixel(s)
+    nside_in  : nside of the input superpixel
+    nside_out : nside of the desired subpixels
+
     Returns:
-    subpix : subpixels for each superpixel
+    --------
+    ipix_out : subpixels for each superpixel
     """
-    if nside_superpix==nside_subpix: return superpix
-    nest_superpix = hp.ring2nest(nside_superpix, superpix)
-    factor = (nside_subpix//nside_superpix)**2
-    if np.isscalar(superpix):
-        nest_subpix = factor*nest_superpix + np.arange(factor)
+
+    if nside_in==nside_out: return ipix
+    if not (nside_in < nside_out): 
+        raise ValueError("nside_in must be less than nside_out")
+
+    if nest: nest_ipix = ipix
+    else:    nest_ipix = hp.ring2nest(nside_in, ipix)
+
+    factor = (nside_out//nside_in)**2
+    if np.isscalar(ipix):
+        nest_ipix_out = factor*nest_ipix + np.arange(factor)
     else:
-        nest_subpix = factor*nest_superpix[:,np.newaxis] + np.arange(factor)
-                            
-    return hp.nest2ring(nside_subpix, nest_subpix)
+        nest_ipix_out = factor*np.asarray(nest_ipix)[:,np.newaxis]+np.arange(factor)
+
+    if nest: return nest_ipix_out
+    else:    return hp.nest2ring(nside_out, nest_ipix_out)
+        
+
+def ud_grade_ipix(ipix, nside_in, nside_out, nest=False):
+    """
+    Upgrade or degrade resolution of a pixel list.
+
+    Parameters:
+    -----------
+    ipix:array-like 
+    the input pixel(s)
+
+    nside_in:int
+    the nside of the input pixel(s)
+
+    nside_out:int
+    the desired nside of the output pixel(s)
+
+    order:str
+    pixel ordering of input and output ("RING" or "NESTED")
+
+    Returns:
+    --------
+    pix_out:array-like
+    the upgraded or degraded pixel array
+    """
+    if nside_in == nside_out: return ipix
+    elif nside_in < nside_out:
+        return u_grade_ipix(ipix, nside_in, nside_out, nest)
+    elif nside_in > nside_out:
+        return d_grade_ipix(ipix, nside_in, nside_out, nest)
 
 ############################################################
+
+#ADW: These can be replaced by healpy functions...
 
 def phi2lon(phi): return np.degrees(phi)
 def lon2phi(lon): return np.radians(lon)
@@ -132,7 +197,18 @@ def healpixMap(nside, lon, lat, fill_value=0., nest=False):
 
 def in_pixels(lon,lat,pixels,nside):
     """
-    Check if (lon,lat) in pixel list.
+    Check if (lon,lat) in pixel list. Assumes RING formatting.
+
+    Parameters:
+    -----------
+    lon    : longitude (deg)
+    lat    : latitude (deg)
+    pixels : pixel list [RING format] to check for inclusion
+    nside  : nside of pixel list 
+
+    Returns:
+    --------
+    inpix : boolean array for inclusion
     """
     pix = ang2pix(nside,lon,lat)
     return np.in1d(pix,pixels)
