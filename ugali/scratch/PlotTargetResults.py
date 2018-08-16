@@ -4,7 +4,7 @@ import matplotlib
 import healpy
 import pylab as plt
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 
 import ugali.utils.skymap
 import ugali.utils.projector
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         except KeyError: title=name
         distance_modulus = ugali.utils.projector.distanceToDistanceModulus(target['distance'])
         idx = numpy.abs(distance_modulus_array - distance_modulus).argmin()
-        print title, distance_modulus, distance_modulus_array[idx]
+        print(title, distance_modulus, distance_modulus_array[idx])
 
         if target['coord'] == 'CEL':
             glon, glat = ugali.utils.projector.celToGal(target['lon'],target['lat'])

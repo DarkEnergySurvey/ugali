@@ -28,18 +28,25 @@ class CompositeIsochrone(IsochroneModel):
             ])
 
     defaults = (IsochroneModel.defaults) + (
-        ('type','PadovaIsochrone','Default type of isochrone to create'),
+        ('type','Bressan2012','Default type of isochrone to create'),
         ('weights',None,'Relative weights for each isochrone'),
         )
     
     def __init__(self, isochrones, **kwargs):
         super(CompositeIsochrone,self).__init__(**kwargs)
 
+        # Remove composite kwargs so that others can be used as defaults
+        kwargs.pop('type',None)
+        kwargs.pop('weights',None)
+
         self.isochrones = []
         for i in isochrones:
             if isinstance(i,Isochrone):
                 iso = i
             else:
+                # Set the defaults from composite
+                [i.setdefault(*kw) for kw in kwargs.items()]
+                # Default isochrone type (ADW: do we want this?)
                 name = i.pop('name',self.type)
                 #iso = isochroneFactory(name=name,**i)
                 iso = factory(name=name,**i)

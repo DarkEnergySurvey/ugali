@@ -427,11 +427,11 @@ if __name__ == '__main__':
     ra1950  = array([ 359.35928, 8.3527459, 18.328867, 28.285743, 38.219246, 48.120124, 57.965657, 67.687386, 76.962913, 72.909428])
     dec1950 = array([-0.27834947, 8.7248461, 18.736315, 28.755752, 38.782542, 48.815833, 58.854545, 68.89732, 78.94207, 88.955871])
 
-    print "Testing jprecess..."
+    print("Testing jprecess...")
     test_ra2000, test_dec2000 = jprecess(ra,dec)
-    print " RAs:",  allclose(ra2000,test_ra2000)
-    print " DECs:", allclose(dec2000,test_dec2000)
-    print "Testing bprecess..."
+    print(" RAs:",  allclose(ra2000,test_ra2000))
+    print(" DECs:", allclose(dec2000,test_dec2000))
+    print("Testing bprecess...")
     test_ra1950, test_dec1950 = bprecess(ra,dec)
-    print " RAs:",  allclose(ra1950,test_ra1950)
-    print " DECs:", allclose(dec1950,test_dec1950)
+    print(" RAs:",  allclose(ra1950,test_ra1950))
+    print(" DECs:", allclose(dec1950,test_dec1950))

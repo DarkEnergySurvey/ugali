@@ -9,16 +9,15 @@ from abc import abstractmethod
 from collections import OrderedDict as odict
 import copy
 
-import numpy
 import numpy as np
+import healpy as hp
 import scipy.integrate
 import scipy.interpolate
-import healpy
 
 import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
 from ugali.analysis.model import Model, Parameter
-from ugali.utils.healpix import ang2vec, ang2pix, query_disc
+from ugali.utils.healpix import ang2vec, ang2pix, query_disc, ang2disc
 
 from ugali.utils.logger import logger
 
@@ -69,7 +68,7 @@ class Kernel(Model):
         else:
             return Projector(self.lon, self.lat, self.proj)
 
-    def integrate(self, rmin=0, rmax=numpy.inf):
+    def integrate(self, rmin=0, rmax=np.inf):
         """
         Calculate the 2D integral of the 1D surface brightness profile 
         (i.e, the flux) between rmin and rmax (elliptical radii). 
@@ -84,7 +83,7 @@ class Kernel(Model):
         integral : Solid angle integral (deg^2)
         """
         if rmin < 0: raise Exception('rmin must be >= 0')
-        integrand = lambda r: self._pdf(r) * 2*numpy.pi * r
+        integrand = lambda r: self._pdf(r) * 2*np.pi * r
         return scipy.integrate.quad(integrand,rmin,rmax,full_output=True,epsabs=0)[0]
 
 class ToyKernel(Kernel):
@@ -94,16 +93,17 @@ class ToyKernel(Kernel):
     """
 
     _params = odict(
-        Kernel._params.items() + 
+        list(Kernel._params.items()) + 
         [
             ('extension',     Parameter(0.1, [0.0001,5.0]) ), 
             ('nside',         Parameter(4096,[4096,4096])),
         ])
 
     def _cache(self, name=None):
-        pixel_area = healpy.nside2pixarea(self.nside,degrees=True)
+        pixel_area = hp.nside2pixarea(self.nside,degrees=True)
         vec = ang2vec(self.lon, self.lat)
-        self.pix = query_disc(self.nside,vec,self.extension)
+        #self.pix = query_disc(self.nside,vec,self.extension)
+        self.pix = ang2disc(self.nside,self.lon,self.lat,self.extension,inclusive=True)
         self._norm = 1./(len(self.pix)*pixel_area)
 
     @property
@@ -128,10 +128,10 @@ class EllipticalKernel(Kernel):
     ### This is a depricated warning (2015/08/12)
     ### ADW: WARNING!!! This is actually the PA *WEST* of North!
     ### to get the conventional PA EAST of North take 90-PA
-    ### Documentation?
+    ### Documentation?!?!
     """
     _params = odict(
-        Kernel._params.items() + 
+        list(Kernel._params.items()) + 
         [
             ('extension',     Parameter(0.1, [0.0001,0.5]) ),   
             ('ellipticity',   Parameter(0.0, [0.0, 0.99]) ),    # Default 0 for RadialKernel
@@ -189,8 +189,8 @@ class EllipticalKernel(Kernel):
         pdf = self._pdf(radius) * np.sin(np.radians(radius))
         cdf = np.cumsum(pdf)
         cdf /= cdf[-1]
-        fn = scipy.interpolate.interp1d(cdf, range(0, len(cdf)))
-        index = numpy.floor(fn(numpy.random.uniform(size=n))).astype(int)
+        fn = scipy.interpolate.interp1d(cdf, list(range(0, len(cdf))))
+        index = np.floor(fn(np.random.uniform(size=n))).astype(int)
         return radius[index]
  
     def sample_lonlat(self, n):
@@ -206,7 +206,7 @@ class EllipticalKernel(Kernel):
         radius = self.sample_radius(n)
         a = radius; b = self.jacobian * radius
 
-        t = 2. * np.pi * numpy.random.rand(n)
+        t = 2. * np.pi * np.random.rand(n)
         cost,sint = np.cos(t),np.sin(t)
         phi = np.pi/2. - np.deg2rad(self.theta)
         cosphi,sinphi = np.cos(phi),np.sin(phi)
@@ -240,7 +240,7 @@ class EllipticalDisk(EllipticalKernel):
     """
     _params = EllipticalKernel._params
     _mapping = odict(
-        EllipticalKernel._mapping.items() +
+        list(EllipticalKernel._mapping.items()) +
         [
             ('r_0','extension')
         ])
@@ -260,7 +260,7 @@ class EllipticalGaussian(EllipticalKernel):
     """
     _params = EllipticalKernel._params
     _mapping = odict(
-        EllipticalKernel._mapping.items() +
+        list(EllipticalKernel._mapping.items()) +
         [
             ('sigma','extension')
         ])
@@ -283,7 +283,7 @@ class EllipticalExponential(EllipticalKernel):
     """
     _params = odict(EllipticalKernel._params)
     _mapping = odict(
-        EllipticalKernel._mapping.items() +
+        list(EllipticalKernel._mapping.items()) +
         [
             ('r_h','extension'), # Half-light radius
         ])
@@ -313,12 +313,12 @@ class EllipticalPlummer(EllipticalKernel):
     http://adsabs.harvard.edu//abs/2006MNRAS.365.1263M (Eq. 6)
     """
     _params = odict(
-        EllipticalKernel._params.items() + 
+        list(EllipticalKernel._params.items()) + 
         [
             ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
-        EllipticalKernel._mapping.items() +
+        list(EllipticalKernel._mapping.items()) +
         [
             ('r_c','extension'), # Plummer radius
             ('r_h','extension'), # ADW: Depricated
@@ -326,7 +326,7 @@ class EllipticalPlummer(EllipticalKernel):
         ])
  
     def _kernel(self, radius):
-        return 1./(numpy.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
+        return 1./(np.pi*self.r_h**2 * (1.+(radius/self.r_h)**2)**2)
 
     def _cache(self, name=None):
         if name in [None,'extension','ellipticity','truncate']:
@@ -359,12 +359,12 @@ class EllipticalKing(EllipticalKernel):
     http://adsabs.harvard.edu/abs/2010MNRAS.406.1220W (App.B)
     """
     _params = odict(
-        EllipticalKernel._params.items() + 
+        list(EllipticalKernel._params.items()) + 
         [
             ('truncate', Parameter(3.0, [0.0, np.inf]) ), # Truncation radius
         ])
     _mapping = odict(
-        EllipticalKernel._mapping.items() +
+        list(EllipticalKernel._mapping.items()) +
         [
             ('r_c','extension'), # Core radius
             ('r_t','truncate'),  # Tidal radius
@@ -400,17 +400,22 @@ class RadialKernel(EllipticalKernel):
     Radial kernel subclass fixing ellipticity and 
     position angle to zero.
     """
-    _fixed_params = ['ellipticity','position_angle']
+    _frozen_params = ['ellipticity','position_angle']
 
     def __init__(self,**kwargs):
         # This is a bit messy because the defaults are set
         # at the instance level not at the class level
         self._params = copy.deepcopy(self._params)
-        self._params['ellipticity'].set(0, [0, 0])
-        self._params['position_angle'].set(0, [0, 0])
+
+        def frozen(x): 
+            if x: raise Exception("Parameter is frozen")
+                
+        self._params['ellipticity'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
+        self._params['position_angle'].set(0, [0, 0], False)
+        self._params['ellipticity'].set_free = frozen
         #logger.warning("Setting bounds on extension")
         #self._params['extension'].set(0.1, [1e-4, 0.1])
-
         super(RadialKernel,self).__init__(**kwargs)
         
     def pdf(self, lon, lat):

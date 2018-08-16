@@ -62,30 +62,33 @@ MAGLIMS = dict(
     y1a1 = {
         #'g': 23.7, # Probably closer to 23.9 (magerr) or 24.2 (mangle)
         #'r': 23.7, # Probably closer to 23.9 (mangle)
-        'g': 23.0, # Truncate at 23.0
+        'g': 23.0, # Truncate at 23.0 (star-galaxy separation)
         'r': 23.0, # Truncate at 23.0
         },
     y2n = {
-        'g': 23.0, # Truncate at 23.0
-        'r': 23.0, # Truncate at 23.0
+        'g': 23.0,
+        'r': 23.0,
         },
-    #y2u1 = {
-    #    'g': 23.5, # Truncate at 23.5
-    #    'r': 23.5, # Truncate at 23.5
-    #    },
     y2u1 = {
-        'g': 24.0, # Truncate at 23.5
-        'r': 24.0, # Truncate at 23.5
+        'g': 24.0,
+        'r': 24.0,
         },
     y2q1 = {
-        'g': 23.5, # Truncate at 23.5
-        'r': 23.5, # Truncate at 23.5
+        'g': 23.5,
+        'r': 23.5,
         },
     y17v1 = {
-        'g': 23.5, # Truncate at 23.5
-        'r': 23.5, # Truncate at 23.5
+        'g': 23.5,
+        'r': 23.5,
         },
-
+    y3a2 = {
+        'g': 24.0, 
+        'r': 24.0,
+        },
+    ps1_dr1 = {
+        'g': 23.0,
+        'r': 23.0,
+        },
 )
 
 
@@ -138,6 +141,18 @@ MAGERR_PARAMS = dict(
         'r': [ -8.86883525e-01,  -2.38329071e+00,   4.56457328e-04], 
         },
 
+    # This is bogus (copy from y1a1)
+    y3a2 = {
+        'g': [ -8.71852748e-01,  -2.52245237e+00,   5.12942930e-04], 
+        'r': [ -8.86883525e-01,  -2.38329071e+00,   4.56457328e-04], 
+        },
+
+    # This is fit from some curves that Keith made
+    ps1_dr1 = {
+        'g' : [-0.84967134, -2.27897518,  0.00304501],
+        'r' : [-0.92218737, -2.34012887,  0.00451849],
+        }
+
 )
 
 # Calibration uncertainty
@@ -147,4 +162,6 @@ CALIB_ERR = dict(
     y2n  = 0.015,
     y2u1 = 0.015,
     y2q1 = 0.015,
+    y3a2 = 0.015, # Y3 FGCM should be closer to 0.007...
+    ps1_dr1 = 0.03, # Made up
 )

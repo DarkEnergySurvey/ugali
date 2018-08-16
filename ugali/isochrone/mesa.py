@@ -12,10 +12,14 @@ import subprocess
 import shutil
 from collections import OrderedDict as odict
 
-import urllib, urllib2
-#import requests
-import numpy as np
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen, Request
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen, Request
 
+import numpy as np
 
 from ugali.utils.logger import logger
 
@@ -64,6 +68,7 @@ class Dotter2016(Isochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
+    download_url = 'http://waps.cfa.harvard.edu/MIST'
     download_defaults = copy.deepcopy(mesa_defaults_10)
 
     abins = np.arange(1., 13.5+0.1, 0.1)
@@ -74,7 +79,7 @@ class Dotter2016(Isochrone):
                 (2, ('mass_init',float)),
                 (3, ('mass_act',float)),
                 (8, ('log_lum',float)),
-                (9,('u',float)),
+                (9, ('u',float)),
                 (10,('g',float)),
                 (11,('r',float)),
                 (12,('i',float)),
@@ -115,11 +120,11 @@ class Dotter2016(Isochrone):
         """
         try:
             columns = self.columns[self.survey.lower()]
-        except KeyError, e:
+        except KeyError as e:
             logger.warning('Unrecognized survey: %s'%(survey))
             raise(e)
 
-        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
         data = np.genfromtxt(filename,**kwargs)
 
         self.mass_init = data['mass_init']
@@ -176,16 +181,18 @@ class Dotter2016(Isochrone):
         if params['age_scale'] == 'log10':
             params['age_value'] = np.log10(params['age_value'])
 
-        server = 'http://waps.cfa.harvard.edu/MIST'
+        server = self.download_url
         url = server + '/iso_form.php'
+        # First check that the server is alive
         logger.debug("Accessing %s..."%url)
+        urlopen(url,timeout=2)
+
         #response = requests.post(url,data=params)
-        q = urllib.urlencode(params)
-        request = urllib2.Request(url,data=q)
-        response = urllib2.urlopen(request)
+        q = urlencode(params).encode('utf-8')
+        request = Request(url,data=q)
+        response = urlopen(request)
         try:
-            #fname = os.path.basename(response.text.split('"')[1])
-            fname = os.path.basename(response.read().split('"')[1])
+            fname = os.path.basename(str(response.read()).split('"')[1])
         except Exception as e:
             logger.debug(str(e))
             msg = 'Output filename not found'
@@ -195,7 +202,7 @@ class Dotter2016(Isochrone):
         tmpfile = os.path.join(tmpdir,fname)
 
         out = '{0}/tmp/{1}'.format(server, fname)
-        cmd = 'wget %s -P %s'%(out,tmpdir)
+        cmd = 'wget --progress dot:binary %s -P %s'%(out,tmpdir)
         logger.debug(cmd)
         stdout = subprocess.check_output(cmd,shell=True,
                                          stderr=subprocess.STDOUT)

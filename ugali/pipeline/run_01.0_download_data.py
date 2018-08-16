@@ -1,11 +1,11 @@
 #!/usr/bin/env python
+"""Download data from database."""
 from os.path import join
 
 from ugali.analysis.pipeline import Pipeline
 from ugali.preprocess.database import databaseFactory
 from ugali.utils.shell import mkdir
 
-description="Download data from database."
 #components = ['data','isochrone']
 components = ['data']
 
@@ -33,7 +33,7 @@ def run(self):
         
 
 Pipeline.run = run
-pipeline = Pipeline(description,components)
+pipeline = Pipeline(__doc__,components)
 pipeline.parser.add_argument('pixfile',nargs='?',metavar='pixels.dat',default='')
 pipeline.parse_args()
 pipeline.execute()

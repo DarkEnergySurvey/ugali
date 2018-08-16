@@ -40,6 +40,8 @@ try:
     rc.initialize = False
 except ImportError:
     pass
+
+#ADW: Why did I need to get rid of this?
 #import multiprocessing
 
 import emcee
@@ -70,10 +72,11 @@ class MCMC(object):
 
         self.loglike = loglike
         self.source = self.loglike.source
-        self.params = self.source.get_free_params().keys()
+        self.params = list(self.source.get_free_params().keys())
         self.samples = None
 
-        self.priors = odict(zip(self.params,len(self.params)*[UniformPrior()]))
+        self.priors = odict(list(zip(self.params,
+                                     len(self.params)*[UniformPrior()])))
         self.priors['extension'] = InversePrior()
 
         self.pool = None
@@ -87,10 +90,7 @@ class MCMC(object):
         self.lnprob(theta)
 
     def get_mle(self):
-        """
-        Get the values of the source parameters.
-        """
-        
+        """ Get the values of the source parameters. """
         #return self.grid.mle()
         mle = self.source.get_params()
         # FIXME: For composite isochrones
@@ -109,8 +109,8 @@ class MCMC(object):
  
         std = odict([
             ('richness',0.1*mle['richness']), # delta_r (10% of max)
-            ('lon',0.01),                     # delta_l (deg)
-            ('lat',0.01),                     # delta_b (deg)
+            ('lon',0.01),                     # delta_lon (deg)
+            ('lat',0.01),                     # delta_lat (deg)
             ('distance_modulus',0.1),         # delta_mu                
             ('extension',0.01),               # delta_ext (deg)
             ('ellipticity',0.1),              # delta_e 
@@ -126,27 +126,45 @@ class MCMC(object):
                                              
         p0 = np.array([mle[k] for k in params])
         s0 = np.array([std[k] for k in params])
- 
-        return emcee.utils.sample_ball(p0,s0,size)
- 
+        ball = emcee.utils.sample_ball(p0,s0,size) 
+
+        # Set points outside the bounds to the mle estimate
+        for i,param in enumerate(params):
+            bounds = self.source.params[param].bounds
+            outside = (ball[:,i] < bounds[0]) | (ball[:,i] > bounds[1])
+            ball[:,i][outside] = p0[i]
+
+        return ball
+
+    def get_uniform(self, params, size=1):
+        # Placeholder for starting walkers over a uniform distribution
+        raise Exception("'get_uniform' is not implemented")
+
+        ball = np.ones((len(params),size),dtype=float)
+        for i,param in enumerate(params):
+            bounds = self.source.params[param].bounds
+            # How do we want to deal with unbounded (inf) parameters?
+            ball[:,i] = np.random.uniform(bounds[0],bounds[1],size)
+        return ball
+
     def lnlike(self, theta):
         """ Logarithm of the likelihood """
         params,loglike = self.params,self.loglike
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         try:
             lnlike = loglike.value(**kwargs)
-        except ValueError,AssertionError:
+        except ValueError as AssertionError:
             lnlike = -np.inf
         return lnlike
  
     def lnprior(self,theta):
         """ Logarithm of the prior """
         params,priors = self.params,self.priors
-        kwargs = dict(zip(params,theta))
+        kwargs = dict(list(zip(params,theta)))
         err = np.seterr(invalid='raise')
         try:
-            lnprior = np.sum(np.log([priors[k](v) for k,v in kwargs.items()]))
-        except FloatingPointError,ValueError:
+            lnprior = np.sum(np.log([priors[k](v) for k,v in list(kwargs.items())]))
+        except (FloatingPointError,ValueError):
             lnprior = -np.inf
         np.seterr(**err)
         return lnprior
@@ -187,6 +205,8 @@ class MCMC(object):
         logger.info(str(self.loglike))
  
         if params is not None: self.params = params
+        if len(self.params) == 0:
+            raise Exception("No free parameters to fit.")
             
         params   = self.params
         nwalkers = self.nwalkers
@@ -319,7 +339,12 @@ if __name__ == "__main__":
         source.load(opts.srcmdl,section=opts.name)
     if opts.coords:
         lon,lat,radius = opts.coords[0]
-        source.set_params(lon=lon,lat=lat)
+        if config['coords']['coordsys'].lower() == 'gal':
+            source.set_params(lon=lon,lat=lat)
+        else:
+            lon,lat = gal2cel(lon,lat)
+            source.set_params(lon=lon,lat=lat)
+
     if config['mcmc'].get('params'):
         params = config['mcmc'].get('params')
         source.set_free_params(params)
@@ -331,15 +356,38 @@ if __name__ == "__main__":
         grid.search()
         source.set_params(**grid.mle())
 
-    params = source.get_free_params().keys()
-
+    params = list(source.get_free_params().keys())
+    logger.info(source)
     mcmc = MCMC(config,like)
 
     logger.info("Writing %s..."%srcfile)
     mcmc.write_srcmdl(srcfile)
 
+    """
+    # DEBUGGING
+    loglike = mcmc.loglike
+    roi = loglike.roi
+    mask = loglike.mask
+    
+    ra = np.linspace(354.3,354.4)
+    dec = np.linspace(-63.274,-63.256)
+
+    rr,dd = np.meshgrid(ra,dec)
+    zz = [mcmc.lnprob([2500,r,d,0.02]) for r,d in zip(rr.flat,dd.flat)]
+    zz = np.array(zz).reshape(rr.shape)
+    import pylab as plt
+    plt.ion()
+    plt.pcolormesh(rr,dd,zz)
+    import skymap
+    smap =skymap.Skymap(projection='cass',lon_0=354.36,lat_0=-63.265,
+                        llcrnrlon=354.3,urcrnrlon=354.4,
+                        llcrnrlat=-63.2725,urcrnrlat=-63.2575,
+                        celestial=False)
+    smap.draw_hpxmap(mask.mask_1.frac_roi_sparse,
+    import pdb; pdb.set_trace()
+    """
+
     mcmc.run(params,samfile)
-    #MCMC.run(mcmc,params,samfile)
 
     logger.info("Writing %s..."%srcfile)
     from ugali.analysis.results import write_results

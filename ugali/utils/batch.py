@@ -8,6 +8,9 @@ import getpass
 from collections import OrderedDict as odict
 from itertools import chain
 import copy
+import time
+
+import numpy as np
 
 from ugali.utils.logger import logger
 
@@ -26,30 +29,42 @@ QUEUES = odict([
     ('condor',['local','vanilla','universe','grid']),
 ])
 
+# https://confluence.slac.stanford.edu/x/OaUlCw
 RUNLIMITS = odict([              #Hard limits
         (None       ,'4:00'),    # Default value
-        ('express'  ,'0:01'),    # 0:01
-        ('short'    ,'0:30'),    # 0:30
-        ('medium'   ,'1:00'),    # 4:00
-        ('long'     ,'4:00'),    # 32:00
+        ('express'  ,'0:04'),    # 0:04
+        ('short'    ,'0:30'),    # 1:00
+        ('medium'   ,'1:00'),    # 48:00
+        ('long'     ,'4:00'),    # 120:00
         ('xlong'    ,'72:00'),   # 72:00
         ('xxl'      ,'168:00'),
-        ('kipac-ibq','24:00'),   # MPI queues
-        ('bulletmpi','72:00'),
+        # MPI queues
+        ('kipac-ibq','36:00'),   # 24:00 (deprecated)
+        ('bulletmpi','36:00'),   # 72:00
         ])
 
+# SLAC updated how memory was handled on the batch system  
+# General queues now only have 4GB of RAM per CPU
+# To get more memory for a general job, you need to request more cores:
+# i.e., '-n 2 -R "span[hosts=1]"' for 8GB of RAM
+# https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
+
+# These are options for MPI jobs
 MPIOPTS = odict([
         (None       ,' -R "span[ptile=4]"'),
         ('local'    ,''),
+        ('short'    ,''),
+        ('medium'   ,''),
         ('kipac-ibq',' -R "span[ptile=8]"'),
         ('bulletmpi',' -R "span[ptile=16]"'),
         ])
 
 def factory(queue,**kwargs):
+    # The default for the factory
     if queue is None: queue = 'local'
 
     name = queue.lower()
-    if name in list(chain(*QUEUES.values())):
+    if name in list(chain(*list(QUEUES.values()))):
         kwargs.setdefault('q',name)
 
     if name in CLUSTERS['local']+QUEUES['local']:
@@ -68,6 +83,7 @@ def factory(queue,**kwargs):
     return batch
 
 batchFactory = factory
+batch_factory = factory
 
 class Batch(object):
     # Default options for batch submission
@@ -77,6 +93,7 @@ class Batch(object):
 
     def __init__(self, **kwargs):
         self.username = getpass.getuser()
+        self.max_jobs = kwargs.pop('max_jobs',None)
         self.default_opts = copy.deepcopy(self._defaults)
         self.default_opts.update(**kwargs)
         self.submit_cmd = "submit %(opts)s %(command)s"
@@ -91,6 +108,17 @@ class Batch(object):
         # Remove header line
         jobs = self.jobs()
         return len(jobs.strip().split('\n'))-1 if jobs else 0
+
+    def throttle(self,max_jobs=None,sleep=60):
+        if max_jobs is None: max_jobs = self.max_jobs
+        if max_jobs is None: return
+        while True:
+            njobs = self.njobs()
+            if njobs < max_jobs:
+                return
+            else:
+                logger.info('%i jobs already in queue, waiting...'%(njobs))
+                time.sleep(sleep)
 
     def popen(self, command):
         return sub.Popen(command,shell=True,
@@ -115,6 +143,7 @@ class Batch(object):
 
     def submit(self, command, jobname=None, logfile=None, **opts):
         cmd = self.batch(command, jobname, logfile, **opts)
+        self.throttle()
         self.call(cmd)
         return cmd
 
@@ -127,6 +156,9 @@ class Local(Batch):
     def parse_options(self,**opts):
         if opts.get('logfile'): return ' 2>&1 | tee %(logfile)s'%opts
         return ''
+
+    def njobs(self):
+        return 0
 
 class LSF(Batch):
     _defaults = odict([
@@ -170,8 +202,8 @@ class LSF(Batch):
         #options.update(OPTIONS[options.get('q')])
         # User specified options
         options.update(opts)
-        if 'n' in options.keys(): 
-            options['a'] = 'mpirun'
+        if 'n' in list(options.keys()): 
+            #options['a'] = 'mpirun'
             options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())

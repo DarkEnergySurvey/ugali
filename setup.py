@@ -100,7 +100,13 @@ class TarballCommand(distutils.cmd.Command,object):
         return os.path.exists(self.path)
         
     def install_tarball(self, tarball):
-        import urllib
+        try:
+            from urllib.request import urlopen, urlretrieve
+            from urllib.error import HTTPError
+        except ImportError:
+            from urllib import urlopen, urlretrieve
+            from urllib2 import HTTPError
+
         import tarfile
 
         if not os.path.exists(self.ugali_dir):
@@ -111,13 +117,13 @@ class TarballCommand(distutils.cmd.Command,object):
         url = os.path.join(self.release,tarball)
 
         print("downloading %s..."%url)
-        if urllib.urlopen(url).getcode() >= 400:
+        if urlopen(url).getcode() >= 400:
             raise Exception('url does not exist')
 
-        urllib.urlretrieve(url,tarball,reporthook=ProgressFileIO.progress_bar)
+        urlretrieve(url,tarball,reporthook=ProgressFileIO.progress_bar)
         print('')
         if not os.path.exists(tarball):
-            raise urllib.error.HTTPError()
+            raise HTTPError()
             
         print("extracting %s..."%tarball)
         with tarfile.open(fileobj=ProgressFileIO(tarball),mode='r:gz') as tar:
@@ -278,7 +284,7 @@ setup(
         'numpy >= 1.9.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
-        'pyfits >= 3.1',
+        'fitsio >= 0.9.10',
         'emcee >= 2.1.0',
         'corner >= 1.0.0',
         'pyyaml >= 3.10',

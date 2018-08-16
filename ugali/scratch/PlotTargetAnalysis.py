@@ -5,7 +5,7 @@ import matplotlib
 import healpy
 import pylab as plt
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 import copy
 
 import ugali.utils.skymap
@@ -59,15 +59,15 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     if os.path.splitext(args[0])[1] != '.fits':
-        print "ERROR: Results file required"
+        print("ERROR: Results file required")
         parser.pring_help()
         raise Exception()
     if os.path.splitext(args[1])[1] != '.py':
-        print "ERROR: Config file required"
+        print("ERROR: Config file required")
         parser.pring_help()
         raise Exception()
     if opts.targets is None:
-        print "ERROR: Target file required"
+        print("ERROR: Target file required")
         parser.pring_help()
         raise Exception()
         
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         except KeyError: title = name
         distance_modulus = ugali.utils.projector.distanceToDistanceModulus(target['distance'])
         idx = numpy.abs(distance_modulus_array - distance_modulus).argmin()
-        print title, distance_modulus, distance_modulus_array[idx]
+        print(title, distance_modulus, distance_modulus_array[idx])
 
         if target['coord'] == 'CEL':
             glon, glat = ugali.utils.projector.celToGal(target['lon'],target['lat'])

@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Module for wrapping Dartmouth isochrones.
+http://stellar.dartmouth.edu/models/isolf_new.php
+"""
 import os
 import sys
 import glob
@@ -6,9 +10,13 @@ import copy
 from collections import OrderedDict as odict
 
 import re
-from urllib import urlencode
-from urllib2 import urlopen
-#import requests
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen
+
 import tempfile
 import subprocess
 from collections import OrderedDict as odict
@@ -59,6 +67,13 @@ dict_clr = {
     'ps1' : 12,
     }
 
+dict_output = odict([
+        ('des','DECam'),
+        ('sdss','SDSSugriz'),
+        ('ps1','PanSTARRS'),
+        # Need to add acs_wfc
+])
+
 dict_hel = {'Y=0.245+1.5*Z' : 1,
             'Y=0.33'        : 2,
             'Y=0.40'        : 3}
@@ -86,7 +101,6 @@ dartmouth_defaults = {
     'lns':'', 
     }
 
-
 class Dotter2008(Isochrone):
     """
     KCB: currently inheriting from PadovaIsochrone because there are 
@@ -104,8 +118,10 @@ class Dotter2008(Isochrone):
         )
 
     abins = np.arange(1., 13.5 + 0.1, 0.1)
-    zbins = np.arange(7e-5,1e-3 + 1e-5,1e-5)
+    #zbins = np.arange(7e-5,2e-3 + 1e-5,1e-5)
+    zbins = np.arange(1e-3, 2e-3 + 5e-5, 5e-5)
 
+    download_url = 'http://stellar.dartmouth.edu'
     download_defaults = copy.deepcopy(dartmouth_defaults)
 
     columns = dict(
@@ -148,11 +164,11 @@ class Dotter2008(Isochrone):
         """
         try:
             columns = self.columns[self.survey.lower()]
-        except KeyError, e:
+        except KeyError as e:
             logger.warning('Unrecognized survey: %s'%(survey))
             raise(e)
 
-        kwargs = dict(comments='#',usecols=columns.keys(),dtype=columns.values())
+        kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
         self.data = np.genfromtxt(filename,**kwargs)
 
         # KCB: Not sure whether the mass in Dotter isochrone output
@@ -207,11 +223,16 @@ class Dotter2008(Isochrone):
         params['feh']='%.6f'%feh
         params['clr']=dict_clr[self.survey]
 
-        url = 'http://stellar.dartmouth.edu/models/isolf_new.php'
+        server = self.download_url
+        url = server + '/models/isolf_new.php'
+        # First check that the server is alive
+        logger.debug("Accessing %s..."%url)
+        urlopen(url,timeout=2)
+
         query = url + '?' + urlencode(params)
         logger.debug(query)
         response = urlopen(query)
-        page_source = response.read()
+        page_source = str(response.read())
         try:
             file_id = int(page_source.split('tmp/tmp')[-1].split('.iso')[0])
         except Exception as e:
@@ -221,7 +242,7 @@ class Dotter2008(Isochrone):
 
         infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(file_id)
         command = 'wget -q %s -O %s'%(infile, outfile)
-        subprocess.call(command,shell=True)        
+        subprocess.call(command,shell=True)
 
         ## ADW: Old code to rename the output file based on Zeff ([a/Fe] corrected)
         #tmpfile = tempfile.NamedTemporaryFile().name

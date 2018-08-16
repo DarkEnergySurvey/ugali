@@ -8,7 +8,6 @@ from collections import OrderedDict as odict
 
 import numpy
 import numpy as np
-import pyfits
 import healpy
 import fitsio
 
@@ -132,6 +131,7 @@ class GridSearch:
 
             self.u_color_array[ii] = False
             if self.config['scan']['color_lut_infile'] is not None:
+                DeprecationWarning("'color_lut' is deprecated")
                 logger.info('  Precomputing signal color from %s'%(self.config['scan']['color_lut_infile']))
                 self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config['scan']['color_lut_infile'],
                                                                                distance_modulus,
@@ -198,7 +198,7 @@ class GridSearch:
                 self.loglike.sync_params()
                                          
                 args = (jj+1, npixels, self.loglike.source.lon, self.loglike.source.lat)
-                message = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '%(args)
+                msg = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '%(args)
 
                 self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
                 self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
@@ -229,15 +229,15 @@ class GridSearch:
                         self.stellar_mass_conversion*self.richness_upper_sparse_array[ii][jj],
                         self.stellar_mass_conversion*self.richness_upper_limit_sparse_array[ii][jj]
                     )
-                    message += 'TS=%.1f, Stellar Mass=%.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
+                    msg += 'TS=%.1f, Stellar Mass=%.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
                 else:
                     args = (
                         2. * self.log_likelihood_sparse_array[ii][jj], 
                         self.stellar_mass_conversion * self.richness_sparse_array[ii][jj],
                         self.fraction_observable_sparse_array[ii][jj]
                     )
-                    message += 'TS=%.1f, Stellar Mass=%.1f, Fraction=%.2g'%(args)
-                logger.debug( message )
+                    msg += 'TS=%.1f, Stellar Mass=%.1f, Fraction=%.2g'%(args)
+                logger.debug(msg)
                 
                 #if coords is not None and distance_modulus is not None:
                 #    results = [self.richness_sparse_array[ii][jj],
@@ -254,9 +254,9 @@ class GridSearch:
                 2. * self.log_likelihood_sparse_array[ii][jj_max], 
                 self.stellar_mass_conversion * self.richness_sparse_array[ii][jj_max]
             )
-            message = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
-            logger.info( message )
-            
+            msg = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
+            logger.info(msg)
+
     def mle(self):
         a = self.log_likelihood_sparse_array
         j,k = np.unravel_index(a.argmax(),a.shape)
@@ -344,7 +344,7 @@ class GridSearch:
             data['FRACTION_OBSERVABLE']=self.fraction_observable_sparse_array.T
 
         # Convert to 32bit float
-        for k in data.keys()[1:]:
+        for k in list(data.keys())[1:]:
             data[k] = data[k].astype('f4',copy=False)
             
         # Stellar mass can be calculated from STELLAR * RICHNESS

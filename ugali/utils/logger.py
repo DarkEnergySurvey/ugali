@@ -27,6 +27,7 @@ if not len(logger.handlers):
 logger.DEBUG    = logging.DEBUG
 logger.INFO     = logging.INFO
 logger.WARNING  = logging.WARNING
+logger.WARN     = logging.WARN
 logger.ERROR    = logging.ERROR
 logger.CRITICAL = logging.CRITICAL
 

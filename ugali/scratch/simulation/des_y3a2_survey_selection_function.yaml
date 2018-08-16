@@ -1,0 +1,22 @@
+infile:
+    stellar_density: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/skymap/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy
+    fracdet: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_griz_o.4096_t.32768_coverfoot_EQU.fits.gz
+    maglim_g: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_g_depth.fits.gz
+    maglim_r: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/data/maps/y3a2_gold_1.0_cmv02-001_v1_nside4096_nest_r_depth.fits.gz
+    population_metadata: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/v5/sim_population_v5_mc_source_id_000001-005000.fits
+
+operation:
+    algorithm: simple
+    params_intrinsic: [[distance, log],
+                       [abs_mag, linear],
+                       [r_physical, log]]
+    params_geometric: [] # Could include stellar density, E(B-V), maglim, etc.
+
+simple:
+    real_results: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/simple/sid/y3_gold_20/candidate_list_real.fits
+    sim_results: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a2/simple/sid/sim_v5/candidate_list_sim.fits
+    sig_threshold: 7.0
+    fracdet_core_threshold: 0.8
+    fracdet_wide_threshold: 0.5 
+    hotspot_angsep_threshold: 0.5 # deg
+    classifier: /Users/keithbechtol/Documents/DES/projects/mw_substructure/des/y3a1/sim/population/v5/trained_classifier.txt

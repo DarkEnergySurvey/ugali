@@ -7,7 +7,7 @@ import matplotlib.patheffects as patheffects
 
 import numpy as np
 import fitsio
-import pyfits
+import astropy.io.fits as pyfits
 
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -102,7 +102,7 @@ def draw_scatter(coord, data, **kwargs):
     else:
         lon,lat = data['RA'],data['DEC']
 
-    print len(cut), cut.sum(), (cut==False).sum()
+    print(len(cut), cut.sum(), (cut==False).sum())
     
     ax[sys].scatter(lon[~cut],lat[~cut],**bkg_kwargs)
     ax[sys].scatter(lon[cut],lat[cut],c=prob[cut],**kwargs)
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     dirname = 'mcmc_v08'
     for name,c in zip(opts.names,opts.coords):
         if (opts.name is not None) and name != opts.name: continue
-        print name,c
+        print(name,c)
 
         memfile = join(dirname,'%s_mcmc.fits'%name)
         resfile = join(dirname,'%s_mcmc.yaml'%name)
