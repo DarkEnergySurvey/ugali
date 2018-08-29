@@ -330,19 +330,19 @@ class IsochroneModel(Model):
         --------
         abs_mag : Absolute magnitude (Mv)
         """
-        # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
+        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
         # for stars with R-I < 1.15
         # V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
         # g_des = g_sdss - 0.104(g_sdss - r_sdss) + 0.01
         # r_des = r_sdss - 0.102(g_sdss - r_sdss) + 0.02
         if self.survey.lower() != 'des':
-            raise Exception('Only valid for DES')
+            raise ValueError('Absolute magnitude calculation only valid for DES')
         if 'g' not in [self.band_1,self.band_2]:
-            msg = "Need g-band for absolute magnitude"
-            raise Exception(msg)    
+            msg = "Need g-band for absolute magnitude calculation"
+            raise ValueError(msg)    
         if 'r' not in [self.band_1,self.band_2]:
-            msg = "Need r-band for absolute magnitude"
-            raise Exception(msg)    
+            msg = "Need r-band for absolute magnitude calculation"
+            raise ValueError(msg)    
 
         mass_init,mass_pdf,mass_act,mag_1,mag_2=self.sample(mass_steps = steps)
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
