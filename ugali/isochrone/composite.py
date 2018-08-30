@@ -129,6 +129,12 @@ class CompositeIsochrone(IsochroneModel):
     stellarLuminosity = stellar_luminosity
     observableFraction = observable_fraction
 
+    def absolute_magnitude(self, richness=1, steps=1e4):
+        raise ValueError("Not implemented for CompositeIsochrone")
+
+    def absolute_magnitude_martin(self, richness=1, steps=1e4):
+        raise ValueError("Not implemented for CompositeIsochrone")
+
 # ADW: It would be better if the factory were in isochrone.__init__
 # but then you get into a circular import situation with the
 # CompositeIsochrone. This is an unfortunate design decision...
