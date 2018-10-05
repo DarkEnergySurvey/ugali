@@ -247,7 +247,8 @@ class Results(object):
         except ValueError as e:
             logger.warning("Skipping absolute magnitude")
             logger.warn(str(e))
-            results['Mv'] = np.nan
+            Mv = np.nan
+            results['Mv'] = Mv
 
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space

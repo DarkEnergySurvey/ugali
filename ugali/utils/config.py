@@ -13,6 +13,7 @@ import healpy as hp
 
 from ugali.utils.logger import logger
 import ugali.utils.config # To recognize own type
+from ugali.utils.mlab import isstring
 
 try: import yaml
 except ImportError: logger.warning("YAML not found")
@@ -22,20 +23,20 @@ class Config(dict):
     Configuration object
     """
 
-    def __init__(self, input, default=None):
+    def __init__(self, config, default=None):
         """
         Initialize a configuration object from a filename or a dictionary.
         Provides functionality to merge with a default configuration.
 
         Parameters:
-          input:   Filename, dict, or Config (deep copied)
-          default: Default configuration to merge
+          config:   filename, dict, or Config object (deep copied)
+          default:  default configuration to merge
         
         Returns:
           config
         """
         self.update(self._load(default))
-        self.update(self._load(input))
+        self.update(self._load(config))
 
         self._formatFilepaths()
 
@@ -60,29 +61,27 @@ class Config(dict):
     def __str__(self):
         return yaml.dump(self)
 
-    def _load(self, input):
-        if isinstance(input, str):
-            self.filename = input
-            ext = os.path.splitext(input)[1]
-            if ext == '.py':
-                # ADW: This is dangerous and terrible!!!
-                # THIS SHOULD BE DEPRICATED!!!
-                msg = "Python configuration files are deprecated."
-                DeprecationWarning(msg)
-                reader = open(input)
-                params = eval(''.join(reader.readlines()))
-                reader.close()
-            elif ext == '.yaml':
-                params = yaml.load(open(input))
-            else:
-                raise Exception('Unrecognized config format: %s'%ext)
-        elif isinstance(input, Config):
+    def _load(self, config):
+        """ Load this config from an existing config 
+
+        Parameters:
+        -----------
+        config : filename, config object, or dict to load
+
+        Returns:
+        --------
+        params : configuration parameters
+        """
+        if isstring(config):
+            self.filename = config
+            params = yaml.load(open(config))
+        elif isinstance(config, Config):
             # This is the copy constructor...
-            self.filename = input.filename
-            params = copy.deepcopy(input)
-        elif isinstance(input, dict):
-            params = copy.deepcopy(input)
-        elif input is None:
+            self.filename = config.filename
+            params = copy.deepcopy(config)
+        elif isinstance(config, dict):
+            params = copy.deepcopy(config)
+        elif config is None:
             params = {}
         else:
             raise Exception('Unrecognized input')
