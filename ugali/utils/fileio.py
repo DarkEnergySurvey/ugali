@@ -8,14 +8,14 @@ import shutil
 import os
 from collections import OrderedDict as odict
 import itertools
+import warnings
 
 import fitsio
 import numpy as np
 import healpy as hp
 
 from ugali.utils.logger import logger
-#import logging as logger
-import warnings
+from ugali.utils.mlab import isstring
 
 def read(filename,**kwargs):
     """ Read a generic input file into a recarray.
@@ -126,7 +126,7 @@ def load(args):
     return fitsio.read(infile,columns=columns)
 
 def load_infiles(infiles,columns=None,multiproc=False):
-    if isinstance(infiles,str):
+    if isstring(infiles):
         infiles = [infiles]
 
     logger.debug("Loading %s files..."%len(infiles))

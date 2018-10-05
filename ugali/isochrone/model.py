@@ -61,6 +61,12 @@ def get_iso_dir():
         logger.warning(msg)
     return isodir
 
+def sumMag(mag_1, mag_2):
+    """Sum two magnitudes in flux space."""
+    flux_1 = 10**(-mag_1 / 2.5)
+    flux_2 = 10**(-mag_2 / 2.5)
+    return -2.5 * np.log10(flux_1 + flux_2)
+
 class IsochroneModel(Model):
     """ Abstract base class for dealing with isochrone models. """
 
@@ -316,8 +322,10 @@ class IsochroneModel(Model):
     stellarMass = stellar_mass
     stellarLuminosity = stellar_luminosity
 
-    def absolute_magnitude(self, richness=1, steps=1e4):
+    def absolute_magnitude2(self, richness=1, steps=1e4):
         """
+        DEPRECATED: ADW 2018-08-30
+
         Calculate the absolute magnitude (Mv) by integrating the
         stellar luminosity.
 
@@ -352,20 +360,57 @@ class IsochroneModel(Model):
         Mv = -2.5*np.log10(richness*flux)
         return Mv
 
-    def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.32, seed=None):
+    def absolute_magnitude(self, richness=1, steps=1e4):
         """
+        Calculate the absolute magnitude (Mv) from the richness by
+        transforming the isochrone in the SDSS system and using the
+        g,r -> V transform equations from Jester 2005
+        [astro-ph/0506022].
+
+
+        Parameters:
+        -----------
+        richness : isochrone normalization parameter
+        steps    : number of isochrone sampling steps
+
+        Returns:
+        --------
+        abs_mag : Absolute magnitude (Mv)
+        """
+        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
+        # for stars with R-I < 1.15
+        # V = g_sdss - 0.59*(g_sdss - r_sdss) - 0.01
+
+        # Create a copy of the isochrone in the SDSS system
+        params = {k:v.value for k,v in self._params.items()}
+        params.update(band_1='g',band_2='r',survey='sdss')
+        iso = self.__class__(**params)
+
+        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps=steps)
+
+        V = g - 0.59*(g - r) - 0.01
+        flux = np.sum(mass_pdf*10**(-V/2.5))
+        Mv = -2.5*np.log10(richness*flux)
+        return Mv
+
+    def absolute_magnitude_martin2(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.32, seed=None):
+        """
+        DEPRECATED: 2018-08
+
         Calculate the absolute magnitude (Mv) of the isochrone using
         the prescription of Martin et al. 2008.
         
+        ADW: Seems like the faint and bright limits should depend on the survey maglime?
+
         Parameters:
         -----------
-        richness : Isochrone nomalization factor
-        steps : Number of steps for sampling the isochrone.
-        n_trials : Number of bootstrap samples
+        richness   : Isochrone nomalization factor
+        steps      : Number of steps for sampling the isochrone.
+        n_trials   : Number of bootstrap samples
         mag_bright : Bright magnitude limit for calculating luminosity.
-        mag_faint : Faint magnitude limit for calculating luminosity.
-        alpha : Output confidence interval (1-alpha)
-        seed : Random seed
+        mag_faint  : Faint magnitude limit for calculating luminosity.
+        alpha      : Output confidence interval (1-alpha)
+        seed       : Random seed
 
         Returns:
         --------
@@ -374,6 +419,8 @@ class IsochroneModel(Model):
         # ADW: This function is not quite right. You should be restricting
         # the catalog to the obsevable space (using the function named as such)
         # Also, this needs to be applied in each pixel individually
+        # ADW: This becomes even more complicated when we transform
+        # the isochrone into SDSS g,r.
         
         # Using the SDSS g,r -> V from Jester 2005 [arXiv:0506022]
         # for stars with R-I < 1.15
@@ -400,11 +447,6 @@ class IsochroneModel(Model):
             abs_mag_v = -2.5 * np.log10(flux)
             return abs_mag_v
 
-        def sumMag(mag_1, mag_2):
-            flux_1 = 10**(-mag_1 / 2.5)
-            flux_2 = 10**(-mag_2 / 2.5)
-            return -2.5 * np.log10(flux_1 + flux_2)
-
         # Analytic part
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps = steps)
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
@@ -428,6 +470,75 @@ class IsochroneModel(Model):
         # ADW: Careful, fainter abs mag is larger (less negative) number
         q = [100*alpha/2., 50, 100*(1-alpha/2.)]
         hi,med,lo = np.percentile(abs_mag_obs_array,q)
+        return ugali.utils.stats.interval(med,lo,hi)
+
+    def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=None, mag_faint=23., alpha=0.32, seed=None):
+        """
+        Calculate the absolute magnitude (Mv) of the isochrone using
+        the prescription of Martin et al. 2008.
+        
+        ADW: Seems like the faint and bright limits should depend on the survey maglim?
+
+        Parameters:
+        -----------
+        richness   : Isochrone nomalization factor
+        steps      : Number of steps for sampling the isochrone.
+        n_trials   : Number of bootstrap samples
+        mag_bright : Bright magnitude limit [SDSS g-band] for luminosity calculation
+        mag_faint  : Faint magnitude limit [SDSS g-band] for luminosity calculation
+        alpha      : Output confidence interval (1-alpha)
+        seed       : Random seed
+
+        Returns:
+        --------
+        med,lo,hi : Absolute magnitude interval
+        """
+        # ADW: This function is not quite right. It should restrict
+        # the catalog to the obsevable space using the mask in each
+        # pixel.  This becomes even more complicated when we transform
+        # the isochrone into SDSS g,r...
+        
+        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
+        # for stars with R-I < 1.15
+        # V = g_sdss - 0.59*(g_sdss - r_sdss) - 0.01
+        np.random.seed(seed)
+
+        # Create a copy of the isochrone in the SDSS system
+        params = {k:v.value for k,v in self._params.items()}
+        params.update(band_1='g',band_2='r',survey='sdss')
+        iso = self.__class__(**params)
+
+        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps=steps)
+
+        def visual(g, r, pdf=None):
+            # Calculate the visual absolute magnitude from g,r
+            V = g - 0.59*(g - r) - 0.01
+            if pdf is None:
+                flux = np.sum(10**(-V / 2.5))
+            else:
+                flux = np.sum(pdf * 10**(-V / 2.5))
+            abs_mag_v = -2.5 * np.log10(flux)
+            return abs_mag_v
+
+
+        # Analytic part (below detection threshold)
+        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps = steps)
+        cut = ((g + iso.distance_modulus) > mag_faint)
+        mag_unobs = visual(g[cut], r[cut], richness * mass_pdf[cut])
+
+        # Stochastic part (above detection threshold)
+        abs_mag = np.zeros(n_trials)
+        for i in range(n_trials):
+            if i%100==0: logger.debug('%i absolute magnitude trials'%i)
+            g, r = iso.simulate(richness * iso.stellar_mass())
+            cut = (g < mag_faint) 
+            mag_obs = visual(g[cut] - iso.distance_modulus, 
+                             r[cut] - iso.distance_modulus)
+            abs_mag[i] = sumMag(mag_obs, mag_unobs)
+
+        # ADW: Careful, fainter abs mag is larger (less negative) number
+        q = [100*alpha/2., 50, 100*(1-alpha/2.)]
+        hi,med,lo = np.percentile(abs_mag,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
     def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
