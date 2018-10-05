@@ -61,6 +61,12 @@ def get_iso_dir():
         logger.warning(msg)
     return isodir
 
+def sumMag(mag_1, mag_2):
+    """Sum two magnitudes in flux space."""
+    flux_1 = 10**(-mag_1 / 2.5)
+    flux_2 = 10**(-mag_2 / 2.5)
+    return -2.5 * np.log10(flux_1 + flux_2)
+
 class IsochroneModel(Model):
     """ Abstract base class for dealing with isochrone models. """
 
@@ -441,11 +447,6 @@ class IsochroneModel(Model):
             abs_mag_v = -2.5 * np.log10(flux)
             return abs_mag_v
 
-        def sumMag(mag_1, mag_2):
-            flux_1 = 10**(-mag_1 / 2.5)
-            flux_2 = 10**(-mag_2 / 2.5)
-            return -2.5 * np.log10(flux_1 + flux_2)
-
         # Analytic part
         mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps = steps)
         g,r = (mag_1,mag_2) if self.band_1 == 'g' else (mag_2,mag_1)
@@ -476,7 +477,7 @@ class IsochroneModel(Model):
         Calculate the absolute magnitude (Mv) of the isochrone using
         the prescription of Martin et al. 2008.
         
-        ADW: Seems like the faint and bright limits should depend on the survey maglime?
+        ADW: Seems like the faint and bright limits should depend on the survey maglim?
 
         Parameters:
         -----------
@@ -493,10 +494,9 @@ class IsochroneModel(Model):
         med,lo,hi : Absolute magnitude interval
         """
         # ADW: This function is not quite right. It should restrict
-        # the catalog to the obsevable space (using the function named
-        # as such). Also, this needs to be applied in each pixel
-        # individually. This becomes even more complicated when we
-        # transform the isochrone into SDSS g,r.
+        # the catalog to the obsevable space using the mask in each
+        # pixel.  This becomes even more complicated when we transform
+        # the isochrone into SDSS g,r...
         
         # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
         # for stars with R-I < 1.15
@@ -520,11 +520,6 @@ class IsochroneModel(Model):
             abs_mag_v = -2.5 * np.log10(flux)
             return abs_mag_v
 
-        def sumMag(mag_1, mag_2):
-            # Sum magnitudes by flux
-            flux_1 = 10**(-mag_1 / 2.5)
-            flux_2 = 10**(-mag_2 / 2.5)
-            return -2.5 * np.log10(flux_1 + flux_2)
 
         # Analytic part (below detection threshold)
         mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps = steps)
