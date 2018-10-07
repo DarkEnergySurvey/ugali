@@ -52,6 +52,8 @@ from ugali.utils.projector import mod2dist
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 
+
+
 ############################################################
 
 def get_iso_dir():
@@ -61,11 +63,44 @@ def get_iso_dir():
         logger.warning(msg)
     return isodir
 
-def sumMag(mag_1, mag_2):
-    """Sum two magnitudes in flux space."""
-    flux_1 = 10**(-mag_1 / 2.5)
-    flux_2 = 10**(-mag_2 / 2.5)
-    return -2.5 * np.log10(flux_1 + flux_2)
+
+def sum_mags(mags, weights=None):
+    """
+    Sum an array of magnitudes in flux space.
+
+    Parameters:
+    -----------
+    mags    : array of magnitudes
+    weights : array of weights for each magnitude (i.e. from a pdf)
+    
+    Returns:
+    --------
+    sum_mag : the summed magnitude of all the stars
+    """
+    flux = 10**(-np.asarray(mags) / 2.5)
+    if weights is None:
+        return -2.5 * np.log10(np.sum(flux))
+    else:
+        return -2.5 * np.log10(np.sum(weights*flux))
+
+def jester_mag_v(g_sdss, r_sdss):
+    """
+    Convert from SDSS g,r to Johnson V using the Table 1 of Jester
+    2005 [astro-ph/0506022] for stars with R-I < 1.15: 
+
+      V = g_sdss - 0.59(g_sdss-r_sdss) - 0.01
+
+    Parameters:
+    -----------
+    g_sdss : SDSS g-band magnitude
+    r_sdss : SDSS r-band magnitude
+    pdf    : pdf weighting for each star
+
+    Returns:
+    --------
+    mag_v  : total 
+    """
+    return g_sdss - 0.59 * (g_sdss - r_sdss) - 0.01
 
 class IsochroneModel(Model):
     """ Abstract base class for dealing with isochrone models. """
@@ -133,8 +168,8 @@ class IsochroneModel(Model):
         return mod2dist(self.distance_modulus)
 
     def sample(self, mode='data', mass_steps=1000, mass_min=0.1, full_data_range=False):
-        """Sample the isochrone in steps of mass interpolating between the
-        originally defined isochrone points.
+        """Sample the isochrone in steps of mass interpolating between
+        the originally defined isochrone points.
 
         Parameters:
         -----------
@@ -148,8 +183,8 @@ class IsochroneModel(Model):
         mass_init : Initial mass of each point
         mass_pdf : PDF of number of stars in each point
         mass_act : Actual (current mass) of each stellar point
-        mag_1 : Array of magnitudes in first band (distance modulus applied)
-        mag_2 : Array of magnitudes in second band (distance modulus applied)
+        mag_1 : Array of absolute magnitudes in first band (no distance modulus applied)
+        mag_2 : Array of absolute magnitudes in second band (no distance modulus applied)
         """
 
         if full_data_range:
@@ -360,39 +395,6 @@ class IsochroneModel(Model):
         Mv = -2.5*np.log10(richness*flux)
         return Mv
 
-    def absolute_magnitude(self, richness=1, steps=1e4):
-        """
-        Calculate the absolute magnitude (Mv) from the richness by
-        transforming the isochrone in the SDSS system and using the
-        g,r -> V transform equations from Jester 2005
-        [astro-ph/0506022].
-
-
-        Parameters:
-        -----------
-        richness : isochrone normalization parameter
-        steps    : number of isochrone sampling steps
-
-        Returns:
-        --------
-        abs_mag : Absolute magnitude (Mv)
-        """
-        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
-        # for stars with R-I < 1.15
-        # V = g_sdss - 0.59*(g_sdss - r_sdss) - 0.01
-
-        # Create a copy of the isochrone in the SDSS system
-        params = {k:v.value for k,v in self._params.items()}
-        params.update(band_1='g',band_2='r',survey='sdss')
-        iso = self.__class__(**params)
-
-        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps=steps)
-
-        V = g - 0.59*(g - r) - 0.01
-        flux = np.sum(mass_pdf*10**(-V/2.5))
-        Mv = -2.5*np.log10(richness*flux)
-        return Mv
-
     def absolute_magnitude_martin2(self, richness=1, steps=1e4, n_trials=1000, mag_bright=16., mag_faint=23., alpha=0.32, seed=None):
         """
         DEPRECATED: 2018-08
@@ -438,6 +440,12 @@ class IsochroneModel(Model):
             msg = "Need r-band for absolute magnitude"
             raise Exception(msg)    
         
+        def sumMag(mag_1, mag_2):
+            """Sum two magnitudes in flux space."""
+            flux_1 = 10**(-mag_1 / 2.5)
+            flux_2 = 10**(-mag_2 / 2.5)
+            return -2.5 * np.log10(flux_1 + flux_2)
+
         def visual(g, r, pdf=None):
             v = g - 0.487 * (g - r) - 0.0249
             if pdf is None:
@@ -472,6 +480,45 @@ class IsochroneModel(Model):
         hi,med,lo = np.percentile(abs_mag_obs_array,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
+    def absolute_magnitude(self, richness=1, steps=1e4):
+        """
+        Calculate the absolute visual magnitude (Mv) from the richness
+        by transforming the isochrone in the SDSS system and using the
+        g,r -> V transform equations from Jester 2005
+        [astro-ph/0506022].
+
+
+        Parameters:
+        -----------
+        richness : isochrone normalization parameter
+        steps    : number of isochrone sampling steps
+
+        Returns:
+        --------
+        abs_mag : Absolute magnitude (Mv)
+        """
+        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
+        # for stars with R-I < 1.15
+        # V = g_sdss - 0.59*(g_sdss - r_sdss) - 0.01
+
+        # Create a copy of the isochrone in the SDSS system
+        params = {k:v.value for k,v in self._params.items()}
+        params.update(band_1='g',band_2='r',survey='sdss')
+        iso = self.__class__(**params)
+
+        # g, r are absolute magnitude
+        mass_init, mass_pdf, mass_act, sdss_g, sdss_r = iso.sample(mass_steps=steps)
+        V = jester_mag_v(sdss_g,sdss_r)
+
+        # Sum the V-band absolute magnitudes
+        return sum_mags(V,weights=mass_pdf*richness)
+
+        #V = g - 0.59*(g - r) - 0.01
+        #flux = np.sum(mass_pdf*10**(-V/2.5))
+        #Mv = -2.5*np.log10(richness*flux)
+        #return Mv
+
+
     def absolute_magnitude_martin(self, richness=1, steps=1e4, n_trials=1000, mag_bright=None, mag_faint=23., alpha=0.32, seed=None):
         """
         Calculate the absolute magnitude (Mv) of the isochrone using
@@ -491,63 +538,62 @@ class IsochroneModel(Model):
 
         Returns:
         --------
-        med,lo,hi : Absolute magnitude interval
+        med,lo,hi : Total absolute magnitude interval
         """
         # ADW: This function is not quite right. It should restrict
         # the catalog to the obsevable space using the mask in each
         # pixel.  This becomes even more complicated when we transform
         # the isochrone into SDSS g,r...
-        
-        # Using the SDSS g,r -> V from Jester 2005 [astro-ph/0506022]
-        # for stars with R-I < 1.15
-        # V = g_sdss - 0.59*(g_sdss - r_sdss) - 0.01
-        np.random.seed(seed)
+        if seed is not None: np.random.seed(seed)
 
         # Create a copy of the isochrone in the SDSS system
         params = {k:v.value for k,v in self._params.items()}
         params.update(band_1='g',band_2='r',survey='sdss')
         iso = self.__class__(**params)
 
-        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps=steps)
-
-        def visual(g, r, pdf=None):
-            # Calculate the visual absolute magnitude from g,r
-            V = g - 0.59*(g - r) - 0.01
-            if pdf is None:
-                flux = np.sum(10**(-V / 2.5))
-            else:
-                flux = np.sum(pdf * 10**(-V / 2.5))
-            abs_mag_v = -2.5 * np.log10(flux)
-            return abs_mag_v
-
-
         # Analytic part (below detection threshold)
-        mass_init, mass_pdf, mass_act, g, r = iso.sample(mass_steps = steps)
-        cut = ((g + iso.distance_modulus) > mag_faint)
-        mag_unobs = visual(g[cut], r[cut], richness * mass_pdf[cut])
+        # g, r are absolute magnitudes
+        mass_init, mass_pdf, mass_act, sdss_g, sdss_r = iso.sample(mass_steps = steps)
+        V = jester_mag_v(sdss_g, sdss_r)
+        cut = ( (sdss_g + iso.distance_modulus) > mag_faint)
+        mag_unobs = sum_mags(V[cut], weights = richness * mass_pdf[cut])
 
         # Stochastic part (above detection threshold)
-        abs_mag = np.zeros(n_trials)
+        abs_mag_v = np.zeros(n_trials)
         for i in range(n_trials):
             if i%100==0: logger.debug('%i absolute magnitude trials'%i)
-            g, r = iso.simulate(richness * iso.stellar_mass())
-            cut = (g < mag_faint) 
-            mag_obs = visual(g[cut] - iso.distance_modulus, 
-                             r[cut] - iso.distance_modulus)
-            abs_mag[i] = sumMag(mag_obs, mag_unobs)
+            # g,r are apparent magnitudes
+            sdss_g, sdss_r = iso.simulate(richness * iso.stellar_mass())
+            cut = (sdss_g < mag_faint) 
+            # V is absolute magnitude
+            V = jester_mag_v(sdss_g[cut]-iso.distance_modulus,
+                             sdss_r[cut]-iso.distance_modulus)
+            mag_obs = sum_mags(V)
+            abs_mag_v[i] = sum_mags([mag_obs,mag_unobs])
 
         # ADW: Careful, fainter abs mag is larger (less negative) number
         q = [100*alpha/2., 50, 100*(1-alpha/2.)]
-        hi,med,lo = np.percentile(abs_mag,q)
+        hi,med,lo = np.percentile(abs_mag_v,q)
         return ugali.utils.stats.interval(med,lo,hi)
 
     def simulate(self, stellar_mass, distance_modulus=None, **kwargs):
         """
-        Simulate a set of stellar magnitudes (no uncertainty) for a satellite of a given stellar mass and distance.
+        Simulate a set of stellar magnitudes (no uncertainty) for a
+        satellite of a given stellar mass and distance.
+
+        Parameters:
+        -----------
+        stellar_mass : the total stellar mass of the system (Msun)
+        distance_modulus : distance modulus of the system (if None takes from isochrone)
+        kwargs : passed to iso.imf.sample
+
+        Returns:
+        --------
+        mag_1, mag_2 : simulated magnitudes with length stellar_mass/iso.stellar_mass()
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
-        n = int(stellar_mass / self.stellar_mass()) 
+        n = int(round(stellar_mass / self.stellar_mass()))
         f_1 = scipy.interpolate.interp1d(self.mass_init, self.mag_1)
         f_2 = scipy.interpolate.interp1d(self.mass_init, self.mag_2)
         mass_init_sample = self.imf.sample(n, np.min(self.mass_init), np.max(self.mass_init), **kwargs)
