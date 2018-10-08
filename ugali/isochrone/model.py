@@ -26,7 +26,7 @@ you need each unique limit in both magnitudes.
 
 """
 
-# FIXME: Need to parallelize CMD and MMD formulation
+# FIXME: Need to vectorize CMD and MMD calculation
 
 import sys
 import os
@@ -46,23 +46,13 @@ import scipy.ndimage as ndimage
 import ugali.analysis.imf
 from ugali.analysis.model import Model, Parameter
 from ugali.utils.stats import norm_cdf
-from ugali.utils.shell import get_ugali_dir, mkdir
+from ugali.utils.shell import mkdir, get_ugali_dir, get_iso_dir
 from ugali.utils.projector import mod2dist
 
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 
-
-
 ############################################################
-
-def get_iso_dir():
-    isodir = os.path.join(get_ugali_dir(),'isochrones')
-    if not os.path.exists(isodir):
-        msg = "Isochrone directory not found:\n%s"%isodir
-        logger.warning(msg)
-    return isodir
-
 
 def sum_mags(mags, weights=None):
     """
