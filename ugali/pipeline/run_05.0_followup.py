@@ -8,8 +8,9 @@ from collections import OrderedDict as odict
 from multiprocessing import Pool
 
 import matplotlib
-try:             os.environ['DISPLAY']
-except KeyError: matplotlib.use('Agg')
+matplotlib.use('Agg')
+#try:             os.environ['DISPLAY']
+#except KeyError: matplotlib.use('Agg')
 
 import numpy
 import numpy as np

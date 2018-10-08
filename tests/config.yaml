@@ -26,23 +26,23 @@ coords:
   proj_type: ait
 
 catalog:
-  dirname: ./healpix
-  basename: "catalog_hpx%04i.fits"
-  lon_field: RA
-  lat_field: DEC
   # Color always defined as mag_1 - mag_2
-  objid_field       : COADD_OBJECT_ID
-  mag_1_band        : &band1 g
-  mag_1_field       : WAVG_MAG_PSF_G
-  mag_err_1_field   : WAVG_MAGERR_PSF_G
-  mag_2_band        : &band2 r
-  mag_2_field       : WAVG_MAG_PSF_R
-  mag_err_2_field   : WAVG_MAGERR_PSF_R
+  dirname: ./healpix                    # directory of catalog files
+  basename: "catalog_hpx%04i.fits"      # catalog file basename format
+  objid_field       : COADD_OBJECT_ID   # unique object identifier
+  lon_field         : RA                # name of longitude field
+  lat_field         : DEC               # name of latitude field
+  mag_1_band        : &band1 g          # name of mag_1 filter band
+  mag_1_field       : WAVG_MAG_PSF_G    # name of mag_1 field
+  mag_err_1_field   : WAVG_MAGERR_PSF_G # name of magerr_1 field
+  mag_2_band        : &band2 r          # name of mag_2 filter band
+  mag_2_field       : WAVG_MAG_PSF_R    # name of mag_2 field
+  mag_err_2_field   : WAVG_MAGERR_PSF_R # name of magerr_2 field
   # True = band 1 is detection band; False = band 2 is detection band     
-  band_1_detection  : &detection True
-  mc_source_id_field: MC_SOURCE_ID
+  band_1_detection  : &detection True   # detection occurs in band_1?
+  mc_source_id_field: MC_SOURCE_ID      # field for simulated objects
+  # Additional selection parameters to get a sample of stars
   selection         : "(np.abs(self.data['WAVG_SPREAD_MODEL_I']) < 0.003)"
-  #selection         : null
 
 data: 
   dirname: ./raw
@@ -50,7 +50,7 @@ data:
   survey : des
   release: y3a2
   density: ./density/density_hpx%04i.fits
-  footprint: null 
+  footprint: ./maps/footprint_nside4096_equ.fits.gz
 
 mask:
   dirname    : ./mask
@@ -171,7 +171,6 @@ search:
   
 mcmc:
   script  : ./ugali/analysis/mcmc.py
-  params  : ['richness','lon','lat','extension','position_angle']
   srcmdl  : 'srcmdl.yaml'
   nsamples: 100
   nwalkers: 20

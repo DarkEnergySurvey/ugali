@@ -19,7 +19,7 @@ There are several ways to install `ugali`.
 The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
 ```bash
 # Create and activate conda environment
-conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee fitsio -c conda-forge -c kadrlica
+conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose fitsio corner -c conda-forge -c kadrlica
 source activate ugali-env
 
 # Clone source code from the parent repository
@@ -46,7 +46,7 @@ By default, the minimal isochrone and catalog libraries are installed into the d
 Auxiliary Libraries
 -------------------
 
-The `ugali` source code is distributed with several auxiliary libraries for isochrone generation and catalog matching. These libraries can be downloaded directly from the [releases](../../releases) page, and unpacked in your `$UGALIDIR`. For example, to install the Bressan+ 2012 isochrones for the DES survey:
+The `ugali` source code is distributed with several auxiliary libraries for isochrone generation and catalog matching. These libraries can be downloaded directly from the [releases](../../releases) page, and unpacked in your `$UGALIDIR`. For example, to install the [Bressan et al. 2012](http://adsabs.harvard.edu/abs/2012MNRAS.427..127B) isochrones for the DES survey:
 
 ```
 cd $UGALIDIR
@@ -81,7 +81,7 @@ python setup.py catalogs
 Usage Examples
 --------------
 
-Several usage examples are available as jupyter notebooks in the [notebooks](notebooks/) directory.
+Several examples can be found as jupyter notebooks in the [notebooks](notebooks/) directory.
 
 Additional Information
 ----------------------
@@ -91,8 +91,8 @@ These should mostly be taken care of by PyPi with a `pip install`.
 * [numpy](http://www.numpy.org/)
 * [scipy](https://www.scipy.org/)
 * [matplotlib](http://matplotlib.org/)
-* [healpy](https://github.com/healpy/healpy)
 * [astropy](http://www.astropy.org/)
+* [healpy](https://github.com/healpy/healpy)
 * [emcee](http://dan.iel.fm/emcee/current/)
 * [pyyaml](http://pyyaml.org/)
 * [fitsio](https://github.com/esheldon/fitsio)

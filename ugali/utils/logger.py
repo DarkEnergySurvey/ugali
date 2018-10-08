@@ -3,7 +3,6 @@
 Interface to python logging. For more info see:
 http://docs.python.org/2/howto/logging.html
 """
-
 import logging
 
 class SpecialFormatter(logging.Formatter):
@@ -38,6 +37,7 @@ logger.setLevel(logger.INFO)
 #logger.setLevel(logger.CRITICAL) # Least verbose
 
 def file_found(filename,force):
+    """Check if a file exists"""
     if os.path.exists(filename) and not force:
         logger.info("Found %s; skipping..."%filename)
         return True
