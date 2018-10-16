@@ -12,7 +12,7 @@ import ugali.utils.projector
 from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
 from ugali.utils.healpix import ang2pix
-from ugali.utils.shell import get_ugali_dir
+from ugali.utils.shell import get_ugali_dir, get_cat_dir
 from ugali.utils.logger import logger
 
 #class Catalog(np.recarray):
@@ -56,12 +56,6 @@ from ugali.utils.logger import logger
 #            glon,glat = lon, lat
 #        return ugali.utils.projector.match(glon,glat,self.data['glon'],self.data['glat'],tol)
 
-def get_cat_dir():
-    catdir = os.path.join(get_ugali_dir(),'catalogs')
-    if not os.path.exists(catdir):
-        msg = "Catalog directory not found:\n%s"%catdir
-        logger.warning(msg)
-    return catdir
 
 
 class SourceCatalog(object):

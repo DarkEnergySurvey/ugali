@@ -35,8 +35,8 @@ from ugali.utils.healpix import ang2pix, get_nside
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
 from ugali.utils.projector import sphere2image,image2sphere
 from ugali.utils.config import Config
-
 from ugali.utils.logger import logger
+from ugali.utils.mlab import isstring
 
 params = {
     #'backend': 'eps',
@@ -848,7 +848,7 @@ class SourcePlotter(BasePlotter):
 
     def drawMembersSpatial(self,data):
         ax = plt.gca()
-        if isinstance(data,str):
+        if isstring(data):
             filename = data
             data = fitsio.read(filename)
 
@@ -886,7 +886,7 @@ class SourcePlotter(BasePlotter):
 
     def drawMembersCMD(self,data):
         ax = plt.gca()
-        if isinstance(data,str):
+        if isstring(data):
             filename = data
             data = fitsio.read(filename)
 
@@ -1149,7 +1149,7 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     config = ugali.utils.config.Config(config)
-    if isinstance(data,str):
+    if isstring(data):
         data,header = fitsio.read(data,header=True)
 
     defaults = dict(s=20,edgecolor='none',vmin=0,vmax=1,zorder=3)

@@ -48,18 +48,40 @@ def which(program):
 def get_ugali_dir():
     """Get the path to the ugali data directory from the environment"""
 
-    ugalidir = os.getenv('UGALIDIR')
+    dirname = os.getenv('UGALIDIR')
 
     # Get the HOME directory
-    if not ugalidir:
-        ugalidir=os.path.join(os.getenv('HOME'),'.ugali')
+    if not dirname:
+        dirname=os.path.join(os.getenv('HOME'),'.ugali')
 
-    if not os.path.exists(ugalidir):
+    if not os.path.exists(dirname):
         from ugali.utils.logger import logger
-        msg = "Creating UGALIDIR:\n%s"%ugalidir
-        logger.debug(msg)
+        msg = "Creating UGALIDIR:\n%s"%dirname
+        logger.warning(msg)
 
-    return mkdir(ugalidir)
+    return mkdir(dirname)
+
+def get_iso_dir():
+    """Get the ugali isochrone directory."""
+    dirname = os.path.join(get_ugali_dir(),'isochrones')
+
+    if not os.path.exists(dirname):
+        from ugali.utils.logger import logger
+        msg = "Isochrone directory not found:\n%s"%dirname
+        logger.warning(msg)
+
+    return dirname
+
+def get_cat_dir():
+    """Get the ugali catalog directory."""
+    dirname = os.path.join(get_ugali_dir(),'catalogs')
+
+    if not os.path.exists(dirname):
+        from ugali.utils.logger import logger
+        msg = "Catalog directory not found:\n%s"%dirname
+        logger.warning(msg)
+
+    return dirname
 
 if __name__ == "__main__":
     from optparse import OptionParser

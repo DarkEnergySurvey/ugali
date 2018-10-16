@@ -8,6 +8,7 @@ http://adsabs.harvard.edu/abs/2002A%26A...395.1077C
 import numpy as np
 
 from ugali.utils.logger import logger
+from ugali.utils.mlab import isstring
 
 ############################################################
 
@@ -385,9 +386,7 @@ def dec2hms(dec):
     MINUTE = 60.
     SECOND = 3600.
     
-    if isinstance(dec,str):
-        dec = float(dec)
-
+    dec = float(dec)
     fhour = dec*(HOUR/DEGREE)
     hour = int(fhour)
 
@@ -405,10 +404,8 @@ def dec2dms(dec):
     HOUR = 24.
     MINUTE = 60.
     SECOND = 3600.
-    
-    if isinstance(dec,str):
-        dec = float(dec)
 
+    dec = float(dec)
     sign = np.copysign(1.0,dec)
 
     fdeg = np.abs(dec)
@@ -434,7 +431,7 @@ def hms2dec(hms):
     MINUTE = 60.
     SECOND = 3600.
 
-    if isinstance(hms,str):
+    if isstring(hms):
         hour,minute,second = np.array(re.split('[hms]',hms))[:3].astype(float)
     else:
         hour,minute,second = hms.T
@@ -456,7 +453,7 @@ def dms2dec(dms):
     # can have its signbit set:
     # http://docs.scipy.org/doc/numpy-1.7.0/reference/c-api.coremath.html#NPY_NZERO
 
-    if isinstance(dms,str):
+    if isstring(dms):
         degree,minute,second = np.array(re.split('[dms]',hms))[:3].astype(float)
     else:
         degree,minute,second = dms.T
