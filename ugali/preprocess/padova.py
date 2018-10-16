@@ -30,12 +30,14 @@ photsys_dict = odict([
         ('des' ,'tab_mag_odfnew/tab_mag_decam.dat'),
         ('sdss','tab_mag_odfnew/tab_mag_sloan.dat'),
         ('ps1' ,'tab_mag_odfnew/tab_mag_panstarrs1.dat'),
+	('lsst','tab_mag_odfnew/tab_mag_lsst.dat'), # Mitch: just a guess
 ])
 
 photname_dict = odict([
         ('des' ,'DECAM'),
         ('sdss','SDSS'),
         ('ps1' ,'Pan-STARRS1'),
+	('lsst','LSST'), # Mitch: just a guess
 ])
 
 # Commented options may need to be restored for older version/isochrones.

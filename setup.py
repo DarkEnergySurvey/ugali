@@ -45,7 +45,7 @@ ISOSIZE = "~1MB"
 CATSIZE = "~20MB"
 # Could find file size dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
-SURVEYS = ['des','ps1','sdss']
+SURVEYS = ['des','ps1','sdss','lsst'] # Mitch: Added 'lsst'
 MODELS = ['bressan2012','marigo2017','dotter2008','dotter2016']
 
 class ProgressFileIO(io.FileIO):
