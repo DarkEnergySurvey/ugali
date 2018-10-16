@@ -109,9 +109,10 @@ dartmouth_defaults = {
 
 # survey system
 dict_output = odict([
-        ('des','DECam'),
+        ('des' ,'DECam'),
         ('sdss','SDSSugriz'),
-        ('ps1','PanSTARRS'),
+        ('ps1' ,'PanSTARRS'),
+	('lsst','LSST'), # Mitch: A guess based on the the dropdown menu on the above site
 ])
 
 mesa_defaults = {
