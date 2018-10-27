@@ -112,7 +112,7 @@ dict_output = odict([
         ('des' ,'DECam'),
         ('sdss','SDSSugriz'),
         ('ps1' ,'PanSTARRS'),
-	('lsst','LSST'), # Mitch: A guess based on the the dropdown menu on the above site
+	('lsst','LSST'),
 ])
 
 mesa_defaults = {
