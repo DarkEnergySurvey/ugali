@@ -139,8 +139,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     age = np.random.choice([10., 12.0, 13.5])
     metal_z = np.random.choice([0.0001, 0.0002])
     distance_modulus = ugali.utils.projector.distanceToDistanceModulus(distance)
-    #iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus)
-    iso = isochrone_factory('Dotter2016', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus) # Mitch
+    iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus)
     s.set_isochrone(iso)
     # Simulate takes stellar mass as an argument, NOT richness
     mag_1, mag_2 = s.isochrone.simulate(stellar_mass) 
@@ -160,7 +159,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
         mag_extinction_1 = 3.172 * m_ebv[pix]
         mag_extinction_2 = 2.271 * m_ebv[pix]
-    elif config['survey'] == 'lsst': # Mitch
+    elif config['survey'] == 'lsst':
         # From Table 6 in Schlafly 2011 with Rv = 3.1
         # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
         mag_extinction_1 = 3.237 * m_ebv[pix]
@@ -191,10 +190,8 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (23.46 - np.clip(maglim_2, 20., 26.))))
     elif config['survey'] == 'ps1':
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2))
-    elif config['survey'] == 'lsst': # Mitch
-        #cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2)) # Just copied from above
-        cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (25.0 - np.clip(maglim_2, 20., 26.)))) # Copied, replacing with lsst snr_10? Seems to at least be in the right direction for better depth
-
+    elif config['survey'] == 'lsst':
+        cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (25.0 - np.clip(maglim_2, 20., 26.)))) # Using the psuedo mag depth of 25 for now
     n_g22 = np.sum(cut_detect & (mag_1 < 22.))
     n_g24 = np.sum(cut_detect & (mag_1 < 24.))
     print('  n_sim = %i, n_detect = %i, n_g24 = %i, n_g22 = %i'%(len(mag_1),np.sum(cut_detect),n_g24,n_g22))
@@ -213,7 +210,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         C_0 = -0.017
         C_1 = -0.508
         v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
-    elif config['survey'] == 'lsst': # Mitch
+    elif config['survey'] == 'lsst':
         # Numbers are just placeholders for now, need to figure out exact ones
         C_0 = -0.02
         C_1 = -0.50
@@ -274,7 +271,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     if not os.path.exists(tag): os.makedirs(tag)
 
     if isinstance(config,str): config = yaml.load(open(config))
-    assert config['survey'] in ['des', 'ps1', 'lsst'] # Mitch
+    assert config['survey'] in ['des', 'ps1', 'lsst']
 
     infile_ebv = config['ebv']
     infile_fracdet = config['fracdet']
@@ -596,7 +593,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                 ('RFPSFMAG_SFD', [mag_2_array, 'E']),
                 ('EXTENDED_CLASS', [np.tile(0, len(mc_source_id_array)), 'I']),
                 ])
-    elif config['survey'] == 'lsst': # Mitch: I'm guessing at all these names, based on the native_quantities in the GCRCatalogs
+    elif config['survey'] == 'lsst': # Keys make to match those in the GCRCatalog native_quantities
         key_map = odict([
                 ('objectId', [coadd_object_id_array, 'K']),
                 ('coord_ra', [lon_array, 'D']),
@@ -605,9 +602,9 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                 ('mag_r', [mag_2_array+mag_extinction_2_array, 'E']),
                 ('magerr_g', [mag_1_error_array, 'D']),
                 ('magerr_r', [mag_2_error_array, 'D']),
-                ('mag_corrected_g', [mag_1_array, 'D']), # There doesn't seem to be an analogue so I completely made up this key
-                ('mag_corrected_r', [mag_2_array, 'D']), # There doesn't seem to be an analogue so I completely made up this key
-                ('extneded_class', [np.tile(0, len(mc_source_id_array)), 'I']), # There doesn't seem to be an analogue so I completely made up this key
+                ('mag_corrected_g', [mag_1_array, 'D']), 
+                ('mag_corrected_r', [mag_2_array, 'D']), 
+                ('extended_class', [np.tile(0, len(mc_source_id_array)), 'I']), 
                 ])
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
@@ -668,7 +665,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     print("Writing population mask file...")
     outfile_mask = '%s/sim_mask_%s_cel_nside_%i.fits'%(tag, tag, healpy.npix2nside(len(mask)))
     if not os.path.exists(outfile_mask):
-        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C') # Mitch, removed overwrite=True because it isn't recognized as a kwarg
+        #healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
+        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C') # overwrite no longer appeasr to be a kwarg?
         os.system('gzip -f %s'%(outfile_mask))
 
 ############################################################
@@ -678,7 +676,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Simulate at Milky Way satellite population.')
     parser.add_argument('config',
                         help='Configuration file')
-    parser.add_argument('-s','--section',required=True,choices=['des','ps1','lsst'], # Mitch
+    parser.add_argument('-s','--section',required=True,choices=['des','ps1','lsst'],
                         help='Config section for simulation parameters')
     parser.add_argument('--tag',required=True,
                         help='Descriptive tag for the simulation run')
