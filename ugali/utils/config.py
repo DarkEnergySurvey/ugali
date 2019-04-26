@@ -1,3 +1,4 @@
+
 """
 Class for storing and updating config dictionaries.
 """
@@ -10,12 +11,14 @@ import glob
 
 import numpy as np
 import healpy as hp
+import yaml
 
 from ugali.utils.logger import logger
 import ugali.utils.config # To recognize own type
 
-try: import yaml
-except ImportError: logger.warning("YAML not found")
+#Yaml is a firm dependency
+#try: import yaml
+#except ImportError: logger.warning("YAML not found")
 
 class Config(dict):
     """
@@ -133,8 +136,10 @@ class Config(dict):
         """
         likedir=self['output']['likedir']
         self.likefile  = join(likedir,self['output']['likefile'])
-        self.mergefile = join(likedir,self['output']['mergefile'])
-        self.roifile   = join(likedir,self['output']['roifile'])
+
+        mergedir=self['output'].get('mergedir',likedir)
+        self.mergefile = join(mergedir,self['output']['mergefile'])
+        self.roifile   = join(mergedir,self['output']['roifile'])
 
         searchdir=self['output']['searchdir']
         self.labelfile  = join(searchdir,self['output']['labelfile'])
