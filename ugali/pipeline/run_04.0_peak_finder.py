@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Perform object finding and association."""
-import os
+import os, glob
 from os.path import exists, join
 import time
 
@@ -11,7 +11,7 @@ import ugali.candidate.associate
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 
-components = ['label','objects','associate','candidate','plot']
+components = ['label','objects','associate','candidate','plot','www']
 
 def run(self):
     search = CandidateSearch(self.config)
@@ -23,6 +23,8 @@ def run(self):
             logger.info("  Found %s; skipping..."%search.labelfile)
         else:
             #search.createLabels3D()
+            #search.loadLikelhood()
+            #search.loadROI()
             search.createLabels2D()
             search.writeLabels()
     if 'objects' in self.opts.run:
@@ -49,31 +51,52 @@ def run(self):
             search.loadAssociations()
             search.writeCandidates()
     if 'plot' in self.opts.run:
+        self.opts.run.append('www')
         logger.info("Running 'plot'...")
         import fitsio
 
         threshold = self.config['search']['cand_threshold']
         outdir = mkdir(self.config['output']['plotdir'])
-        logdir = mkdir(os.path.join(outdir,'log'))
+        logdir = mkdir(join(outdir,'log'))
+
+        # Eventually move this into 'plotting' module
+        candidates = fitsio.read(self.config.candfile,lower=True,trim_strings=True)
+        candidates = candidates[candidates['ts'] >= threshold]
+        
+        for i,c in enumerate(candidates):
+            name = c['name'].replace('(','').replace(')','')
+            msg = "(%i/%i) Plotting %s (%.2f,%.2f)..."%(i,len(candidates),name,c['ra'],c['dec'])
+            logger.info(msg)
+            params = (self.opts.config,outdir,name,c['ra'],
+                      c['dec'],0.5,c['modulus'])
+            cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f --radius %s -m %.2f'
+            cmd = cmd%params
+            logger.info(cmd)
+            jobname = name.lower().replace(' ','_')
+            logfile = join(logdir,jobname+'.log')
+            batch = self.config['search'].get('batch',self.config['batch'])
+            if len(glob.glob(join(outdir,jobname+'*.png')))==3 and not self.opts.force:
+                logger.info("  Found plots for %s; skipping..."%name)
+            else:
+                self.batch.submit(cmd,jobname,logfile,**batch.get(self.opts.queue,{}))
+                time.sleep(3)
+
+    if 'www' in self.opts.run:
+        logger.info("Running 'www'...")
+        import fitsio
+
+        threshold = self.config['search']['cand_threshold']
+        outdir = mkdir(self.config['output']['plotdir'])
 
         # Eventually move this into 'plotting' module
         candidates = fitsio.read(self.config.candfile,lower=True,trim_strings=True)
         candidates = candidates[candidates['ts'] >= threshold]
 
-        for i,c in enumerate(candidates):
-            msg = "(%i/%i) Plotting %s (%.2f,%.2f)..."%(i,len(candidates),c['name'],c['ra'],c['dec'])
-            logger.info(msg)
-            params = (self.opts.config,outdir,c['name'],c['ra'],
-                      c['dec'],0.5,c['modulus'])
-            cmd = 'ugali/scratch/PlotCandidate.py %s %s -n="%s" --cel %f %f --radius %s -m %.2f'
-            cmd = cmd%params
-            logger.info(cmd)
-            jobname = c['name'].lower().replace(' ','_')
-            logfile = os.path.join(logdir,jobname+'.log')
-            batch = self.config['search'].get('batch',self.config['batch'])
-            self.batch.submit(cmd,jobname,logfile,**batch['opts'])
-            time.sleep(3)
+        from ugali.utils.www import create_index_html
+        filename = os.path.join(outdir,'index.html')
+        create_index_html(filename,candidates)
 
+        
 Pipeline.run = run
 pipeline = Pipeline(__doc__,components)
 pipeline.parse_args()

@@ -9,6 +9,7 @@ import healpy as hp
 
 import ugali.utils.projector
 from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
+from ugali.utils.healpix import read_partial_map
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 
@@ -33,7 +34,23 @@ def inFootprint(config, pixels, nside=None):
     """
     Open each valid filename for the set of pixels and determine the set 
     of subpixels with valid data.
+
+    Parameters
+    ----------
+    config : config
+        Configuration (file or object)
+    pixels : array or int
+        List of pixels to create footprint for
+    nside  : int, optional
+        Healpix nside
+        
+    Returns
+    -------
+    inside : array
+        Boolean array of whether pixel is in footprint
     """
+    logger.info("Calculating survey footprint...")
+
     config = Config(config)
     nside_catalog    = config['coords']['nside_catalog']
     nside_likelihood = config['coords']['nside_likelihood']
@@ -52,17 +69,21 @@ def inFootprint(config, pixels, nside=None):
         catalog_pix = superpixel(pixels,nside,nside_catalog)
         catalog_pix = np.intersect1d(catalog_pix,catalog_pixels)
 
-    for fnames in filenames[catalog_pix]:
-        logger.debug("Loading %s"%filenames['mask_1'])
-        #subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_1'],'MAGLIM',construct_map=False)
-        _nside,subpix_1,val_1 = ugali.utils.healpix.read_partial_map(fnames['mask_1'],'MAGLIM',fullsky=False)
-        logger.debug("Loading %s"%fnames['mask_2'])
-        #subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(fnames['mask_2'],'MAGLIM',construct_map=False)
-        _nside,subpix_2,val_2 = ugali.utils.healpix.read_partial_map(fnames['mask_2'],'MAGLIM',fullsky=False)
-        subpix = np.intersect1d(subpix_1,subpix_2)
-        superpix = np.unique(superpixel(subpix,nside_pixel,nside))
-        inside |= np.in1d(pixels, superpix)
-        
+    fnames = filenames[catalog_pix]
+
+    # Load the first mask
+    logger.debug("Loading %s"%fnames['mask_1'])
+    _nside,subpix1,val1 = read_partial_map(fnames['mask_1'],'MAGLIM',
+                                           fullsky=False,multiproc=8)
+    # Load the second mask
+    logger.debug("Loading %s"%fnames['mask_2'])
+    _nside,subpix2,val2 = read_partial_map(fnames['mask_2'],'MAGLIM',
+                                           fullsky=False,multiproc=8)
+    # Run the subpixels
+    subpix = np.intersect1d(subpix1,subpix2)
+    superpix = np.unique(superpixel(subpix,nside_pixel,nside))
+    inside |= np.in1d(pixels, superpix)
+    
     return inside
 
 def footprint(config, nside=None):
@@ -70,6 +91,7 @@ def footprint(config, nside=None):
     UNTESTED.
     Should return a boolean array representing the pixels in the footprint.
     """
+    DeprecationWarning("This function is deprecated.")
     config = Config(config)
     if nside is None:
         nside = config['coords']['nside_pixel']

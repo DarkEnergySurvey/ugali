@@ -12,7 +12,7 @@ import healpy
 import fitsio
 
 import ugali.utils.projector
-import ugali.utils.fileio
+from ugali.utils import fileio
 from ugali.utils.logger import logger
 
 ############################################################
@@ -399,8 +399,8 @@ def write_partial_map(filename, data, nside, coord=None, nest=False,
     if header is not None:
         for k,v in header.items():
             fitshdr.add_record({'name':k,'value':v})
-
-    logger.info("Writing %s"%filename)
+    # ADW: Should this be a debug?
+    logger.info("Writing %s..."%filename)
     fitsio.write(filename,data,extname='PIX_DATA',header=fitshdr,clobber=True)
 
 def read_partial_map(filenames, column, fullsky=True, **kwargs):
@@ -426,7 +426,7 @@ def read_partial_map(filenames, column, fullsky=True, **kwargs):
 
     filenames = np.atleast_1d(filenames)
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
-    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    data = fileio.load_files(filenames,**kwargs)
 
     pix = data['PIXEL']
     value = data[column]
@@ -455,7 +455,7 @@ def merge_partial_maps(filenames,outfile,**kwargs):
 
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
     nside = header['NSIDE']
-    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    data = fileio.load_files(filenames,**kwargs)
     pix = data['PIXEL']
 
     ndupes = len(pix) - len(np.unique(pix))
@@ -464,7 +464,8 @@ def merge_partial_maps(filenames,outfile,**kwargs):
         raise Exception(msg)
 
     extname = 'DISTANCE_MODULUS'
-    distance = ugali.utils.fileio.load_files(filenames,ext=extname)[extname]
+    kwargs['ext'] = extname
+    distance = fileio.load_files(filenames,**kwargs)[extname]
     unique_distance = np.unique(distance)
     # Check if distance moduli are the same...
     if np.any(distance[:len(unique_distance)] != unique_distance):
@@ -472,11 +473,13 @@ def merge_partial_maps(filenames,outfile,**kwargs):
         msg += '\n'+str(distance[:len(unique_distance)])
         msg += '\n'+str(unique_distance)
         raise Exception(msg)
+    del distance
 
+    # Writing partial maps
     write_partial_map(outfile,data=data,nside=nside,clobber=True)
     fitsio.write(outfile,{extname:unique_distance},extname=extname)
 
-def merge_likelihood_headers(filenames, outfile):
+def merge_likelihood_headers(filenames, outfile, **kwargs):
     """
     Merge header information from likelihood files.
 
@@ -489,7 +492,32 @@ def merge_likelihood_headers(filenames, outfile):
     --------
     data      : the data being written
     """
+    filenames = np.atleast_1d(filenames)
 
+    ext='PIX_DATA'
+    nside = fitsio.read_header(filenames[0],ext=ext)['LKDNSIDE']
+
+    keys = ['LKDPIX','STELLAR','NINSIDE','NANNULUS']
+    data_dict = fileio.load_headers(filenames,ext=ext,keys=keys,mulitproc=8)
+    names = data_dict.dtype.names
+    data_dict.dtype.names = ['PIXEL' if n=='LKDPIX' else n for n in names]
+        
+    write_partial_map(outfile, data_dict, nside)
+    return data_dict
+
+def merge_likelihood_headers2(filenames, outfile, **kwargs):
+    """
+    Merge header information from likelihood files.
+
+    Parameters:
+    -----------
+    filenames : input filenames
+    oufile    : the merged file to write
+    
+    Returns:
+    --------
+    data      : the data being written
+    """
     filenames = np.atleast_1d(filenames)
 
     ext='PIX_DATA'
@@ -513,7 +541,6 @@ def merge_likelihood_headers(filenames, outfile):
     for key in keys:
         data_dict[key] = np.array(data_dict[key],dtype='f4')
 
-    #import pdb; pdb.set_trace()
     write_partial_map(outfile, data_dict, nside)
     return data_dict
 
