@@ -237,12 +237,18 @@ class Results(object):
         lum = rich*stellar_luminosity
         lum_lo,lum_hi = rich_err[0]*stellar_luminosity,rich_err[1]*stellar_luminosity
         results['luminosity'] = ugali.utils.stats.interval(lum,lum_lo,lum_hi)
- 
-        Mv = self.source.absolute_magnitude(rich)
-        Mv_lo = self.source.absolute_magnitude(rich_err[0])
-        Mv_hi = self.source.absolute_magnitude(rich_err[1])
-        results['Mv'] = ugali.utils.stats.interval(Mv,Mv_lo,Mv_hi)
- 
+
+        # Absolute magnitude only calculated for DES isochrones with g,r 
+        try:
+            Mv = self.source.absolute_magnitude(rich)
+            Mv_lo = self.source.absolute_magnitude(rich_err[0])
+            Mv_hi = self.source.absolute_magnitude(rich_err[1])
+            results['Mv'] = ugali.utils.stats.interval(Mv,Mv_lo,Mv_hi)
+        except ValueError as e:
+            logger.warning("Skipping absolute magnitude")
+            logger.warn(str(e))
+            results['Mv'] = np.nan
+
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space
         kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,

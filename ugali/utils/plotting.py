@@ -834,8 +834,8 @@ class SourcePlotter(BasePlotter):
         ugali.utils.plotting.drawIsochrone(self.isochrone, c='b', zorder=10)
         ax.set_xlim(-0.5, 1.)
         ax.set_ylim(24., 16.)
-        plt.xlabel(r'$g - r$')
-        plt.ylabel(r'$g$')
+        plt.xlabel(r'$%s - %s$' % (self.isochrone.band_1, self.isochrone.band_2))
+        plt.ylabel(r'$%s$' % self.isochrone.band_1)
         plt.xticks([-0.5, 0., 0.5, 1.])
         plt.yticks(np.arange(mmax - 1., mmin - 1., -1.))
 
@@ -913,8 +913,8 @@ class SourcePlotter(BasePlotter):
                    marker='o', s=10, edgecolor='none', cmap='jet', vmin=0., vmax=1) 
         plt.xlim(cmin, cmax)
         plt.ylim(mmax, mmin)
-        plt.xlabel(r'$g - r$')
-        plt.ylabel(r'$g$')
+        plt.xlabel(r'$%s - %s$' % (self.isochrone.band_1, self.isochrone.band_2))
+        plt.ylabel(r'$%s$' % self.isochrone.band_1)
         #axes[1].yaxis.set_major_locator(MaxNLocator(prune='lower'))
         plt.xticks([-0.5, 0., 0.5, 1.])
         plt.yticks(np.arange(mmax - 1., mmin - 1., -1.))
@@ -1215,9 +1215,9 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     if isochrone is not None:
         plt.sca(axes[1])
         drawIsochrone(isochrone,cookie=False)
-
-    axes[1].set_ylabel(r'$g$')
-    axes[1].set_xlabel(r'$g-r$')
+ 
+    axes[1].set_ylabel(r'$%s - %s$' % (self.isochrone.band_1, self.isochrone.band_2))
+    axes[1].set_xlabel(r'$%s$' % self.isochrone.band_1)
     axes[1].set_ylim(config['mag']['max'],config['mag']['min'])
     axes[1].set_xlim(config['color']['min'],config['color']['max'])
     axes[1].xaxis.set_major_locator(MaxNLocator(4))
