@@ -23,19 +23,21 @@ import copy
 import numpy as np
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-from ugali.analysis.isochrone import PadovaIsochrone
+from ugali.analysis.isochrone import Padova as PadovaIsochrone
 
 # survey system
 photsys_dict = odict([
         ('des' ,'tab_mag_odfnew/tab_mag_decam.dat'),
         ('sdss','tab_mag_odfnew/tab_mag_sloan.dat'),
         ('ps1' ,'tab_mag_odfnew/tab_mag_panstarrs1.dat'),
+        ('lsst','tab_mag_odfnew/tab_mag_lsst.dat'),
 ])
 
 photname_dict = odict([
         ('des' ,'DECAM'),
         ('sdss','SDSS'),
         ('ps1' ,'Pan-STARRS1'),
+        ('lsst','LSST'),
 ])
 
 # Commented options may need to be restored for older version/isochrones.
@@ -198,7 +200,7 @@ class Padova(Download):
 
         q = urlencode(d)
         logger.debug(url+'?'+q)
-        c = urlopen(url, q).read()
+        c = str(urlopen(url, str.encode(q)).read())
         aa = re.compile('output\d+')
         fname = aa.findall(c)
         
@@ -206,7 +208,8 @@ class Padova(Download):
             msg = "Output filename not found"
             raise RuntimeError(msg)
 
-        out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
+        #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
+        out = '{0}/tmp/{1}.dat'.format(server, fname[0])
         cmd = 'wget %s -O %s'%(out,outfile)
         logger.debug(cmd)
         stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)

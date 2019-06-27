@@ -43,3 +43,13 @@ kbechtol_ps1:
   ebv: /Users/keithbechtol/Documents/DES/projects/calibration/ebv_maps/converted/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
   completeness: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_stellar_classification_summary_r.csv
   photo_error: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_photo_error_model_r.csv
+
+lsst:
+  survey: lsst
+  stellar_density: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_stellar_density_map_cel_nside_256.npy
+  fracdet: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_fracdet_n2048.fits.gz
+  maglim_g: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_depth_n32_g_maglim.fits
+  maglim_r: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_depth_n32_r_maglim.fits
+  ebv: /global/homes/m/mcnanna/sim_inputs/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
+  completeness: /global/homes/m/mcnanna/sim_inputs/stellar_efficiency.csv
+  photo_error: /global/homes/m/mcnanna/sim_inputs/photoerror_r.csv
