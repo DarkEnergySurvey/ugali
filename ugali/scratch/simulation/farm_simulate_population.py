@@ -1,9 +1,10 @@
+#!/usr/bin/env python
 import os
 import subprocess
 import numpy as np
 
 tag = 'ps1_v1' # PS1
-tag = 'v7' # DES
+tag = 'des_v7' # DES
 n_chunk = 100
 mc_source_id_start_global = 1
 size_batch = 1000 
@@ -13,12 +14,18 @@ import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('config')
 parser.add_argument('-q','--queue',default='local')
-parser.add_argument('-t','--tag',default=tag)
-parser.add_argument('-k','--nchunk',default=n_chunk,type=int)
-parser.add_argument('-b','--size-batch',default=size_batch,type=int)
-parser.add_argument('-n','--nbatch',default=number_of_batches,type=int)
-parser.add_argument('--mc_source_id',default=mc_source_id_start_global,type=int)
-parser.add_argument('-s','--section',default='des',choices=['des','ps1'])
+parser.add_argument('-t','--tag',default=tag,
+                    help='tag appended to file name')
+parser.add_argument('-k','--nchunk',default=n_chunk,type=int,
+                    help='number of satellites per catalog file')
+parser.add_argument('-b','--size-batch',default=size_batch,type=int,
+                    help='number of satellites per population file')
+parser.add_argument('-n','--nbatch',default=number_of_batches,type=int,
+                    help='number of batches to submit')
+parser.add_argument('--mc_source_id',default=mc_source_id_start_global,type=int,
+                    help='unique identifier')
+parser.add_argument('-s','--section',default='des',choices=['des','ps1'],
+                    help='section of config file')
 
 args = parser.parse_args()
 
