@@ -1,7 +1,5 @@
 """
-Tools for making maps of the sky with healpix.
-
-ADW 2018-05-07: Largely deprecated?
+Tools for making maps of the sky with healpix. Used by simulations.
 """
 
 import numpy as np
@@ -112,21 +110,20 @@ def allSkyCoordinates(nside):
     lon,lat = pix2ang(nside, np.arange(0, hp.nside2npix(nside)))
     return lon, lat
 
-
-def randomPositions(input, nside_pix, n=1):
+def coarseFootprint(input, nside_pix):
     """
-    Generate n random positions within a full HEALPix mask of booleans, or a set of (lon, lat) coordinates.
+    Generate a coarse healpix mask of booleans from a finer healpix
+    mask or a set of (lon, lat) coordinates.
 
     Parameters:
     -----------
     input :     (1) full HEALPix mask of booleans, or (2) a set of (lon, lat) coordinates for catalog objects that define the occupied pixels.
-    nside_pix : nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
+    nside_pix : nside_pix is meant to be at coarser (or equivalent) resolution than the input mask or catalog object positions
     so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
 
     Returns:
     --------
     lon,lat,area : Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
-
     """
     input = np.array(input)
     if len(input.shape) == 1:
@@ -146,6 +143,27 @@ def randomPositions(input, nside_pix, n=1):
     # Create mask at the coarser resolution
     mask = np.tile(False, hp.nside2npix(nside_pix))
     mask[pix] = True
+    
+    return mask
+
+def randomPositions(input, nside_pix, n=1):
+    """
+    Generate n random positions within a full HEALPix mask of booleans, or a set of (lon, lat) coordinates.
+
+    Parameters:
+    -----------
+    input :     (1) full HEALPix mask of booleans, or (2) a set of (lon, lat) coordinates for catalog objects that define the occupied pixels.
+    nside_pix : nside_pix is meant to be at coarser resolution than the input mask or catalog object positions
+    so that gaps from star holes, bleed trails, cosmic rays, etc. are filled in. 
+    n     : number of random points
+
+    Returns:
+    --------
+    lon,lat,area : Return the longitude and latitude of the random positions (deg) and the total area (deg^2).
+
+    """
+    mask = coarseFootprint(input, nside_pix)
+    area = mask.sum() * hp.nside2pixarea(nside_pix, degrees=True)
 
     # Estimate the number of points that need to be thrown based off
     # coverage fraction of the HEALPix mask
