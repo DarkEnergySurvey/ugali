@@ -1,7 +1,7 @@
 """
 Tool to generate a population of simulated satellite properties.
 """
-
+from collections import OrderedDict as odict
 import numpy as np
 import pylab
 import pandas as pd
@@ -16,17 +16,24 @@ import ugali.isochrone
 pylab.ion()
 
 ############################################################
+NAMES = ['id','lon','lat','distance','stellar_mass','r_physical','ellipticity',
+         'position_angle','age','metallicity']
+DTYPE = [('id',int)] + [(n,float) for n in NAMES[1:]]
 
-def satellitePopulation(mask, nside_pix, n,
+def satellitePopulation(mask, nside_pix, size,
                         range_distance=[5., 500.],
                         range_stellar_mass=[1.e1, 1.e6],
                         range_r_physical=[1.e-3, 2.],
+                        range_ellipticity=[0.1,0.8],
+                        range_position_angle=[0,180],
+                        choice_age=[10., 12.0, 13.5],
+                        choice_metal=[0.00010,0.00020],
                         plot=False):
     """
-    Create a population of n randomly placed satellites within a
+    Create a population of randomly placed satellites within a
     survey mask.  Satellites are distributed uniformly in
-    log(distance) (kpc), uniformly in log(stellar_mass) (M_sol), and
-    uniformly in physical half-light radius log(r_physical) (kpc). The
+    log(distance/kpc), uniformly in log(stellar_mass/Msun), and
+    uniformly in physical half-light radius log(r_physical/kpc). The
     ranges can be set by the user.
 
     Returns the simulated area (deg^2) as well as the lon (deg), lat
@@ -37,66 +44,68 @@ def satellitePopulation(mask, nside_pix, n,
     -----------
     mask      : the survey mask of available area
     nside_pix : coarse resolution npix for avoiding small gaps in survey
-    n         : number of satellites to simulate
+    size      : number of satellites to simulate
     range_distance     : heliocentric distance range (kpc)
     range_stellar_mass : stellar mass range (Msun)
     range_r_physical   : projected physical half-light radius (kpc)
-
+    range_ellipticity : elliptictiy [0,1]
+    range_position_angle : position angle (deg)
+    choice_age : choices for age
+    choice_metal : choices for metallicity
+    
     Returns:
     --------
-    area, lon, lat, distance, stellar_mass, r_physical    
+    area, population : area of sky covered and population of objects
     """
-    
-    distance = 10**np.random.uniform(np.log10(range_distance[0]),
-                                     np.log10(range_distance[1]),
-                                     n)
 
-    stellar_mass = 10**np.random.uniform(np.log10(range_stellar_mass[0]), 
-                                         np.log10(range_stellar_mass[1]), 
-                                         n)
+    population = np.recarray(size,dtype=DTYPE)
+    population.fill(np.nan)
+
+    # Source ID
+    population['id'] = np.arange(size)
+
+    # Distance (kpc)
+    population['distance'] = 10**np.random.uniform(np.log10(range_distance[0]),
+                                                   np.log10(range_distance[1]),
+                                                   size)
+    # Stellar mass (Msun)
+    population['stellar_mass'] = 10**np.random.uniform(np.log10(range_stellar_mass[0]), 
+                                                       np.log10(range_stellar_mass[1]), 
+                                                       size)
     
     # Physical half-light radius (kpc)
-    r_physical = 10**np.random.uniform(np.log10(range_r_physical[0]), 
-                                       np.log10(range_r_physical[1]), 
-                                       n)
+    population['r_physical'] = 10**np.random.uniform(np.log10(range_r_physical[0]), 
+                                                     np.log10(range_r_physical[1]), 
+                                                     size)
 
-    # Call positions last because while loop has a variable number of calls to np.random (thus not preserving seed information)
-    lon, lat, simulation_area = ugali.utils.skymap.randomPositions(mask, nside_pix, n=n)
+    # Ellipticity [e = 1 - (b/a)] with semi-major axis a and semi-minor axis b
+    # See http://iopscience.iop.org/article/10.3847/1538-4357/833/2/167/pdf
+    # Based loosely on https://arxiv.org/abs/0805.2945
+    population['ellipticity'] = np.random.uniform(range_ellipticity[0], 
+                                                  range_ellipticity[1],
+                                                  size)
 
-    #half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \
-    #                                         / ugali.utils.projector.distanceModulusToDistance(distance_modulus)))
+    # Random position angle (deg)
+    population['position_angle'] = np.random.uniform(range_position_angle[0],
+                                                     range_position_angle[1],
+                                                     size) 
 
-    # One choice of theory prior
-    #half_light_radius_physical = ugali.analysis.kernel.halfLightRadius(stellar_mass) # kpc
-    #half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \
-    #                                               / ugali.utils.projector.distanceModulusToDistance(distance_modulus)))
+    # Age (Gyr)
+    population['age'] = np.random.choice(choice_age,size)
+    # Metallicity
+    population['metallicity'] = np.random.choice(choice_metal,size)
 
-    if plot:
-        pylab.figure()
-        #pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
-        #pylab.colorbar()
-        pylab.scatter(lon, lat, edgecolors='none')
-        xmin, xmax = pylab.xlim() # Reverse azimuthal axis
-        pylab.xlim([xmax, xmin])
-        pylab.title('Random Positions in Survey Footprint')
-        pylab.xlabel('Longitude (deg)')
-        pylab.ylabel('Latitude (deg)')
+    # Call positions last because while loop has a variable number of
+    # calls to np.random (thus not preserving seed information)
+    lon, lat, area = ugali.utils.skymap.randomPositions(mask, nside_pix, n=size)
+    population['lon'] = lon
+    population['lat'] = lat
 
-        pylab.figure()
-        pylab.scatter(stellar_mass, ugali.utils.projector.distanceModulusToDistance(distance_modulus),
-                      c=(60. * half_light_radius), s=500 * half_light_radius, edgecolors='none')
-        pylab.xscale('log')
-        pylab.yscale('log')
-        pylab.xlim([0.5 * range_stellar_mass[0], 2. * range_stellar_mass[1]])
-        pylab.colorbar()
-        pylab.title('Half-light Radius (arcmin)')
-        pylab.xlabel('Stellar Mass (arcmin)')
-        pylab.ylabel('Distance (kpc)')
-
-    return simulation_area, lon, lat, distance, stellar_mass, r_physical
+    return area, population
 
 ############################################################
 
+# ADW: 2019-09-01 DEPRECATED
 def satellitePopulationOrig(config, n,
                             range_distance_modulus=[16.5, 24.],
                             range_stellar_mass=[1.e2, 1.e5],
@@ -104,12 +113,26 @@ def satellitePopulationOrig(config, n,
                             mode='mask',
                             plot=False):
     """
-    Create a population of n randomly placed satellites within a survey mask or catalog specified in the config file.
-    Satellites are distributed uniformly in distance modulus, uniformly in log(stellar_mass) (M_sol), and uniformly in
-    log(r_physical) (kpc). The ranges can be set by the user.
+    Create a population of `n` randomly placed satellites within a
+    survey mask or catalog specified in the config file.  Satellites
+    are distributed uniformly in distance modulus, uniformly in
+    log(stellar_mass / Msun), and uniformly in
+    log(r_physical/kpc). The ranges can be set by the user.
 
     Returns the simulated area (deg^2) as well as the
-    lon (deg), lat (deg), distance modulus, stellar mass (M_sol), and half-light radius (deg) for each satellite
+    Parameters
+    ----------
+    config : configuration file or object
+    n      : number of satellites to simulate
+    range_distance_modulus : range of distance modulus to sample
+    range_stellar_mass : range of stellar mass to sample (Msun)
+    range_r_physical : range of azimuthally averaged half light radius (kpc)
+    mode : how to sample the area['mask','catalog']
+
+    Returns
+    -------
+    lon (deg), lat (deg), distance modulus, stellar mass (Msun), and
+    half-light radius (kpc) for each satellite
     """
     
     if type(config) == str:
@@ -240,3 +263,26 @@ def knownPopulation(dwarfs, mask, nside_pix, n):
 
     lon, lat, distance_modulus, stellar_mass, half_light_radius = np.hstack(results)
     return area, lon, lat, distance_modulus, stellar_mass, half_light_radius
+
+def plot_population(population):
+    # ADW: DEPRECATED: 2019-09-01
+    pylab.figure()
+    #pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
+    #pylab.colorbar()
+    pylab.scatter(lon, lat, edgecolors='none')
+    xmin, xmax = pylab.xlim() # Reverse azimuthal axis
+    pylab.xlim([xmax, xmin])
+    pylab.title('Random Positions in Survey Footprint')
+    pylab.xlabel('Longitude (deg)')
+    pylab.ylabel('Latitude (deg)')
+
+    pylab.figure()
+    pylab.scatter(stellar_mass, distance,c=r_physical,
+                  s=500 * r_physical, edgecolors='none')
+    pylab.xscale('log')
+    pylab.yscale('log')
+    pylab.xlim([0.5 * range_stellar_mass[0], 2. * range_stellar_mass[1]])
+    pylab.colorbar()
+    pylab.title('Half-light Radius (arcmin)')
+    pylab.xlabel('Stellar Mass (arcmin)')
+    pylab.ylabel('Distance (kpc)')
