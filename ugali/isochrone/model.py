@@ -321,6 +321,8 @@ class IsochroneModel(Model):
         Calculate the absolute magnitude (Mv) by integrating the
         stellar luminosity.
 
+        TODO: ADW If richness not specified, should use self.richness
+
         Parameters:
         -----------
         richness : isochrone normalization parameter
