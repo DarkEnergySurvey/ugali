@@ -379,7 +379,11 @@ def cel2gal_angle(ra,dec,angle,offset=1e-7):
 
 def dec2hms(dec):
     """
-    ADW: This should really be replaced by astropy
+    ADW: This should be replaced by astropy...
+
+    from astropy.coordinates import Angle
+    hms = Angle(dec*u.deg).hms
+    return (hms.h,hms.m,hms.s)
     """
     DEGREE = 360.
     HOUR = 24.
@@ -398,7 +402,11 @@ def dec2hms(dec):
 
 def dec2dms(dec):
     """
-    ADW: This should really be replaced by astropy
+    ADW: This should be replaced by astropy
+
+    from astropy.coordinates import Angle
+    dms = Angle(dec*u.deg).dms
+    return (dms.d,dms.m,dms.s)
     """
     DEGREE = 360.
     HOUR = 24.
@@ -516,8 +524,8 @@ def ang2iau(lon,lat,coord='gal'):
     Naming has precision of one minute: J{HH}{MM}+{DD}{MM}
 
     See:
-    http://cdsarc.u-strasbg.fr/ftp/pub/iau/
-    http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
+    https://www.iau.org/public/themes/naming/
+    http://cdsweb.u-strasbg.fr/Dic/iau-spec.html
 
     Parameters
     ----------
@@ -553,7 +561,7 @@ def ang2iau(lon,lat,coord='gal'):
     if scalar: return iau[0]
     return np.array(iau)
 
-    
+
 def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):
     """
     Adapted from Eric Tollerud.
