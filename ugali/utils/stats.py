@@ -101,6 +101,9 @@ def peak_interval(data, alpha=_alpha, npoints=_npoints):
     return interval(peak,lo,hi)
 
 def min_interval(data, alpha=_alpha):
+    """
+    Identify interval of minimum width.
+    """
     x = np.sort(data.flat); n = len(x)
     # The number of entries in the interval
     window = int(np.rint((1.0-alpha)*n))
