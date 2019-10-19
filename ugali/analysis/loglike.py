@@ -273,7 +273,7 @@ class LogLikelihood(object):
             msg = "No observable fraction"
             msg += ("\n"+str(self.source.params))
             logger.error(msg)
-            raise ValueError(msg)
+            #raise ValueError(msg)
         return observable_fraction
 
     def calc_signal_color1(self, distance_modulus, mass_steps=10000):
