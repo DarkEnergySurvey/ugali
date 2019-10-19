@@ -419,7 +419,8 @@ def dec2dms(dec):
     
     second = (fminute - minute)*MINUTE
 
-    deg = int(deg * sign)
+    # Careful, need float to allow negative zeros
+    deg = sign*int(deg)
     return (deg, minute, second)
 
 def hms2dec(hms):
@@ -516,7 +517,7 @@ def ang2iau(lon,lat,coord='gal'):
     # Default name formatting
     # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
     # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
-    fmt = "J%(hour)02i%(hmin)02i%(deg)+03i%(dmin)02i"
+    fmt = "J%(hour)02i%(hmin)02i%(deg)+03.0f%(dmin)02i"
 
     scalar = np.isscalar(lon)
     lon = np.array(lon,copy=False,ndmin=1)
