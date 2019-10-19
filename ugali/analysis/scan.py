@@ -17,6 +17,7 @@ from ugali.analysis.loglike import LogLikelihood, createSource, createObservatio
 from ugali.analysis.source import Source
 from ugali.utils.parabola import Parabola
 
+from ugali.utils.batch import LSF
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
@@ -88,105 +89,82 @@ class GridSearch:
 
         self.config = Config(config)
         self.loglike = loglike
+        self.source = self.loglike.source
         self.roi  = self.loglike.roi
         self.mask = self.loglike.mask
 
         logger.info(str(self.loglike))
 
-        self.stellar_mass_conversion = self.loglike.source.stellar_mass()
+        self.stellar_mass_conversion = self.source.stellar_mass()
         self.distance_modulus_array = np.asarray(self.config['scan']['distance_modulus_array'])
+        self.extension_array = np.asarray(self.config['scan'].get('extension_array',[self.source.extension]))
 
-    def precompute(self, distance_modulus_array=None):
+
+    def search(self, coords=None, distance_modulus=None, extension=None, tolerance=1.e-2):
         """
-        DEPRECATED: ADW 20170627
+        Organize a grid search over ROI target pixels, distance
+        moduli, and extensions. If coords, distance_modulus, or
+        extension is specified, then the nearest value in the
+        predefined scan grid is used. ***This may be different than
+        the input value.**
 
-        Precompute color probabilities for background ('u_background')
-        and signal ('u_color') for each star in catalog.  Precompute
-        observable fraction in each ROI pixel.  # Precompute still
-        operates over the full ROI, not just the likelihood region
+        Parameters
+        ----------
+        coords : (float,float)
+            coordinate to search (matched to nearest scan value)
+        distance_modulus : float
+            distance modulus to search (matched to nearest scan value)
+        extension : float
+            extension to search (matched to nearest scan value)
+        tolerance : float
+            tolerance on richness maximization
 
-        Parameters:
-        -----------
-        distance_modulus_array : Array of distance moduli 
-        
-        Returns:
-        --------
-        None
-        """
-        msg = "'%s.precompute': ADW 2017-09-20"%self.__class__.__name__
-        DeprecationWarning(msg)
-
-        if distance_modulus_array is not None:
-            self.distance_modulus_array = distance_modulus_array
-        else:
-            self.distance_modulus_array = sel
-
-        # Observable fraction for each pixel
-        self.u_color_array = [[]] * len(self.distance_modulus_array)
-        self.observable_fraction_sparse_array = [[]] * len(self.distance_modulus_array)
-
-        logger.info('Looping over distance moduli in precompute ...')
-        for ii, distance_modulus in enumerate(self.distance_modulus_array):
-            logger.info('  (%i/%i) Distance Modulus = %.2f ...'%(ii+1, len(self.distance_modulus_array), distance_modulus))
-
-            self.u_color_array[ii] = False
-            if self.config['scan']['color_lut_infile'] is not None:
-                DeprecationWarning("'color_lut' is deprecated")
-                logger.info('  Precomputing signal color from %s'%(self.config['scan']['color_lut_infile']))
-                self.u_color_array[ii] = ugali.analysis.color_lut.readColorLUT(self.config['scan']['color_lut_infile'],
-                                                                               distance_modulus,
-                                                                               self.loglike.catalog.mag_1,
-                                                                               self.loglike.catalog.mag_2,
-                                                                               self.loglike.catalog.mag_err_1,
-                                                                               self.loglike.catalog.mag_err_2)
-            if not np.any(self.u_color_array[ii]):
-                logger.info('  Precomputing signal color on the fly...')
-                self.u_color_array[ii] = self.loglike.calc_signal_color(distance_modulus) 
-            
-            # Calculate over all pixels in ROI
-            self.observable_fraction_sparse_array[ii] = self.loglike.calc_observable_fraction(distance_modulus)
-
-        self.u_color_array = np.array(self.u_color_array)
-
-    def search(self, coords=None, distance_modulus=None, tolerance=1.e-2):
-        """
-        Organize a grid search over ROI target pixels and distance moduli in distance_modulus_array
-        coords: (lon,lat)
-        distance_modulus: scalar
+        Returns
+        -------
+        None 
         """
         nmoduli = len(self.distance_modulus_array)
-        npixels    = len(self.roi.pixels_target)
-        self.log_likelihood_sparse_array       = np.zeros([nmoduli, npixels])
-        self.richness_sparse_array             = np.zeros([nmoduli, npixels])
-        self.richness_lower_sparse_array       = np.zeros([nmoduli, npixels])
-        self.richness_upper_sparse_array       = np.zeros([nmoduli, npixels])
-        self.richness_upper_limit_sparse_array = np.zeros([nmoduli, npixels])
-        self.stellar_mass_sparse_array         = np.zeros([nmoduli, npixels])
-        self.fraction_observable_sparse_array  = np.zeros([nmoduli, npixels])
+        npixels = len(self.roi.pixels_target)
+        self.loglike_array              = np.zeros([nmoduli,npixels],dtype='f4')
+        self.richness_array             = np.zeros([nmoduli,npixels],dtype='f4')
+        self.stellar_mass_array         = np.zeros([nmoduli,npixels],dtype='f4')
+        self.fraction_observable_array  = np.zeros([nmoduli,npixels],dtype='f4')
+        self.extension_fit_array        = np.zeros([nmoduli,npixels],dtype='f4')
+        # DEPRECATED: ADW 2019-04-27
+        self.richness_lower_array       = np.zeros([nmoduli,npixels],dtype='f4')
+        self.richness_upper_array       = np.zeros([nmoduli,npixels],dtype='f4')
+        self.richness_ulimit_array      = np.zeros([nmoduli,npixels],dtype='f4')
 
         # Specific pixel/distance_modulus
-        coord_idx, distance_modulus_idx = None, None
+        coord_idx, distance_modulus_idx, extension_idx = None, None, None
         if coords is not None:
             # Match to nearest grid coordinate index
             coord_idx = self.roi.indexTarget(coords[0],coords[1])
         if distance_modulus is not None:
             # Match to nearest distance modulus index
             distance_modulus_idx=np.fabs(self.distance_modulus_array-distance_modulus).argmin()
+        if extension is not None:
+            # Match to nearest extension
+            extension_idx=np.fabs(self.extension_array-extension).argmin()
 
         lon, lat = self.roi.pixels_target.lon, self.roi.pixels_target.lat
             
         logger.info('Looping over distance moduli in grid search ...')
         for ii, distance_modulus in enumerate(self.distance_modulus_array):
-
-            # Specific pixel
+            # Specific distance
             if distance_modulus_idx is not None:
                 if ii != distance_modulus_idx: continue
 
             logger.info('  (%-2i/%i) Distance Modulus=%.1f ...'%(ii+1,nmoduli,distance_modulus))
 
+            # No objects, continue
+            if len(self.loglike.catalog) == 0: 
+                logger.warn("No catalog objects")
+                continue
+
             # Set distance_modulus once to save time
             self.loglike.set_params(distance_modulus=distance_modulus)
-
+            # Loop over pixels
             for jj in range(0, npixels):
                 # Specific pixel
                 if coord_idx is not None:
@@ -194,84 +172,90 @@ class GridSearch:
 
                 # Set kernel location
                 self.loglike.set_params(lon=lon[jj],lat=lat[jj])
-                # Doesn't re-sync distance_modulus each time
-                self.loglike.sync_params()
-                                         
-                args = (jj+1, npixels, self.loglike.source.lon, self.loglike.source.lat)
-                msg = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '%(args)
 
-                self.log_likelihood_sparse_array[ii][jj], self.richness_sparse_array[ii][jj], parabola = self.loglike.fit_richness()
-                self.stellar_mass_sparse_array[ii][jj] = self.stellar_mass_conversion * self.richness_sparse_array[ii][jj]
-                self.fraction_observable_sparse_array[ii][jj] = self.loglike.f
+                loglike = 0
+                # Loop over extensions
+                for kk,ext in enumerate(self.extension_array):
+                    # Specific extension
+                    if extension_idx is not None:
+                        if kk != extension_idx: continue
+
+                    # Set extension
+                    self.loglike.set_params(extension=ext)
+
+                    # Doesn't re-sync distance_modulus each time
+                    self.loglike.sync_params()
+
+                    # Maximize the likelihood with respect to richness
+                    loglike,rich,p = self.loglike.fit_richness()
+
+                    if loglike < self.loglike_array[ii][jj]:
+                        # No loglike increase, continue
+                        continue
+
+                    self.loglike_array[ii][jj],self.richness_array[ii][jj], parabola = loglike,rich,p
+                    self.stellar_mass_array[ii][jj] = self.stellar_mass_conversion*self.richness_array[ii][jj]
+                    self.fraction_observable_array[ii][jj] = self.loglike.f
+                    self.extension_fit_array[ii][jj] = self.source.extension
+
+                # ADW: Careful, we are leaving the extension at the
+                # last value in the array, not at the maximum...
+
+                # Debug output
+                args = (jj+1, npixels, lon[jj], lat[jj],
+                        2.*self.loglike_array[ii][jj], 
+                        self.stellar_mass_array[ii][jj],
+                        self.fraction_observable_array[ii][jj],
+                        self.extension_fit_array[ii][jj]
+                        )
+                msg  = '    (%-3i/%i) Candidate at (%.2f, %.2f) ... '
+                msg += 'TS=%.1f, Mstar=%.2g, ObsFrac=%.2g, Ext=%.2g'
+                logger.debug(msg%args)
+
+                """
+                # This is debugging output
                 if self.config['scan']['full_pdf']:
-                    #n_pdf_points = 100
-                    #richness_range = parabola.profileUpperLimit(delta=25.) - self.richness_sparse_array[ii][jj]
-                    #richness = np.linspace(max(0., self.richness_sparse_array[ii][jj] - richness_range),
-                    #                          self.richness_sparse_array[ii][jj] + richness_range,
-                    #                          n_pdf_points)
-                    #if richness[0] > 0.:
-                    #    richness = np.insert(richness, 0, 0.)
-                    #    n_pdf_points += 1
-                    # 
-                    #log_likelihood = np.zeros(n_pdf_points)
-                    #for kk in range(0, n_pdf_points):
-                    #    log_likelihood[kk] = self.loglike.value(richness=richness[kk])
-                    #parabola = ugali.utils.parabola.Parabola(richness, 2.*log_likelihood)
-                    #self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = parabola.confidenceInterval(0.6827)
-                    self.richness_lower_sparse_array[ii][jj], self.richness_upper_sparse_array[ii][jj] = self.loglike.richness_interval(0.6827)
+                    DeprecationWarning("'full_pdf' is deprecated.")
+                    self.richness_lower_array[ii][jj], self.richness_upper_array[ii][jj] = self.loglike.richness_interval(0.6827)
                     
-                    self.richness_upper_limit_sparse_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
+                    self.richness_ulimit_array[ii][jj] = parabola.bayesianUpperLimit(0.95)
 
                     args = (
-                        2. * self.log_likelihood_sparse_array[ii][jj],
-                        self.stellar_mass_conversion*self.richness_sparse_array[ii][jj],
-                        self.stellar_mass_conversion*self.richness_lower_sparse_array[ii][jj],
-                        self.stellar_mass_conversion*self.richness_upper_sparse_array[ii][jj],
-                        self.stellar_mass_conversion*self.richness_upper_limit_sparse_array[ii][jj]
+                        2. * self.loglike_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_lower_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_upper_array[ii][jj],
+                        self.stellar_mass_conversion*self.richness_ulimit_array[ii][jj]
                     )
-                    msg += 'TS=%.1f, Stellar Mass=%.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
-                else:
-                    args = (
-                        2. * self.log_likelihood_sparse_array[ii][jj], 
-                        self.stellar_mass_conversion * self.richness_sparse_array[ii][jj],
-                        self.fraction_observable_sparse_array[ii][jj]
-                    )
-                    msg += 'TS=%.1f, Stellar Mass=%.1f, Fraction=%.2g'%(args)
-                logger.debug(msg)
+                    msg = 'TS=%.1f, Stellar Mass=%.1f (%.1f -- %.1f @ 0.68 CL, < %.1f @ 0.95 CL)'%(args)
+                    logger.debug(msg)
+                """
                 
-                #if coords is not None and distance_modulus is not None:
-                #    results = [self.richness_sparse_array[ii][jj],
-                #               self.log_likelihood_sparse_array[ii][jj],
-                #               self.richness_lower_sparse_array[ii][jj],
-                #               self.richness_upper_sparse_array[ii][jj],
-                #               self.richness_upper_limit_sparse_array[ii][jj],
-                #               richness, log_likelihood, self.loglike.p, self.loglike.f]
-                #    return results
-
-            jj_max = self.log_likelihood_sparse_array[ii].argmax()
+            jj_max = self.loglike_array[ii].argmax()
             args = (
                 jj_max+1, npixels, lon[jj_max], lat[jj_max],
-                2. * self.log_likelihood_sparse_array[ii][jj_max], 
-                self.stellar_mass_conversion * self.richness_sparse_array[ii][jj_max]
+                2. * self.loglike_array[ii][jj_max], 
+                self.stellar_mass_conversion * self.richness_array[ii][jj_max],
+                self.extension_fit_array[ii][jj_max]
             )
-            msg = '  (%-3i/%i) Maximum at (%.2f, %.2f) ... TS=%.1f, Stellar Mass=%.1f'%(args)
+            msg = '  (%-3i/%i) Max at (%.2f, %.2f) : TS=%.1f, Mstar=%.2g, Ext=%.2f'%(args)
             logger.info(msg)
 
     def mle(self):
-        a = self.log_likelihood_sparse_array
+        a = self.loglike_array
         j,k = np.unravel_index(a.argmax(),a.shape)
         mle = odict()
-        mle['richness'] = self.richness_sparse_array[j][k]
+        mle['richness'] = self.richness_array[j][k]
         mle['lon'] = self.roi.pixels_target.lon[k]
         mle['lat'] = self.roi.pixels_target.lat[k]
         mle['distance_modulus'] = self.distance_modulus_array[j]
-        mle['extension'] = float(self.loglike.source.extension)
-        mle['ellipticity'] = float(self.loglike.source.ellipticity)
-        mle['position_angle'] = float(self.loglike.source.position_angle)
+        mle['extension'] = float(self.source.extension)
+        mle['ellipticity'] = float(self.source.ellipticity)
+        mle['position_angle'] = float(self.source.position_angle)
         # ADW: FIXME!
         try: 
-            mle['age'] = np.mean(self.loglike.source.age)
-            mle['metallicity'] = np.mean(self.loglike.source.metallicity)
+            mle['age'] = np.mean(self.source.age)
+            mle['metallicity'] = np.mean(self.source.metallicity)
         except AttributeError:
             mle['age'] = np.nan
             mle['metallicity'] = np.nan
@@ -288,7 +272,7 @@ class GridSearch:
         err.update([(k,np.nan*np.ones(2)) for k in err.keys()])
 
         # Find the maximum likelihood
-        a = self.log_likelihood_sparse_array
+        a = self.loglike_array
         j,k = np.unravel_index(a.argmax(),a.shape)
 
         self.loglike.set_params(distance_modulus=self.distance_modulus_array[j],
@@ -331,17 +315,17 @@ class GridSearch:
         data['PIXEL']=self.roi.pixels_target
         # Full data output (too large for survey)
         if self.config['scan']['full_pdf']:
-            data['LOG_LIKELIHOOD']=self.log_likelihood_sparse_array.T
-            data['RICHNESS']=self.richness_sparse_array.T
-            data['RICHNESS_LOWER']=self.richness_lower_sparse_array.T
-            data['RICHNESS_UPPER']=self.richness_upper_sparse_array.T
-            data['RICHNESS_LIMIT']=self.richness_upper_limit_sparse_array.T
-            #data['STELLAR_MASS']=self.stellar_mass_sparse_array.T
-            data['FRACTION_OBSERVABLE']=self.fraction_observable_sparse_array.T
+            data['LOG_LIKELIHOOD']=self.loglike_array.T
+            data['RICHNESS']=self.richness_array.T
+            data['RICHNESS_LOWER']=self.richness_lower_array.T
+            data['RICHNESS_UPPER']=self.richness_upper_array.T
+            data['RICHNESS_LIMIT']=self.richness_ulimit_array.T
+            #data['STELLAR_MASS']=self.stellar_mass_array.T
+            data['FRACTION_OBSERVABLE']=self.fraction_observable_array.T
         else:
-            data['LOG_LIKELIHOOD']=self.log_likelihood_sparse_array.T
-            data['RICHNESS']=self.richness_sparse_array.T
-            data['FRACTION_OBSERVABLE']=self.fraction_observable_sparse_array.T
+            data['LOG_LIKELIHOOD']=self.loglike_array.T
+            data['RICHNESS']=self.richness_array.T
+            data['FRACTION_OBSERVABLE']=self.fraction_observable_array.T
 
         # Convert to 32bit float
         for k in list(data.keys())[1:]:
@@ -386,6 +370,8 @@ if __name__ == "__main__":
     parser = ugali.utils.parser.Parser(description=description)
     parser.add_config()
     parser.add_argument('outfile',metavar='outfile.fits',help='Output fits file.')
+    parser.add_argument('-m','--mlimit',nargs='?',default=-1, type=int,
+                        help='Memory limit (KB)')
     parser.add_debug()
     parser.add_verbose()
     parser.add_coords(required=True,radius=False)
@@ -394,6 +380,14 @@ if __name__ == "__main__":
     if len(opts.coords) != 1: 
         raise Exception('Must specify exactly one coordinate.')
     lon,lat,radius = opts.coords[0]
+
+    #if opts.mlimit > 0:
+    if True:
+        # Convert from KB to GB
+        mlimit,_ = LSF.get_memory_limit()
+        logger.info("Setting memory limit: %.1fGB"%(mlimit/1024.**3))
+        soft,hard = LSF.set_memory_limit(mlimit)
+        logger.info("Memory limit: %.1fGB"%(soft/1024.**3))
 
     grid = createGridSearch(opts.config,lon,lat)
     if not opts.debug:
