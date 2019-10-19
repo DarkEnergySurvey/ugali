@@ -19,7 +19,7 @@ import scipy.ndimage as ndimage
 from ugali.utils.shell import mkdir, which
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
-from ugali.utils.projector import Projector,gal2cel,cel2gal,dec2hms,dec2dms,mod2dist
+from ugali.utils.projector import Projector,gal2cel,cel2gal,ang2iau,mod2dist
 from ugali.utils import healpix, mlab
 from ugali.utils.healpix import pix2ang, ang2pix
 from ugali.candidate.associate import SourceCatalog, catalogFactory
@@ -404,15 +404,17 @@ class CandidateSearch(object):
         objs['NANNULUS']  = self.nannulus[pix].astype(int)
         objs['NINTERIOR'] = self.ninterior[pix].astype(int)
 
+        objs['NAME'] = ang2iau(objs['RA'],objs['DEC'],coord='cel')
+
         # Default name formatting
         # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
         # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
-        fmt = "J%(hour)02i%(hmin)04.1f%(deg)+03i%(dmin)02i"
-        for obj,_ra,_dec in zip(objs,objs['RA'],objs['DEC']):
-            hms = dec2hms(_ra); dms = dec2dms(_dec)
-            params = dict(hour=hms[0],hmin=hms[1]+hms[2]/60.,
-                          deg=dms[0],dmin=dms[1]+dms[2]/60.)
-            obj['NAME'] = fmt%params
+        #fmt = "J%(hour)02i%(hmin)04.1f%(deg)+03i%(dmin)02i"
+        #for obj,_ra,_dec in zip(objs,objs['RA'],objs['DEC']):
+        #    hms = dec2hms(_ra); dms = dec2dms(_dec)
+        #    params = dict(hour=hms[0],hmin=hms[1]+hms[2]/60.,
+        #                  deg=dms[0],dmin=dms[1]+dms[2]/60.)
+        #    obj['NAME'] = fmt%params
 
         out = recfuncs.merge_arrays([objs,objects],usemask=False,
                                     asrecarray=True,flatten=True)
