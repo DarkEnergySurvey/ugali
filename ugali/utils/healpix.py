@@ -476,8 +476,11 @@ def merge_partial_maps(filenames,outfile,**kwargs):
     del distance
 
     # Writing partial maps
-    write_partial_map(outfile,data=data,nside=nside,clobber=True)
-    fitsio.write(outfile,{extname:unique_distance},extname=extname)
+    if outfile is not None:
+        write_partial_map(outfile,data=data,nside=nside,clobber=True)
+        fitsio.write(outfile,{extname:unique_distance},extname=extname)
+
+    return nside,data,unique_distance
 
 def merge_likelihood_headers(filenames, outfile, **kwargs):
     """
