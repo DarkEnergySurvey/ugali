@@ -23,13 +23,15 @@ from ugali.utils.projector import ang2const, ang2iau
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 
+_alpha = 0.32
+
 class Results(object):
     """
     Calculate results from a MCMC chain.
     """
     def __init__(self, config, loglike, samples=None):
         self.config = Config(config)
-        self.alpha = self.config['results'].get('alpha',0.10)
+        self.alpha = self.config['results'].get('alpha',_alpha)
         self.nwalkers = self.config['mcmc'].get('nwalkers',100)
         self.nburn = self.config['results'].get('nburn',10)
         self.coordsys = self.config['coords']['coordsys'].lower()
@@ -54,9 +56,22 @@ class Results(object):
             
         return mle
 
-    def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
-        """ Estimate parameter value and uncertainties """
+    def estimate(self,param,burn=None,clip=10.0,alpha=_alpha):
+        """ Estimate parameter value and uncertainties 
+
+        Parameters
+        ----------
+        param : parameter of interest
+        burn  : number of burn in samples
+        clip  : sigma clipping
+        alpha : confidence interval
+
+        Returns
+        -------
+        [mle, [lo,hi]] : value and interval
+        """
         # FIXME: Need to add age and metallicity to composite isochrone params (currently properties)
+        if alpha is None: alpha = self.alpha
         if param not in list(self.samples.names) + list(self.source.params) + ['age','metallicity']:
             msg = 'Unrecognized parameter: %s'%param
             raise KeyError(msg)
@@ -89,18 +104,20 @@ class Results(object):
         ### msg = "Unrecognized parameter: %s"%param
         ### raise KeyError(msg)
  
-    def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
+    def estimate_params(self,burn=None,clip=10.0,alpha=None):
         """ Estimate all source parameters """
+        if alpha is None: alpha = self.alpha
         mle = self.get_mle()
         out = odict()
         for param in mle.keys():
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
  
-    def estimate_position_angle(self,param='position_angle',burn=None,clip=10.0,alpha=0.32):
+    def estimate_position_angle(self,param='position_angle',burn=None,clip=10.0,alpha=None):
         """ Estimate the position angle from the posterior dealing
         with periodicity.
         """
+        if alpha is None: alpha = self.alpha
         # Transform so peak in the middle of the distribution
         pa = self.samples.get(param,burn=burn,clip=clip)
         peak = ugali.utils.stats.kde_peak(pa)
@@ -141,6 +158,8 @@ class Results(object):
 
         # Extra parameters from the MCMC chain
         logger.debug('Estimating auxiliary parameters...')
+        logger.debug("alpha = %.2f"%kwargs['alpha'])
+        results['alpha'] = kwargs['alpha']
         try: 
             results['ra']  = self.estimate('ra',**kwargs)
             results['dec'] = self.estimate('dec',**kwargs)
@@ -164,14 +183,6 @@ class Results(object):
         logger.debug('Calculating TS...')
         ts = 2*self.loglike.value(**params)
         results['ts'] = ugali.utils.stats.interval(ts,np.nan,np.nan)
- 
-        #lon,lat = estimate['lon'][0],estimate['lat'][0]
-        # 
-        #results.update(gal=[float(lon),float(lat)])
-        #ra,dec = gal2cel(lon,lat)
-        #results.update(cel=[float(ra),float(dec)])
-        #results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
-        #results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
  
         # Celestial position angle
         # Break ambiguity in direction with '% 180.'
@@ -252,7 +263,7 @@ class Results(object):
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space
         kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,
-                      n_trials=5000,alpha=self.alpha, seed=0)
+                      n_trials=5000,alpha=kwargs['alpha'], seed=0)
         martin = self.config['results'].get('martin')
         if martin:
             logger.info("Calculating Martin magnitude...")
