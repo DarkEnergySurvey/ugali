@@ -6,6 +6,7 @@ import os
 from os.path import join, splitext, exists
 import time
 import glob
+import shutil
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
@@ -20,11 +21,16 @@ from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.healpix import pix2ang
 
-components = ['simulate','analyze','merge','plot']
+#components = ['simulate','analyze','merge','plot']
+components = ['analyze','merge']
 
 def run(self):
     outdir=mkdir(self.config['output']['simdir'])
     logdir=mkdir(join(outdir,'log'))
+
+    # Actually copy config instead of re-writing
+    shutil.copy(self.config.filename,outdir)
+    configfile = join(outdir,os.path.basename(self.config.filename))
 
     if 'simulate' in self.opts.run:
         logger.info("Running 'simulate'...")
@@ -36,7 +42,7 @@ def run(self):
             logfile=join(logdir,base+'.log')
             jobname=base
             script = self.config['simulator']['script']
-            cmd='%s %s %s --seed %i'%(script,self.opts.config,outfile,i)
+            cmd='%s %s %s --seed %i'%(script,configfile,outfile,i)
             #cmd='%s %s %s'%(script,self.opts.config,outfile)
             self.batch.submit(cmd,jobname,logfile)
             time.sleep(0.1)
@@ -51,16 +57,22 @@ def run(self):
         for i,catfile in enumerate(catfiles):
             basename = os.path.basename(catfile)
             outfile = join(outdir,basename)
-
-            if exists(outfile) and not self.opts.force:
-                logger.info("Found %s; skipping..."%outfile)
-                continue
-
             base = splitext(os.path.basename(outfile))[0]
             logfile=join(logdir,base+'.log')
             jobname=base
+
+            if exists(outfile) and not self.opts.force:
+                msg = "Found %s;"%outfile
+                if exists(logfile) and len(self.batch.bfail(logfile)):
+                    msg += " failed."
+                    logger.info(msg)
+                else:
+                    msg += " skipping..."
+                    logger.info(msg)
+                    continue
+                    
             script = self.config['simulate']['script']
-            cmd='%s %s -p %s -c %s -o %s'%(script,self.opts.config,popfile,catfile,outfile)
+            cmd='%s %s -m 0 --rerun -p %s -c %s -o %s'%(script,configfile,popfile,catfile,outfile)
             self.batch.max_jobs = batch.get('max_jobs',200)
             opts = batch.get(self.opts.queue,dict())
             self.batch.submit(cmd,jobname,logfile,**opts)
@@ -72,21 +84,15 @@ def run(self):
     if 'merge' in self.opts.run:
         logger.info("Running 'merge'...")
 
-        filenames=join(outdir,self.config['output']['simfile']).split('_%')[0]+'_*'
+        filenames=join(outdir,self.config['simulate']['catfile'])
         infiles=sorted(glob.glob(filenames))
+        print("Reading %i files..."%len(infiles))
+        data = np.concatenate([fitsio.read(f,ext=1) for f in infiles])
+        hdr = fitsio.read_header(infiles[0],ext=1)
 
-        f = fitsio.read(infiles[0])
-        table = np.empty(0,dtype=data.dtype)
-        for filename in infiles:
-            logger.debug("Reading %s..."%filename)
-            d = fitsio.read(filename)
-            t = d[~np.isnan(d['ts'])]
-            table = recfuncs.stack_arrays([table,t],usemask=False,asrecarray=True)
-
-        logger.info("Found %i simulations."%len(table))
-        outfile = join(outdir,"merged_sims.fits")
+        outfile = "./merged_sims.fits"
         logger.info("Writing %s..."%outfile)
-        fitsio.write(outfile,table,clobber=True)
+        fitsio.write(outfile,data,header=hdr,clobber=True)
         
     if 'plot' in self.opts.run:
         logger.info("Running 'plot'...")
