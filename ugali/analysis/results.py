@@ -281,7 +281,7 @@ class Results(object):
             results['constellation'] = ang2const(lon,lat,self.coordsys)[1]
         except:
             pass
-        results['iau'] = ugali.utils.projector.ang2iau(lon,lat)
+        results['iau'] = ugali.utils.projector.ang2iau(lon,lat,self.coordsys)
  
         coord = SkyCoord(ra*u.deg,dec*u.deg,distance=dist*u.kpc)
         results['ra_sex'] = str(coord.ra.to_string())
