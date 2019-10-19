@@ -379,7 +379,11 @@ def cel2gal_angle(ra,dec,angle,offset=1e-7):
 
 def dec2hms(dec):
     """
-    ADW: This should really be replaced by astropy
+    ADW: This should be replaced by astropy...
+
+    from astropy.coordinates import Angle
+    hms = Angle(dec*u.deg).hms
+    return (hms.h,hms.m,hms.s)
     """
     DEGREE = 360.
     HOUR = 24.
@@ -398,7 +402,11 @@ def dec2hms(dec):
 
 def dec2dms(dec):
     """
-    ADW: This should really be replaced by astropy
+    ADW: This should be replaced by astropy
+
+    from astropy.coordinates import Angle
+    dms = Angle(dec*u.deg).dms
+    return (dms.d,dms.m,dms.s)
     """
     DEGREE = 360.
     HOUR = 24.
@@ -416,7 +424,8 @@ def dec2dms(dec):
     
     second = (fminute - minute)*MINUTE
 
-    deg = int(deg * sign)
+    # Careful, need float to allow negative zeros
+    deg = sign*int(deg)
     return (deg, minute, second)
 
 def hms2dec(hms):
@@ -510,10 +519,26 @@ def ang2const(lon,lat,coord='gal'):
     return const
 
 def ang2iau(lon,lat,coord='gal'):
+    """
+    Convert from coordinates to IAU naming convention.
+    Naming has precision of one minute: J{HH}{MM}+{DD}{MM}
+
+    See:
+    https://www.iau.org/public/themes/naming/
+    http://cdsweb.u-strasbg.fr/Dic/iau-spec.html
+
+    Parameters
+    ----------
+    lon   : longitude (deg)
+    lat   : latitude (deg)
+    coord : coordinate system for lon/lat ['gal','cel']
+
+    Returns
+    -------
+    name  : name consistent with IAU convention
+    """
     # Default name formatting
-    # http://cdsarc.u-strasbg.fr/ftp/pub/iau/
-    # http://cds.u-strasbg.fr/vizier/Dic/iau-spec.htx
-    fmt = "J%(hour)02i%(hmin)02i%(deg)+03i%(dmin)02i"
+    fmt = "J%(hour)02i%(hmin)02i%(deg)+03.0f%(dmin)02i"
 
     scalar = np.isscalar(lon)
     lon = np.array(lon,copy=False,ndmin=1)
@@ -527,7 +552,6 @@ def ang2iau(lon,lat,coord='gal'):
         msg = "Unrecognized coordinate"
         raise Exception(msg)
 
-    x,y = np.radians([ra,dec])
     iau = []
     for _ra,_dec in zip(ra,dec):
         hms = dec2hms(_ra); dms = dec2dms(_dec)
@@ -535,9 +559,9 @@ def ang2iau(lon,lat,coord='gal'):
                       deg=dms[0],dmin=dms[1])
         iau.append(fmt%params)
     if scalar: return iau[0]
-    return iau
+    return np.array(iau)
 
-    
+
 def match(lon1, lat1, lon2, lat2, tol=None, nnearest=1):
     """
     Adapted from Eric Tollerud.
