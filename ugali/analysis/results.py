@@ -163,14 +163,26 @@ class Results(object):
         try: 
             results['ra']  = self.estimate('ra',**kwargs)
             results['dec'] = self.estimate('dec',**kwargs)
+            results['glon'] = self.estimate('glon',**kwargs)
+            results['glat'] = self.estimate('glat',**kwargs)
         except KeyError:
-            logger.warn("Didn't find 'ra' or 'dec'")
-            ra,dec = gal2cel(results['lon'][0],results['lat'][0])
-            results['ra'] = ugali.utils.stats.interval(ra)
-            results['dec'] = ugali.utils.stats.interval(dec)
+            logger.warn("Didn't find 'ra' or 'dec' in Samples...")
+            if self.coordsys == 'gal':
+                results['glon'] = results['lon']
+                results['glat'] = results['lat']
+                ra,dec = gal2cel(results['lon'][0],results['lat'][0])
+                results['ra'] = ugali.utils.stats.interval(ra)
+                results['dec'] = ugali.utils.stats.interval(dec)
+            else:
+                results['ra'] = results['lon']
+                results['dec'] = results['lat']
+                glon,glat = cel2gal(results['lon'][0],results['lat'][0])
+                results['glon'] = ugali.utils.stats.interval(glon)
+                results['glat'] = ugali.utils.stats.interval(glat)
 
-        ra,dec = results['ra'][0],results['dec'][0]
-        glon,glat = lon,lat = results['lon'][0],results['lat'][0]
+        lon,lat   = results['lon'][0],results['lat'][0]
+        ra,dec    = results['ra'][0],results['dec'][0]
+        glon,glat = results['glon'][0],results['glat'][0]
         results.update(gal=[float(glon),float(glat)])
         results.update(cel=[float(ra),float(dec)])
 
