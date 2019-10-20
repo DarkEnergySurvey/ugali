@@ -263,7 +263,8 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
 
 #from memory_profiler import profile
 #@profile
-def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
+def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100, 
+                     known_dwarfs=False):
     """ Create a population of satellites and then simulate the stellar distributions for each.
 
     Parameters
@@ -301,7 +302,7 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
     range_position_angle= config.get('range_position_angle',[0.0, 180.0])
     choice_age          = config.get('choice_age',[10., 12.0, 13.5])
     choice_metal        = config.get('choice_metal',[0.00010,0.00020])
-    known_dwarfs        = config.get('known_dwarfs',None)
+    dwarf_file          = config.get('known_dwarfs',None)
 
     m_density = np.load(infile_density)
     nside_density = hp.npix2nside(len(m_density))
@@ -317,10 +318,11 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
 
     mask = (m_fracdet > 0.5)
 
-    if known_dwarfs is not None:
+    if known_dwarfs:
         # Simulate from known dwarfs
-        print known_darfs
-        area, population = ugali.simulation.population.knownPopulation(known_dwarfs, mask, nside_pix, n)
+        if dwarf_file is None: raise Exception("Must provide known_dwarf file")
+        print "Simulating dwarfs from: %s"%dwarf_file
+        area, population = ugali.simulation.population.knownPopulation(dwarf_file, mask, nside_pix, n)
     else:
         # r_physical is azimuthally-averaged half-light radius, kpc
         kwargs = dict(range_distance = range_distance,
@@ -479,7 +481,11 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
     coadd_object_id_array = []
     for mc_source_id in population['id']:
         coadd_object_id_array.append((1000000 * mc_source_id) + 1 + np.arange(np.sum(mc_source_id == mc_source_id_array)))
-    coadd_object_id_array = -1 * np.concatenate(coadd_object_id_array) # Assign negative numbers to distinguish from real objects
+    # Assign negative numbers to distinguish from real objects
+    coadd_object_id_array = -1 * np.concatenate(coadd_object_id_array) 
+
+    # Object ID assignment can get messed up if there are duplicate population ids
+    assert len(coadd_object_id_array) == len(mc_source_id_array)
 
     # Population metadata output file
     tbhdu = pyfits.BinTableHDU.from_columns([
@@ -529,96 +535,87 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
     if config['survey'] == 'des':
         # Y3 Gold v2.0
         key_map = odict([
-                ('COADD_OBJECT_ID', [coadd_object_id_array, 'K']),
-                ('RA', [lon_array, 'D']),
-                ('DEC', [lat_array, 'D']),
+                ('COADD_OBJECT_ID',         [coadd_object_id_array, 'K']),
+                ('RA',                      [lon_array, 'D']),
+                ('DEC',                     [lat_array, 'D']),
                 ('SOF_PSF_MAG_CORRECTED_G', [mag_1_array, 'D']),
                 ('SOF_PSF_MAG_CORRECTED_R', [mag_2_array, 'D']),
-                ('SOF_PSF_MAG_ERR_G', [mag_1_error_array, 'D']),
-                ('SOF_PSF_MAG_ERR_R', [mag_2_error_array, 'D']),
-                ('A_SED_SFD98_G', [mag_extinction_1_array, 'E']),
-                ('A_SED_SFD98_R', [mag_extinction_2_array, 'E']),
-                ('WAVG_MAG_PSF_G', [mag_1_array+mag_extinction_1_array, 'E']),
-                ('WAVG_MAG_PSF_R', [mag_2_array+mag_extinction_2_array, 'E']),
-                ('WAVG_MAGERR_PSF_G', [mag_1_error_array, 'E']),
-                ('WAVG_MAGERR_PSF_R', [mag_2_error_array, 'E']),
-                ('WAVG_SPREAD_MODEL_I', [default_array, 'E']),
-                ('WAVG_SPREADERR_MODEL_I', [default_array, 'E']),
-                ('SOF_CM_T', [default_array, 'D']),
-                ('SOF_CM_T_ERR', [default_array, 'D']),
-                ('FLAGS_GOLD', [np.tile(0, len(mc_source_id_array)), 'J']),
+                ('SOF_PSF_MAG_ERR_G',       [mag_1_error_array, 'D']),
+                ('SOF_PSF_MAG_ERR_R',       [mag_2_error_array, 'D']),
+                ('A_SED_SFD98_G',           [mag_extinction_1_array, 'E']),
+                ('A_SED_SFD98_R',           [mag_extinction_2_array, 'E']),
+                ('WAVG_MAG_PSF_G',          [mag_1_array+mag_extinction_1_array, 'E']),
+                ('WAVG_MAG_PSF_R',          [mag_2_array+mag_extinction_2_array, 'E']),
+                ('WAVG_MAGERR_PSF_G',       [mag_1_error_array, 'E']),
+                ('WAVG_MAGERR_PSF_R',       [mag_2_error_array, 'E']),
+                ('WAVG_SPREAD_MODEL_I',     [default_array, 'E']),
+                ('WAVG_SPREADERR_MODEL_I',  [default_array, 'E']),
+                ('SOF_CM_T',                [default_array, 'D']),
+                ('SOF_CM_T_ERR',            [default_array, 'D']),
+                ('FLAGS_GOLD',              [np.tile(0, len(mc_source_id_array)), 'J']),
                 ('EXTENDED_CLASS_MASH_SOF', [np.tile(0, len(mc_source_id_array)), 'I']),
                 ])
     elif config['survey'] == 'ps1':
         # PS1
         key_map = odict([
-                ('OBJID', [coadd_object_id_array, 'K']),
-                ('RA', [lon_array, 'D']),
-                ('DEC', [lat_array, 'D']),
-                #('UNIQUEPSPSOBID', [coadd_object_id_array, 'K']),
-                #('OBJINFOFLAG', [default_array, 'E']),
-                #('QUALITYFLAG', [np.tile(16, len(mc_source_id_array)), 'I']),
-                #('NSTACKDETECTIONS', [np.tile(99, len(mc_source_id_array)), 'I']),
-                #('NDETECTIONS', [np.tile(99, len(mc_source_id_array)), 'I']),
-                #('NG', [default_array, 'E']),
-                #('NR', [default_array, 'E']),
-                #('NI', [default_array, 'E']),
-                ('GFPSFMAG', [mag_1_array+mag_extinction_1_array, 'E']),
-                ('RFPSFMAG', [mag_2_array+mag_extinction_2_array, 'E']),
-                #('IFPSFMAG', [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
-                ('GFPSFMAGERR', [mag_1_error_array, 'E']),
-                ('RFPSFMAGERR', [mag_2_error_array, 'E']),
-                #('IFPSFMAGERR', [default_array, 'E']),
-                #('GFKRONMAG', [mag_1_array, 'E']),
-                #('RFKRONMAG', [mag_2_array, 'E']),
-                #('IFKRONMAG', [np.tile(0., len(mc_source_id_array)), 'E'], # Too pass star selection
-                #('GFKRONMAGERR', [mag_1_error_array, 'E']),
-                #('RFKRONMAGERR', [mag_2_error_array, 'E']),
-                #('IFKRONMAGERR', [default_array, 'E']),
-                #('GFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('RFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('IFLAGS', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('GINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('RINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('IINFOFLAG', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('GINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('RINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('IINFOFLAG2', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('GINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('RINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('IINFOFLAG3', [np.tile(0, len(mc_source_id_array)), 'I']),
-                #('PRIMARYDETECTION', [default_array, 'E']),
-                #('BESTDETECTION', [default_array, 'E']),
-                #('EBV', [default_array, 'E']),
-                #('EXTSFD_G', [mag_extinction_1_array 'E']),
-                #('EXTSFD_R', [mag_extinction_2_array, 'E']),
-                #('EXTSFD_I', [default_array, 'E']),
-                ('GFPSFMAG_SFD', [mag_1_array, 'E']),
-                ('RFPSFMAG_SFD', [mag_2_array, 'E']),
-                ('EXTENDED_CLASS', [np.tile(0, len(mc_source_id_array)), 'I']),
+                ('OBJID',                   [coadd_object_id_array, 'K']),
+                ('RA',                      [lon_array, 'D']),
+                ('DEC',                     [lat_array, 'D']),
+                #('UNIQUEPSPSOBID',          [coadd_object_id_array, 'K']),
+                #('OBJINFOFLAG',             [default_array, 'E']),
+                #('QUALITYFLAG',             [np.tile(16, len(mc_source_id_array)), 'I']),
+                #('NSTACKDETECTIONS',        [np.tile(99, len(mc_source_id_array)), 'I']),
+                #('NDETECTIONS',             [np.tile(99, len(mc_source_id_array)), 'I']),
+                #('NG',                      [default_array, 'E']),
+                #('NR',                      [default_array, 'E']),
+                #('NI',                      [default_array, 'E']),
+                ('GFPSFMAG',                 [mag_1_array+mag_extinction_1_array, 'E']),
+                ('RFPSFMAG',                 [mag_2_array+mag_extinction_2_array, 'E']),
+                #('IFPSFMAG',                 [np.tile(0., len(mc_source_id_array)), 'E'], # Pass star selection
+                ('GFPSFMAGERR',              [mag_1_error_array, 'E']),
+                ('RFPSFMAGERR',              [mag_2_error_array, 'E']),
+                #('IFPSFMAGERR',              [default_array, 'E']),
+                #('GFKRONMAG',                [mag_1_array, 'E']),
+                #('RFKRONMAG',                [mag_2_array, 'E']),
+                #('IFKRONMAG',                [np.tile(0., len(mc_source_id_array)), 'E'], # Pass star selection
+                #('GFKRONMAGERR',             [mag_1_error_array, 'E']),
+                #('RFKRONMAGERR',             [mag_2_error_array, 'E']),
+                #('IFKRONMAGERR',             [default_array, 'E']),
+                #('GFLAGS',                   [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RFLAGS',                   [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IFLAGS',                   [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG',                [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG',                [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG',                [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG2',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG2',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG2',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('GINFOFLAG3',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('RINFOFLAG3',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('IINFOFLAG3',               [np.tile(0, len(mc_source_id_array)), 'I']),
+                #('PRIMARYDETECTION',         [default_array, 'E']),
+                #('BESTDETECTION',            [default_array, 'E']),
+                #('EBV',                      [default_array, 'E']),
+                #('EXTSFD_G',                 [mag_extinction_1_array 'E']),
+                #('EXTSFD_R',                 [mag_extinction_2_array, 'E']),
+                #('EXTSFD_I',                 [default_array, 'E']),
+                ('GFPSFMAG_SFD',             [mag_1_array, 'E']),
+                ('RFPSFMAG_SFD',             [mag_2_array, 'E']),
+                ('EXTENDED_CLASS',           [np.tile(0, len(mc_source_id_array)), 'I']),
                 ])
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
     print("Writing catalog files...")
-    #columns = []
-    #for key in key_map:
-    #    columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
-    #tbhdu = pyfits.BinTableHDU.from_columns(columns)
-    #tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n//n_chunk):
         outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
         print('  '+outfile)
-
         sel = np.in1d(mc_source_id_array, mc_source_id_chunk)
         columns = [pyfits.Column(name=k, format=v[1], array=v[0][sel]) for k,v in key_map.items()]
         tbhdu = pyfits.BinTableHDU.from_columns(columns)
         tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-        #header = copy.deepcopy(tbhdu.header)
         tbhdu.header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
         tbhdu.header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
         tbhdu.writeto(outfile, overwrite=True)
-        #pyfits.writeto(outfile, tbhdu.data, header, overwrite=True)
 
     # Mask output file
     print("Writing population mask file...")
@@ -646,6 +643,8 @@ if __name__ == "__main__":
                         help="Number of MC_SOURCE_ID's per catalog output file")
     parser.add_argument('--seed', dest='seed', type=int, default=None,
                         help="Random seed")
+    parser.add_argument('--dwarfs', dest='dwarfs', action='store_true', 
+                        help="Simulate from known dwarfs")
     args = parser.parse_args()
 
     if args.seed is not None: 
@@ -656,7 +655,7 @@ if __name__ == "__main__":
     config = yaml.load(open(args.config))[args.section]
     
     #catsimPopulation(tag, mc_source_id_start=mc_source_id_start, n=n, n_chunk=n_chunk)
-    catsimPopulation(config, args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk)
+    catsimPopulation(config, args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk, known_dwarfs=args.dwarfs)
 
 ############################################################
 

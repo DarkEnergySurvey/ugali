@@ -13,12 +13,10 @@ import ugali.analysis.kernel
 import ugali.observation.catalog
 import ugali.isochrone
 
-pylab.ion()
-
 ############################################################
-NAMES = ['id','lon','lat','distance','stellar_mass','r_physical','ellipticity',
-         'position_angle','age','metallicity']
-DTYPE = [('id',int)] + [(n,float) for n in NAMES[1:]]
+NAMES = ['id','name','lon','lat','distance','stellar_mass','r_physical',
+         'ellipticity','position_angle','age','metallicity']
+DTYPE = [('id',int)] + [('name','S8')] + [(n,float) for n in NAMES[2:]]
 
 def satellitePopulation(mask, nside_pix, size,
                         range_distance=[5., 500.],
@@ -60,6 +58,7 @@ def satellitePopulation(mask, nside_pix, size,
 
     population = np.recarray(size,dtype=DTYPE)
     population.fill(np.nan)
+    population['name'] = ''
 
     # Source ID
     population['id'] = np.arange(size)
@@ -207,7 +206,7 @@ def interpolate_absolute_magnitude():
 
     return abs_mag,stellar_mass
 
-def knownPopulation(dwarfs, mask, nside_pix, n):
+def knownPopulation(dwarfs, mask, nside_pix, size):
     """ Sample parameters from a known population .
     
     Parameters
@@ -215,12 +214,12 @@ def knownPopulation(dwarfs, mask, nside_pix, n):
     dwarfs : known dwarfs to sample at
     mask      : the survey mask of available area
     nside_pix : coarse resolution npix for avoiding small gaps in survey
-    n         : number of satellites to simulate; will be broken into 
-                n//len(dwarfs) per dwarf
+    size      : number of satellites to simulate; will be broken into 
+                size//len(dwarfs) per dwarf
 
     Returns
     -------
-    area, lon, lat, distance, stellar_mass, r_physical    
+    area, population
     """
     # generated from the interpolation function above.
     abs_mag_interp = [5.7574, 4.5429, 3.5881, 2.7379, 1.8594, 0.9984, 0.0245, 
@@ -237,13 +236,12 @@ def knownPopulation(dwarfs, mask, nside_pix, n):
                     23637055.10][::-1]
 
     if isinstance(dwarfs,str):
+        # Note that the random seed will be dependent on the order of dwarfs
         dwarfs = pd.read_csv(dwarfs).to_records(index=False)
 
-    nsim = n // len(dwarfs)
-    nlast = nsim + n % len(dwarfs)
+    nsim = size // len(dwarfs)
+    nlast = nsim + size % len(dwarfs)
 
-    import pdb; pdb.set_trace()
-    
     print('Calculating coarse footprint mask...')
     coarse_mask = ugali.utils.skymap.coarseFootprint(mask, nside_pix)
 
@@ -252,17 +250,28 @@ def knownPopulation(dwarfs, mask, nside_pix, n):
         print(dwarf['name'])
         kwargs = dict()
         kwargs['range_distance']   = [dwarf['distance'],dwarf['distance']]
-        r_physical = dwarf['r_physical']/1000.
+        r_physical = dwarf['r12']/1000.
         kwargs['range_r_physical'] = [r_physical,r_physical]
-        stellar_mass = np.interp(dwarf['abs_mag'],abs_mag_interp,stellar_mass_interp)
+        stellar_mass = np.interp(dwarf['M_V'],abs_mag_interp,stellar_mass_interp)
+        print("WARNING: Zeroing stellar mass...")
+        stellar_mass = 0.01
         kwargs['range_stellar_mass'] = [stellar_mass, stellar_mass]      
-        print("Generating population...")
-        num = nsim if i < (len(dwarfs)-1) else nlast
-        ret = satellitePopulation(coarse_mask, nside_pix, num, **kwargs)
-        results += [ret[1:]]
+        kwargs['range_ellipticity'] = [dwarf['ellipticity'],dwarf['ellipticity']]
+        kwargs['range_position_angle']=[0.0, 180.0]
+        kwargs['choice_age']=[10., 12.0, 13.5]
+        kwargs['choice_metal']=[0.00010,0.00020]
 
-    lon, lat, distance_modulus, stellar_mass, half_light_radius = np.hstack(results)
-    return area, lon, lat, distance_modulus, stellar_mass, half_light_radius
+        num = nsim if i < (len(dwarfs)-1) else nlast
+        area,pop = satellitePopulation(coarse_mask, nside_pix, num, **kwargs)
+        pop['name'] = dwarf['abbreviation']
+        print("WARNING: Fixing location...")
+        pop['lon'] = dwarf['ra']
+        pop['lat'] = dwarf['dec']
+        results += [pop]
+
+    population = np.hstack(results)
+    population['id'] = np.arange(size)
+    return area, population
 
 def plot_population(population):
     # ADW: DEPRECATED: 2019-09-01
