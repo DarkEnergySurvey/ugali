@@ -25,6 +25,8 @@ parser.add_argument('--mc_source_id',default=mc_source_id_start_global,type=int,
                     help='unique identifier')
 parser.add_argument('-s','--section',default='des',choices=['des','ps1'],
                     help='section of config file')
+parser.add_argument('--dwarfs', dest='dwarfs', action='store_true', 
+                    help="Simulate from known dwarfs")
 parser.add_argument('--sleep',default=None,type=int,
                     help='sleep between jobs (seconds)')
 parser.add_argument('--njobs',default=10,type=int,
@@ -45,7 +47,8 @@ if not os.path.exists(logdir): os.makedirs(logdir)
 
 for index_batch in range(args.nbatch):
     seed = mc_source_id_start = args.mc_source_id + (args.size_batch * index_batch)
-    command = 'simulate_population.py %s -s %s --tag %s --start %i --size %i --chunk %i --seed %i'%(args.config, args.section, args.tag, mc_source_id_start, args.size_batch, args.nchunk, seed)
+    dwarfs = '--dwarfs' if args.dwarfs else ''
+    command = 'simulate_population.py %s -s %s --tag %s --start %i --size %i --chunk %i --seed %i %s'%(args.config, args.section, args.tag, mc_source_id_start, args.size_batch, args.nchunk, seed, dwarfs)
     
     # Max number of jobs limited by memory
     logfile = os.path.join(logdir,'%07i.log'%mc_source_id_start)
