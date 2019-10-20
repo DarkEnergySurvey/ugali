@@ -606,21 +606,19 @@ def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
     if (not healpy.isnpixok(m.size) or (sz>0 and sz != m.size)) and verbose:
         print('nside={0:d}, sz={1:d}, m.size={2:d}'.format(nside,sz,m.size))
         raise ValueError('Wrong nside parameter.')
-    if not nest is None:
+    if nest is not None:
         if nest and ordering.startswith('RING'):
             idx = healpy.nest2ring(nside,np.arange(m.size,dtype=np.int32))
-            if verbose: print('Ordering converted to NEST')
             m = m[idx]
-            return  m[idx]
+            if verbose: print('Ordering converted to NEST')
         elif (not nest) and ordering.startswith('NESTED'):
             idx = healpy.ring2nest(nside,np.arange(m.size,dtype=np.int32))
             m = m[idx]
             if verbose: print('Ordering converted to RING')
 
-    if h:
-        return m, header
-    else:
-        return m
+    if h: return m, hdr
+    else: return m
+
 
 if __name__ == "__main__":
     import argparse
