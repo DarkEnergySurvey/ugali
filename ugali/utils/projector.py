@@ -484,16 +484,30 @@ def deg2sr(solid_angle):
 ############################################################
 
 def distanceToDistanceModulus(distance):
+    """ Return distance modulus for a given distance (kpc).
+
+    Parameters
+    ----------
+    distance : distance (kpc)
+
+    Returns
+    -------
+    mod : distance modulus
     """
-    Return distance modulus for a given distance (kpc).
-    """
-    return 5. * (np.log10(np.array(distance) * 1.e3) - 1.)
+    return 5. * (np.log10(np.array(distance)) + 2.)
 
 dist2mod = distanceToDistanceModulus
 
 def distanceModulusToDistance(distance_modulus):
-    """
-    Return distance (kpc) for a given distance modulus.
+    """ Return distance (kpc) for a given distance modulus.
+
+    Parameters
+    ----------
+    distance_modulus : distance modulus
+
+    Returns
+    -------
+    distance : distance (kpc)
     """
     return 10**((0.2 * np.array(distance_modulus)) - 2.)
 
