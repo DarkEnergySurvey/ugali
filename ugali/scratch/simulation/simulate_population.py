@@ -9,7 +9,7 @@ from collections import OrderedDict as odict
 import yaml
 import numpy as np
 import scipy.interpolate
-import healpy
+import healpy as hp
 import fitsio
 import astropy.io.fits as pyfits
 
@@ -87,7 +87,7 @@ def meanFracdet(map_fracdet, lon_population, lat_population, radius_population):
 
     lon, lat, and radius are taken to be arrays of the same length
     """
-    nside_fracdet = healpy.npix2nside(len(map_fracdet))
+    nside_fracdet = hp.npix2nside(len(map_fracdet))
     map_fracdet_zero = np.where(map_fracdet >= 0., map_fracdet, 0.)
     fracdet_population = np.empty(len(lon_population))
     for ii in range(0, len(lon_population)):
@@ -101,11 +101,33 @@ def meanFracdet(map_fracdet, lon_population, lat_population, radius_population):
 ############################################################
 
 def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, r_physical, 
+                    ellipticity, position_angle, age, metal, 
                     m_maglim_1, m_maglim_2, m_ebv,
                     plot=False, title='test'):
-    """
-    Simulate a single satellite. This is currently only valid for band_1 = g and band_2 = r.
-    r_physical is azimuthally averaged half-light radius, kpc
+    """ Simulate a single satellite. This is currently only valid for
+    band_1 = g and band_2 = r.  r_physical is azimuthally averaged
+    half-light radius, kpc
+
+    Parameters
+    ----------
+    config : configuration
+    lon_centroid : longitude centroid (deg)
+    lat_centroid : latitude centroid (deg)
+    distance : distance (kpc)
+    stellar_mass : stellar mass (Msun)
+    r_physical : azimuthally averaged physical half-light radius (kpc)
+    ellipticity : ellipticity [0, 1]
+    position_angle : position angle (deg)
+    age : age (Gyr)
+    metal : metallicity
+    m_maglim_1 : mask of magnitude limit in band 2
+    m_maglim_2 : mask of magnitude limit in band 2
+    m_ebv : mask of E(B-V) values
+    plot : Plot the output [False]
+    
+    Returns
+    -------
+    satellite : ordered dictionary of satellite star output
     """
 
     # Probably don't want to parse every time
@@ -114,40 +136,39 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
 
     s = ugali.analysis.source.Source()
 
-    # Following McConnachie 2012, ellipticity = 1 - (b/a) , where a is semi-major axis and b is semi-minor axis
-    
-    r_h = np.degrees(np.arcsin(r_physical / distance)) # Azimuthally averaged half-light radius
-    #ellipticity = 0.3 # Semi-arbitrary default for testing purposes
-    # See http://iopscience.iop.org/article/10.3847/1538-4357/833/2/167/pdf
-    # Based loosely on https://arxiv.org/abs/0805.2945
-    ellipticity = np.random.uniform(0.1, 0.8)
-    position_angle = np.random.uniform(0., 180.) # Random position angle (deg)
-    a_h = r_h / np.sqrt(1. - ellipticity) # semi-major axis (deg)
-    
-        
-    # Elliptical kernels take the "extension" as the semi-major axis
-    ker = ugali.analysis.kernel.EllipticalPlummer(lon=lon_centroid, lat=lat_centroid, ellipticity=ellipticity, position_angle=position_angle)
+    # Azimuthally averaged projected half-light radius (deg)
+    r_h = np.degrees(np.arcsin(r_physical / distance)) 
+    # Elliptical half-light radius along semi-major axis (deg)
+    a_h = r_h / np.sqrt(1. - ellipticity) 
 
+    # Create the kernel without extension
+    ker = ugali.analysis.kernel.EllipticalPlummer(lon=lon_centroid, lat=lat_centroid, 
+                                                  ellipticity=ellipticity, position_angle=position_angle)
+    # Apply a max extension cut
     flag_too_extended = False
-    if a_h >= 1.0:
+    max_extension = 5.0 # deg
+    if a_h >= max_extension:
         print 'Too extended: a_h = %.2f'%(a_h)
-        a_h = 1.0
+        a_h = max_extension
         flag_too_extended = True
-    ker.setp('extension', value=a_h, bounds=[0.0,1.0])
+    # Elliptical kernels take the "extension" as the semi-major axis
+    extension = a_h # Elliptical half-light radius
+    ker.setp('extension', value=a_h, bounds=[0.0,max_extension])
     s.set_kernel(ker)
-    
-    age = np.random.choice([10., 12.0, 13.5])
-    metal_z = np.random.choice([0.0001, 0.0002])
-    distance_modulus = ugali.utils.projector.distanceToDistanceModulus(distance)
-    iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal_z, distance_modulus=distance_modulus)
+
+    # Create the isochrone
+    distance_modulus = ugali.utils.projector.dist2mod(distance)
+    iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal, 
+                            distance_modulus=distance_modulus)
     s.set_isochrone(iso)
     # Simulate takes stellar mass as an argument, NOT richness
     mag_1, mag_2 = s.isochrone.simulate(stellar_mass) 
 
+    # Generate the positions of stars
     lon, lat = s.kernel.sample_lonlat(len(mag_2))
 
-    nside = healpy.npix2nside(len(m_maglim_1)) # Assuming that the two maglim maps have same resolution
-    pix = ugali.utils.healpix.angToPix(nside, lon, lat)
+    nside = hp.npix2nside(len(m_maglim_1)) # Assuming that the two maglim maps have same resolution
+    pix = ugali.utils.healpix.ang2pix(nside, lon, lat)
     maglim_1 = m_maglim_1[pix]
     maglim_2 = m_maglim_2[pix]
     if config['survey'] == 'des':
@@ -194,9 +215,10 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     #abs_mag_martin = s.isochrone.absolute_magnitude_martin(richness=richness, n_trials=10)[0] # 100 trials seems to be sufficient for rough estimate
     #print 'abs_mag_martin = %.2f mag'%(abs_mag_martin)
 
-    # The more clever thing to do would be to sum up the actual simulated stars
+    # The more clever thing is to sum the simulated stars
     if config['survey'] == 'des':
-        v = mag_1 - 0.487*(mag_1 - mag_2) - 0.0249 # See https://github.com/DarkEnergySurvey/ugali/blob/master/ugali/isochrone/model.py
+        # See https://github.com/DarkEnergySurvey/ugali/blob/master/ugali/isochrone/model.py
+        v = mag_1 - 0.487*(mag_1 - mag_2) - 0.0249 
     elif config['survey'] == 'ps1':
         # https://arxiv.org/pdf/1706.06147.pdf
         # V - g = C_0 + C_1 * (g - r)
@@ -206,16 +228,9 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     flux = np.sum(10**(-v/2.5))
     abs_mag = -2.5*np.log10(flux) - distance_modulus
 
-    #print abs_mag, abs_mag_martin
+    # Realized surface brightness within azimuthally averaged half-light radius
+    surface_brightness = ugali.analysis.results.surfaceBrightness(abs_mag, r_physical, distance) 
 
-    #distance = ugali.utils.projector.distanceModulusToDistance(distance_modulus)
-    #r_h = extension * np.sqrt(1. - ellipticity) # Azimuthally averaged half-light radius
-    r_physical = distance * np.tan(np.radians(r_h)) # Azimuthally averaged half-light radius, kpc
-    #print 'distance = %.3f kpc'%(distance)
-    #print 'r_physical = %.3f kpc'%(r_physical)
-    surface_brightness = ugali.analysis.results.surfaceBrightness(abs_mag, r_physical, distance) # Average within azimuthally averaged half-light radius
-    #print 'surface_brightness = %.3f mag arcsec^-2'%(surface_brightness)
-    
     if plot:
         import pylab
         pylab.ion()
@@ -229,25 +244,39 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         pylab.xlabel('g - r')
         pylab.ylabel('g')
         pylab.title('Number of stars with g < 23: %i'%(n_sigma_p))
-        pylab.savefig('y3_sat_sim_cmd_%s.png'%(title), dpi=150.)
+        pylab.savefig('y3_sat_sim_cmd_%s.png'%('test'), dpi=150.)
         
         print 'n_Sigma_p = %i'%(n_sigma_p)
         raw_input('WAIT')
         
-    #if flag_too_extended:
-    #    # This is a kludge to remove these satellites. fragile!!
-    #    n_g24 = 1.e6
+    satellite=odict(lon=lon[cut_detect], lat=lat[cut_detect], 
+                    mag_1=mag_1_meas[cut_detect], mag_2=mag_2_meas[cut_detect], 
+                    mag_1_error=mag_1_error[cut_detect], mag_2_error=mag_2_error[cut_detect], 
+                    mag_extinction_1=mag_extinction_1[cut_detect], 
+                    mag_extinction_2=mag_extinction_2[cut_detect], 
+                    n_g22=n_g22, n_g24=n_g24, abs_mag=abs_mag, surface_brightness=surface_brightness, 
+                    extension=extension, flag_too_extended=flag_too_extended)
 
-    return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], mag_extinction_1[cut_detect], mag_extinction_2[cut_detect], n_g22, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended
+    return satellite
 
 ############################################################
 
 #from memory_profiler import profile
 #@profile
-def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='simulate_population.yaml'):
-    """
-    n = Number of satellites to simulation
-    n_chunk = Number of satellites in a file chunk
+def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100):
+    """ Create a population of satellites and then simulate the stellar distributions for each.
+
+    Parameters
+    ----------
+    config : configuration file or dictionary
+    tag    : output name
+    mc_source_id_start : starting value of source id
+    n       : number of satellites to simulate [5000]
+    n_chunk : number of satellites written in a file chunk
+
+    Returns
+    -------
+    None
     """
 
     assert mc_source_id_start >= 1, "Starting mc_source_id must be >= 1" 
@@ -265,14 +294,19 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     infile_maglim_r = config['maglim_r']
     infile_density = config['stellar_density']
 
-    range_distance = config.get('range_distance',[5., 500.])
-    range_stellar_mass = config.get('range_stellar_mass',[1.e1, 1.e6])
-    range_r_physical = config.get('range_r_physical',[1.e-3, 2.0])
-    
+    range_distance      = config.get('range_distance',[5., 500.])
+    range_stellar_mass  = config.get('range_stellar_mass',[1.e1, 1.e6])
+    range_r_physical    = config.get('range_r_physical',[1.e-3, 2.0])
+    range_ellipticity   = config.get('range_ellipticity',[0.1, 0.8])
+    range_position_angle= config.get('range_position_angle',[0.0, 180.0])
+    choice_age          = config.get('choice_age',[10., 12.0, 13.5])
+    choice_metal        = config.get('choice_metal',[0.00010,0.00020])
+    known_dwarfs        = config.get('known_dwarfs',None)
+
     m_density = np.load(infile_density)
-    nside_density = healpy.npix2nside(len(m_density))
+    nside_density = hp.npix2nside(len(m_density))
     m_fracdet = read_map(infile_fracdet, nest=False) #.astype(np.float16)
-    nside_fracdet = healpy.npix2nside(len(m_fracdet))
+    nside_fracdet = hp.npix2nside(len(m_fracdet))
 
     m_maglim_g = read_map(infile_maglim_g, nest=False) #.astype(np.float16)
     m_maglim_r = read_map(infile_maglim_r, nest=False) #.astype(np.float16)
@@ -283,22 +317,30 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
 
     mask = (m_fracdet > 0.5)
 
-    kwargs = dict(range_distance = range_distance,
-                  range_stellar_mass = range_stellar_mass,
-                  range_r_physical = range_r_physical)
-    print kwargs
-    # r_physical is azimuthally-averaged half-light radius, kpc
-    simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n, **kwargs)
+    if known_dwarfs is not None:
+        # Simulate from known dwarfs
+        print known_darfs
+        area, population = ugali.simulation.population.knownPopulation(known_dwarfs, mask, nside_pix, n)
+    else:
+        # r_physical is azimuthally-averaged half-light radius, kpc
+        kwargs = dict(range_distance = range_distance,
+                      range_stellar_mass = range_stellar_mass,
+                      range_r_physical = range_r_physical,
+                      range_ellipticity=[0.1, 0.8],
+                      range_position_angle=[0.0, 180.0],
+                      choice_age=[10., 12.0, 13.5],
+                      choice_metal=[0.00010,0.00020],
+                      plot=False)
+        area, population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n, **kwargs)
+
+    population['id'] += mc_source_id_start
+    simulation_area = area
+
     n_g22_population = np.tile(np.nan, n)
     n_g24_population = np.tile(np.nan, n)
     abs_mag_population = np.tile(np.nan, n)
     surface_brightness_population = np.tile(np.nan, n)
-    ellipticity_population = np.tile(np.nan, n)
-    position_angle_population = np.tile(np.nan, n)
-    age_population = np.tile(np.nan, n)
-    metal_z_population = np.tile(np.nan, n)
-    mc_source_id_population = np.arange(mc_source_id_start, mc_source_id_start + n)
-    #cut_difficulty_population = np.tile(False, n)
+    extension_population = np.tile(np.nan, n)
     difficulty_population = np.tile(0, n)
 
     lon_array = []
@@ -310,44 +352,40 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mag_extinction_1_array = []
     mag_extinction_2_array = []
     mc_source_id_array = []
-    for ii, mc_source_id in enumerate(mc_source_id_population):
-        print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
-        print '  distance=%.2e, stellar_mass=%.2e, rhalf=%.2e'%(distance_population[ii],stellar_mass_population[ii],r_physical_population[ii])
-        lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g22, n_g24, abs_mag, surface_brightness, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
-                                                                                                                                                                             lon_population[ii], 
-                                                                                                                                                                             lat_population[ii], 
-                                                                                                                                                                             distance_population[ii], 
-                                                                                                                                                                             stellar_mass_population[ii], 
-                                                                                                                                                                             r_physical_population[ii],
-                                                                                                                                                                             m_maglim_g,
-                                                                                                                                                                             m_maglim_r,
-                                                                                                                                                                             m_ebv)
-        print '  ', len(lon)
+    for ii, mc_source_id in enumerate(population['id']):
+        print 'Simulating satellite (%i/%i) ... mc_source_id = %i'%(ii + 1, n, mc_source_id)
+        print '  distance=%(distance).2e, stellar_mass=%(stellar_mass).2e, r_physical=%(r_physical).2e'%(population[ii])
+        satellite = catsimSatellite(config, population[ii]['lon'], population[ii]['lat'], 
+                                    population[ii]['distance'], population[ii]['stellar_mass'], 
+                                    population[ii]['r_physical'],population[ii]['ellipticity'],
+                                    population[ii]['position_angle'],population[ii]['age'],
+                                    population[ii]['metallicity'],
+                                    m_maglim_g, m_maglim_r, m_ebv)
         
-        n_g22_population[ii] = n_g22
-        n_g24_population[ii] = n_g24
-        abs_mag_population[ii] = abs_mag
-        surface_brightness_population[ii] = surface_brightness
-        ellipticity_population[ii] = ellipticity
-        position_angle_population[ii] = position_angle
-        age_population[ii] = age
-        metal_z_population[ii] = metal_z
-
-        #print "Difficulty masking..."  
+        n_g22_population[ii] = satellite['n_g22']
+        n_g24_population[ii] = satellite['n_g24']
+        abs_mag_population[ii] = satellite['abs_mag']
+        extension_population[ii] = satellite['extension']
+        surface_brightness_population[ii] = satellite['surface_brightness']
 
         # These objects are too extended and are not simulated
-        if (flag_too_extended):
+        if (satellite['flag_too_extended']):
             difficulty_population[ii] |= 0b0001
 
         # We assume that these objects would be easily detected and
         # remove them to reduce data volume
-        if (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1e2):
+        if (surface_brightness_population[ii]<23.5)&(n_g22_population[ii]>1e3):
             difficulty_population[ii] |= 0b0010
-        if (surface_brightness_population[ii]<28.)&(n_g22_population[ii]>1e4):
-            difficulty_population[ii] |= 0b0100
-        if (surface_brightness_population[ii]<30.)&(n_g22_population[ii]>1e5):
-            difficulty_population[ii] |= 0b1000
+
+        # ADW 2019-08-31: I don't think these were implmented
+        #if (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1e2):
+        #    difficulty_population[ii] |= 0b0010
+        #if (surface_brightness_population[ii]<28.)&(n_g22_population[ii]>1e4):
+        #    difficulty_population[ii] |= 0b0100
+        #if (surface_brightness_population[ii]<30.)&(n_g22_population[ii]>1e5):
+        #    difficulty_population[ii] |= 0b1000
         
+        # ADW: 2019-08-31: These were Keith's original cuts, which were too aggressive
         #cut_easy = (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1.e2) \
         #           | ((surface_brightness_population[ii] < 30.) & (n_g24_population[ii] > 1.e4)) \
         #           | ((surface_brightness_population[ii] < 31.) & (n_g24_population[ii] > 1.e5))
@@ -360,19 +398,21 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         #if flag_too_extended:
         #    difficulty_population[ii] += 3 # TOO EXTENDED
 
+        # Only write satellites that aren't flagged
         if difficulty_population[ii] == 0:
-            lon_array.append(lon)
-            lat_array.append(lat)
-            mag_1_array.append(mag_1)
-            mag_2_array.append(mag_2)
-            mag_1_error_array.append(mag_1_error)
-            mag_2_error_array.append(mag_2_error)
-            mag_extinction_1_array.append(mag_extinction_1)
-            mag_extinction_2_array.append(mag_extinction_2)
-            mc_source_id_array.append(np.tile(mc_source_id, len(lon)))
+            lon_array.append(satellite['lon'])
+            lat_array.append(satellite['lat'])
+            mag_1_array.append(satellite['mag_1'])
+            mag_2_array.append(satellite['mag_2'])
+            mag_1_error_array.append(satellite['mag_1_error'])
+            mag_2_error_array.append(satellite['mag_2_error'])
+            mag_extinction_1_array.append(satellite['mag_extinction_1'])
+            mag_extinction_2_array.append(satellite['mag_extinction_2'])
+            mc_source_id_array.append(np.tile(mc_source_id, len(satellite['lon'])))
+        else:
+            print '  difficulty=%i; satellite not simulated...'%difficulty_population[ii]
 
-    # Concatenate all the arrays
-
+    # Concatenate the arrays
     print "Concatenating arrays..."
     lon_array = np.concatenate(lon_array)
     lat_array = np.concatenate(lat_array)
@@ -385,9 +425,8 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mc_source_id_array = np.concatenate(mc_source_id_array)
 
     # Now do the masking all at once
-
     print "Fracdet masking..."
-    pix_array = ugali.utils.healpix.angToPix(nside_fracdet, lon_array, lat_array)
+    pix_array = ugali.utils.healpix.ang2pix(nside_fracdet, lon_array, lat_array)
     cut_fracdet = (np.random.uniform(size=len(lon_array)) < m_fracdet[pix_array])
 
     lon_array = lon_array[cut_fracdet]
@@ -400,114 +439,93 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mag_extinction_2_array = mag_extinction_2_array[cut_fracdet]
     mc_source_id_array = mc_source_id_array[cut_fracdet]
 
-    # Cut out the entries that are easily detectable
-    """
-    lon_population = lon_population[cut_difficulty_population]
-    lat_population = lat_population[cut_difficulty_population]
-    distance_population = distance_population[cut_difficulty_population]
-    stellar_mass_population = stellar_mass_population[cut_difficulty_population]
-    r_physical_population = r_physical_population[cut_difficulty_population]
-    n_g24_population = n_g24_population[cut_difficulty_population]
-    abs_mag_population = abs_mag_population[cut_difficulty_population]
-    surface_brightness_population = surface_brightness_population[cut_difficulty_population]
-    ellipticity_population = ellipticity_population[cut_difficulty_population]
-    position_angle_population = position_angle_population[cut_difficulty_population]
-    age_population = age_population[cut_difficulty_population]
-    metal_z_population = metal_z_population[cut_difficulty_population]
-    mc_source_id_population = mc_source_id_population[cut_difficulty_population]
-    """
-    
     # Create bonus columns
-    
     print "Creating bonus columns..."
-    distance_modulus_population = ugali.utils.projector.distanceToDistanceModulus(distance_population)
-    hpix_32_population = ugali.utils.healpix.angToPix(32, lon_population, lat_population) # Make sure this matches the dataset
+    distance_modulus_population = ugali.utils.projector.dist2mod(population['distance'])
+    hpix_32_population = ugali.utils.healpix.ang2pix(32, population['lon'], population['lat']) # Make sure this matches the dataset
 
     # Local stellar density
-    pixarea = healpy.nside2pixarea(nside_density, degrees=True) * 60.**2 # arcmin^2
-    density_population = m_density[ugali.utils.healpix.angToPix(nside_density, lon_population, lat_population)] / pixarea # arcmin^-2
+    pixarea = hp.nside2pixarea(nside_density, degrees=True) * 60.**2 # arcmin^2
+    density_population = m_density[ugali.utils.healpix.ang2pix(nside_density, population['lon'], population['lat'])] / pixarea # arcmin^-2
 
     # Average fracdet within the azimuthally averaged half-light radius
     #m_fracdet_zero = np.where(m_fracdet >= 0., m_fracdet, 0.)
     #m_fracdet_zero = m_fracdet
-    r_half = np.degrees(np.arctan2(r_physical_population, distance_population)) # Azimuthally averaged half-light radius in degrees
-    fracdet_half_population = meanFracdet(m_fracdet, lon_population, lat_population, r_half)
-    fracdet_core_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.1)
-    fracdet_wide_population = meanFracdet(m_fracdet, lon_population, lat_population, 0.5)
+
+    # Azimuthally averaged half-light radius in degrees
+    r_half = np.degrees(np.arctan2(population['r_physical'], population['distance']))
+    fracdet_half_population = meanFracdet(m_fracdet, population['lon'], population['lat'], r_half)
+    fracdet_core_population = meanFracdet(m_fracdet, population['lon'], population['lat'], 0.1)
+    fracdet_wide_population = meanFracdet(m_fracdet, population['lon'], population['lat'], 0.5)
 
     # Magnitude limits
-    nside_maglim = healpy.npix2nside(len(m_maglim_g))
-    pix_population = ugali.utils.healpix.angToPix(nside_maglim, lon_population, lat_population)
+    nside_maglim = hp.npix2nside(len(m_maglim_g))
+    pix_population = ugali.utils.healpix.ang2pix(nside_maglim, population['lon'], population['lat'])
     maglim_g_population = m_maglim_g[pix_population]
     maglim_r_population = m_maglim_r[pix_population]
     
     # E(B-V)
-    nside_ebv = healpy.npix2nside(len(m_ebv))
-    pix_population = ugali.utils.healpix.angToPix(nside_ebv, lon_population, lat_population)
+    nside_ebv = hp.npix2nside(len(m_ebv))
+    pix_population = ugali.utils.healpix.ang2pix(nside_ebv, population['lon'], population['lat'])
     ebv_population = m_ebv[pix_population]
 
     # Survey
-    survey_population = np.tile(config['survey'], len(lon_population))
+    survey_population = np.tile(config['survey'], len(population))
 
     # Number of surviving catalog stars
-    n_catalog_population = np.histogram(mc_source_id_array, bins=np.arange(mc_source_id_population[0] - 0.5, mc_source_id_population[-1] + 0.51))[0]
+    n_catalog_population = np.histogram(mc_source_id_array, bins=np.arange(population['id'][0] - 0.5, population['id'][-1] + 0.51))[0]
 
     # Faked-up coadd_object_ids
     coadd_object_id_array = []
-    for mc_source_id in mc_source_id_population:
+    for mc_source_id in population['id']:
         coadd_object_id_array.append((1000000 * mc_source_id) + 1 + np.arange(np.sum(mc_source_id == mc_source_id_array)))
     coadd_object_id_array = -1 * np.concatenate(coadd_object_id_array) # Assign negative numbers to distinguish from real objects
 
-    # Catalog output file
+    # Population metadata output file
+    tbhdu = pyfits.BinTableHDU.from_columns([
+        pyfits.Column(name='RA',                 format='E', array=population['lon'], unit='deg'),
+        pyfits.Column(name='DEC',                format='E', array=population['lat'], unit='deg'),
+        pyfits.Column(name='DISTANCE',           format='E', array=population['distance'], unit='kpc'),
+        pyfits.Column(name='DISTANCE_MODULUS',   format='E', array=distance_modulus_population, unit='kpc'),
+        pyfits.Column(name='STELLAR_MASS',       format='E', array=population['stellar_mass'], unit='Msun'),
+        pyfits.Column(name='R_PHYSICAL',         format='E', array=population['r_physical'], unit='kpc'),
+        pyfits.Column(name='N_G22',              format='J', array=n_g22_population, unit=''),
+        pyfits.Column(name='N_G24',              format='J', array=n_g24_population, unit=''),
+        pyfits.Column(name='N_CATALOG',          format='J', array=n_catalog_population, unit=''),
+        pyfits.Column(name='DIFFICULTY',         format='J', array=difficulty_population, unit=''),
+        pyfits.Column(name='ABS_MAG',            format='E', array=abs_mag_population, unit='mag'),
+        pyfits.Column(name='SURFACE_BRIGHTNESS', format='E', array=surface_brightness_population, unit='mag arcsec^-2'),
+        pyfits.Column(name='EXTENSION',          format='E', array=extension_population, unit='deg'),
+        pyfits.Column(name='ELLIPTICITY',        format='E', array=population['ellipticity'], unit=''),
+        pyfits.Column(name='POSITION_ANGLE',     format='E', array=population['position_angle'], unit='deg'),
+        pyfits.Column(name='AGE',                format='E', array=population['age'], unit='Gyr'),
+        pyfits.Column(name='METAL_Z',            format='E', array=population['metallicity'], unit=''),
+        pyfits.Column(name='MC_SOURCE_ID',       format='K', array=population['id'], unit=''),
+        pyfits.Column(name='HPIX_32',            format='E', array=hpix_32_population, unit=''),
+        pyfits.Column(name='DENSITY',            format='E', array=density_population, unit='arcmin^-2'),
+        pyfits.Column(name='FRACDET_HALF',       format='E', array=fracdet_half_population, unit=''),
+        pyfits.Column(name='FRACDET_CORE',       format='E', array=fracdet_core_population, unit=''),
+        pyfits.Column(name='FRACDET_WIDE',       format='E', array=fracdet_wide_population, unit=''),
+        pyfits.Column(name='MAGLIM_G',           format='E', array=maglim_g_population, unit='mag'),
+        pyfits.Column(name='MAGLIM_R',           format='E', array=maglim_r_population, unit='mag'),
+        pyfits.Column(name='EBV',                format='E', array=ebv_population, unit='mag'),
+        pyfits.Column(name='SURVEY',             format='A12', array=survey_population, unit=''),
+    ])
+    tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
+    print("Writing population metadata file...")
+    filename = '%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1)
+    tbhdu.writeto(filename, overwrite=True)
 
+    # Write simulated catalogs
+
+    # Simulated catalog output needs to match the real data
+    #   https://github.com/sidneymau/simple/blob/master/search_algorithm.py 
+    #   https://github.com/sidneymau/simple/blob/master/config.yaml
+    #   /home/s1/kadrlica/projects/y3a2/dsphs/v2/skim/ 
+    #   e.g., /home/s1/kadrlica/projects/y3a2/dsphs/v2/skim/y3a2_ngmix_cm_11755.fits
     # for ii in range(0, len(d.formats)): print '\'%s\': [ , \'%s\'],'%(d.names[ii], d.formats[ii])
-    
-    # See: 
-    # https://github.com/sidneymau/simple/blob/master/search_algorithm.py 
-    # https://github.com/sidneymau/simple/blob/master/config.yaml
-    # /home/s1/kadrlica/projects/y3a2/dsphs/v2/skim/ , e.g., /home/s1/kadrlica/projects/y3a2/dsphs/v2/skim/y3a2_ngmix_cm_11755.fits
 
-    #default_array = np.tile(np.nan, len(mc_source_id_array)) # To recognize that those values are synthetic filler
     default_array = np.tile(-9999., len(mc_source_id_array))
-
-    """
-    # Column name, data, fits format
-    # Y3A2 pre-Gold
-    key_map = {'CM_MAG_ERR_G': [mag_1_error_array, 'D'],
-               'CM_MAG_ERR_R': [mag_2_error_array, 'D'],
-               'CM_MAG_G': [mag_1_array, 'D'],
-               'CM_MAG_R': [mag_2_array, 'D'],
-               'CM_T': [default_array, 'D'],
-               'CM_T_ERR': [default_array, 'D'],
-               'COADD_OBJECT_ID': [coadd_object_id_array, 'K'],
-               'DEC': [lat_array, 'D'],
-               'FLAGS': [default_array, 'K'],
-               'PSF_MAG_ERR_G': [mag_1_error_array, 'D'],
-               'PSF_MAG_ERR_R': [mag_2_error_array, 'D'],
-               'PSF_MAG_G': [mag_1_array, 'D'],
-               'PSF_MAG_R': [mag_2_array, 'D'],
-               'RA': [lon_array, 'D'],
-               'SEXTRACTOR_FLAGS_G': [np.tile(0, len(mc_source_id_array)), 'I'],
-               'SEXTRACTOR_FLAGS_R': [np.tile(0, len(mc_source_id_array)), 'I'],
-               'WAVG_MAG_PSF_G': [mag_1_array, 'E'],
-               'WAVG_MAG_PSF_R': [mag_2_array, 'E'],
-               'WAVG_MAGERR_PSF_G': [mag_1_error_array, 'E'],
-               'WAVG_MAGERR_PSF_R': [mag_2_error_array, 'E'],
-               'WAVG_SPREAD_MODEL_I': [default_array, 'E'],
-               'WAVG_SPREADERR_MODEL_I': [default_array, 'E'],
-               'EXT_SFD98_G': [default_array, 'E'],
-               'EXT_SFD98_R': [default_array, 'E'],
-               'CM_MAG_SFD_G': [mag_1_array, 'D'],
-               'CM_MAG_SFD_R': [mag_2_array, 'D'],
-               'FLAG_FOOTPRINT': [np.tile(1, len(mc_source_id_array)), 'J'],
-               'FLAG_FOREGROUND': [np.tile(0, len(mc_source_id_array)), 'J'],
-               'EXTENDED_CLASS_MASH': [np.tile(0, len(mc_source_id_array)), 'K'],
-               'PSF_MAG_SFD_G': [mag_1_array, 'D'],
-               'PSF_MAG_SFD_R': [mag_2_array, 'D'],
-               'WAVG_MAG_PSF_SFD_G': [mag_1_array, 'E'],
-               'WAVG_MAG_PSF_SFD_R': [mag_2_array, 'E']}
-    """
-    
     if config['survey'] == 'des':
         # Y3 Gold v2.0
         key_map = odict([
@@ -581,64 +599,32 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                 ])
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
-    print "Writing catalog files..."
-    columns = []
-    for key in key_map:
-        columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
-    tbhdu = pyfits.BinTableHDU.from_columns(columns)
-    tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
+    print("Writing catalog files...")
+    #columns = []
+    #for key in key_map:
+    #    columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
+    #tbhdu = pyfits.BinTableHDU.from_columns(columns)
+    #tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
 
-    for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
-        print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
-        cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
+    for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n//n_chunk):
         outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
-        header = copy.deepcopy(tbhdu.header)
-        header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
-        header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
-        pyfits.writeto(outfile, tbhdu.data[cut_chunk], header, clobber=True)
+        print('  '+outfile)
 
-    # Population metadata output file
-    
-    print "Writing population metadata file..."
-    tbhdu = pyfits.BinTableHDU.from_columns([
-        pyfits.Column(name='RA', format='E', array=lon_population, unit='deg'),
-        pyfits.Column(name='DEC', format='E', array=lat_population, unit='deg'),
-        pyfits.Column(name='DISTANCE', format='E', array=distance_population, unit='kpc'),
-        pyfits.Column(name='DISTANCE_MODULUS', format='E', array=distance_modulus_population, unit='kpc'),
-        pyfits.Column(name='STELLAR_MASS', format='E', array=stellar_mass_population, unit='m_solar'),
-        pyfits.Column(name='R_PHYSICAL', format='E', array=r_physical_population, unit='kpc'),
-        pyfits.Column(name='N_G22', format='J', array=n_g22_population, unit=''),
-        pyfits.Column(name='N_G24', format='J', array=n_g24_population, unit=''),
-        pyfits.Column(name='N_CATALOG', format='J', array=n_catalog_population, unit=''),
-        pyfits.Column(name='DIFFICULTY', format='J', array=difficulty_population, unit=''),
-        pyfits.Column(name='ABS_MAG', format='E', array=abs_mag_population, unit='mag'),
-        pyfits.Column(name='SURFACE_BRIGHTNESS', format='E', array=surface_brightness_population, unit='mag arcsec^-2'),
-        pyfits.Column(name='ELLIPTICITY', format='E', array=ellipticity_population, unit=''),
-        pyfits.Column(name='POSITION_ANGLE', format='E', array=position_angle_population, unit='deg'),
-        pyfits.Column(name='AGE', format='E', array=age_population, unit='deg'),
-        pyfits.Column(name='METAL_Z', format='E', array=metal_z_population, unit=''),
-        pyfits.Column(name='MC_SOURCE_ID', format='K', array=mc_source_id_population, unit=''),
-        pyfits.Column(name='HPIX_32', format='E', array=hpix_32_population, unit=''),
-        pyfits.Column(name='DENSITY', format='E', array=density_population, unit='arcmin^-2'),
-        pyfits.Column(name='FRACDET_HALF', format='E', array=fracdet_half_population, unit=''),
-        pyfits.Column(name='FRACDET_CORE', format='E', array=fracdet_core_population, unit=''),
-        pyfits.Column(name='FRACDET_WIDE', format='E', array=fracdet_wide_population, unit=''),
-        pyfits.Column(name='MAGLIM_G', format='E', array=maglim_g_population, unit='mag'),
-        pyfits.Column(name='MAGLIM_R', format='E', array=maglim_r_population, unit='mag'),
-        pyfits.Column(name='EBV', format='E', array=ebv_population, unit='mag'),
-        pyfits.Column(name='SURVEY', format='A12', array=survey_population, unit=''),
-    ])
-    tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-    tbhdu.writeto('%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1), clobber=True)
-
-    # 5284.2452461023322
+        sel = np.in1d(mc_source_id_array, mc_source_id_chunk)
+        columns = [pyfits.Column(name=k, format=v[1], array=v[0][sel]) for k,v in key_map.items()]
+        tbhdu = pyfits.BinTableHDU.from_columns(columns)
+        tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
+        #header = copy.deepcopy(tbhdu.header)
+        tbhdu.header.set('IDMIN',mc_source_id_chunk[0], 'Minimum MC_SOURCE_ID')
+        tbhdu.header.set('IDMAX',mc_source_id_chunk[-1], 'Maximum MC_SOURCE_ID')
+        tbhdu.writeto(outfile, overwrite=True)
+        #pyfits.writeto(outfile, tbhdu.data, header, overwrite=True)
 
     # Mask output file
-
-    print "Writing population mask file..."
-    outfile_mask = '%s/sim_mask_%s_cel_nside_%i.fits'%(tag, tag, healpy.npix2nside(len(mask)))
+    print("Writing population mask file...")
+    outfile_mask = '%s/sim_mask_%s_cel_nside_%i.fits'%(tag, tag, hp.npix2nside(len(mask)))
     if not os.path.exists(outfile_mask):
-        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
+        hp.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
         os.system('gzip -f %s'%(outfile_mask))
 
 ############################################################
@@ -662,7 +648,6 @@ if __name__ == "__main__":
                         help="Random seed")
     args = parser.parse_args()
 
-    #print args
     if args.seed is not None: 
         print("Setting random seed: %i"%args.seed)
         np.random.seed(args.seed)
@@ -671,7 +656,7 @@ if __name__ == "__main__":
     config = yaml.load(open(args.config))[args.section]
     
     #catsimPopulation(tag, mc_source_id_start=mc_source_id_start, n=n, n_chunk=n_chunk)
-    catsimPopulation(args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk,config=config)
+    catsimPopulation(config, args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk)
 
 ############################################################
 
