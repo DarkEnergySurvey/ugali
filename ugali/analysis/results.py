@@ -337,20 +337,35 @@ class Results(object):
         out.close()
 
 def surfaceBrightness(abs_mag, r_physical, distance):
-    """
-    Compute the average surface brightness [mag arcsec^-2] within the half-light radius
+    """Compute the average surface brightness [mag/arcsec^2] within the
+    physical half-light radius.
 
-    abs_mag = absolute magnitude [mag]
-    r_physical = half-light radius [kpc] 
-    distance = [kpc]
+    The azimuthally averaged physical half-light radius is used
+    because the surface brightness is calculated as a function of
+    area. The area of an ellipse is:
 
-    The factor 2 in the c_v equation below account for half the luminosity 
-    within the half-light radius. The 3600.**2 is conversion from deg^2 to arcsec^2
+    A = pi * a*b = pi * a**2 * (1-e) = pi * r**2
+
+    The factor 2 in the c_v equation below accounts for the fact that
+    we are taking half the luminosity within the half-light
+    radius. The 3600.**2 is conversion from deg^2 to arcsec^2
 
     c_v = 2.5 * np.log10(2.) + 2.5 * np.log10(np.pi * 3600.**2) = 19.78
+
+    TODO: Distance could be optional
+
+    Parameters
+    ----------
+    abs_mag    : absolute V-band magnitude [mag]
+    r_physical : azimuthally averaged physical half-light radius [kpc]
+    distance   : heliocentric distance [kpc]
+
+    Returns
+    -------
+    mu         : surface brightnes [mag/arcsec^2]
     """
+    c_v = 19.78 # conversion to mag/arcsec^2
     r_angle = np.degrees(np.arctan(r_physical / distance))
-    c_v = 19.78 # mag/arcsec^2
     return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
 
 def createResults(config,srcfile,section='source',samples=None):
