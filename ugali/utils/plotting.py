@@ -1215,9 +1215,9 @@ def plotMembership(config, data=None, kernel=None, isochrone=None, **kwargs):
     if isochrone is not None:
         plt.sca(axes[1])
         drawIsochrone(isochrone,cookie=False)
- 
-    axes[1].set_ylabel(r'$%s - %s$' % (self.isochrone.band_1, self.isochrone.band_2))
-    axes[1].set_xlabel(r'$%s$' % self.isochrone.band_1)
+
+    axes[1].set_xlabel(r'$%s - %s$' % (config['catalog']['mag_1_band'], config['catalog']['mag_2_band']))
+    axes[1].set_ylabel(r'$%s$' % config['catalog']['mag_1_band'])
     axes[1].set_ylim(config['mag']['max'],config['mag']['min'])
     axes[1].set_xlim(config['color']['min'],config['color']['max'])
     axes[1].xaxis.set_major_locator(MaxNLocator(4))
