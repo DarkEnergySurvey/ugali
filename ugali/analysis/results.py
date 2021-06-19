@@ -264,7 +264,7 @@ class Results(object):
             logger.warning("Skipping Martin magnitude")
             results['Mv_martin'] = np.nan
         
-        mu = surfaceBrightness(Mv, size, dist)
+        mu = surfaceBrightness(Mv, rsize, dist) ##updated from size-->rsize
         results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
  
         try: 
