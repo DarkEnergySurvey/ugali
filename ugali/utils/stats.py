@@ -42,7 +42,7 @@ def mean_interval(data, alpha=_alpha):
 
 def median_interval(data, alpha=_alpha):
     """
-    Median including bayesian credible interval.
+    Median with bayesian credible interval from percentiles.
     """
     q = [100*alpha/2., 50, 100*(1-alpha/2.)]
     lo,med,hi = np.percentile(data,q)
@@ -80,8 +80,18 @@ def kde(data, npoints=_npoints):
     return values[np.argmax(kde_values)], kde.evaluate(peak)
 
 def peak_interval(data, alpha=_alpha, npoints=_npoints):
-    """
-    Identify interval using Gaussian kernel density estimator.
+    """Identify minimum interval containing the peak of the posterior as
+    determined by a Gaussian kernel density estimator.
+
+    Parameters
+    ----------
+    data   : the 1d data sample
+    alpha  : the confidence interval
+    npoints: number of kde points to evaluate
+
+    Returns
+    -------
+    interval : the minimum interval containing the peak
     """
     peak = kde_peak(data,npoints)
     x = np.sort(data.flat); n = len(x)
@@ -96,11 +106,24 @@ def peak_interval(data, alpha=_alpha, npoints=_npoints):
     if len(widths) == 0:
         raise ValueError('Too few elements for interval calculation')
     min_idx = np.argmin(widths)
-    lo = x[min_idx]
-    hi = x[min_idx+window]
+    lo = starts[select][min_idx]
+    hi = ends[select][min_idx]
     return interval(peak,lo,hi)
 
 def min_interval(data, alpha=_alpha):
+    """Minimum interval containing 1-alpha of the posterior.
+    Note: interval is *not* required to contain the peak of the
+    posterior.
+
+    Parameters
+    ----------
+    data   : the 1d data sample
+    alpha  : the confidence interval
+
+    Returns
+    -------
+    interval : the minimum interval
+    """
     x = np.sort(data.flat); n = len(x)
     # The number of entries in the interval
     window = int(np.rint((1.0-alpha)*n))
@@ -110,14 +133,15 @@ def min_interval(data, alpha=_alpha):
     if len(widths) == 0:
         raise ValueError('Too few elements for interval calculation')
     min_idx = np.argmin(widths)
-    lo = x[min_idx]
-    hi = x[min_idx+window]
-    mean = (hi+lo)/2.
-    return interval(mean,lo,hi)
+    lo = starts[min_idx]
+    hi = ends[min_idx]
+    center = (hi+lo)/2.
+    return interval(center,lo,hi)
 
 def norm_cdf(x):
-    # Faster than scipy.stats.norm.cdf
-    #https://en.wikipedia.org.wiki/Normal_distribution
+    """Faster than scipy.stats.norm.cdf
+    https://en.wikipedia.org.wiki/Normal_distribution
+    """
     return 0.5*(1 + scipy.special.erf(x/np.sqrt(2)))
 
 def random_pdf(value,pdf,size=None):
