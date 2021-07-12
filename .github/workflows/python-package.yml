@@ -16,6 +16,7 @@ jobs:
 
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 5
       matrix:
         python-version: [2.7, 3.7, 3.8]
     steps:
@@ -62,7 +63,7 @@ jobs:
         conda install jupyter nbconvert nose -c conda-forge
         export MPLBACKEND=Agg
         if [[ ${{ matrix.python-version }} < 3.0 ]]; then
-          nosetests -v;
+          nosetests -v -I test_loglike.py; 
         else 
-          nosetests -v -I test_notebook.py;
+          nosetests -v -I test_loglike.py -I test_notebook.py;
         fi
