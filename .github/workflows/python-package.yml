@@ -34,11 +34,11 @@ jobs:
         conda update -q conda
         conda info -a
         conda init bash
+        conda list python
+    - name: Create conda environment
+      run: |
+        conda env create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
      
-    #- name: Create conda environment
-    #  run: |
-    #    conda env create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
-    # 
     #- name: Install
     #  run: |
     #    source activate env
