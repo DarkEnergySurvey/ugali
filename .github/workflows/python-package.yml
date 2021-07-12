@@ -38,7 +38,7 @@ jobs:
     - name: Create conda environment
       run: |
         conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
-    - name: Install ugali
+    - name: Install package
       run: |
         source activate env
         export UGALIDIR="$HOME/.ugali"
@@ -47,7 +47,6 @@ jobs:
       run: |
         wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
         tar -xzf ugali-test-data.tar.gz
-    
     #- name: Lint with flake8
     #  run: |
     #    source activate env
@@ -57,13 +56,13 @@ jobs:
     #    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
     #    flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     # 
-    #- name: Test with nose
-    #  run: |
-    #    source activate env
-    #    conda install jupyter nbconvert nose -c conda-forge
-    #    export MPLBACKEND=Agg
-    #    if [[ ${{ matrix.python-version }} < 3.0 ]]; then
-    #      nosetests -v;
-    #    else 
-    #      nosetests -v -I test_notebook.py;
-    #    fi
+    - name: Test with nose
+      run: |
+        source activate env
+        conda install jupyter nbconvert nose -c conda-forge
+        export MPLBACKEND=Agg
+        if [[ ${{ matrix.python-version }} < 3.0 ]]; then
+          nosetests -v;
+        else 
+          nosetests -v -I test_notebook.py;
+        fi
