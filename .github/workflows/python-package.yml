@@ -62,7 +62,7 @@ jobs:
         conda install jupyter nbconvert nose -c conda-forge
         export MPLBACKEND=Agg
         if [[ ${{ matrix.python-version }} < 3.0 ]]; then
-          nosetests -v -I test_loglike.py; 
+          nosetests -v; 
         else 
-          nosetests -v -I test_loglike.py -I test_notebook.py;
+          nosetests -v -I test_notebook.py;
         fi
