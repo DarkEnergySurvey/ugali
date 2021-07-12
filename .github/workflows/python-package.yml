@@ -26,16 +26,15 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Add conda to system path
       run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        # Add $CONDA/bin to built-in path
         echo $CONDA/bin >> $GITHUB_PATH
-
-    #- name: Update conda
-    #  run: |
-    #    conda config --set always_yes yes --set changeps1 no
-    #    conda update -q conda
-    #    conda info -a
-    #    conda init bash
-    # 
+    - name: Update conda
+      run: |
+        conda config --set always_yes yes --set changeps1 no
+        conda update -q conda
+        conda info -a
+        conda init bash
+     
     #- name: Create conda environment
     #  run: |
     #    conda env create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
