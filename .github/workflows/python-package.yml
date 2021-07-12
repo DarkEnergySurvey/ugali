@@ -37,7 +37,7 @@ jobs:
         conda list python
     - name: Create conda environment
       run: |
-        conda env create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
+        conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
      
     #- name: Install
     #  run: |
