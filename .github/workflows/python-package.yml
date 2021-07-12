@@ -38,13 +38,16 @@ jobs:
     - name: Create conda environment
       run: |
         conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
-     
-    #- name: Install
-    #  run: |
-    #    source activate env
-    #    export UGALIDIR="$HOME/.ugali"
-    #    python setup.py -q install --isochrones --catalogs
-    #
+    - name: Install ugali
+      run: |
+        source activate env
+        export UGALIDIR="$HOME/.ugali"
+        python setup.py -q install --isochrones --catalogs
+    - name: Install test data
+      run: |
+        wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
+        tar -xzf ugali-test-data.tar.gz
+    
     #- name: Lint with flake8
     #  run: |
     #    source activate env
@@ -53,11 +56,6 @@ jobs:
     #    flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
     #    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
     #    flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    # 
-    #- name: Install test data
-    #  run: |
-    #    wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
-    #    tar -xzf ugali-test-data.tar.gz
     # 
     #- name: Test with nose
     #  run: |
