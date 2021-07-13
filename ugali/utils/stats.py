@@ -35,7 +35,7 @@ def mean_interval(data, alpha=_alpha):
     """
     Interval assuming gaussian posterior.
     """
-    mean =np.mean(data)
+    mean = np.mean(data)
     sigma = np.std(data)
     scale = scipy.stats.norm.ppf(1-alpha/2.)
     return interval(mean,mean-scale*sigma,mean+scale*sigma)
@@ -49,31 +49,65 @@ def median_interval(data, alpha=_alpha):
     return interval(med,lo,hi)
     
 def peak(data, bins=_nbins):
+    """
+    Bin the distribution and find the mode
+
+    Parameters:
+    -----------
+    data  : The 1d data sample
+    bins  : Number of bins
+
+    Returns
+    -------
+    peak : peak of the kde
+    """
     num,edges = np.histogram(data,bins=bins)
     centers = (edges[1:]+edges[:-1])/2.
     return centers[np.argmax(num)]
 
-def kde_peak(data, npoints=_npoints):
+def kde_peak(data, npoints=_npoints, clip=5.0):
     """
     Identify peak using Gaussian kernel density estimator.
-    """
-    return kde(data,npoints)[0]
 
-def kde(data, npoints=_npoints):
+    Parameters:
+    -----------
+    data    : The 1d data sample
+    npoints : The number of kde points to evaluate
+    clip    : NMAD to clip
+
+    Returns
+    -------
+    peak : peak of the kde
+    """
+    return kde(data,npoints,clip)[0]
+
+def kde(data, npoints=_npoints, clip=5.0):
     """
     Identify peak using Gaussian kernel density estimator.
     
     Parameters:
     -----------
-    data   : The 1d data sample
+    data    : The 1d data sample
     npoints : The number of kde points to evaluate
+    clip    : NMAD to clip
+
+    Returns
+    -------
+    peak : peak of the kde
     """
-    # Clipping of severe outliers to concentrate more KDE samples in the parameter range of interest
+
+    # Clipping of severe outliers to concentrate more KDE samples
+    # in the parameter range of interest
     mad = np.median(np.fabs(np.median(data) - data))
-    cut = (data > np.median(data) - 5. * mad) & (data < np.median(data) + 5. * mad)
-    x = data[cut]
+    if clip > 0:
+        cut  = (data > np.median(data) - clip * mad)
+        cut &= (data < np.median(data) + clip * mad)
+        x = data[cut]
+    else:
+        x = data
     kde = scipy.stats.gaussian_kde(x)
-    # No penalty for using a finer sampling for KDE evaluation except computation time
+    # No penalty for using a finer sampling for KDE evaluation
+    # except computation time
     values = np.linspace(np.min(x), np.max(x), npoints)
     kde_values = kde.evaluate(values)
     peak = values[np.argmax(kde_values)]
