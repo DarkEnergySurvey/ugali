@@ -59,7 +59,7 @@ jobs:
         # Exclude notebook tests
         nosetests -v -I test_notebook.py;
     - name: Test notebooks
-      if: ${{ matrix.python-version }} < 3.0
+      if: ${{ matrix.python-version < 3.0 }}
       run: |
         source activate env
         conda install -q jupyter nbconvert -c conda-forge
