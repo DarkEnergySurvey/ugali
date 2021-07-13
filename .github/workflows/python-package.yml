@@ -46,7 +46,7 @@ jobs:
       if: ${{ false }}
       run: |
         source activate env
-        conda install flake8 -c conda-forge
+        conda install -q flake8 -c conda-forge
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
@@ -54,7 +54,7 @@ jobs:
     - name: Test with nose
       run: |
         source activate env
-        conda install nose -c conda-forge
+        conda install -q nose -c conda-forge
         export MPLBACKEND=Agg
         # Exclude notebook tests
         nosetests -v -I test_notebook.py;
@@ -62,6 +62,6 @@ jobs:
       if: ${{ matrix.python-version }} < 3.0
       run: |
         source activate env
-        conda install jupyter nbconvert -c conda-forge
+        conda install -q jupyter nbconvert -c conda-forge
         # Run notebook tests
-        nosetests -v test_notebook.py
+        nosetests -v tests/test_notebook.py
