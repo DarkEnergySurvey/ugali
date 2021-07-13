@@ -13,10 +13,9 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 5
+      max-parallel: 3
       matrix:
         python-version: [3.7]
     steps:
@@ -25,16 +24,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Add conda to system path
+    - name: Setup conda
       run: |
         # Add $CONDA/bin to built-in path
         echo $CONDA/bin >> $GITHUB_PATH
-    - name: Update conda
-      run: |
-        conda config --set always_yes yes --set changeps1 no
         conda update -q conda
-        conda info -a
-        conda init bash
+        conda info
     - name: Create conda environment
       run: |
         conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
@@ -48,6 +43,7 @@ jobs:
         wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
         tar -xzf ugali-test-data.tar.gz
     - name: Lint with flake8
+      if: ${{ false }}
       run: |
         source activate env
         conda install flake8 -c conda-forge
