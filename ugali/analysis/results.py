@@ -343,7 +343,7 @@ class Results(object):
 
 def surfaceBrightness(abs_mag, r_physical, distance):
     """Compute the average surface brightness [mag/arcsec^2] within the
-    physical half-light radius.
+    azimuthally averaged physical half-light radius.
 
     The azimuthally averaged physical half-light radius is used
     because the surface brightness is calculated as a function of
@@ -367,11 +367,39 @@ def surfaceBrightness(abs_mag, r_physical, distance):
 
     Returns
     -------
-    mu         : surface brightnes [mag/arcsec^2]
+    mu         : surface brightness [mag/arcsec^2]
     """
     c_v = 19.78 # conversion to mag/arcsec^2
     r_angle = np.degrees(np.arctan(r_physical / distance))
     return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
+
+def surfaceBrightness2(app_mag, r_half_arcmin):
+    """Compute the average surface brightness [mag/arcsec^2] within the
+    azimuthally averaged angular half-light radius.
+
+    The azimuthally averaged half-light radius is used
+    because the surface brightness is calculated as a function of
+    area. The area of an ellipse is:
+
+    A = pi * a*b = pi * a**2 * (1-e) = pi * r**2
+
+    The factor 2.5*log10(2) accounts for the fact that half the
+    luminosity is within the half-light radius.
+
+    Parameters
+    ----------
+    app_mag : apparent V-band magnitude [mag]
+    r_half  : azimuthally averaged half-light radius [arcmin]
+
+    Returns
+    -------
+    mu      : surface brightness [mag/arcsec^2]
+
+    """
+    r_half_arcsec = r_half_arcmin * 60 # arcmin to arcsec
+    mu = app_mag + 2.5*np.log10(2.) + 2.5*np.log10(np.pi * r_half_arcsec**2)
+    return mu
+
 
 def createResults(config,srcfile,section='source',samples=None):
     """ Create an MCMC instance """
