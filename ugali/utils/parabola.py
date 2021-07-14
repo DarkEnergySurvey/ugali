@@ -122,7 +122,7 @@ class Parabola:
             
         return max((np.sqrt(b**2 - 4. * a * c) - b) / (2. * a), (-1. * np.sqrt(b**2 - 4. * a * c) - b) / (2. * a)) 
 
-    def bayesianUpperLimit(self, alpha, steps=1.e5, plot=False):
+    def bayesianUpperLimit(self, alpha, steps=1e5, plot=False):
         """
         Compute one-sided upper limit using Bayesian Method of Helene.
         Several methods of increasing numerical stability have been implemented.
@@ -130,7 +130,7 @@ class Parabola:
         x_dense, y_dense = self.densify()
         y_dense -= np.max(y_dense) # Numeric stability
         f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
-        x = np.linspace(0., np.max(x_dense), steps)
+        x = np.linspace(0., np.max(x_dense), int(steps))
         pdf = np.exp(f(x) / 2.)
         cut = (pdf / np.max(pdf)) > 1.e-10
         x = x[cut]
@@ -147,7 +147,7 @@ class Parabola:
 
         return cdf_reflect(alpha)
 
-    def bayesianUpperLimit2(self, alpha, steps=1.e5, plot=False):
+    def bayesianUpperLimit2(self, alpha, steps=1e5, plot=False):
         """
         Compute one-sided upper limit using Bayesian Method of Helene.
         """
@@ -156,7 +156,7 @@ class Parabola:
             f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='cubic')
         except:
             f = scipy.interpolate.interp1d(self.x[cut], self.y[cut], kind='linear')
-        x = np.linspace(0., np.max(self.x[cut]), steps)
+        x = np.linspace(0., np.max(self.x[cut]), int(steps))
         y = np.exp(f(x) / 2.)
         #forbidden = np.nonzero((y / np.exp(self.vertex_y / 2.)) < 1.e-10)[0]
         forbidden = np.nonzero((y / self.vertex_y) < 1.e-10)[0]
@@ -171,17 +171,17 @@ class Parabola:
         return cdf_reflect(alpha)
 
 
-    def confidenceInterval(self, alpha=0.6827, steps=1.e5, plot=False):
+    def confidenceInterval(self, alpha=0.6827, steps=1e5, plot=False):
         """
         Compute two-sided confidence interval by taking x-values corresponding to the largest PDF-values first.
         """
         x_dense, y_dense = self.densify()
         y_dense -= np.max(y_dense) # Numeric stability
         f = scipy.interpolate.interp1d(x_dense, y_dense, kind='linear')
-        x = np.linspace(0., np.max(x_dense), steps)
+        x = np.linspace(0., np.max(x_dense), int(steps))
         # ADW: Why does this start at 0, which often outside the input range?
         # Wouldn't starting at xmin be better:
-        #x = np.linspace(np.min(x_dense), np.max(x_dense), steps)
+        #x = np.linspace(np.min(x_dense), np.max(x_dense), int(steps))
         pdf = np.exp(f(x) / 2.)
         cut = (pdf / np.max(pdf)) > 1.e-10
         x = x[cut]
@@ -206,7 +206,7 @@ def upperLimitsDeltaTS(confidence_level, one_sided=True, degrees_of_freedom=1):
     ts_min = 0 # TS = Test Statistic
     ts_max = 5
     ts_steps = 1000
-    x = np.linspace(ts_min, ts_max, ts_steps)
+    x = np.linspace(ts_min, ts_max, int(ts_steps))
     y = (0.5 * scipy.stats.chi2.sf(x, degrees_of_freedom) - (1. - confidence_level))**2
     return x[np.argmin(y)]
         

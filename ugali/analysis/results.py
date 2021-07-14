@@ -270,7 +270,11 @@ class Results(object):
         except ValueError as e:
             logger.warning("Skipping absolute magnitude")
             logger.warn(str(e))
-            results['Mv'] = np.nan
+            Mv = np.nan
+            results['Mv'] = Mv
+
+        mu = surfaceBrightness(Mv, rsize, dist) ##updated from size-->rsize
+        results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
 
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space
@@ -282,13 +286,14 @@ class Results(object):
             if martin > 1: kwargs['n_trials'] = martin
             Mv_martin = self.source.isochrone.absolute_magnitude_martin(**kwargs)
             results['Mv_martin'] = Mv_martin
+
+            mu_martin = surfaceBrightness(Mv_martin, rsize, dist) ##updated from size-->rsize
+            results['surface_brightness_martin'] = ugali.utils.stats.interval(mu_martin,np.nan,np.nan)
         else:
             logger.warning("Skipping Martin magnitude")
             results['Mv_martin'] = np.nan
-        
-        mu = surfaceBrightness(Mv, size, dist)
-        results['surface_brightness'] = ugali.utils.stats.interval(mu,np.nan,np.nan)
- 
+            results['surface_brightness_martin'] = np.nan
+
         try: 
             results['constellation'] = ang2const(lon,lat,self.coordsys)[1]
         except:

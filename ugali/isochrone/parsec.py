@@ -33,6 +33,7 @@ photsys_dict = odict([
         ('sdss','tab_mag_odfnew/tab_mag_sloan.dat'),
         ('ps1' ,'tab_mag_odfnew/tab_mag_panstarrs1.dat'),
         ('acs_wfc' ,'tab_mag_odfnew/tab_mag_acs_wfc.dat'),
+        ('lsst', 'tab_mag_odfnew/tab_mag_lsst.dat'),
 ])
 
 photname_dict = odict([
@@ -40,6 +41,7 @@ photname_dict = odict([
         ('sdss','SDSS'),
         ('ps1' ,'Pan-STARRS1'),
         ('acs_wfc','HST/ACS'),
+        ('lsst', 'LSST'),
 ])
 
 # Commented options may need to be restored for older version/isochrones.
@@ -345,6 +347,18 @@ class Bressan2012(ParsecIsochrone):
                 (13,('y',float)),
                 (16,('stage',int)),
                 ]),
+        lsst = odict([
+                (3, ('mass_init',float)),
+                (4, ('mass_act',float)),
+                (5, ('log_lum',float)),
+                (9, ('u',float)),
+                (10,('g',float)),
+                (11,('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (14,('Y',float)),
+                (16,('stage',float))
+                ]),
         )
 
     def _parse(self,filename):
@@ -427,6 +441,18 @@ class Marigo2017(ParsecIsochrone):
                 (26,('z',float)),
                 (27,('y',float)),
                 (28,('w',float)),
+                ]),
+        lsst = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (4, ('log_lum',float)),
+                (7, ('stage',int)),
+                (23,('u',float)),
+                (24,('g',float)),
+                (25,('r',float)),
+                (26,('i',float)),
+                (27,('z',float)),
+                (28,('Y',float)),
                 ]),
         )
     

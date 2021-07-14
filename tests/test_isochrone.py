@@ -116,22 +116,19 @@ def test_pdf():
     np.testing.assert_array_almost_equal(u_color[9490:9500],test_results)
 
 def test_simulate():
-    """ 
-    Test isochrone simulation.
-    """    
+    """Test isochrone simulation."""    
+    
     iso = isochrone.Bressan2012(**default_kwargs)
     stellar_mass = 5.0e3
 
     np.random.seed(0)
     mag_1, mag_2 = iso.simulate(stellar_mass)
-    np.testing.assert_equal(len(mag_1), 21105)
+    np.testing.assert_equal(len(mag_1), 21106)
     np.testing.assert_allclose(mag_1[:3], [28.606918, 27.670816, 28.302291])
     np.testing.assert_allclose(mag_2[:3], [27.539174, 26.717612, 27.271779])
 
 def test_download():
-    """
-    Test isochrone download.
-    """
+    """Test isochrone download."""
     try:
         from urllib.error import URLError
     except ImportError:
