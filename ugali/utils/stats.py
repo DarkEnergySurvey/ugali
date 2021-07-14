@@ -111,7 +111,7 @@ def kde(data, npoints=_npoints, clip=5.0):
     values = np.linspace(np.min(x), np.max(x), npoints)
     kde_values = kde.evaluate(values)
     peak = values[np.argmax(kde_values)]
-    return values[np.argmax(kde_values)], kde.evaluate(peak)
+    return peak, kde.evaluate(peak)
 
 def peak_interval(data, alpha=_alpha, npoints=_npoints):
     """Identify minimum interval containing the peak of the posterior as
