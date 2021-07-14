@@ -25,9 +25,9 @@ def asscalar(a):
     # Do we want to check that the value is numeric?
     #if   isinstance(value, (int, long, float)): return value
     try:
-        return np.asscalar(a)
+        return a.item()
     except AttributeError as e:
-        return np.asscalar(np.asarray(a))
+        return np.asarray(a).item()
 
 
 class Model(object):
