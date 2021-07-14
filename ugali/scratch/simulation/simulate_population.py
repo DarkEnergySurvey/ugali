@@ -160,6 +160,12 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
         mag_extinction_1 = 3.172 * m_ebv[pix]
         mag_extinction_2 = 2.271 * m_ebv[pix]
+    elif config['survey'] == 'lsst':
+        # From Table 6 in Schlafly 2011 with Rv = 3.1
+        # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
+        mag_extinction_1 = 3.237 * m_ebv[pix]
+        mag_extinction_2 = 2.273 * m_ebv[pix] 
+
     
     # Photometric uncertainties are larger in the presence of interstellar dust reddening
     mag_1_error = 0.01 + 10**(log_photo_error((mag_1 + mag_extinction_1) - maglim_1))
@@ -185,10 +191,11 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (23.46 - np.clip(maglim_2, 20., 26.))))
     elif config['survey'] == 'ps1':
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2))
-
+    elif config['survey'] == 'lsst':
+        cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (25.0 - np.clip(maglim_2, 20., 26.)))) # Using the psuedo mag depth of 25 for now
     n_g22 = np.sum(cut_detect & (mag_1 < 22.))
     n_g24 = np.sum(cut_detect & (mag_1 < 24.))
-    print '  n_sim = %i, n_detect = %i, n_g24 = %i, n_g22 = %i'%(len(mag_1),np.sum(cut_detect),n_g24,n_g22)
+    print('  n_sim = %i, n_detect = %i, n_g24 = %i, n_g22 = %i'%(len(mag_1),np.sum(cut_detect),n_g24,n_g22))
     
     richness = stellar_mass / s.isochrone.stellarMass()
     #abs_mag = s.isochrone.absolute_magnitude()
@@ -203,6 +210,11 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         # V - g = C_0 + C_1 * (g - r)
         C_0 = -0.017
         C_1 = -0.508
+        v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
+    elif config['survey'] == 'lsst':
+        # Numbers are just placeholders for now, need to figure out exact ones
+        C_0 = -0.02
+        C_1 = -0.50
         v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
     flux = np.sum(10**(-v/2.5))
     abs_mag = -2.5*np.log10(flux) - distance_modulus
@@ -230,7 +242,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         pylab.title('Number of stars with g < 23: %i'%(n_sigma_p))
         pylab.savefig('y3_sat_sim_cmd_%s.png'%(title), dpi=150.)
         
-        print 'n_Sigma_p = %i'%(n_sigma_p)
+        print('n_Sigma_p = %i'%(n_sigma_p))
         raw_input('WAIT')
         
     return lon[cut_detect], lat[cut_detect], mag_1_meas[cut_detect], mag_2_meas[cut_detect], mag_1_error[cut_detect], mag_2_error[cut_detect], mag_extinction_1[cut_detect], mag_extinction_2[cut_detect], n_g22, n_g24, abs_mag, surface_brightness, extension, ellipticity, position_angle, age, metal_z, flag_too_extended
@@ -252,7 +264,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     if not os.path.exists(tag): os.makedirs(tag)
 
     if isinstance(config,str): config = yaml.load(open(config))
-    assert config['survey'] in ['des', 'ps1']
+    assert config['survey'] in ['des', 'ps1', 'lsst']
 
     infile_ebv = config['ebv']
     infile_fracdet = config['fracdet']
@@ -281,14 +293,14 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
 
     if known_dwarfs is not None:
         # Simulate from known dwarfs
-        print known_darfs
+        print(known_darfs)
         population = ugali.simulation.population.knownPopulation(known_dwarfs, mask, nside_pix, n)
     else:
         # r_physical is azimuthally-averaged half-light radius, kpc
         kwargs = dict(range_distance = range_distance,
                       range_stellar_mass = range_stellar_mass,
                       range_r_physical = range_r_physical)
-        print kwargs
+        print(kwargs)
         population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n, **kwargs)
 
     simulation_area, lon_population, lat_population, distance_population, stellar_mass_population, r_physical_population = population
@@ -316,10 +328,10 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mag_extinction_2_array = []
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(mc_source_id_population):
-        print '  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id)
-        print '  distance=%.2e, stellar_mass=%.2e, rhalf=%.2e'%(distance_population[ii],stellar_mass_population[ii],r_physical_population[ii])
+        print('  Simulating satellite (%i/%i) ... MC_SOURCE_ID = %i'%(ii + 1, n, mc_source_id))
+        print('  distance=%.2e, stellar_mass=%.2e, rhalf=%.2e'%(distance_population[ii],stellar_mass_population[ii],r_physical_population[ii]))
         lon, lat, mag_1, mag_2, mag_1_error, mag_2_error, mag_extinction_1, mag_extinction_2, n_g22, n_g24, abs_mag, surface_brightness, extension, ellipticity, position_angle, age, metal_z, flag_too_extended = catsimSatellite(config,
-                                                                                                                                                                             lon_population[ii], 
+                                                                                                                                                                             lon_population[ii],
                                                                                                                                                                              lat_population[ii], 
                                                                                                                                                                              distance_population[ii], 
                                                                                                                                                                              stellar_mass_population[ii], 
@@ -327,7 +339,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                                                                                                                                                                              m_maglim_g,
                                                                                                                                                                              m_maglim_r,
                                                                                                                                                                              m_ebv)
-        print '  ', len(lon)
+        print('  ', len(lon))
         
         n_g22_population[ii] = n_g22
         n_g24_population[ii] = n_g24
@@ -382,7 +394,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
             mc_source_id_array.append(np.tile(mc_source_id, len(lon)))
 
     # Concatenate the arrays
-    print "Concatenating arrays..."
+    print("Concatenating arrays...")
     lon_array = np.concatenate(lon_array)
     lat_array = np.concatenate(lat_array)
     mag_1_array = np.concatenate(mag_1_array)
@@ -394,7 +406,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mc_source_id_array = np.concatenate(mc_source_id_array)
 
     # Now do the masking all at once
-    print "Fracdet masking..."
+    print("Fracdet masking...")
     pix_array = ugali.utils.healpix.angToPix(nside_fracdet, lon_array, lat_array)
     cut_fracdet = (np.random.uniform(size=len(lon_array)) < m_fracdet[pix_array])
 
@@ -409,7 +421,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     mc_source_id_array = mc_source_id_array[cut_fracdet]
 
     # Create bonus columns
-    print "Creating bonus columns..."
+    print("Creating bonus columns...")
     distance_modulus_population = ugali.utils.projector.distanceToDistanceModulus(distance_population)
     hpix_32_population = ugali.utils.healpix.angToPix(32, lon_population, lat_population) # Make sure this matches the dataset
 
@@ -528,9 +540,22 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
                 ('RFPSFMAG_SFD', [mag_2_array, 'E']),
                 ('EXTENDED_CLASS', [np.tile(0, len(mc_source_id_array)), 'I']),
                 ])
+    elif config['survey'] == 'lsst': # Keys make to match those in the GCRCatalog native_quantities
+        key_map = odict([
+                ('objectId', [coadd_object_id_array, 'K']),
+                ('coord_ra', [lon_array, 'D']),
+                ('coord_dec', [lat_array, 'D']),
+                ('mag_g', [mag_1_array+mag_extinction_1_array, 'E']),
+                ('mag_r', [mag_2_array+mag_extinction_2_array, 'E']),
+                ('magerr_g', [mag_1_error_array, 'D']),
+                ('magerr_r', [mag_2_error_array, 'D']),
+                ('mag_corrected_g', [mag_1_array, 'D']), 
+                ('mag_corrected_r', [mag_2_array, 'D']), 
+                ('extended_class', [np.tile(0, len(mc_source_id_array)), 'I']), 
+                ])
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
-    print "Writing catalog files..."
+    print("Writing catalog files...")
     columns = []
     for key in key_map:
         columns.append(pyfits.Column(name=key, format=key_map[key][1], array=key_map[key][0]))
@@ -538,7 +563,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
 
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n / n_chunk):
-        print '  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1])
+        print('  writing MC_SOURCE_ID values from %i to %i'%(mc_source_id_chunk[0], mc_source_id_chunk[-1]))
         cut_chunk = np.in1d(mc_source_id_array, mc_source_id_chunk)
         outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
         header = copy.deepcopy(tbhdu.header)
@@ -548,6 +573,7 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
 
     # Population metadata output file
     
+    print("Writing population metadata file...")
     tbhdu = pyfits.BinTableHDU.from_columns([
         pyfits.Column(name='RA', format='E', array=lon_population, unit='deg'),
         pyfits.Column(name='DEC', format='E', array=lat_population, unit='deg'),
@@ -578,15 +604,15 @@ def catsimPopulation(tag, mc_source_id_start=1, n=5000, n_chunk=100, config='sim
         pyfits.Column(name='SURVEY', format='A12', array=survey_population, unit=''),
     ])
     tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')
-    print "Writing population metadata file..."
     filename = '%s/sim_population_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_start, mc_source_id_start + n - 1)
     tbhdu.writeto(filename, overwrite=True)
 
     # Mask output file
-    print "Writing population mask file..."
+    print("Writing population mask file...")
     outfile_mask = '%s/sim_mask_%s_cel_nside_%i.fits'%(tag, tag, healpy.npix2nside(len(mask)))
     if not os.path.exists(outfile_mask):
-        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
+        #healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C', overwrite=True)
+        healpy.write_map(outfile_mask, mask.astype(int), nest=True, coord='C') # overwrite no longer appeasr to be a kwarg?
         os.system('gzip -f %s'%(outfile_mask))
 
 ############################################################
@@ -596,7 +622,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Simulate at Milky Way satellite population.')
     parser.add_argument('config',
                         help='Configuration file')
-    parser.add_argument('-s','--section',required=True,choices=['des','ps1'],
+    parser.add_argument('-s','--section',required=True,choices=['des','ps1','lsst'],
                         help='Config section for simulation parameters')
     parser.add_argument('--tag',required=True,
                         help='Descriptive tag for the simulation run')

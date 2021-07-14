@@ -1,4 +1,4 @@
-[![Build](https://img.shields.io/travis/DarkEnergySurvey/ugali.svg)](https://travis-ci.org/DarkEnergySurvey/ugali)
+[![Build](https://github.com/DarkEnergySurvey/ugali/actions/workflows/python-package.yml/badge.svg)](https://github.com/DarkEnergySurvey/ugali/actions/workflows/python-package.yml)
 [![PyPI](https://img.shields.io/pypi/v/ugali.svg)](https://pypi.python.org/pypi/ugali)
 [![Release](https://img.shields.io/github/release/DarkEnergySurvey/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
@@ -7,16 +7,16 @@
 Overview
 --------
 
-The ultra-faint galaxy likelihood (UGaLi) toolkit provides a set of python modules developed for maximum-likelihood-based studies of Milky Way satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys. In addition, ugali ships with a set of synthetic isochrone libraries and catalogs of known resolved stellar systems.
+The ultra-faint galaxy likelihood (`ugali`) toolkit provides a set of python modules developed for maximum-likelihood-based studies of resolved satellite galaxies. The primary inputs are stellar object catalogs derived from optical photometric surveys and the coverage masks of those surveys. In addition, `ugali` ships with a set of synthetic isochrone libraries and catalogs of known resolved stellar systems.
 
-[Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
+Authors: [Keith Bechtol](https://github.com/bechtol) & [Alex Drlica-Wagner](https://github.com/kadrlica)
 
 Installation
 ------------
 
 There are several ways to install `ugali`.
 
-The most robust way is to follow the installation procedure for the automated builds documented in [.travis.yml](.travis.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
+The most robust way is to follow the installation procedure for the automated GitHub Actions build documented in [python-package.yml](.github/workflows/python-package.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
 ```bash
 # Create and activate conda environment
 conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose fitsio corner -c conda-forge -c kadrlica

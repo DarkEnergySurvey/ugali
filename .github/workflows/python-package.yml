@@ -1,0 +1,67 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+# For more information on conda actions see: https://autobencoder.com/2020-08-24-conda-actions/
+# Starter workflow for conda: https://github.com/actions/starter-workflows/blob/main/ci/python-package-conda.yml
+
+name: build
+
+on:
+  push:
+    branches: [ master, actions ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3
+      matrix:
+        python-version: [2.7, 3.8]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Setup conda
+      run: |
+        # Add $CONDA/bin to built-in path
+        echo $CONDA/bin >> $GITHUB_PATH
+        conda update -q conda
+        conda info
+    - name: Create conda environment
+      run: |
+        conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
+    - name: Install package
+      run: |
+        source activate env
+        export UGALIDIR="$HOME/.ugali"
+        python setup.py -q install --isochrones --catalogs
+    - name: Install test data
+      run: |
+        wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
+        tar -xzf ugali-test-data.tar.gz
+    - name: Lint with flake8
+      if: ${{ false }}
+      run: |
+        source activate env
+        conda install -q flake8 -c conda-forge
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with nose
+      run: |
+        source activate env
+        conda install -q nose -c conda-forge
+        export MPLBACKEND=Agg
+        # Exclude notebook tests
+        nosetests -v -I test_notebook.py;
+    - name: Test notebooks
+      if: ${{ matrix.python-version == '2.7' }}
+      run: |
+        source activate env
+        conda install -q jupyter nbconvert -c conda-forge
+        # Run notebook tests
+        nosetests -v tests/test_notebook.py

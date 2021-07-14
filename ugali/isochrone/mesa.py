@@ -35,6 +35,7 @@ dict_output = odict([
         ('des','DECam'),
         ('sdss','SDSSugriz'),
         ('ps1','PanSTARRS'),
+	    ('lsst','LSST'),
 ])
 
 mesa_defaults = {
@@ -108,6 +109,18 @@ class Dotter2016(Isochrone):
                 (12,('z',float)),
                 (13,('y',float)),
                 (16,('stage',float))
+                ]),
+            lsst = odict([
+                (2, ('mass_init',float)),
+                (3, ('mass_act',float)),
+                (6, ('log_lum',float)),
+                (9, ('u',float)),
+                (10,('g',float)),
+                (11,('r',float)),
+                (12,('i',float)),
+                (13,('z',float)),
+                (14,('Y',float)),
+                (15,('stage',float))
                 ]),
             )
 

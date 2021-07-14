@@ -9,7 +9,6 @@ import numpy
 import numpy as np
 import healpy as hp
 import healpy
-import fitsio
 
 import ugali.utils.projector
 from ugali.utils import fileio
@@ -150,7 +149,7 @@ def ang2pix(nside, lon, lat, nest=False):
     """
     theta = np.radians(90. - lat)
     phi = np.radians(lon)
-    return healpy.ang2pix(nside, theta, phi, nest=nest)
+    return hp.ang2pix(nside, theta, phi, nest=nest)
 
 def ang2vec(lon, lat):
     theta = lat2theta(lat)
@@ -182,8 +181,8 @@ def healpixMap(nside, lon, lat, fill_value=0., nest=False):
     pix = angToPix(nside, lon, lat, nest=nest)
     if max_angsep < 10:
         # More efficient histograming for small regions of sky
-        m = np.tile(fill_value, healpy.nside2npix(nside))
-        pix_subset = ugali.utils.healpix.angToDisc(nside, lon_median, lat_median, max_angsep, nest=nest)
+        m = np.tile(fill_value, hp.nside2npix(nside))
+        pix_subset = ang2disc(nside, lon_median, lat_median, max_angsep, nest=nest)
         bins = np.arange(np.min(pix_subset), np.max(pix_subset) + 1)
         m_subset = np.histogram(pix, bins=bins - 0.5)[0].astype(float)
         m[bins[0:-1]] = m_subset
@@ -383,6 +382,8 @@ def write_partial_map(filename, data, nside, coord=None, nest=False,
     --------
     None
     """
+    import fitsio
+
     # ADW: Do we want to make everything uppercase?
 
     if isinstance(data,dict):
@@ -420,6 +421,8 @@ def read_partial_map(filenames, column, fullsky=True, **kwargs):
     --------
     (nside,pix,map) : pixel array and healpix map (partial or fullsky)
     """
+    import fitsio
+
     # Make sure that PIXEL is in columns
     #kwargs['columns'] = ['PIXEL',column]
     kwargs['columns'] = ['PIXEL'] + np.atleast_1d(column).tolist()
@@ -451,6 +454,18 @@ def read_partial_map(filenames, column, fullsky=True, **kwargs):
         return (nside,pix,value.T)
 
 def merge_partial_maps(filenames,outfile,**kwargs):
+    """
+    Parameters:
+    -----------
+    filenames : list of filenames to merge
+    outfile   : name of outfile to create
+    kwargs    : kwargs passed to fitsio.read
+
+    Returns:
+    --------
+    None
+    """
+    import fitsio
     filenames = np.atleast_1d(filenames)
 
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
@@ -492,6 +507,7 @@ def merge_likelihood_headers(filenames, outfile, **kwargs):
     --------
     data      : the data being written
     """
+    import fitsio
     filenames = np.atleast_1d(filenames)
 
     ext='PIX_DATA'
@@ -518,6 +534,7 @@ def merge_likelihood_headers2(filenames, outfile, **kwargs):
     --------
     data      : the data being written
     """
+    import fitsio
     filenames = np.atleast_1d(filenames)
 
     ext='PIX_DATA'
