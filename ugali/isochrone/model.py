@@ -1137,6 +1137,17 @@ class Isochrone(IsochroneModel):
         """
         Check valid parameter range and download isochrones from:
         http://stev.oapd.inaf.it/cgi-bin/cmd
+
+        Parameters
+        ----------
+        age         : age in (Gyr)
+        metallicity : Z
+        outdir      : output directory (default to current directory)
+        force       : force overwrite of file
+
+        Returns
+        -------
+        outfile : the output isochrone
         """
         try:
             from urllib.error import URLError
