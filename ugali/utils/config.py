@@ -74,7 +74,7 @@ class Config(dict):
         """
         if isstring(config):
             self.filename = config
-            params = yaml.load(open(config))
+            params = yaml.safe_load(open(config))
         elif isinstance(config, Config):
             # This is the copy constructor...
             self.filename = config.filename
