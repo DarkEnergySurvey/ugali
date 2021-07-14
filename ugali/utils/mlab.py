@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 """
-Transplanted from matplotlib.mlab
+Python utilities.
 """
-
 import six
 import numpy as np
 
@@ -14,6 +13,10 @@ def iterable(obj):
         return False
     return True
 
+def isstring(obj):
+    """Python 2/3 compatible string check"""
+    return isinstance(obj, six.string_types)
+
 def rec_append_fields(rec, names, arrs, dtypes=None):
     """
     Return a new record array with field names populated with data
@@ -21,8 +24,7 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
     *arrs* and *dtypes* do not have to be lists. They can just be the
     values themselves.
     """
-    if (not isinstance(names, six.string_types) and iterable(names)
-            and len(names) and isinstance(names[0], six.string_types)):
+    if (not isstring(names) and iterable(names) and len(names) and isstring(names[0])):
         if len(names) != len(arrs):
             raise ValueError("number of arrays do not match number of names")
     else:  # we have only 1 name and 1 array
@@ -48,8 +50,3 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
     for name, arr in zip(names, arrs):
         newrec[name] = arr
     return newrec
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    args = parser.parse_args()

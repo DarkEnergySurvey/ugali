@@ -20,7 +20,7 @@ class IMF(object):
         """ Call the pdf of the mass function """
         return self.pdf(mass,**kwargs)
 
-    def integrate(self, mass_min, mass_max, log_mode=True, weight=False, steps=1e4):
+    def integrate(self, mass_min, mass_max, log_mode=True, weight=False, steps=10000):
         """ Numerical Riemannn integral of the IMF (stupid simple).
 
         Parameters:
@@ -28,13 +28,14 @@ class IMF(object):
         mass_min: minimum mass bound for integration (solar masses)
         mass_max: maximum mass bound for integration (solar masses)
         log_mode[True]: use logarithmic steps in stellar mass as oppose to linear
-            weight[False]: weight the integral by stellar mass
-            steps: number of numerical integration steps
+        weight[False]: weight the integral by stellar mass
+        steps: number of numerical integration steps
 
         Returns:
         --------
         result of integral
         """
+        steps = int(steps)
         if log_mode:
             d_log_mass = (np.log10(mass_max) - np.log10(mass_min)) / float(steps)
             log_mass = np.linspace(np.log10(mass_min), np.log10(mass_max), steps)
@@ -73,6 +74,7 @@ class IMF(object):
         mass     : array of randomly sampled mass values
         """
         if seed is not None: np.random.seed(seed)
+        steps = int(steps)
         d_mass = (mass_max - mass_min) / float(steps)
         mass = np.linspace(mass_min, mass_max, steps)
         cdf = np.insert(np.cumsum(d_mass * self.pdf(mass[1:], log_mode=False)), 0, 0.)
