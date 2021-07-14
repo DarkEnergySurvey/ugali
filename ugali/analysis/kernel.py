@@ -40,29 +40,42 @@ class Kernel(Model):
         super(Kernel,self).__init__(**kwargs)
 
     def __call__(self, lon, lat):
+        """
+        Return the value of the pdf at a give location.
+
+        Parameters
+        ----------
+        lon : longitude (deg)
+        lat : latitude (deg)
+        
+        Returns
+        -------
+        pdf : normalized, truncated pdf
+        """
         return self.pdf(lon, lat)
 
     @abstractmethod
     def _kernel(self, r):
-        # unnormalized, untruncated kernel
+        """Unnormalized, untruncated kernel"""
         pass
 
     def _pdf(self, radius):
-        # unnormalized, truncated kernel
+        """Unnormalized, truncated kernel"""
         return np.where(radius<=self.edge, self._kernel(radius), 0.)
 
     @abstractmethod
     def pdf(self, lon, lat):
-        # normalized, truncated pdf
+        """Normalized, truncated pdf"""
         pass
 
     @property
     def norm(self):
-        # Numerically integrate the pdf
+        """Normalization from the integated pdf"""
         return 1./self.integrate()
 
     @property
     def projector(self):
+        """Projector used to transform to local sky coordinates."""       
         if self.proj is None or self.proj.lower()=='none':
             return None
         else:
@@ -133,12 +146,14 @@ class EllipticalKernel(Kernel):
     _params = odict(
         list(Kernel._params.items()) + 
         [
+            # This is the semi-major axis
             ('extension',     Parameter(0.1, [0.0001,0.5]) ),   
-            ('ellipticity',   Parameter(0.0, [0.0, 0.99]) ),    # Default 0 for RadialKernel
-            ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # Default 0 for RadialKernel
-            # This is the PA *WEST* of North.
+            # This is e = 1 - b/a (0 for RadialKernel)
+            ('ellipticity',   Parameter(0.0, [0.0, 0.99]) ),    
+            # This is the PA *WEST* of North (0 for RadialKernel)
             # to get the conventional PA EAST of North take 90-PA
             # Would it be better to have bounds [-90,90]?
+            ('position_angle',Parameter(0.0, [0.0, 180.0]) ),  # 
         ])
     _mapping = odict([
         ('e','ellipticity'),
@@ -183,19 +198,36 @@ class EllipticalKernel(Kernel):
         """
         Sample the radial distribution (deg) from the 2D stellar density.
         Output is elliptical radius in true projected coordinates.
+
+        Parameters
+        ----------
+        n : number of stars to sample
+
+        Returns
+        -------
+        radius : distance from centroid (deg)
         """
+        size = int(n)
         edge = self.edge if self.edge<20*self.extension else 20*self.extension
-        radius = np.linspace(0, edge, 1.e5)
+        radius = np.linspace(0, edge, int(10**5))
         pdf = self._pdf(radius) * np.sin(np.radians(radius))
         cdf = np.cumsum(pdf)
         cdf /= cdf[-1]
         fn = scipy.interpolate.interp1d(cdf, list(range(0, len(cdf))))
-        index = np.floor(fn(np.random.uniform(size=n))).astype(int)
+        index = np.floor(fn(np.random.uniform(size=size))).astype(int)
         return radius[index]
  
     def sample_lonlat(self, n):
         """
         Sample 2D distribution of points in lon, lat
+
+        Parameters
+        ----------
+        n : number of stars to sample
+
+        Returns
+        -------
+        lon,lat : longitude and latitude (deg)
         """
         # From http://en.wikipedia.org/wiki/Ellipse#General_parametric_form
         # However, Martin et al. (2009) use PA theta "from North to East"
@@ -374,7 +406,7 @@ class EllipticalKing(EllipticalKernel):
         return ((1./np.sqrt(1.+(radius/self.r_c)**2))-(1./np.sqrt(1.+(self.r_t/self.r_c)**2)))**2
 
     def _cache(self, name=None):
-        if name in ['extension','ellipticity','truncate']:
+        if name in [None,'extension','ellipticity','truncate']:
             self._norm = 1./self.integrate()
         else:
             return
