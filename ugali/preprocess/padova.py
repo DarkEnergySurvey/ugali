@@ -23,11 +23,7 @@ import copy
 import numpy as np
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-<<<<<<< HEAD
 from ugali.analysis.isochrone import Padova
-=======
-from ugali.analysis.isochrone import Padova as PadovaIsochrone
->>>>>>> master
 
 # survey system
 photsys_dict = odict([
@@ -212,10 +208,6 @@ class Padova(Download):
             msg = "Output filename not found"
             raise RuntimeError(msg)
 
-<<<<<<< HEAD
-=======
-        #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
->>>>>>> master
         out = '{0}/tmp/{1}.dat'.format(server, fname[0])
         cmd = 'wget %s -O %s'%(out,outfile)
         logger.debug(cmd)
