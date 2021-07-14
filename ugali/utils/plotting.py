@@ -563,10 +563,6 @@ class BasePlotter(object):
         import ugali.isochrone
 
         if zidx is not None:
-            #filename = self.config.mergefile
-            #logger.debug("Opening %s..."%filename)
-            #f = fitsio.FITS(filename)
-            #distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]
             distance_modulus = self.get_likelihood()[2][zidx]
 
             iso = ugali.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
@@ -598,10 +594,6 @@ class BasePlotter(object):
         if not ax: ax = plt.gca()
         import ugali.analysis.scan
 
-        #filename = self.config.mergefile
-        #logger.debug("Opening %s..."%filename)
-        #f = fitsio.FITS(filename)
-        #distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]        
         distance_modulus = self.get_likelihood()[2]
 
         for ii, name in enumerate(self.config.params['isochrone']['infiles']):
@@ -639,11 +631,6 @@ class BasePlotter(object):
         except: plt.colorbar(sc)
 
     def plotDistance(self):
-        #filename = self.config.mergefile
-        #logger.debug("Opening %s..."%filename)
-        #f = fitsio.FITS(filename)
-        #d = f[1].read()
-        #distances = f[2].read()['DISTANCE_MODULUS']
         _,d,distances = self.get_likelihood()
 
         pixels,values = d['PIXEL'],2*d['LOG_LIKELIHOOD']
