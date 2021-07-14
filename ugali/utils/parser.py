@@ -100,8 +100,9 @@ class Parser(argparse.ArgumentParser):
             gal = pix2ang(*opts.hpx)
 
         if gal is not None:
-            opts.coords = [(gal[0],gal[1],radius)]
-            opts.names = [vars(opts).get('name','')]
+            dtype = [('lon',float),('lat',float),('radius',float)]
+            opts.coords = np.array([(gal[0],gal[1],radius)],dtype=dtype)
+            opts.names  = np.array([vars(opts).get('name','')])
         else:
             opts.coords = None
             opts.names = None

@@ -11,6 +11,7 @@ import healpy as hp
 import healpy
 
 import ugali.utils.projector
+from ugali.utils import fileio
 from ugali.utils.logger import logger
 
 ############################################################
@@ -181,7 +182,7 @@ def healpixMap(nside, lon, lat, fill_value=0., nest=False):
     if max_angsep < 10:
         # More efficient histograming for small regions of sky
         m = np.tile(fill_value, hp.nside2npix(nside))
-        pix_subset = ugali.utils.healpix.angToDisc(nside, lon_median, lat_median, max_angsep, nest=nest)
+        pix_subset = ang2disc(nside, lon_median, lat_median, max_angsep, nest=nest)
         bins = np.arange(np.min(pix_subset), np.max(pix_subset) + 1)
         m_subset = np.histogram(pix, bins=bins - 0.5)[0].astype(float)
         m[bins[0:-1]] = m_subset
@@ -382,7 +383,6 @@ def write_partial_map(filename, data, nside, coord=None, nest=False,
     None
     """
     import fitsio
-    import ugali.utils.fileio
 
     # ADW: Do we want to make everything uppercase?
 
@@ -400,8 +400,8 @@ def write_partial_map(filename, data, nside, coord=None, nest=False,
     if header is not None:
         for k,v in header.items():
             fitshdr.add_record({'name':k,'value':v})
-
-    logger.info("Writing %s"%filename)
+    # ADW: Should this be a debug?
+    logger.info("Writing %s..."%filename)
     fitsio.write(filename,data,extname='PIX_DATA',header=fitshdr,clobber=True)
 
 def read_partial_map(filenames, column, fullsky=True, **kwargs):
@@ -422,7 +422,6 @@ def read_partial_map(filenames, column, fullsky=True, **kwargs):
     (nside,pix,map) : pixel array and healpix map (partial or fullsky)
     """
     import fitsio
-    import ugali.utils.fileio
 
     # Make sure that PIXEL is in columns
     #kwargs['columns'] = ['PIXEL',column]
@@ -430,7 +429,7 @@ def read_partial_map(filenames, column, fullsky=True, **kwargs):
 
     filenames = np.atleast_1d(filenames)
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
-    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    data = fileio.load_files(filenames,**kwargs)
 
     pix = data['PIXEL']
     value = data[column]
@@ -467,13 +466,11 @@ def merge_partial_maps(filenames,outfile,**kwargs):
     None
     """
     import fitsio
-    import ugali.utils.fileio
-
     filenames = np.atleast_1d(filenames)
 
     header = fitsio.read_header(filenames[0],ext=kwargs.get('ext',1))
     nside = header['NSIDE']
-    data = ugali.utils.fileio.load_files(filenames,**kwargs)
+    data = fileio.load_files(filenames,**kwargs)
     pix = data['PIXEL']
 
     ndupes = len(pix) - len(np.unique(pix))
@@ -482,7 +479,8 @@ def merge_partial_maps(filenames,outfile,**kwargs):
         raise Exception(msg)
 
     extname = 'DISTANCE_MODULUS'
-    distance = ugali.utils.fileio.load_files(filenames,ext=extname)[extname]
+    kwargs['ext'] = extname
+    distance = fileio.load_files(filenames,**kwargs)[extname]
     unique_distance = np.unique(distance)
     # Check if distance moduli are the same...
     if np.any(distance[:len(unique_distance)] != unique_distance):
@@ -490,11 +488,43 @@ def merge_partial_maps(filenames,outfile,**kwargs):
         msg += '\n'+str(distance[:len(unique_distance)])
         msg += '\n'+str(unique_distance)
         raise Exception(msg)
+    del distance
 
-    write_partial_map(outfile,data=data,nside=nside,clobber=True)
-    fitsio.write(outfile,{extname:unique_distance},extname=extname)
+    # Writing partial maps
+    if outfile is not None:
+        write_partial_map(outfile,data=data,nside=nside,clobber=True)
+        fitsio.write(outfile,{extname:unique_distance},extname=extname)
 
-def merge_likelihood_headers(filenames, outfile):
+    return nside,data,unique_distance
+
+def merge_likelihood_headers(filenames, outfile, **kwargs):
+    """
+    Merge header information from likelihood files.
+
+    Parameters:
+    -----------
+    filenames : input filenames
+    oufile    : the merged file to write
+    
+    Returns:
+    --------
+    data      : the data being written
+    """
+    import fitsio
+    filenames = np.atleast_1d(filenames)
+
+    ext='PIX_DATA'
+    nside = fitsio.read_header(filenames[0],ext=ext)['LKDNSIDE']
+
+    keys = ['LKDPIX','STELLAR','NINSIDE','NANNULUS']
+    data_dict = fileio.load_headers(filenames,ext=ext,keys=keys,mulitproc=8)
+    names = data_dict.dtype.names
+    data_dict.dtype.names = ['PIXEL' if n=='LKDPIX' else n for n in names]
+        
+    write_partial_map(outfile, data_dict, nside)
+    return data_dict
+
+def merge_likelihood_headers2(filenames, outfile, **kwargs):
     """
     Merge header information from likelihood files.
 
@@ -593,21 +623,19 @@ def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
     if (not healpy.isnpixok(m.size) or (sz>0 and sz != m.size)) and verbose:
         print('nside={0:d}, sz={1:d}, m.size={2:d}'.format(nside,sz,m.size))
         raise ValueError('Wrong nside parameter.')
-    if not nest is None:
+    if nest is not None:
         if nest and ordering.startswith('RING'):
             idx = healpy.nest2ring(nside,np.arange(m.size,dtype=np.int32))
-            if verbose: print('Ordering converted to NEST')
             m = m[idx]
-            return  m[idx]
+            if verbose: print('Ordering converted to NEST')
         elif (not nest) and ordering.startswith('NESTED'):
             idx = healpy.ring2nest(nside,np.arange(m.size,dtype=np.int32))
             m = m[idx]
             if verbose: print('Ordering converted to RING')
 
-    if h:
-        return m, header
-    else:
-        return m
+    if h: return m, hdr
+    else: return m
+
 
 if __name__ == "__main__":
     import argparse

@@ -54,52 +54,6 @@ class Farm:
                       verbose='-v' if self.verbose else '')
         cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i %(verbose)s'%params
         return cmd
-
-    # ADW: Should probably be in a utility
-    def footprint(self, nside=None):
-        """
-        UNTESTED.
-        Should return a boolean array representing the pixels in the footprint.
-        """
-        if nside is None:
-            nside = self.nside_pixel
-        elif nside < self.nside_catalog: 
-            raise Exception('Requested nside=%i is less than catalog_nside'%nside)
-        elif nside > self.nside_pixel:
-            raise Exception('Requested nside=%i is greater than pixel_nside'%nside)
-        pix = np.arange(hp.nside2npix(nside), dtype=int)
-        map = self.inFootprint(pix,nside)
-        return map 
-
-    # ADW: Should probably be in a utility
-    def inFootprint(self, pixels, nside=None):
-        """
-        Open each valid filename for the set of pixels and determine the set 
-        of subpixels with valid data.
-        """
-        if np.isscalar(pixels): pixels = np.array([pixels])
-        if nside is None: nside = self.nside_likelihood
-
-        inside = np.zeros( len(pixels), dtype='bool')
-        if not self.nside_catalog:
-            catalog_pix = [0]
-        else:
-            catalog_pix = superpixel(pixels,nside,self.nside_catalog)
-            catalog_pix = np.intersect1d(catalog_pix,self.catalog_pixels)
-
-        for filenames in self.filenames[catalog_pix]:
-            # ADW: Need to replace with healpix functions...
-            #logger.debug("Loading %s"%filenames['mask_1'])
-            #subpix_1,val_1 = ugali.utils.skymap.readSparseHealpixMap(filenames['mask_1'],'MAGLIM',construct_map=False)
-            _n,subpix_1,val_1 = read_partial_map(filenames['mask_1'],'MAGLIM',fullsky=False)
-            #logger.debug("Loading %s"%filenames['mask_2'])
-            #subpix_2,val_2 = ugali.utils.skymap.readSparseHealpixMap(filenames['mask_2'],'MAGLIM',construct_map=False)
-            _n,subpix_2,val_2 = read_partial_map(filenames['mask_2'],'MAGLIM',fullsky=False)
-            subpix = np.intersect1d(subpix_1,subpix_2)
-            superpix = np.unique(superpixel(subpix,self.nside_pixel,nside))
-            inside |= np.in1d(pixels, superpix)
-            
-        return inside
         
     def submit_all(self, coords=None, queue=None, debug=False):
         """
@@ -114,18 +68,9 @@ class Farm:
         if coords is None:
             pixels = np.arange(hp.nside2npix(self.nside_likelihood))
         else:
-            coords = np.asarray(coords)
-            if coords.ndim == 1:
-                coords = np.array([coords])
-            if coords.shape[1] == 2:
-                lon,lat = coords.T
-                radius  = np.zeros(len(lon))
-            elif coords.shape[1] == 3:
-                lon,lat,radius = coords.T
-            else:
-                raise Exception("Unrecognized coords shape:"+str(coords.shape))
+            lon,lat,radius = coords['lon'],coords['lat'],coords['radius']
 
-            #ADW: targets is still in glon,glat
+            #ADW: coords are always parsed in GAL, so convert to CEL if necessary
             if self.config['coords']['coordsys'].lower() == 'cel':
                 lon,lat = gal2cel(lon,lat)
 
@@ -158,11 +103,11 @@ class Farm:
         """
         # For backwards compatibility
         batch = self.config['scan'].get('batch',self.config['batch'])
-        queue = batch['cluster'] if queue is None else queue
+        queue = batch.get('default','medium') if queue is None else queue
 
         # Need to develop some way to take command line arguments...
-        self.batch = ugali.utils.batch.batchFactory(queue,**batch['opts'])
-        self.batch.max_jobs = batch.get('max_jobs',200)
+        self.batch = ugali.utils.batch.batchFactory(queue,**batch.get(queue,{}))
+        self.batch.max_jobs = self.config['scan'].get('max_jobs',200)
 
         if np.isscalar(pixels): pixels = np.array([pixels])
 
@@ -178,7 +123,7 @@ class Farm:
                 
         lon,lat = pix2ang(self.nside_likelihood,pixels)
         commands = []
-        chunk = batch['chunk']
+        chunk = self.config['scan'].get('chunk',25)
         istart = 0
         logger.info('=== Submit Likelihood ===')
         for ii,pix in enumerate(pixels):
@@ -189,7 +134,7 @@ class Farm:
             # Create outfile name
             outfile = self.config.likefile%(pix,self.config['coords']['coordsys'].lower())
             outbase = os.path.basename(outfile)
-            jobname = batch['jobname']
+            jobname = batch.get('jobname','ugali')
 
             # Submission command
             sub = not os.path.exists(outfile)
@@ -226,21 +171,48 @@ class Farm:
                 time.sleep(0.5)
 
     def write_script(self, filename, commands):
+        """ Write a batch submission script.
+
+        Parameters
+        ----------
+        filename : filename of batch script
+        commands : list of commands to execute
+
+        Returns
+        -------
+        None
+        """
         info = 'echo "{0:=^60}";\n'
         hline = info.format("")
         newline = 'echo;\n'
+        shebang = "#!/usr/bin/env bash"
+        # Limit the memory based on SLAC 4 GB per node (defined in KB)
+        # Careful, shell arithmetic is weird.
+        memory_limit = """
+if [ -n "$LSB_CG_MEMLIMIT" ] & [ -n "$LSB_HOSTS" ]; then
+    mlimit=$(( $(wc -w <<< $LSB_HOSTS) * $LSB_CG_MEMLIMIT/1024 * 9/10 ))
+    ulimit -v ${mlimit}; ulimit -H -v ${mlimit};
+fi
+"""
+        memory_usage=r"""free -m | awk 'NR==2{printf "Memory Usage: %.2f/%.2fGB (%.2f%%)\n",$3/1024,$2/1024,$3*100/$2}';"""
+        memory_usage=r"""ps -U $USER --no-headers -o rss | awk '{sum+=$1} END {print "Memory Usage: " int(sum/1024**2) "GB"}'"""
 
         istart, iend = commands[0][0], commands[-1][0]
         script = open(filename,'w')
+        script.write(shebang)
+        #script.write(memory_limit)
         script.write(hline)
-        script.write(info.format('Submit Pixels %i to %i'%(istart,iend)))
+        script.write(info.format('Submit Jobs %i to %i'%(istart,iend)))
         script.write(hline)
         script.write(newline)
         script.write('status=0;\n')
         for i,cmd,lon,lat,sub in commands: 
-            script.write(info.format('Pixel %i: (%.2f, %.2f)'%(i,lon,lat)))
-            if sub: script.write('%s; [ $? -ne 0 ] && status=1;\n'%cmd)
-            else:   script.write('echo "%s";\n'%self.skip)
+            script.write(info.format('Job %i: (%.2f, %.2f)'%(i,lon,lat)))
+            if sub: 
+                script.write(memory_usage+'\n')
+                script.write('%s; [ $? -ne 0 ] && status=1;\n'%cmd)
+            else:   
+                script.write('echo "%s";\n'%self.skip)
             script.write(hline)
             script.write(newline)
         script.write('exit $status;\n')

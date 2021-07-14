@@ -355,6 +355,8 @@ class IsochroneModel(Model):
         [astro-ph/0506022].
 
 
+        TODO: ADW If richness not specified, should use self.richness
+
         Parameters:
         -----------
         richness : isochrone normalization parameter
@@ -1159,6 +1161,17 @@ class Isochrone(IsochroneModel):
         """
         Check valid parameter range and download isochrones from:
         http://stev.oapd.inaf.it/cgi-bin/cmd
+
+        Parameters
+        ----------
+        age         : age in (Gyr)
+        metallicity : Z
+        outdir      : output directory (default to current directory)
+        force       : force overwrite of file
+
+        Returns
+        -------
+        outfile : the output isochrone
         """
         try:
             from urllib.error import URLError

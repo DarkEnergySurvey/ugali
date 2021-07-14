@@ -318,8 +318,10 @@ def reverseHistogram(data,bins=None):
     """
     if bins is None: bins = np.arange(data.max()+2)
     hist, edges = np.histogram(data, bins=bins)
-    digi = np.digitize(data.flat,bins=np.unique(data)).argsort()
-    rev = np.hstack( (len(edges), len(edges) + np.cumsum(hist), digi) )
+    #digi = np.digitize(data.flat,bins=np.unique(data)).argsort()
+    #rev = np.hstack((len(edges), len(edges) + np.cumsum(hist), digi))
+    rev = np.hstack((len(edges), len(edges)+np.cumsum(hist), 
+                     np.digitize(data.flat,bins=np.unique(data)).argsort()))
     return hist,edges,rev
     
 def binnedMedian(x,y,xbins=None):

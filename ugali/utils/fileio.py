@@ -15,6 +15,7 @@ import numpy as np
 import healpy as hp
 
 from ugali.utils.logger import logger
+import warnings
 from ugali.utils.mlab import isstring
 
 def read(filename,**kwargs):
@@ -84,6 +85,49 @@ def add_column(filename,column,formula,force=False):
     insert_columns(filename,col,force=force)
     return True
 
+def load_header(kwargs):
+    """ Load a FITS header with kwargs. 
+
+    Parameters
+    ----------
+    kwargs : dict
+        keyword arguments passed to fitsio.read_header
+
+    Returns
+    -------
+    data : ndarray 
+        fits catalog data
+    """
+    logger.debug("Loading %(filename)s..."%kwargs)
+    try:
+        keys = kwargs.pop('keys',None)
+        hdr = fitsio.read_header(**kwargs)
+        if not keys: keys = hdr.keys()
+        return {k:hdr[k] for k in keys}
+    except Exception as e:
+        logger.error("Failed to load file: %(filename)s"%kwargs)
+        raise(e)
+
+def load_headers(filenames,multiproc=False,**kwargs):
+    """ Load a set of FITS headers with kwargs. """
+    filenames = np.atleast_1d(filenames)
+    logger.debug("Loading %s files..."%len(filenames))
+
+    kwargs = [dict(filename=f,**kwargs) for f in filenames]
+
+    if multiproc:
+        from multiprocessing import Pool
+        processes = multiproc if multiproc > 0 else None
+        pool = Pool(processes,maxtasksperchild=1)
+        out = pool.map(load_header,kwargs)
+        del pool
+    else:
+        out = [load_header(kw) for kw in kwargs]
+        
+    logger.debug('Concatenating headers...')
+    return np.rec.fromrecords([o.values() for o in out],names=out[0].keys())
+
+
 def load_file(kwargs):
     """ Load a FITS file with kwargs. 
 
@@ -92,8 +136,13 @@ def load_file(kwargs):
     Returns:
     ndarray : fits catalog data
     """
-    logger.debug("Loading %s..."%kwargs['filename'])
-    return fitsio.read(**kwargs)
+    logger.debug("Loading %(filename)s..."%kwargs)
+    try:
+        return fitsio.read(**kwargs)
+    except Exception as e:
+        logger.error("Failed to load file: %(filename)s"%kwargs)
+        raise(e)
+
 
 def load_files(filenames,multiproc=False,**kwargs):
     """ Load a set of FITS files with kwargs. """
@@ -105,8 +154,9 @@ def load_files(filenames,multiproc=False,**kwargs):
     if multiproc:
         from multiprocessing import Pool
         processes = multiproc if multiproc > 0 else None
-        p = Pool(processes,maxtasksperchild=1)
-        out = p.map(load_file,kwargs)
+        pool = Pool(processes,maxtasksperchild=1)
+        out = pool.map(load_file,kwargs)
+        del pool
     else:
         out = [load_file(kw) for kw in kwargs]
 

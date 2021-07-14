@@ -2,18 +2,20 @@
 """
 Cross-platform batch computing interface.
 """
-
+import os
 import subprocess, subprocess as sub
 import getpass
 from collections import OrderedDict as odict
 from itertools import chain
 import copy
 import time
+import resource
 
 import numpy as np
 
 from ugali.utils.logger import logger
 
+GB=1024**3
 CLUSTERS = odict([
     ('local' ,['local']),
     ('lsf'   ,['lsf','slac','kipac']),
@@ -33,7 +35,7 @@ QUEUES = odict([
 RUNLIMITS = odict([              #Hard limits
         (None       ,'4:00'),    # Default value
         ('express'  ,'0:04'),    # 0:04
-        ('short'    ,'0:30'),    # 1:00
+        ('short'    ,'0:59'),    # 1:00
         ('medium'   ,'1:00'),    # 48:00
         ('long'     ,'4:00'),    # 120:00
         ('xlong'    ,'72:00'),   # 72:00
@@ -47,16 +49,20 @@ RUNLIMITS = odict([              #Hard limits
 # General queues now only have 4GB of RAM per CPU
 # To get more memory for a general job, you need to request more cores:
 # i.e., '-n 2 -R "span[hosts=1]"' for 8GB of RAM
-# https://confluence.slac.stanford.edu/display/SCSPub/Batch+Compute+Best+Practices+and+Other+Info
+# https://confluence.slac.stanford.edu/x/moNdCw
 
-# These are options for MPI jobs
+# These are options for MPI jobs 
+# '-R "span[ptile=16]"' indicates the number of processors on each
+# host that should be allocated to the job
 MPIOPTS = odict([
         (None       ,' -R "span[ptile=4]"'),
         ('local'    ,''),
         ('short'    ,''),
         ('medium'   ,''),
+        ('long'     ,''),
         ('kipac-ibq',' -R "span[ptile=8]"'),
-        ('bulletmpi',' -R "span[ptile=16]"'),
+        #('bulletmpi',' -R "span[ptile=16]"'),
+        ('bulletmpi',''),
         ])
 
 def factory(queue,**kwargs):
@@ -109,6 +115,40 @@ class Batch(object):
         jobs = self.jobs()
         return len(jobs.strip().split('\n'))-1 if jobs else 0
 
+    def bfail(self, path):
+        """ Check logfile(s) for failure. 
+
+        Parameters:
+        -----------
+        path : path to logfile(s)
+        
+        Returns:
+        --------
+        files : failed logfiles and message
+        """
+        cmd='grep -r "^Exited" %s'%path
+        out = self.popen(cmd)
+        stdout = out.communicate()[0]
+        # There is an extra newline at the end
+        return stdout.split('\n')[:-1]
+
+    def bcomp(self, path):
+        """ Return completed logfile(s).
+
+        Parameters:
+        -----------
+        path : path to logfile(s)
+        
+        Returns:
+        --------
+        files : completed logfiles and message
+        """
+        cmd='grep -r "^Successfully completed." %s'%path
+        out = self.popen(cmd)
+        stdout = out.communicate()[0]
+        # There is an extra newline at the end
+        return stdout.split('\n')[:-1]
+
     def throttle(self,max_jobs=None,sleep=60):
         if max_jobs is None: max_jobs = self.max_jobs
         if max_jobs is None: return
@@ -146,6 +186,9 @@ class Batch(object):
         self.throttle()
         self.call(cmd)
         return cmd
+
+    def get_memory_limit(): pass
+    def set_memory_limit(mlimit): pass
 
 class Local(Batch):
     def __init__(self,**kwargs):
@@ -202,11 +245,51 @@ class LSF(Batch):
         #options.update(OPTIONS[options.get('q')])
         # User specified options
         options.update(opts)
-        if 'n' in list(options.keys()): 
-            #options['a'] = 'mpirun'
-            options['R'] += self.mpiopts(options.get('q'))
+        #if 'n' in list(options.keys()): 
+        #    #options['a'] = 'mpirun'
+        #    options['R'] += self.mpiopts(options.get('q'))
         options.setdefault('W',self.runlimit(options.get('q')))
         return ''.join('-%s %s '%(k,v) for k,v in options.items())
+
+    @classmethod
+    def set_memory_limit(cls, mlimit):
+        """Set the (soft) memory limit for setrlimit.
+        
+        Parameters:
+        -----------
+        mlimit : soft memory limit (bytes)
+        
+        Returns:
+        --------
+        soft, hard : memory limits (bytes)
+        """
+        rsrc = resource.RLIMIT_AS
+        resource.setrlimit(rsrc, (mlimit, mlimit))
+        return resource.getrlimit(rsrc)
+
+    @classmethod
+    def get_memory_limit(cls):
+        """Get the hard memory limit from LSF.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        mlimit : memory limit (bytes)
+        """
+        rsrc = resource.RLIMIT_AS
+        soft, hard = resource.getrlimit(rsrc)
+        if os.getenv('LSB_CG_MEMLIMIT') and os.getenv('LSB_HOSTS'):
+            # Memory limit per core
+            memlimit = int(os.getenv('LSB_CG_MEMLIMIT'), 16)
+            # Number of cores
+            ncores = len(os.getenv('LSB_HOSTS').split())
+            #soft = ncores * memlimit - 100*1024**2
+            soft = int( 0.95 * ncores * memlimit )
+        return soft,hard
+
         
 class Slurm(Batch):
     _defaults = odict([

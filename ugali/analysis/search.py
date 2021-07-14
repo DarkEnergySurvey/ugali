@@ -7,6 +7,7 @@ import os
 import copy
 import subprocess
 from collections import OrderedDict as odict
+import glob
 
 import healpy
 import fitsio
@@ -23,6 +24,7 @@ from ugali.utils import healpix, mlab
 from ugali.utils.healpix import pix2ang, ang2pix
 from ugali.candidate.associate import SourceCatalog, catalogFactory
 from ugali.utils.config import Config
+from ugali.utils import fileio
 
 class CandidateSearch(object):
     """
@@ -54,16 +56,44 @@ class CandidateSearch(object):
         self.loadLikelihood()
         self.loadROI()
 
-    def loadLikelihood(self,filename=None):
-        if filename is None: filename = self.mergefile
-        f = fitsio.FITS(self.mergefile)
-        data = f[1].read()
+    def loadLikelihood(self,filenames=None):
+        """Load the merged likelihood healpix map.
+
+        Parameters
+        ----------
+        filename : input filename for sparse healpix map (default: mergefile)
+        
+        Returns
+        -------
+        None : sets attributes: `pixels`, `values`, `distances`, `richness` 
+        """
+        if filenames is None: 
+            if os.path.exists(self.mergefile):
+                filenames = self.mergefile
+            else:
+                filenames = glob.glob(self.mergefile.split('_%')[0]+'_*.fits')
+            
+        filenames = np.atleast_1d(filenames)
+        data = fileio.load_files(filenames)
+
         self.pixels = data['PIXEL'] if 'PIXEL' in data.dtype.names else data['PIX']
         self.values = 2*data['LOG_LIKELIHOOD']
-        self.distances = f[2].read()['DISTANCE_MODULUS']
         self.richness = data['RICHNESS']
 
+        # Load distances from first file (should all be the same)
+        self.distances = fileio.load_files(filenames[0],ext=2,columns='DISTANCE_MODULUS')
+
     def loadROI(self,filename=None):
+        """Load the ROI parameter sparse healpix map.
+
+        Parameters
+        ----------
+        filename : input filename for sparse healpix map (default: roifile)
+
+        Returns
+        -------
+        None : sets attributes: `ninterior`, `nannulus`, `stellar`
+        """
         if filename is None: filename = self.roifile
 
         self.ninterior = healpix.read_partial_map(filename,'NINSIDE')[-1]
@@ -71,16 +101,29 @@ class CandidateSearch(object):
         self.stellar = healpix.read_partial_map(filename,'STELLAR')[-1]
 
     def createLabels2D(self):
-        """ 2D labeling at zmax """
-        logger.debug("  Creating 2D labels...")
-        self.zmax = np.argmax(self.values,axis=1)
-        self.vmax = self.values[np.arange(len(self.pixels),dtype=int),self.zmax]
+        """Create a flattened (2D) labeled array at zmax. 
 
-        kwargs=dict(pixels=self.pixels,values=self.vmax,nside=self.nside,
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        labels, nlables : labeled healpix array.
+        """
+        logger.debug("  Creating 2D labels...")
+        zmax = np.argmax(self.values,axis=1)
+        vmax = self.values[np.arange(len(self.pixels),dtype=int),zmax]
+
+        kwargs=dict(pixels=self.pixels,values=vmax,nside=self.nside,
                     threshold=self.threshold,xsize=self.xsize)
         labels,nlabels = CandidateSearch.labelHealpix(**kwargs)
         self.nlabels = nlabels
+
+        # This is wasteful, but returns the same shape array for 2D and 3D labels
         self.labels = np.repeat(labels,len(self.distances)).reshape(len(labels),len(self.distances))
+        #self.labels = labels
+
         return self.labels, self.nlabels
 
     def createLabels3D(self):
@@ -91,13 +134,20 @@ class CandidateSearch(object):
         return self.labels, self.nlabels
 
     def writeLabels(self,filename=None):
+        """Write the labeled array to a file.
+        
+        Parameters
+        ----------
+        filename : output filename (default: labelfile)
+
+        Returns
+        -------
+        None
+        """
         if filename is None: filename = self.labelfile
 
-        # ADW: Is it necessary to convert labels?
-        data_dict = {'PIXEL':self.pixels,
-                     'LABEL':self.labels.astype(float,copy=False)}
+        data_dict = {'PIXEL':self.pixels,'LABEL':self.labels}
 
-        logger.info("Writing %s..."%filename)
         healpix.write_partial_map(filename,data_dict,self.nside)
         fitsio.write(filename,
                      {'DISTANCE_MODULUS':self.distances.astype('f4',copy=False)},
@@ -106,30 +156,56 @@ class CandidateSearch(object):
 
 
     def loadLabels(self,filename=None):
+        """Load labels from filename.
+
+        Parameters
+        ----------
+        filename : labeled healpix map
+
+        Returns
+        -------
+        labels,nlabels : labels and number of labels
+        """
         if filename is None: filename = self.labelfile
-        data = fitsio.read(filename)
-        distances = fitsio.read(filename,ext='DISTANCE_MODULUS')['DISTANCE_MODULUS']
+        f = fitsio.FITS(filename)
+
+        data = f['PIX_DATA'].read()
         if not (self.pixels == data['PIXEL']).all(): 
             raise Exception("Pixels do not match")
+        self.pixels = data['PIXEL'] # this is just to save memory
+
+        distances = f['DISTANCE_MODULUS'].read(columns='DISTANCE_MODULUS')
         if not (self.distances == distances).all():
             raise Exception("Distance moduli do not match.")
+        self.distances = distances
 
-        self.labels = data['LABEL'].astype(int)
+        self.labels = data['LABEL']
         self.nlabels = self.labels.max()
         if self.nlabels != (len(np.unique(self.labels)) - 1):
             raise Exception("Incorrect number of labels found.")
+
         return self.labels, self.nlabels
-        
+
     def createObjects(self):
+        """Create list of objects from the labeled array
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        objects : array of objects
+        """
         logger.debug("  Creating objects...")
-        hist,edges,rev = reverseHistogram(self.labels,bins=numpy.arange(self.nlabels+2))
+        hist,edges,rev = reverseHistogram(self.labels,bins=np.arange(self.nlabels+2))
         self.rev = rev
         # Make some cut on the minimum size of a labelled object
-        good, = numpy.where( (hist >= self.minpix) )
+        good, = np.where( (hist >= self.minpix) )
         # Get rid of zero label (below threshold)
-        self.good, = numpy.nonzero(good)
+        self.good, = np.nonzero(good)
 
-        kwargs=dict(pixels=self.pixels,values=self.values,nside=self.nside, 
+        kwargs=dict(pixels=self.pixels,values=self.values,nside=self.nside,
                     zvalues=self.distances, rev=self.rev, good=self.good)
         objects = self.findObjects(**kwargs)
         self.objects = self.finalizeObjects(objects)
@@ -171,13 +247,13 @@ class CandidateSearch(object):
         if values.ndim < 2: iterate = [values]
         else:               iterate = values.T
         for i,value in enumerate(iterate):
-            logger.debug("Labeling slice %i...")
-            searchim = numpy.zeros(xx.shape,dtype=bool)
+            logger.debug("Labeling slice %i..."%i)
+            searchim = np.zeros(xx.shape,dtype=bool)
             select = (value > threshold)
             yidx = ij[0][select]; xidx = ij[1][select]
             searchim[yidx,xidx] |= True
             searchims.append( searchim )
-        searchims = numpy.array(searchims)
+        searchims = np.array(searchims)
 
         # Full binary structure
         s = ndimage.generate_binary_structure(searchims.ndim,searchims.ndim)
@@ -203,19 +279,19 @@ class CandidateSearch(object):
         Characterize labelled candidates in a multi-dimensional HEALPix map.
      
         Parameters:
+        pixels    : Pixel values associated to (sparse) HEALPix array
         values    : (Sparse) HEALPix array of data values
         nside     : HEALPix dimensionality
-        pixels    : Pixel values associated to (sparse) HEALPix array
         zvalues   : Values of the z-dimension (usually distance modulus)
         rev       : Reverse indices for pixels in each "island"
         good      : Array containg labels for each "island"
      
         Returns:
-        objs      : numpy.recarray of object characteristics
+        objs      : np.recarray of object characteristics
         """
      
         ngood = len(good)
-        objs = numpy.recarray((ngood,),
+        objs = np.recarray((ngood,),
                            dtype=[('LABEL','i4'),
                                   ('NPIX','i4'),
                                   ('VAL_MAX','f4'),
@@ -269,7 +345,7 @@ class CandidateSearch(object):
             xpix,ypix = proj.sphereToImage(xval,yval)
 
             # Projected centroid
-            x_cent,y_cent,zval_cent = numpy.average([xpix,ypix,zval],axis=1)
+            x_cent,y_cent,zval_cent = np.average([xpix,ypix,zval],axis=1)
             xval_cent, yval_cent = proj.imageToSphere(x_cent,y_cent)
             objs[i]['X_CENT'] = xval_cent
             objs[i]['Y_CENT'] = yval_cent
@@ -277,7 +353,7 @@ class CandidateSearch(object):
 
             # Projected barycenter
             weights=[island,island,island]
-            x_bary,y_bary,zval_bary = numpy.average([xpix,ypix,zval],weights=weights,axis=1)
+            x_bary,y_bary,zval_bary = np.average([xpix,ypix,zval],weights=weights,axis=1)
             xval_bary,yval_bary = proj.imageToSphere(x_bary, y_bary)
             objs[i]['X_BARY'] = xval_bary
             objs[i]['Y_BARY'] = yval_bary
@@ -286,7 +362,7 @@ class CandidateSearch(object):
         return objs
 
     def finalizeObjects(self, objects):
-        objs = numpy.recarray(len(objects),
+        objs = np.recarray(len(objects),
                               dtype=[('NAME','S24'),
                                      ('TS','f4'),
                                      ('GLON','f4'),
@@ -333,21 +409,6 @@ class CandidateSearch(object):
                                     asrecarray=True,flatten=True)
 
         return out
-
-    def loadLabels(self,filename=None):
-        if filename is None: filename = self.labelfile
-        data = fitsio.read(filename)
-        distances = fitsio.read(filename,ext='DISTANCE_MODULUS')['DISTANCE_MODULUS']
-        if not (self.pixels == data['PIXEL']).all(): 
-            raise Exception("Pixels do not match")
-        if not (self.distances == distances).all():
-            raise Exception("Distance moduli do not match.")
-
-        self.labels = data['LABEL'].astype(int)
-        self.nlabels = self.labels.max()
-        if self.nlabels != (len(np.unique(self.labels)) - 1):
-            raise Exception("Incorrect number of labels found.")
-        return self.labels, self.nlabels
 
     def loadObjects(self,filename=None):
         if filename is None: filename = self.objectfile

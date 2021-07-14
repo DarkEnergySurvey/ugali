@@ -92,10 +92,68 @@ defaults_cmd=  {#'binary_frac': 0.3,
                 #'photsys_version': 'yang',
                 'submit_form': 'Submit'}
 
-defaults_27 = dict(defaults_cmd,cmd_version='2.7')
-defaults_28 = dict(defaults_cmd,cmd_version='2.8')
-defaults_29 = dict(defaults_cmd,cmd_version='2.9')
-defaults_30 = dict(defaults_cmd,cmd_version='3.0')
+# Access prior to 3.1 seems to be gone
+defaults_27 = dict(defaults_cmd,cmd_version=2.7)
+defaults_28 = dict(defaults_cmd,cmd_version=2.8)
+defaults_29 = dict(defaults_cmd,cmd_version=2.9)
+defaults_30 = dict(defaults_cmd,cmd_version=3.0)
+
+# This seems to maintain old ischrone format
+defaults_31 = dict(defaults_cmd,cmd_version=3.1)
+
+# New query and file format for 3.3...
+defaults_33 = {'cmd_version': 3.3,
+               'track_parsec': 'parsec_CAF09_v1.2S',
+               'track_colibri': 'parsec_CAF09_v1.2S_S35',
+               'track_postagb': 'no',
+               'n_inTPC': 10,
+               'eta_reimers': 0.2,
+               'kind_interp': 1,
+               'kind_postagb': -1,
+               'photsys_file': photsys_dict['des'],
+               'photsys_version': 'OBC',
+               'dust_sourceM': 'dpmod60alox40',
+               'dust_sourceC': 'AMCSIC15',
+               'kind_mag': 2,
+               'kind_dust': 0,
+               #'extinction_av': 0.0,
+               'extinction_coeff': 'constant',
+               'extinction_curve': 'cardelli',
+               'imf_file': 'tab_imf/imf_chabrier_lognormal.dat',
+               'isoc_isagelog': 0,
+               'isoc_agelow': 1.0e9,
+               'isoc_ageupp': 1.0e10,
+               'isoc_dage': 0.0,
+               'isoc_lagelow': 6.6,
+               'isoc_lageupp': 10.13,
+               'isoc_dlage': 0.0,
+               'isoc_ismetlog': 0,
+               'isoc_zlow': 0.0152,
+               'isoc_zupp': 0.03,
+               'isoc_dz': 0.0,
+               'isoc_metlow': -2,
+               'isoc_metupp': 0.3,
+               'isoc_dmet': 0.0,
+               'output_kind': 0,
+               'output_evstage': 1,
+               #'lf_maginf': -15,
+               #'lf_magsup': 20,
+               #'lf_deltamag': 0.5,
+               #'sim_mtot': 1.0e4,
+               'submit_form': 'Submit',
+               #'.cgifields': 'dust_sourceC',
+               #'.cgifields': 'track_colibri',
+               #'.cgifields': 'extinction_curve',
+               #'.cgifields': 'output_kind',
+               #'.cgifields': 'photsys_version',
+               #'.cgifields': 'isoc_isagelog',
+               #'.cgifields': 'track_parsec',
+               #'.cgifields': 'extinction_coeff',
+               #'.cgifields': 'track_postagb',
+               #'.cgifields': 'output_gzip',
+               #'.cgifields': 'isoc_ismetlog',
+               #'.cgifields': 'dust_sourceM',
+               }
 
 class ParsecIsochrone(Isochrone):
     """ Base class for PARSEC-style isochrones. """
@@ -154,20 +212,29 @@ class ParsecIsochrone(Isochrone):
 
         epsilon = 1e-4
         lage = np.log10(age*1e9)
-        lage_min,lage_max = params['isoc_lage0'],params['isoc_lage1']
+        
+        lage_min = params.get('isoc_lage0',6.602)
+        lage_max = params.get('isoc_lage1',10.1303)
+
         if not (lage_min-epsilon < lage <lage_max+epsilon):
             msg = 'Age outside of valid range: %g [%g < log(age) < %g]'%(lage,lage_min,lage_max)
             raise RuntimeError(msg)
 
-        z_min,z_max = params['isoc_z0'],params['isoc_z1']
+        z_min = params.get('isoc_z0',0.0001)
+        z_max = params.get('isoc_z1',0.03)
+    
         if not (z_min <= metallicity <= z_max):
             msg = 'Metallicity outside of valid range: %g [%g < z < %g]'%(metallicity,z_min,z_max)
             raise RuntimeError(msg)
         
         params['photsys_file'] = photsys_dict[self.survey]
-        params['isoc_age']     = age * 1e9
-        params['isoc_zeta']    = metallicity
-
+        if params['cmd_version'] < 3.3:
+            params['isoc_age']    = age * 1e9
+            params['isoc_zeta']   = metallicity
+        else:
+            params['isoc_agelow'] = age * 1e9
+            params['isoc_zlow']   = metallicity
+    
         server = self.download_url
         url = server + '/cgi-bin/cmd_%s'%params['cmd_version']
         # First check that the server is alive
@@ -242,7 +309,8 @@ class Bressan2012(ParsecIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
-    download_defaults = copy.deepcopy(defaults_27)
+    #download_defaults = copy.deepcopy(defaults_27)
+    download_defaults = copy.deepcopy(defaults_31)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
     columns = dict(
@@ -325,7 +393,7 @@ class Bressan2012(ParsecIsochrone):
         self.color = self.mag_1 - self.mag_2
 
 class Marigo2017(ParsecIsochrone):
-    #http://stev.oapd.inaf.it/cgi-bin/cmd_30
+    #http://stev.oapd.inaf.it/cgi-bin/cmd_31
     #_dirname = '/u/ki/kadrlica/des/isochrones/v4/'
     _dirname =  os.path.join(get_iso_dir(),'{survey}','marigo2017')
 
@@ -335,7 +403,7 @@ class Marigo2017(ParsecIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
-    download_defaults = dict(defaults_30)
+    download_defaults = copy.deepcopy(defaults_31)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S_NOV13'
 
     columns = dict(

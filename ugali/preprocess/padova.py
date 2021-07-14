@@ -23,7 +23,7 @@ import copy
 import numpy as np
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-from ugali.analysis.isochrone import Padova as PadovaIsochrone
+from ugali.analysis.isochrone import Padova
 
 # survey system
 photsys_dict = odict([
@@ -171,7 +171,7 @@ class Download(object):
 
 class Padova(Download):
     defaults = copy.deepcopy(defaults_27)
-    isochrone = PadovaIsochrone
+    isochrone = Padova
     
     abins = np.arange(1.0, 13.5 + 0.1, 0.1)
     zbins = np.arange(1e-4,1e-3 + 1e-5,1e-5)
@@ -208,7 +208,6 @@ class Padova(Download):
             msg = "Output filename not found"
             raise RuntimeError(msg)
 
-        #out = '{0}/~lgirardi/tmp/{1}.dat'.format(server, fname[0])
         out = '{0}/tmp/{1}.dat'.format(server, fname[0])
         cmd = 'wget %s -O %s'%(out,outfile)
         logger.debug(cmd)
@@ -321,8 +320,8 @@ if __name__ == "__main__":
     parser = ugali.utils.parser.Parser(description=description)
     parser.add_verbose()
     parser.add_force()
-    parser.add_argument('-a','--age',default=None,type=float)
-    parser.add_argument('-z','--metallicity',default=None,type=float)
+    parser.add_argument('-a','--age',default=None,type=float,action='append')
+    parser.add_argument('-z','--metallicity',default=None,type=float,action='append')
     parser.add_argument('-k','--kind',default='Bressan2012')
     parser.add_argument('-s','--survey',default='des')
     parser.add_argument('-o','--outdir',default=None)
@@ -332,10 +331,11 @@ if __name__ == "__main__":
     if args.verbose:
         try:                                                                                            
             from http.client import HTTPConnection
-        except ImportError:                                                                     from httplib import HTTPConnection
+        except ImportError:
+            from httplib import HTTPConnection
         HTTPConnection.debuglevel = 1
 
-    if args.outdir is None: 
+    if args.outdir is None:
         args.outdir = os.path.join(args.survey.lower(),args.kind.lower())
     logger.info("Writing to output directory: %s"%args.outdir)
 
@@ -349,9 +349,9 @@ if __name__ == "__main__":
     logger.info("Metallicities:\n  %s"%np.unique(grid[1]))
 
     def run(args):
-        try:  
+        try:
             p.download(*args)
-        except Exception as e: 
+        except Exception as e:
             logger.warn(str(e))
             logger.error("Download failed.")
 

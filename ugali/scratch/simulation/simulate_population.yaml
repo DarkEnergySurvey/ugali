@@ -1,8 +1,9 @@
 des:
   survey: des
-  range_distance:     [5.0, 1.0e+3] # kpc
+  range_distance:     [5.0,    1.0e+3] # kpc
   range_stellar_mass: [1.0e+1, 1.0e+6] # Lsun
-  range_r_physical:   [1.0e-3, 2.0] # pc
+  range_r_physical:   [1.0e-3, 2.0]    # kpc
+  known_dwarfs:       /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/recovered_satellites_des.csv
   stellar_density: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/des_y3a2_stellar_density_map_g_23_cel_nside_128.npy
   fracdet: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_griz_o.4096_t.32768_coverfoot_EQU_ring.fits
   maglim_g: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/y3a2_gold_1.0_cmv02-001_v1_nside4096_ring_g_depth.fits
@@ -13,15 +14,20 @@ des:
 
 ps1:
   survey: ps1
-  range_distance:     [5.0, 1.0e+3] # kpc
+  range_distance:     [5.0,    1.0e+3] # kpc
   range_stellar_mass: [1.0e+1, 1.0e+6] # Lsun
-  range_r_physical:   [1.0e-3, 2.0] # pc
+  range_r_physical:   [1.0e-3, 2.0]    # pc
+  known_dwarfs:       /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/recovered_satellites_ps1.csv
   stellar_density: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ps1_dr1_stellar_density_map_cel_nside_256.npy
   fracdet: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ps1_dr1_fracdet_n2048.fits.gz
   maglim_g: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_g_maglim.fits
   maglim_r: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_nside32_nest_r_maglim.fits
   ebv: /home/s1/bechtol/des60.b/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
-  completeness: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_stellar_classification_summary_r.csv
+  #ADW: Ring map (should be faster, but not yet tested)
+  #ebv: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits
+  #ADW: Completeness with SNR cut
+  #completeness: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_stellar_classification_summary_r.csv
+  completeness: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ps1_stellar_classification_summary_r_no_snr_cut.csv
   photo_error: /home/s1/bechtol/des60.b/projects/mw_substructure/ps1/sim_population/inputs/ps1_photo_error_model_r.csv
 
 kbechtol_des:

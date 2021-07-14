@@ -147,7 +147,7 @@ class Mask(object):
         if solid_angle_mmd.sum() == 0:
             msg = "Pruned mask contains no solid angle."
             logger.error(msg)
-            raise Exception(msg)
+            raise ValueError(msg)
 
         self.solid_angle_mmd = solid_angle_mmd
 
@@ -786,7 +786,7 @@ class MaskBand(object):
         except ValueError as e:
             # No detection fraction present
             msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1.0"
-            logger.info(msg)
+            logger.warn(msg)
 
         # Explicitly zero the maglim of pixels with fracdet < fracmin
         self.mask_roi_sparse[self.frac_roi_sparse == 0] = 0.0

@@ -359,6 +359,19 @@ class BasePlotter(object):
             self.galaxies = catalog.applyCut(cut)
         return self.galaxies
 
+    def get_likelihood(self,select=None):
+        nside = self.config.params['coords']['nside_merge']
+        pixel = ang2pix(nside, self.lon, self.lat)
+        pixels = np.append([pixel],hp.get_all_neighbours(nside,pixel))
+
+        filenames = []
+        for p in pixels:
+            f = self.config.mergefile%p
+            if os.path.exists(f): filenames.append(f)
+
+        return ugali.utils.healpix.merge_partial_maps(filenames,None)
+
+        
     def drawSmoothCatalog(self, catalog, label=None, **kwargs):
         ax = plt.gca()
         ra,dec = catalog.ra_dec
@@ -489,13 +502,12 @@ class BasePlotter(object):
 
     def drawTS(self,ax=None, filename=None, zidx=0):
         if not ax: ax = plt.gca()
-        if not filename:
-            #dirname = self.config.params['output2']['searchdir']
-            #basename = self.config.params['output2']['mergefile']
-            #filename = os.path.join(dirname,basename)
-            filename = self.config.mergefile
 
-        data = fitsio.read(filename)
+        if filename:
+            data = fitsio.read(filename)
+        else:
+            data = self.get_likelihood()[1]
+
         pixels = data['PIXEL']
         values = 2*data['LOG_LIKELIHOOD']
 
@@ -507,13 +519,7 @@ class BasePlotter(object):
 
         ts_map[pixels] = values[:,zidx]
 
-        #im = hp.gnomview(ts_map,**self.gnom_kwargs)
-        #hp.graticule(dpar=1,dmer=1,color='0.5',verbose=False)
-        #plt.close()
-        #im = ax.imshow(im,origin='bottom')
-
         im = drawHealpixMap(ts_map,self.lon,self.lat,self.radius,coord=self.coord)
-
         try: ax.cax.colorbar(im)
         except: plt.colorbar(im)
         ax.annotate("TS",**self.label_kwargs)
@@ -543,14 +549,21 @@ class BasePlotter(object):
             
 
     def drawCMD(self, ax=None, radius=None, zidx=None):
+        """ Draw color magnitude diagram with isochrone 
+
+        Parameters:
+        ax     : matplotlib axis
+        radius : selection radius
+        zidx   : distance modulus index
+        
+        Returns:
+        None
+        """
         if not ax: ax = plt.gca()
         import ugali.isochrone
 
         if zidx is not None:
-            filename = self.config.mergefile
-            logger.debug("Opening %s..."%filename)
-            f = fitsio.FITS(filename)
-            distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]
+            distance_modulus = self.get_likelihood()[2][zidx]
 
             iso = ugali.isochrone.Padova(age=12,z=0.0002,mod=distance_modulus)
             #drawIsochrone(iso,ls='',marker='.',ms=1,c='k')
@@ -581,10 +594,7 @@ class BasePlotter(object):
         if not ax: ax = plt.gca()
         import ugali.analysis.scan
 
-        filename = self.config.mergefile
-        logger.debug("Opening %s..."%filename)
-        f = fitsio.FITS(filenaem)
-        distance_modulus = f[2].read()['DISTANCE_MODULUS'][zidx]
+        distance_modulus = self.get_likelihood()[2]
 
         for ii, name in enumerate(self.config.params['isochrone']['infiles']):
             logger.info('%s %s'%(ii, name))
@@ -621,13 +631,10 @@ class BasePlotter(object):
         except: plt.colorbar(sc)
 
     def plotDistance(self):
-        filename = self.config.mergefile
-        logger.debug("Opening %s..."%filename)
-        f = fitsio.FITS(filename)
-        d = f[1].read()
+        _,d,distances = self.get_likelihood()
+
         pixels,values = d['PIXEL'],2*d['LOG_LIKELIHOOD']
         if values.ndim == 1: values = values.reshape(-1,1)
-        distances = f[2].read()['DISTANCE_MODULUS']
         if distances.ndim == 1: distances = distances.reshape(-1,1)
         ts_map = hp.UNSEEN * np.ones(hp.nside2npix(self.nside))
 
@@ -657,8 +664,13 @@ class BasePlotter(object):
 
         for i,val in enumerate(values.T):
             ax = axes[i]
-            im = ax.imshow(images[i],origin='bottom',vmin=vmin,vmax=vmax)
-            ax.cax.colorbar(im)
+
+            #https://github.com/matplotlib/matplotlib/issues/9720/
+            im = ax.imshow(images[i].data,origin='bottom',vmin=vmin,vmax=vmax)
+            try:
+                ax.cax.colorbar(im)
+            except TypeError as e:
+                print(e)
             
             #ax.annotate(r"$\mu = %g$"%distances[i],**self.label_kwargs)
             ax.annotate(r"$d = %.0f$ kpc"%mod2dist(distances[i]),**self.label_kwargs)

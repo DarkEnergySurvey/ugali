@@ -38,7 +38,7 @@ class SphericalRotator:
         cos_phi,sin_phi = np.cos(phi),np.sin(phi)
         cos_theta,sin_theta = np.cos(theta),np.sin(theta)
 
-        self.rotation_matrix = np.matrix([
+        self.rotation_matrix = np.array([
             [cos_psi * cos_phi - cos_theta * sin_phi * sin_psi,
              cos_psi * sin_phi + cos_theta * cos_phi * sin_psi,
              sin_psi * sin_theta],
@@ -481,16 +481,30 @@ def deg2sr(solid_angle):
 ############################################################
 
 def distanceToDistanceModulus(distance):
+    """ Return distance modulus for a given distance (kpc).
+
+    Parameters
+    ----------
+    distance : distance (kpc)
+
+    Returns
+    -------
+    mod : distance modulus
     """
-    Return distance modulus for a given distance (kpc).
-    """
-    return 5. * (np.log10(np.array(distance) * 1.e3) - 1.)
+    return 5. * (np.log10(np.array(distance)) + 2.)
 
 dist2mod = distanceToDistanceModulus
 
 def distanceModulusToDistance(distance_modulus):
-    """
-    Return distance (kpc) for a given distance modulus.
+    """ Return distance (kpc) for a given distance modulus.
+
+    Parameters
+    ----------
+    distance_modulus : distance modulus
+
+    Returns
+    -------
+    distance : distance (kpc)
     """
     return 10**((0.2 * np.array(distance_modulus)) - 2.)
 

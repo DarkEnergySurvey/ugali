@@ -23,13 +23,15 @@ from ugali.utils.projector import ang2const, ang2iau
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 
+_alpha = 0.32
+
 class Results(object):
     """
     Calculate results from a MCMC chain.
     """
     def __init__(self, config, loglike, samples=None):
         self.config = Config(config)
-        self.alpha = self.config['results'].get('alpha',0.10)
+        self.alpha = self.config['results'].get('alpha',_alpha)
         self.nwalkers = self.config['mcmc'].get('nwalkers',100)
         self.nburn = self.config['results'].get('nburn',10)
         self.coordsys = self.config['coords']['coordsys'].lower()
@@ -54,9 +56,22 @@ class Results(object):
             
         return mle
 
-    def estimate(self,param,burn=None,clip=10.0,alpha=0.32):
-        """ Estimate parameter value and uncertainties """
+    def estimate(self,param,burn=None,clip=10.0,alpha=_alpha):
+        """ Estimate parameter value and uncertainties 
+
+        Parameters
+        ----------
+        param : parameter of interest
+        burn  : number of burn in samples
+        clip  : sigma clipping
+        alpha : confidence interval
+
+        Returns
+        -------
+        [mle, [lo,hi]] : value and interval
+        """
         # FIXME: Need to add age and metallicity to composite isochrone params (currently properties)
+        if alpha is None: alpha = self.alpha
         if param not in list(self.samples.names) + list(self.source.params) + ['age','metallicity']:
             msg = 'Unrecognized parameter: %s'%param
             raise KeyError(msg)
@@ -89,18 +104,20 @@ class Results(object):
         ### msg = "Unrecognized parameter: %s"%param
         ### raise KeyError(msg)
  
-    def estimate_params(self,burn=None,clip=10.0,alpha=0.32):
+    def estimate_params(self,burn=None,clip=10.0,alpha=None):
         """ Estimate all source parameters """
+        if alpha is None: alpha = self.alpha
         mle = self.get_mle()
         out = odict()
         for param in mle.keys():
             out[param] = self.estimate(param,burn=burn,clip=clip,alpha=alpha)
         return out
  
-    def estimate_position_angle(self,param='position_angle',burn=None,clip=10.0,alpha=0.32):
+    def estimate_position_angle(self,param='position_angle',burn=None,clip=10.0,alpha=None):
         """ Estimate the position angle from the posterior dealing
         with periodicity.
         """
+        if alpha is None: alpha = self.alpha
         # Transform so peak in the middle of the distribution
         pa = self.samples.get(param,burn=burn,clip=clip)
         peak = ugali.utils.stats.kde_peak(pa)
@@ -141,17 +158,31 @@ class Results(object):
 
         # Extra parameters from the MCMC chain
         logger.debug('Estimating auxiliary parameters...')
+        logger.debug("alpha = %.2f"%kwargs['alpha'])
+        results['alpha'] = kwargs['alpha']
         try: 
             results['ra']  = self.estimate('ra',**kwargs)
             results['dec'] = self.estimate('dec',**kwargs)
+            results['glon'] = self.estimate('glon',**kwargs)
+            results['glat'] = self.estimate('glat',**kwargs)
         except KeyError:
-            logger.warn("Didn't find 'ra' or 'dec'")
-            ra,dec = gal2cel(results['lon'][0],results['lat'][0])
-            results['ra'] = ugali.utils.stats.interval(ra)
-            results['dec'] = ugali.utils.stats.interval(dec)
+            logger.warn("Didn't find 'ra' or 'dec' in Samples...")
+            if self.coordsys == 'gal':
+                results['glon'] = results['lon']
+                results['glat'] = results['lat']
+                ra,dec = gal2cel(results['lon'][0],results['lat'][0])
+                results['ra'] = ugali.utils.stats.interval(ra)
+                results['dec'] = ugali.utils.stats.interval(dec)
+            else:
+                results['ra'] = results['lon']
+                results['dec'] = results['lat']
+                glon,glat = cel2gal(results['lon'][0],results['lat'][0])
+                results['glon'] = ugali.utils.stats.interval(glon)
+                results['glat'] = ugali.utils.stats.interval(glat)
 
-        ra,dec = results['ra'][0],results['dec'][0]
-        glon,glat = lon,lat = results['lon'][0],results['lat'][0]
+        lon,lat   = results['lon'][0],results['lat'][0]
+        ra,dec    = results['ra'][0],results['dec'][0]
+        glon,glat = results['glon'][0],results['glat'][0]
         results.update(gal=[float(glon),float(glat)])
         results.update(cel=[float(ra),float(dec)])
 
@@ -164,14 +195,6 @@ class Results(object):
         logger.debug('Calculating TS...')
         ts = 2*self.loglike.value(**params)
         results['ts'] = ugali.utils.stats.interval(ts,np.nan,np.nan)
- 
-        #lon,lat = estimate['lon'][0],estimate['lat'][0]
-        # 
-        #results.update(gal=[float(lon),float(lat)])
-        #ra,dec = gal2cel(lon,lat)
-        #results.update(cel=[float(ra),float(dec)])
-        #results['ra'] = ugali.utils.stats.interval(ra,np.nan,np.nan)
-        #results['dec'] = ugali.utils.stats.interval(dec,np.nan,np.nan)
  
         # Celestial position angle
         # Break ambiguity in direction with '% 180.'
@@ -256,7 +279,7 @@ class Results(object):
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space
         kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,
-                      n_trials=5000,alpha=self.alpha, seed=0)
+                      n_trials=5000,alpha=kwargs['alpha'], seed=0)
         martin = self.config['results'].get('martin')
         if martin:
             logger.info("Calculating Martin magnitude...")
@@ -319,21 +342,64 @@ class Results(object):
         out.close()
 
 def surfaceBrightness(abs_mag, r_physical, distance):
-    """
-    Compute the average surface brightness [mag arcsec^-2] within the half-light radius
+    """Compute the average surface brightness [mag/arcsec^2] within the
+    azimuthally averaged physical half-light radius.
 
-    abs_mag = absolute magnitude [mag]
-    r_physical = half-light radius [kpc] 
-    distance = [kpc]
+    The azimuthally averaged physical half-light radius is used
+    because the surface brightness is calculated as a function of
+    area. The area of an ellipse is:
 
-    The factor 2 in the c_v equation below account for half the luminosity 
-    within the half-light radius. The 3600.**2 is conversion from deg^2 to arcsec^2
+    A = pi * a*b = pi * a**2 * (1-e) = pi * r**2
+
+    The factor 2 in the c_v equation below accounts for the fact that
+    we are taking half the luminosity within the half-light
+    radius. The 3600.**2 is conversion from deg^2 to arcsec^2
 
     c_v = 2.5 * np.log10(2.) + 2.5 * np.log10(np.pi * 3600.**2) = 19.78
+
+    TODO: Distance could be optional
+
+    Parameters
+    ----------
+    abs_mag    : absolute V-band magnitude [mag]
+    r_physical : azimuthally averaged physical half-light radius [kpc]
+    distance   : heliocentric distance [kpc]
+
+    Returns
+    -------
+    mu         : surface brightness [mag/arcsec^2]
     """
+    c_v = 19.78 # conversion to mag/arcsec^2
     r_angle = np.degrees(np.arctan(r_physical / distance))
-    c_v = 19.78 # mag/arcsec^2
     return abs_mag + dist2mod(distance) + c_v + 2.5 * np.log10(r_angle**2)
+
+def surfaceBrightness2(app_mag, r_half_arcmin):
+    """Compute the average surface brightness [mag/arcsec^2] within the
+    azimuthally averaged angular half-light radius.
+
+    The azimuthally averaged half-light radius is used
+    because the surface brightness is calculated as a function of
+    area. The area of an ellipse is:
+
+    A = pi * a*b = pi * a**2 * (1-e) = pi * r**2
+
+    The factor 2.5*log10(2) accounts for the fact that half the
+    luminosity is within the half-light radius.
+
+    Parameters
+    ----------
+    app_mag : apparent V-band magnitude [mag]
+    r_half  : azimuthally averaged half-light radius [arcmin]
+
+    Returns
+    -------
+    mu      : surface brightness [mag/arcsec^2]
+
+    """
+    r_half_arcsec = r_half_arcmin * 60 # arcmin to arcsec
+    mu = app_mag + 2.5*np.log10(2.) + 2.5*np.log10(np.pi * r_half_arcsec**2)
+    return mu
+
 
 def createResults(config,srcfile,section='source',samples=None):
     """ Create an MCMC instance """
