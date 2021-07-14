@@ -44,6 +44,17 @@ def getCompleteness(config):
 ############################################################
 
 def getPhotoError(config):
+    """Photometric error model based on the delta-mag from the maglim and
+    the photometric uncertainty estimated from the data
+
+    Parameters
+    ----------
+    config : configuration dictionary
+
+    Returns
+    -------
+    interp : interpolation function (mag_err as a function of delta_mag)
+    """
     #infile = 'photo_error_model.csv'
     infile = config['photo_error']
     d = np.recfromcsv(infile)
