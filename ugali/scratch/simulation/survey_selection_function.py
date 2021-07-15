@@ -1,5 +1,5 @@
 """
-
+Create a survey selection function
 """
 
 import time
@@ -151,7 +151,7 @@ class surveySelectionFunction:
 
     def loadFracdet(self):
         if self.m_fracdet is None:
-            print 'Loading fracdet map from %s ...'%(self.config['infile']['fracdet'])
+            print('Loading fracdet map from %s ...'%(self.config['infile']['fracdet']))
             self.m_fracdet = hp.read_map(self.config['infile']['fracdet'], nest=False)
 
     def loadPopulationMetadata(self):
@@ -166,7 +166,7 @@ class surveySelectionFunction:
 
     def loadRealResults(self):
         if self.data_real is None:
-            print 'Loading real data search results from %s ...'%(self.config[self.algorithm]['real_results'])
+            print('Loading real data search results from %s ...'%(self.config[self.algorithm]['real_results']))
             reader = pyfits.open(self.config[self.algorithm]['real_results'])
             self.data_real = reader[1].data
             reader.close()
@@ -207,7 +207,7 @@ class surveySelectionFunction:
 
         # Train random forest classifier
         if True:
-            print 'Training the machine learning classifier. This may take a while ...'
+            print('Training the machine learning classifier. This may take a while ...')
             t_start = time.time()
             parameters = {'n_estimators':(500,1000)}#, 'criterion':["gini","entropy"], "min_samples_leaf": [1,2,4]}
             rf = RandomForestClassifier(oob_score=True)
@@ -224,14 +224,14 @@ class surveySelectionFunction:
             print(self.classifier.best_estimator_)
             print(self.classifier.best_params_)
             t_end = time.time()
-            print '  ... training took %.2f seconds'%(t_end - t_start)
+            print('  ... training took %.2f seconds'%(t_end - t_start))
 
             # Save the trained classifier
             classifier_data = pickle.dumps(self.classifier)
             writer = open(self.config[self.algorithm]['classifier'], 'w')
             writer.write(classifier_data)
             writer.close()
-            print 'Saving machine learning classifier to %s ...'%(self.config[self.algorithm]['classifier'])
+            print('Saving machine learning classifier to %s ...'%(self.config[self.algorithm]['classifier']))
         else:
             self.loadClassifier()
 
@@ -375,9 +375,9 @@ class surveySelectionFunction:
         #    pylab.savefig('sim_match_scatter_prediction.pdf')#, dpi=dpi)
 
     def loadClassifier(self):
-        print 'Loading machine learning classifier from %s ...'%(self.config[self.algorithm]['classifier'])
+        print('Loading machine learning classifier from %s ...'%(self.config[self.algorithm]['classifier']))
         if os.path.exists(self.config[self.algorithm]['classifier'] + '.gz') and not os.path.exists(self.config[self.algorithm]['classifier']):
-            print '  Unzipping...'
+            print('  Unzipping...')
             os.system('gunzip -k %s.gz'%(self.config[self.algorithm]['classifier']))
         reader = open(self.config[self.algorithm]['classifier'])
         classifier_data = ''.join(reader.readlines())
