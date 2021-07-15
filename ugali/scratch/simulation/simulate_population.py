@@ -290,7 +290,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         pylab.savefig('y3_sat_sim_cmd_%s.png'%('test'), dpi=150.)
         
         print('n_Sigma_p = %i'%(n_sigma_p))
-        raw_input('WAIT')
+        input('WAIT')
         
     satellite=odict(lon=lon[cut_detect], lat=lat[cut_detect], 
                     mag_1=mag_1_meas[cut_detect], mag_2=mag_2_meas[cut_detect], 

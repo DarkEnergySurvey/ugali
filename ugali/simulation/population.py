@@ -104,7 +104,6 @@ def satellitePopulation(mask, nside_pix, size,
 
 ############################################################
 
-# ADW: 2019-09-01 DEPRECATED
 def satellitePopulationOrig(config, n,
                             range_distance_modulus=[16.5, 24.],
                             range_stellar_mass=[1.e2, 1.e5],
@@ -133,7 +132,9 @@ def satellitePopulationOrig(config, n,
     lon (deg), lat (deg), distance modulus, stellar mass (Msun), and
     half-light radius (kpc) for each satellite
     """
-    
+    msg = "'satellitePopulationOrig': ADW 2019-09-01"
+    DeprecationWarning(msg)
+
     if type(config) == str:
         config = ugali.utils.config.Config(config)
 
@@ -155,8 +156,8 @@ def satellitePopulationOrig(config, n,
                                          np.log10(range_stellar_mass[1]), 
                                          n)
     
-    half_light_radius_physical = 10**np.random.uniform(np.log10(range_half_light_radius_physical[0]), 
-                                                       np.log10(range_half_light_radius_physical[0]), 
+    half_light_radius_physical = 10**np.random.uniform(np.log10(range_r_physical[0]),
+                                                       np.log10(range_r_physical[1]),
                                                        n) # kpc
 
     half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \
@@ -272,26 +273,3 @@ def knownPopulation(dwarfs, mask, nside_pix, size):
     population = np.hstack(results)
     population['id'] = np.arange(size)
     return area, population
-
-def plot_population(population):
-    # ADW: DEPRECATED: 2019-09-01
-    pylab.figure()
-    #pylab.scatter(lon, lat, c=distance_modulus, s=500 * half_light_radius)
-    #pylab.colorbar()
-    pylab.scatter(lon, lat, edgecolors='none')
-    xmin, xmax = pylab.xlim() # Reverse azimuthal axis
-    pylab.xlim([xmax, xmin])
-    pylab.title('Random Positions in Survey Footprint')
-    pylab.xlabel('Longitude (deg)')
-    pylab.ylabel('Latitude (deg)')
-
-    pylab.figure()
-    pylab.scatter(stellar_mass, distance,c=r_physical,
-                  s=500 * r_physical, edgecolors='none')
-    pylab.xscale('log')
-    pylab.yscale('log')
-    pylab.xlim([0.5 * range_stellar_mass[0], 2. * range_stellar_mass[1]])
-    pylab.colorbar()
-    pylab.title('Half-light Radius (arcmin)')
-    pylab.xlabel('Stellar Mass (arcmin)')
-    pylab.ylabel('Distance (kpc)')

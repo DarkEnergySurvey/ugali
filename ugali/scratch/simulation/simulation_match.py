@@ -1,3 +1,5 @@
+DeprecationWarning("'simulation_match.py' should be removed")
+
 import numpy as np
 import astropy.io.fits as pyfits
 import pylab
@@ -40,7 +42,7 @@ reader_sim = pyfits.open('v3/sim_population_v3.fits')
 data_sim = reader_sim[1].data
 reader_sim.close()
 
-print len(data_sim)
+print(len(data_sim))
 
 """
 match_search, match_sim, angsep = ugali.utils.projector.match(data_search['ra'], data_search['dec'], data_sim['RA'], data_sim['DEC'], tol=1.)
@@ -162,13 +164,13 @@ pylab.title('Detection Threshold: Sig > %.2f '%(significance_threshold))
 if save:
     pylab.savefig('sim_match_distance_luminosity.pdf')
 
-print '%20s%20s%20s%20s%20s%20s'%('mc_source_id', 'ra', 'dec', 'distance_modulus', 'fracdet', 'density')
+print('%20s%20s%20s%20s%20s%20s'%('mc_source_id', 'ra', 'dec', 'distance_modulus', 'fracdet', 'density'))
 for index in np.nonzero(cut_why_not)[0]:
-    print '%20i%20.3f%20.3f%20.3f%20.3f%20.3f'%(data_sim['mc_source_id'][index], 
+    print('%20i%20.3f%20.3f%20.3f%20.3f%20.3f'%(data_sim['mc_source_id'][index],
                                                 data_sim['ra'][index], data_sim['dec'][index], 
                                                 data_sim['distance_modulus'][index],
                                                 data_sim['fracdet'][index],
-                                                data_sim['density'][index])
+                                                data_sim['density'][index]))
     
 ############################################################
 
@@ -190,7 +192,7 @@ cut_train = np.arange(len(x)) < 0.8 * len(x) # 0.8, 130 sec
 
 classifier_file = 'trained_classifier.txt'
 if fit:
-    print 'Training the machine learning classifier. This may take a while ...'
+    print('Training the machine learning classifier. This may take a while ...')
     t_start = time.time()
     classifier = sklearn.gaussian_process.GaussianProcessClassifier(1.0 * sklearn.gaussian_process.kernels.RBF(0.5))
     #classifier = sklearn.neighbors.KNeighborsClassifier(3, weights='uniform')
@@ -198,18 +200,18 @@ if fit:
     #classifier = sklearn.svm.SVC(gamma=2, C=1)
     classifier.fit(x[cut_train], y[cut_train])
     t_end = time.time()
-    print '  ... training took %.2f seconds'%(t_end - t_start)
+    print('  ... training took %.2f seconds'%(t_end - t_start))
     # Save the trained classifier
     classifier_data = pickle.dumps(classifier)
     writer = open(classifier_file, 'w')
     writer.write(classifier_data)
     writer.close()
-    print 'Saving machine learning classifier to %s ...'%(classifier_file)
+    print('Saving machine learning classifier to %s ...'%(classifier_file))
     os.system('gzip %s'%(classifier_file))
 else:
-    print 'Loading machine learning classifier from %s ...'%(classifier_file)
+    print('Loading machine learning classifier from %s ...'%(classifier_file))
     if os.path.exists(classifier_file + '.gz') and not os.path.exists(classifier_file):
-        print '  Unzipping...'
+        print('  Unzipping...')
         os.system('gunzip -k %s.gz'%(classifier_file))
     reader = open(classifier_file)
     classifier_data = ''.join(reader.readlines())

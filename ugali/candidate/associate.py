@@ -54,7 +54,7 @@ from ugali.utils.logger import logger
 #            glon, glat = ugali.utils.projector.celToGal(lon,lat)
 #        else:
 #            glon,glat = lon, lat
-#        return ugali.utils.projector.match(glon,glat,self.data['glon'],self.data['glat'],tol)
+#        return ugali.utils.projector.match(glon,glat,self['glon'],self['glat'],tol)
 
 
 
@@ -452,7 +452,7 @@ def catalogFactory(name, **kwargs):
     catalogs = odict(inspect.getmembers(sys.modules[__name__], fn))
 
     if name not in list(catalogs.keys()):
-        msg = "%s not found in catalogs:\n %s"%(name,list(kernels.keys()))
+        msg = "%s not found in catalogs:\n %s"%(name,list(catalogs.keys()))
         logger.error(msg)
         msg = "Unrecognized catalog: %s"%name
         raise Exception(msg)

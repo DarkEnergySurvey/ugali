@@ -18,6 +18,7 @@ import ugali.utils.binning
 import ugali.utils.projector
 import ugali.utils.skymap
 
+from ugali.utils.logger import logger
 from ugali.utils.config import Config
 from ugali.utils.healpix import query_disc, ang2pix, pix2ang, ang2vec
 

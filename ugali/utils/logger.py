@@ -3,6 +3,7 @@
 Interface to python logging. For more info see:
 http://docs.python.org/2/howto/logging.html
 """
+import os.path
 import logging
 
 class SpecialFormatter(logging.Formatter):
