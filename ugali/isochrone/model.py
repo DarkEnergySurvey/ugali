@@ -322,27 +322,6 @@ class IsochroneModel(Model):
 
         return np.sum(luminosity * d_log_mass * self.imf.pdf(mass, log_mode=True))
 
-    def stellar_luminosity2(self, steps=10000):
-        """
-        DEPRECATED: ADW 2017-09-20
-
-        Compute the stellar luminosity (L_Sol; average per star).
-        Uses "sample" to generate mass sample and pdf.  The range of
-        integration only covers the input isochrone data (no
-        extrapolation used), but this seems like a sub-percent effect
-        if the isochrone goes to 0.15 Msun for the old and metal-poor
-        stellar populations of interest.
-
-        Note that the stellar luminosity is very sensitive to the
-        post-AGB population.
-        """
-        msg = "'%s.stellar_luminosity2': ADW 2017-09-20"%self.__class__.__name__
-        DeprecationWarning(msg)
-        mass_init, mass_pdf, mass_act, mag_1, mag_2 = self.sample(mass_steps=steps)
-        luminosity_interpolation = scipy.interpolate.interp1d(self.mass_init, self.luminosity,fill_value=0,bounds_error=False)
-        luminosity = luminosity_interpolation(mass_init)
-        return np.sum(luminosity * mass_pdf)
-
     # ADW: For temporary backward compatibility
     stellarMass = stellar_mass
     stellarLuminosity = stellar_luminosity
@@ -353,7 +332,6 @@ class IsochroneModel(Model):
         by transforming the isochrone in the SDSS system and using the
         g,r -> V transform equations from Jester 2005
         [astro-ph/0506022].
-
 
         TODO: ADW If richness not specified, should use self.richness
 

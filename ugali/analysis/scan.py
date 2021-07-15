@@ -130,10 +130,12 @@ class GridSearch:
         self.stellar_mass_array         = np.zeros([nmoduli,npixels],dtype='f4')
         self.fraction_observable_array  = np.zeros([nmoduli,npixels],dtype='f4')
         self.extension_fit_array        = np.zeros([nmoduli,npixels],dtype='f4')
-        # DEPRECATED: ADW 2019-04-27
-        self.richness_lower_array       = np.zeros([nmoduli,npixels],dtype='f4')
-        self.richness_upper_array       = np.zeros([nmoduli,npixels],dtype='f4')
-        self.richness_ulimit_array      = np.zeros([nmoduli,npixels],dtype='f4')
+        if self.config['scan']['full_pdf']:
+            # DEPRECATED: ADW 2019-04-27
+            DeprecationWarning("'full_pdf' is deprecated.")
+            self.richness_lower_array       = np.zeros([nmoduli,npixels],dtype='f4')
+            self.richness_upper_array       = np.zeros([nmoduli,npixels],dtype='f4')
+            self.richness_ulimit_array      = np.zeros([nmoduli,npixels],dtype='f4')
 
         # Specific pixel/distance_modulus
         coord_idx, distance_modulus_idx, extension_idx = None, None, None
@@ -315,6 +317,7 @@ class GridSearch:
         data['PIXEL']=self.roi.pixels_target
         # Full data output (too large for survey)
         if self.config['scan']['full_pdf']:
+            DeprecationWarning("'full_pdf' is deprecated.")
             data['LOG_LIKELIHOOD']=self.loglike_array.T
             data['RICHNESS']=self.richness_array.T
             data['RICHNESS_LOWER']=self.richness_lower_array.T

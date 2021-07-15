@@ -122,22 +122,12 @@ class ROI(object):
         self.delta_mag = self.bins_mag[1] - self.bins_mag[0]
         self.delta_color = self.bins_color[1] - self.bins_color[0]
 
-        ## Axis labels (DEPRECATED)
-        #self.label_x = 'x (deg)'
-        #self.label_y = 'y (deg)'
-        # 
-        #if self.config.params['catalog']['band_1_detection']:
-        #    self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_1_field'])
-        #else:
-        #    self.label_mag = '%s (mag)'%(self.config.params['catalog']['mag_2_field'])
-        #self.label_color = '%s - %s (mag)'%(self.config.params['catalog']['mag_1_field'],
-        #                                    self.config.params['catalog']['mag_2_field'])
-
     def plot(self, value=None, pixel=None):
         """
         Plot the ROI
         """
-        # DEPRECATED
+        # DEPRECATED: ADW 2021-07-15
+        DeprecationWarning("'roi.plot' is deprecated and will be removed.")
         import ugali.utils.plotting
 
         map_roi = np.array(hp.UNSEEN \

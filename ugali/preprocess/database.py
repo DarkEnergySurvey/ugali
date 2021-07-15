@@ -327,8 +327,7 @@ class DESDatabase(Database):
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client...
         # This should work but it doesn't
-        import warnings
-        warnings.warn("desdbi is deprecated", DeprecationWarning)
+        DeprecationWarning("'desdbi' is deprecated")
         import despydb.desdbi
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):
