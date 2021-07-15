@@ -75,8 +75,8 @@ def satellitePopulation(mask, nside_pix, n,
         pylab.ylabel('Latitude (deg)')
 
         pylab.figure()
-        pylab.scatter(stellar_mass, ugali.utils.projector.distanceModulusToDistance(distance_modulus),
-                      c=(60. * half_light_radius), s=500 * half_light_radius, edgecolors='none')
+        pylab.scatter(stellar_mass, distance,
+                      c=(60. * r_physical), s=500 * r_physical, edgecolors='none')
         pylab.xscale('log')
         pylab.yscale('log')
         pylab.xlim([0.5 * range_stellar_mass[0], 2. * range_stellar_mass[1]])
@@ -103,7 +103,9 @@ def satellitePopulationOrig(config, n,
     Returns the simulated area (deg^2) as well as the
     lon (deg), lat (deg), distance modulus, stellar mass (M_sol), and half-light radius (deg) for each satellite
     """
-    
+    msg = "'satellitePopulationOrig': ADW 2021-07-14"
+    DeprecationWarning(msg)
+
     if type(config) == str:
         config = ugali.utils.config.Config(config)
 
@@ -125,8 +127,8 @@ def satellitePopulationOrig(config, n,
                                          np.log10(range_stellar_mass[1]), 
                                          n)
     
-    half_light_radius_physical = 10**np.random.uniform(np.log10(range_half_light_radius_physical[0]), 
-                                                       np.log10(range_half_light_radius_physical[0]), 
+    half_light_radius_physical = 10**np.random.uniform(np.log10(range_r_physical[0]),
+                                                       np.log10(range_r_physical[1]),
                                                        n) # kpc
 
     half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \

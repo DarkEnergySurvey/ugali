@@ -9,6 +9,7 @@ import yaml
 import numpy as np
 import healpy as hp
 import astropy.io.fits as pyfits
+import matplotlib
 import matplotlib.pyplot as plt
 import pylab
 
@@ -310,7 +311,8 @@ class surveySelectionFunction:
                      'actual': 'black',
                      'hsc': 'black'}
 
-        title = 'N_train = %i ; N_test = %i'%(len(cut_train),len(cut_test))        import matplotlib
+        title = 'N_train = %i ; N_detect = %i'%(len(cut_train),len(cut_detect))
+
         cmap = matplotlib.colors.ListedColormap(['Gold', 'Orange', 'DarkOrange', 'OrangeRed', 'Red'])
 
         pylab.figure()
@@ -449,7 +451,6 @@ class surveySelectionFunction:
         return pred, flags_geometry
 
     def validatePredict(self, pred, flags_geometry, lon, lat, r_physical, abs_mag, distance):
-        import matplotlib
         cmap = matplotlib.colors.ListedColormap(['Gold', 'Orange', 'DarkOrange', 'OrangeRed', 'Red'])
 
         pylab.figure()

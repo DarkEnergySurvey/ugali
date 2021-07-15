@@ -474,10 +474,8 @@ class Mask(object):
                                                               [self.roi.bins_mag,self.roi.bins_mag],
                                                               weights=number_density)[0]
         elif method == 'bootstrap':
-            # Not implemented
+            # Not implemented; see catalog.bootstrap
             raise ValueError("Bootstrap method not implemented")
-            mag_1 + (mag_1_err * np.random.normal(0, 1., len(mag_1)))
-            mag_2 + (mag_2_err * np.random.normal(0, 1., len(mag_2)))
 
         elif method == 'histogram':
             # Apply raw histogram
@@ -577,13 +575,8 @@ class Mask(object):
                                                               [self.roi.bins_color,self.roi.bins_mag],
                                                               weights=number_density)[0]
         elif mode == 'bootstrap':
-            # Not implemented
+            # Not implemented; see catalog.bootstrap
             raise ValueError("Bootstrap mode not implemented")
-            mag_1_array = catalog.mag_1
-            mag_2_array = catalog.mag_2
-
-            catalog.mag_1 + (catalog.mag_1_err * np.random.normal(0, 1., len(catalog.mag_1)))
-            catalog.mag_2 + (catalog.mag_2_err * np.random.normal(0, 1., len(catalog.mag_2)))
 
         elif mode == 'histogram':
             # Apply raw histogram

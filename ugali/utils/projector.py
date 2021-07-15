@@ -4,7 +4,7 @@ Class for converting between sphere to image coordinates using map projections.
 Based on Calabretta & Greisen 2002, A&A, 357, 1077-1122
 http://adsabs.harvard.edu/abs/2002A%26A...395.1077C
 """
-
+import re
 import numpy as np
 
 from ugali.utils.logger import logger
@@ -31,8 +31,9 @@ class SphericalRotator:
         if not zenithal:
             phi = (-np.pi / 2.) + np.radians(lon_ref)
             theta = np.radians(lat_ref)
-            psi = np.radians(90.) # psi = 90 corresponds to (0, 0) psi = -90 corresponds to (180, 0)
-        
+            # psi = 90 corresponds to (0, 0)
+            # psi = -90 corresponds to (180, 0)
+            psi = np.radians(90.)
 
         cos_psi,sin_psi = np.cos(psi),np.sin(psi)
         cos_phi,sin_phi = np.cos(phi),np.sin(phi)
@@ -449,9 +450,10 @@ def hms2dec(hms):
     return decimal
 
 def dms2dec(dms):
-    """
-    Convert latitude from degrees,minutes,seconds in string or 3-array
-   format to decimal degrees.
+    """Convert latitude from degrees,minutes,seconds in string or 3-array
+    format to decimal degrees.
+
+    ADW: This really should be replaced by astropy
     """
     DEGREE = 360.
     HOUR = 24.
@@ -463,7 +465,7 @@ def dms2dec(dms):
     # http://docs.scipy.org/doc/numpy-1.7.0/reference/c-api.coremath.html#NPY_NZERO
 
     if isstring(dms):
-        degree,minute,second = np.array(re.split('[dms]',hms))[:3].astype(float)
+        degree,minute,second = np.array(re.split('[dms]',dms))[:3].astype(float)
     else:
         degree,minute,second = dms.T
 

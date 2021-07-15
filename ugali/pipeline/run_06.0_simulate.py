@@ -75,8 +75,7 @@ def run(self):
         filenames=join(outdir,self.config['output']['simfile']).split('_%')[0]+'_*'
         infiles=sorted(glob.glob(filenames))
 
-        f = fitsio.read(infiles[0])
-        table = np.empty(0,dtype=data.dtype)
+        table = np.empty(0,dtype=fitsio.read(infiles[0]).dtype)
         for filename in infiles:
             logger.debug("Reading %s..."%filename)
             d = fitsio.read(filename)

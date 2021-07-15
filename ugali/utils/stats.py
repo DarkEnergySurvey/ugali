@@ -4,6 +4,7 @@ Module for various statistics utilities.
 """
 
 import copy
+from collections import OrderedDict as odict
 
 import numpy as np
 import numpy.lib.recfunctions as recfuncs

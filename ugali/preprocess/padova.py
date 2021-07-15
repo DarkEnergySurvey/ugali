@@ -228,7 +228,7 @@ class Padova(Download):
                 
             try:
                 s = lines[2].split()[-2]
-                assert dict_output[survey][:4] in s
+                assert photname_dict[survey][:4] in s
             except:
                 msg = "Incorrect survey:\n"+lines[2]
                 raise Exception(msg)

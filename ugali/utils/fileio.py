@@ -65,7 +65,23 @@ def write(filename,data,**kwargs):
 
     msg = "Unrecognized file type: %s"%filename
     raise ValueError(msg)
-    
+
+def check_formula(formula):
+    """ Check that a formula is valid. """
+    if not (('data[' in formula) and (']' in formula)):
+        msg = 'Invalid formula:\n %s'%formula
+        raise ValueError(msg)
+
+def parse_formula(formula):
+    """ Return the columns used in a formula. """
+    check_formula(formula)
+
+    columns = []
+    for x in formula.split('data[')[1:]:
+        col = x.split(']')[0].replace('"','').replace("'",'')
+        columns += [col]
+
+    return columns
 
 def add_column(filename,column,formula,force=False):
     """ Add a column to a FITS file.
@@ -196,65 +212,6 @@ def insert_columns(filename,data,ext=1,force=False,colnum=None):
 # Dealing with FITS files
 def write_fits(filename,data,header=None,force=False):
     if os.path.exists(filename) and not force:
-        found(filename)
+        logger.found(filename)
         return
     fitsio.write(filename,data,header=header,clobber=force)
-
-# Writing membership files
-def write_membership(loglike,filename):
-    """
-    Write a catalog file of the likelihood region including
-    membership properties.
-
-    Parameters:
-    -----------
-    loglike : input loglikelihood object
-    filename : output filename
-    
-    Returns:
-    --------
-    None
-    """
-
-    ra,dec = gal2cel(loglike.catalog.lon,loglike.catalog.lat)
-        
-    name_objid = loglike.config['catalog']['objid_field']
-    name_mag_1 = loglike.config['catalog']['mag_1_field']
-    name_mag_2 = loglike.config['catalog']['mag_2_field']
-    name_mag_err_1 = loglike.config['catalog']['mag_err_1_field']
-    name_mag_err_2 = loglike.config['catalog']['mag_err_2_field']
-
-    # Angular and isochrone separations
-    sep = angsep(loglike.source.lon,loglike.source.lat,
-                 loglike.catalog.lon,loglike.catalog.lat)
-    isosep = loglike.isochrone.separation(loglike.catalog.mag_1,loglike.catalog.mag_2)
-
-    data = odict()
-    data[name_objid] = loglike.catalog.objid
-    data['GLON'] = loglike.catalog.lon
-    data['GLAT'] = loglike.catalog.lat
-    data['RA']   = ra
-    data['DEC']  = dec
-    data[name_mag_1] = loglike.catalog.mag_1
-    data[name_mag_err_1] = loglike.catalog.mag_err_1
-    data[name_mag_2] = loglike.catalog.mag_2
-    data[name_mag_err_2] = loglike.catalog.mag_err_2
-    data['COLOR'] = loglike.catalog.color
-    data['ANGSEP'] = sep
-    data['ISOSEP'] = isosep
-    data['PROB'] = loglike.p
-
-    # HIERARCH allows header keywords longer than 8 characters
-    header = []
-    for param,value in loglike.source.params.items():
-        card = dict(name='HIERARCH %s'%param.upper(),
-                    value=value.value,
-                    comment=param)
-        header.append(card)
-    card = dict(name='HIERARCH %s'%'TS',value=loglike.ts(),
-                comment='test statistic')
-    header.append(card)
-    card = dict(name='HIERARCH %s'%'TIMESTAMP',value=time.asctime(),
-                comment='creation time')
-    header.append(card)
-    fitsio.write(filename,data,header=header,clobber=True)

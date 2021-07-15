@@ -97,8 +97,8 @@ def jprecess(ra, dec, mu_radec=None, parallax=None, rad_vel=None, epoch=None):
       ra = array(ra)
       dec = array(dec)
    else:
-      ra = array([ra0])
-      dec = array([dec0])
+      ra = array([ra])
+      dec = array([dec])
    n = ra.size
     
    if rad_vel is None:   
@@ -111,7 +111,7 @@ def jprecess(ra, dec, mu_radec=None, parallax=None, rad_vel=None, epoch=None):
     
    if (mu_radec is not None):   
       if (array(mu_radec).size != 2 * n):   
-         raise Exception('ERROR - MU_RADEC keyword (proper motion) be dimensioned (2,' + strtrim(n, 2) + ')')
+         raise Exception('ERROR - MU_RADEC keyword (proper motion) be dimensioned (2,%s)'%n)
       mu_radec = mu_radec * 1.
     
    if parallax is None:   
@@ -315,7 +315,7 @@ def bprecess(ra0, dec0, mu_radec=None, parallax=None, rad_vel=None, epoch=None):
    
    if (mu_radec is not None):   
       if (array(mu_radec).size != 2 * n):   
-         raise Exception('ERROR - MU_RADEC keyword (proper motion) be dimensioned (2,' + strtrim(n, 2) + ')')
+         raise Exception('ERROR - MU_RADEC keyword (proper motion) be dimensioned (2,%s)'%n)
       mu_radec = mu_radec * 1.
    
    if parallax is None:   

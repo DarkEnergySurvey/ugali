@@ -229,7 +229,7 @@ class Slurm(Batch):
 
 class Condor(Batch):
     """ Not implemented yet... """
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(Condor,self).__init__(**kwargs)
         logger.warning('Condor cluster is untested')
         

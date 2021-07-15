@@ -8,10 +8,11 @@ from collections import OrderedDict as odict
 import numpy
 import numpy as np
 import healpy as hp
-import healpy
+import fitsio
 
 import ugali.utils.projector
 from ugali.utils.logger import logger
+import ugali.utils.fileio
 
 ############################################################
 
@@ -381,8 +382,6 @@ def write_partial_map(filename, data, nside, coord=None, nest=False,
     --------
     None
     """
-    import fitsio
-    import ugali.utils.fileio
 
     # ADW: Do we want to make everything uppercase?
 
@@ -560,15 +559,15 @@ def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
     m [, header] : array, optionally with header appended
       The map read from the file, and the header if *h* is True.
     """
-    
+    import fitsio
     data,hdr = fitsio.read(filename,header=True,ext=hdu)
 
     nside = int(hdr.get('NSIDE'))
     if verbose: print('NSIDE = {0:d}'.format(nside))
 
-    if not healpy.isnsideok(nside):
+    if not hp.isnsideok(nside):
         raise ValueError('Wrong nside parameter.')
-    sz=healpy.nside2npix(nside)
+    sz=hp.nside2npix(nside)
 
     ordering = hdr.get('ORDERING','UNDEF').strip()
     if verbose: print('ORDERING = {0:s} in fits file'.format(ordering))
@@ -585,27 +584,27 @@ def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
 
     # Could be done more efficiently (but complicated) by reordering first
     if hdr['INDXSCHM'] == 'EXPLICIT':
-        m = healpy.UNSEEN*np.ones(sz,dtype=data[fields[1]].dtype)
+        m = hp.UNSEEN*np.ones(sz,dtype=data[fields[1]].dtype)
         m[data[fields[0]]] = data[fields[1]]
     else:
         m = data[fields[0]].ravel()
 
-    if (not healpy.isnpixok(m.size) or (sz>0 and sz != m.size)) and verbose:
+    if (not hp.isnpixok(m.size) or (sz>0 and sz != m.size)) and verbose:
         print('nside={0:d}, sz={1:d}, m.size={2:d}'.format(nside,sz,m.size))
         raise ValueError('Wrong nside parameter.')
     if not nest is None:
         if nest and ordering.startswith('RING'):
-            idx = healpy.nest2ring(nside,np.arange(m.size,dtype=np.int32))
+            idx = hp.nest2ring(nside,np.arange(m.size,dtype=np.int32))
             if verbose: print('Ordering converted to NEST')
             m = m[idx]
             return  m[idx]
         elif (not nest) and ordering.startswith('NESTED'):
-            idx = healpy.ring2nest(nside,np.arange(m.size,dtype=np.int32))
+            idx = hp.ring2nest(nside,np.arange(m.size,dtype=np.int32))
             m = m[idx]
             if verbose: print('Ordering converted to RING')
 
     if h:
-        return m, header
+        return m, hdr
     else:
         return m
 

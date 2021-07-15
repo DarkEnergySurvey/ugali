@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import healpy
 import pylab as plt
+import numpy
+
 import ugali.utils.skymap
 from ugali.utils.projector import celToGal
-import numpy
+from ugali.utils.logger import logger
 
 default_kwargs = dict( xytext=(5,5),textcoords='offset points',
                        ha="left",va="center",

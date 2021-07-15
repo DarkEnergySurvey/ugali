@@ -118,8 +118,6 @@ class GridSearch:
 
         if distance_modulus_array is not None:
             self.distance_modulus_array = distance_modulus_array
-        else:
-            self.distance_modulus_array = sel
 
         # Observable fraction for each pixel
         self.u_color_array = [[]] * len(self.distance_modulus_array)
