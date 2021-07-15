@@ -30,16 +30,13 @@ from ugali.utils.config import Config
 from ugali.utils import mlab
 
 # Analysis flags
-FLAGS = odict([
-        ('FLAG_PROC'    , 0 ),    # Simulation was processed
-        ('FLAG_NOPROC'  , 1 ),    # No processing
-        ('FLAG_NOBJ'    , 2 ),    # Too many catalog objects
-        ('FLAG_FIT'     , 4 ),    # Fit failure
-        ('FLAG_EBV'     , 8 ),    # EBV value too large
-        ('FLAG_MEM'     , 16),    # Memory error
-        ])
-for k,v in FLAGS.items():
-    globals()[k] = v
+FLAGS = odict([])
+FLAGS['FLAG_PROC'  ] = FLAG_PROC   = 0  # Simulation was processed
+FLAGS['FLAG_NOPROC'] = FLAG_NOPROC = 1  # No processing
+FLAGS['FLAG_NOBJ'  ] = FLAG_NOBJ   = 2  # Too many catalog objects
+FLAGS['FLAG_FIT'   ] = FLAG_FIT    = 4  # Fit failure
+FLAGS['FLAG_EBV'   ] = FLAG_EBV    = 8  # EBV value too large
+FLAGS['FLAG_MEM'   ] = FLAG_MEM    = 16 # Memory error
 
 def update_header_flags(filename):
     fits = fitsio.FITS(filename,'rw')

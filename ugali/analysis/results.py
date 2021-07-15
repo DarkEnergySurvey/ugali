@@ -18,7 +18,8 @@ import ugali.analysis.loglike
 
 import ugali.utils.stats
 from ugali.utils.stats import Samples
-from ugali.utils.projector import dist2mod,mod2dist,gal2cel,gal2cel_angle
+from ugali.utils.projector import dist2mod,mod2dist
+from ugali.utils.projector import cel2gal,gal2cel,gal2cel_angle
 from ugali.utils.projector import ang2const, ang2iau
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
