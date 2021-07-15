@@ -84,23 +84,6 @@ def inFootprint(config, pixels, nside=None):
     
     return inside
 
-def footprint(config, nside=None):
-    """
-    UNTESTED.
-    Should return a boolean array representing the pixels in the footprint.
-    """
-    DeprecationWarning("This function is deprecated.")
-    config = Config(config)
-    if nside is None:
-        nside = config['coords']['nside_pixel']
-    elif nside < config['coords']['nside_catalog']:
-        raise Exception('Requested nside=%i is greater than catalog_nside'%nside)
-    elif nside > config['coords']['nside_pixel']:
-        raise Exception('Requested nside=%i is less than pixel_nside'%nside)
-    pix = np.arange(hp.nside2npix(nside), dtype=int)
-    return inFootprint(config,pix)
-
-
 ############################################################
 
 def allSkyCoordinates(nside):

@@ -200,9 +200,6 @@ class Config(dict):
         """
         nside_catalog = self['coords']['nside_catalog']
 
-        # Deprecated: ADW 2018-06-17
-        #if nside_catalog is None:
-        #    pixels = [None]
         if pixels is not None:
             pixels = [pixels] if np.isscalar(pixels) else pixels
         else:
@@ -225,6 +222,7 @@ class Config(dict):
             if pix is None:
                 # DEPRECTATED: ADW 2018-06-17
                 # This is not really being used anymore
+                raise ValueError('pix cannot be None')
                 catalog = os.path.join(catalog_dir,catalog_base)
                 mask_1 = os.path.join(mask_dir,mask_base_1)
                 mask_2 = os.path.join(mask_dir,mask_base_2)

@@ -299,15 +299,15 @@ class SDSSDatabase(Database):
         """
         Download the survey footprint for HEALpix pixels.
         """
-        import healpy
+        import healpy as hp
         import ugali.utils.projector
         if nside > 2**9: raise Exception("Overflow error: nside must be <=2**9")
-        pix = np.arange(healpy.nside2npix(nside),dtype='int')
-        footprint = np.zeros(healpy.nside2npix(nside),dtype='bool')
+        pix = np.arange(hp.nside2npix(nside),dtype='int')
+        footprint = np.zeros(hp.nside2npix(nside),dtype='bool')
         ra,dec = ugali.utils.projector.pixToAng(nside,pix)
         table_name = 'Pix%i'%nside
         self.upload(np.array([pix,ra,dec]).T, ['pix','ra','dec'], name=table_name)
-        radius = healpy.nside2resol(nside_superpix,arcmin=True)
+        radius = hp.nside2resol(nside,arcmin=True)
 
         query="""
         SELECT t.pix, dbo.fInFootprintEq(t.ra, t.dec, %g)
@@ -327,8 +327,7 @@ class DESDatabase(Database):
     def _setup_desdbi(self):
         # Function here to setup trivialAccess client...
         # This should work but it doesn't
-        import warnings
-        warnings.warn("desdbi is deprecated", DeprecationWarning)
+        DeprecationWarning("'desdbi' is deprecated")
         import despydb.desdbi
 
     def generate_query(self, ra_min,ra_max,dec_min,dec_max,filename,db):

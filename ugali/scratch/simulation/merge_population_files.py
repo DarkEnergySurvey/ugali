@@ -1,9 +1,11 @@
+DeprecationWarning("'merge_population_files.py' should be removed")
+
 import sys
 import glob
 import numpy as np
 import astropy.io.fits as pyfits
 
-print sys.argv
+print(sys.argv)
 
 infiles = sorted(glob.glob(sys.argv[1]))
 outfile = sys.argv[2]
@@ -11,7 +13,7 @@ outfile = sys.argv[2]
 data_array = []
 header_array = []
 for infile in infiles:
-    print infile
+    print(infile)
     reader = pyfits.open(infile)
     data_array.append(reader[1].data)
     header_array.append(reader[1].header)
@@ -20,11 +22,11 @@ for infile in infiles:
 data_array = np.concatenate(data_array)
 
 
-print '\nWill write output to %s\n'%(outfile)
+print('\nWill write output to %s\n'%(outfile))
 
 tbhdu = pyfits.BinTableHDU(data_array)
 tbhdu.header = header_array[0]
 
-raw_input('Continue?')
+input('Continue?')
 
 tbhdu.writeto(outfile)

@@ -585,8 +585,6 @@ class BasePlotter(object):
         ax.set_xlabel('Color (mag)')
         ax.set_ylabel('Magnitude (mag)')
 
-        try:    ax.cax.colorbar(im)
-        except: pass
         ax.annotate("Stars",**self.label_kwargs)
 
 
@@ -1416,15 +1414,6 @@ def plot_chain(chain,burn=None,clip=None):
     return fig
 
 ###################################################
-
-    
-def plotSkymapCatalog(lon,lat,**kwargs):
-    """
-    Plot a catalog of coordinates on a full-sky map.
-    """
-    fig = plt.figure()
-    ax = plt.subplot(111,projection=projection)
-    drawSkymapCatalog(ax,lon,lat,**kwargs)
 
 def drawSkymapCatalog(ax,lon,lat,**kwargs):
     mapping = {

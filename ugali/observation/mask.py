@@ -13,7 +13,6 @@ import numpy as np
 import healpy as hp
 import scipy.signal
 
-#import ugali.utils.plotting
 import ugali.utils.binning
 import ugali.utils.skymap
 
@@ -403,51 +402,19 @@ class Mask(object):
 
         return self.photo_err_1, self.photo_err_2
 
-    def plotSolidAngleCMD(self):
-        """
-        Solid angle within the mask as a function of color and magnitude.
-        """
-        msg = "'%s.plotSolidAngleCMD': ADW 2018-05-05"%self.__class__.__name__
-        DeprecationWarning(msg)
-
-        import ugali.utils.plotting        
-        ugali.utils.plotting.twoDimensionalHistogram('mask', 'color', 'magnitude',
-                                                     self.solid_angle_cmd,
-                                                     self.roi.bins_color,
-                                                     self.roi.bins_mag,
-                                                     lim_x = [self.roi.bins_color[0],
-                                                              self.roi.bins_color[-1]],
-                                                     lim_y = [self.roi.bins_mag[-1],
-                                                              self.roi.bins_mag[0]])
-
-    def plotSolidAngleMMD(self):
-        """
-        Solid angle within the mask as a function of color and magnitude.
-        """
-        msg = "'%s.plotSolidAngleMMD': ADW 2018-05-05"%self.__class__.__name__
-        DeprecationWarning(msg)
-
-        import ugali.utils.plotting        
-
-        ugali.utils.plotting.twoDimensionalHistogram('mask', 'mag_2', 'mag_1',
-                                                     self.solid_angle_mmd,
-                                                     self.roi.bins_mag,
-                                                     self.roi.bins_mag,
-                                                     lim_x = [self.roi.bins_mag[0],
-                                                              self.roi.bins_mag[-1]],
-                                                     lim_y = [self.roi.bins_mag[-1],
-                                                              self.roi.bins_mag[0]])
-
-
-
     def backgroundMMD(self, catalog, method='cloud-in-cells', weights=None):
         """
         Generate an empirical background model in magnitude-magnitude space.
         
-        INPUTS:
-            catalog: Catalog object
-        OUTPUTS:
-            background
+        Parameters
+        ----------
+        catalog: catalog object
+        method:  method for estimated MMD
+        weights: weights assigned to each catalog object
+
+        Returns
+        -------
+        background: estimate of background magnitude-magnitude distribution
         """
 
         # Select objects in annulus
@@ -474,10 +441,8 @@ class Mask(object):
                                                               [self.roi.bins_mag,self.roi.bins_mag],
                                                               weights=number_density)[0]
         elif method == 'bootstrap':
-            # Not implemented
+            # Not implemented; see catalog.bootstrap
             raise ValueError("Bootstrap method not implemented")
-            mag_1 + (mag_1_err * np.random.normal(0, 1., len(mag_1)))
-            mag_2 + (mag_2_err * np.random.normal(0, 1., len(mag_2)))
 
         elif method == 'histogram':
             # Apply raw histogram
@@ -547,10 +512,15 @@ class Mask(object):
         """
         Generate an empirical background model in color-magnitude space.
         
-        INPUTS:
-            catalog: Catalog object
-        OUTPUTS:
-            background
+        Parameters
+        ----------
+        catalog: catalog object
+        method:  method for estimated MMD
+        weights: weights assigned to each catalog object
+
+        Returns
+        -------
+        background: estimate of background color-magnitude distribution
         """
 
         # Select objects in annulus
@@ -577,13 +547,8 @@ class Mask(object):
                                                               [self.roi.bins_color,self.roi.bins_mag],
                                                               weights=number_density)[0]
         elif mode == 'bootstrap':
-            # Not implemented
+            # Not implemented; see catalog.bootstrap
             raise ValueError("Bootstrap mode not implemented")
-            mag_1_array = catalog.mag_1
-            mag_2_array = catalog.mag_2
-
-            catalog.mag_1 + (catalog.mag_1_err * np.random.normal(0, 1., len(catalog.mag_1)))
-            catalog.mag_2 + (catalog.mag_2_err * np.random.normal(0, 1., len(catalog.mag_2)))
 
         elif mode == 'histogram':
             # Apply raw histogram
@@ -847,24 +812,6 @@ class MaskBand(object):
         """
         pass
 
-    def plot(self):
-        """
-        Plot the magnitude depth.
-        """
-        msg = "'%s.plot': ADW 2018-05-05"%self.__class__.__name__
-        DeprecationWarning(msg)
-
-        import ugali.utils.plotting
-
-        mask = hp.UNSEEN * np.ones(hp.nside2npix(self.nside))
-        mask[self.roi.pixels] = self.mask_roi_sparse
-        mask[mask == 0.] = hp.UNSEEN
-        ugali.utils.plotting.zoomedHealpixMap('Completeness Depth',
-                                              mask,
-                                              self.roi.lon, self.roi.lat,
-                                              self.roi.config.params['coords']['roi_radius'])
-
-
 class CoverageBand(object):
     """
     Map of coverage fraction for a single observing band.
@@ -923,106 +870,3 @@ class SimpleMaskBand(MaskBand):
         self.mask_roi_sparse = mask[self.roi.pixels] 
 
 ############################################################
-def simpleMask(config):
-
-    #params = ugali.utils.(config, kwargs)
-
-    roi = ugali.observation.roi.ROI(config)
-
-    # De-project the bin centers to get magnitude depths
-
-    mesh_x, mesh_y = np.meshgrid(roi.centers_x, roi.centers_y)
-    r = np.sqrt(mesh_x**2 + mesh_y**2) # Think about x, y conventions here
-
-    #z = (0. * (r > 1.)) + (21. * (r < 1.))
-    #z = 21. - r
-    #z = (21. - r) * (mesh_x > 0.) * (mesh_y < 0.)
-    z = (21. - r) * np.logical_or(mesh_x > 0., mesh_y > 0.)
-
-    return MaskBand(z, roi)
-    
-############################################################
-
-def readMangleFile(infile, lon, lat, index = None):
-    """
-    DEPRECATED: 2018-05-04
-    Mangle must be set up on your system.
-    The index argument is a temporary file naming convention to avoid file conflicts.
-    Coordinates must be given in the native coordinate system of the Mangle file.
-    """
-    msg = "'mask.readMangleFile': ADW 2018-05-05"
-    DeprecationWarning(msg)
-
-    if index is None:
-        index = np.random.randint(0, 1.e10)
-    
-    coordinate_file = 'temp_coordinate_%010i.dat'%(index)
-    maglim_file = 'temp_maglim_%010i.dat'%(index)
-
-    writer = open(coordinate_file, 'w')
-    for ii in range(0, len(lon)):
-        writer.write('%12.5f%12.5f\n'%(lon[ii], lat[ii]))
-    writer.close()
-
-    os.system('polyid -W %s %s %s || exit'%(infile,
-                                            coordinate_file,
-                                            maglim_file))
-
-    reader = open(maglim_file)
-    lines = reader.readlines()
-    reader.close()
-
-    os.remove(maglim_file)
-    os.remove(coordinate_file)
-
-    maglim = []
-    for ii in range(1, len(lines)):
-        if len(lines[ii].split()) == 3:
-            maglim.append(float(lines[ii].split()[2]))
-        elif len(lines[ii].split()) == 2:
-            maglim.append(0.) # Coordinates outside of the MANGLE ploygon
-        elif len(lines[ii].split()) > 3:
-            msg = 'Coordinate inside multiple polygons, masking that coordinate.'
-            logger.warning(msg)
-            maglim.append(0.)
-        else:
-            msg = 'Cannot parse maglim file, unexpected number of columns.'
-            logger.error(msg)
-            break
-            
-    maglim = np.array(maglim)
-    return maglim
-
-############################################################
-
-def allSkyMask(infile, nside):
-    msg = "'mask.allSkyMask': ADW 2018-05-05"
-    DeprecationWarning(msg)
-    lon, lat = ugali.utils.skymap.allSkyCoordinates(nside)
-    maglim = readMangleFile(infile, lon, lat, index = None)
-    return maglim
-
-############################################################
-
-def scale(mask, mag_scale, outfile=None):
-    """
-    Scale the completeness depth of a mask such that mag_new = mag + mag_scale.
-    Input is a full HEALPix map.
-    Optionally write out the scaled mask as an sparse HEALPix map.
-    """
-    msg = "'mask.scale': ADW 2018-05-05"
-    DeprecationWarning(msg)
-    mask_new = hp.UNSEEN * np.ones(len(mask))
-    mask_new[mask == 0.] = 0.
-    mask_new[mask > 0.] = mask[mask > 0.] + mag_scale
-
-    if outfile is not None:
-        pix = np.nonzero(mask_new > 0.)[0]
-        data_dict = {'MAGLIM': mask_new[pix]}
-        nside = hp.npix2nside(len(mask_new))
-        ugali.utils.skymap.writeSparseHealpixMap(pix, data_dict, nside, outfile)
-
-    return mask_new
-
-############################################################
-

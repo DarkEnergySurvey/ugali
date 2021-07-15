@@ -48,11 +48,11 @@ def getCatalog(catalog_dir):
     catalog_infiles = sorted(glob.glob(catalog_dir + '/*catalog*.fits'))
     data_array = []
     for catalog_infile in catalog_infiles:
-        print '  Reading %s ...'%(catalog_infile)
+        print('  Reading %s ...'%(catalog_infile))
         reader = pyfits.open(catalog_infile)
         data_array.append(reader[1].data)
         reader.close()
-    print '  Merging ...'
+    print('  Merging ...')
     return np.concatenate(data_array)
 
 ##########
@@ -64,7 +64,7 @@ dpi = 150
 infile_population = 'v4/sim_population_v4.fits'
 reader_population = pyfits.open(infile_population)
 data_population = reader_population[1].data
-print len(data_population)
+print(len(data_population))
 data_population = data_population #[0:500]
 reader_population.close()
 
@@ -207,7 +207,7 @@ pylab.ylabel('Number of Satellites')
 """
 ##########
 """
-print "Machine learning"
+print("Machine learning")
 
 save = False
 

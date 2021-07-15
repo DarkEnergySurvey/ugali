@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+Incomplete module for dealing with priors...
+"""
+
+import scipy.stats
 
 class Prior(object):
     def __call__(self, value):

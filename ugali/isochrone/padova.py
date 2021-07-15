@@ -1,7 +1,20 @@
 #!/usr/bin/env python
 """
 Older (pre-PARSEC) Padova isochrones.
+
+Not verified to work...
 """
+import os.path
+from collections import OrderedDict as odict
+
+import numpy as np
+
+from ugali.analysis.model import Model, Parameter
+from ugali.utils.shell import mkdir, get_ugali_dir, get_iso_dir
+from ugali.isochrone.model import Isochrone
+from ugali.isochrone.parsec import Marigo2017 as Padova
+from ugali.isochrone.parsec import defaults_27
+from ugali.utils.logger import logger
 
 class Girardi2002(Padova):
     defaults = dict(defaults_27)
@@ -19,7 +32,7 @@ class Girardi2010b(Padova):
     defaults = dict(defaults_27)
     defaults['isoc_kind'] = 'gi10b'
 
-class Girardi2002(PadovaIsochrone):
+class Girardi2002(Padova):
     #_dirname = '/u/ki/kadrlica/des/isochrones/v5/'
     _dirname =  os.path.join(get_iso_dir(),'{survey}','girardi2002')
     # For use with Marigo et al. (2008) and earlier use Anders & Grevesse 1989
@@ -57,7 +70,7 @@ class Girardi2002(PadovaIsochrone):
         try:
             columns = self.columns[self.survey.lower()]
         except KeyError as e:
-            logger.warning('did not recognize survey %s'%(survey))
+            logger.warning('did not recognize survey %s'%(self.survey))
             raise(e)
 
         kwargs = dict(delimiter='\t',usecols=list(columns.keys()),dtype=list(columns.values()))

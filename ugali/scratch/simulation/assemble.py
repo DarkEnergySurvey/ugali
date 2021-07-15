@@ -1,3 +1,5 @@
+DeprecationWarning("'assemble.py' should be removed")
+
 import sys
 import os
 import shutil
@@ -9,7 +11,8 @@ outdir = 'des_y3a2_survey_selection_function_v5_test'
 config = yaml.load(open(config_file))
 
 if os.path.exists(outdir):
-    raw_input('Are you sure you want to continue? [Press ENTER to continue]')
+    print("Output directory exists: %s"%outdir)
+    input('Are you sure you want to continue? [Press ENTER to continue]')
 
 if not os.path.exists(outdir):
     os.mkdir(outdir)

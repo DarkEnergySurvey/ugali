@@ -159,7 +159,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     flag_too_extended = False
     max_extension = 5.0 # deg
     if a_h >= max_extension:
-        print 'Too extended: a_h = %.2f'%(a_h)
+        print('Too extended: a_h = %.2f'%(a_h))
         a_h = max_extension
         flag_too_extended = True
     # Elliptical kernels take the "extension" as the semi-major axis
@@ -270,7 +270,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         pylab.savefig('y3_sat_sim_cmd_%s.png'%('test'), dpi=150.)
         
         print('n_Sigma_p = %i'%(n_sigma_p))
-        raw_input('WAIT')
+        input('WAIT')
         
     satellite=odict(lon=lon[cut_detect], lat=lat[cut_detect], 
                     mag_1=mag_1_meas[cut_detect], mag_2=mag_2_meas[cut_detect], 
@@ -378,8 +378,8 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
     mag_extinction_2_array = []
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(population['id']):
-        print 'Simulating satellite (%i/%i) ... mc_source_id = %i'%(ii + 1, n, mc_source_id)
-        print '  distance=%(distance).2e, stellar_mass=%(stellar_mass).2e, r_physical=%(r_physical).2e'%(population[ii])
+        print('Simulating satellite (%i/%i) ... mc_source_id = %i'%(ii + 1, n, mc_source_id))
+        print('  distance=%(distance).2e, stellar_mass=%(stellar_mass).2e, r_physical=%(r_physical).2e'%(population[ii]))
         satellite = catsimSatellite(config, population[ii]['lon'], population[ii]['lat'], 
                                     population[ii]['distance'], population[ii]['stellar_mass'], 
                                     population[ii]['r_physical'],population[ii]['ellipticity'],
@@ -435,7 +435,7 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
             mag_extinction_2_array.append(satellite['mag_extinction_2'])
             mc_source_id_array.append(np.tile(mc_source_id, len(satellite['lon'])))
         else:
-            print '  difficulty=%i; satellite not simulated...'%difficulty_population[ii]
+            print('  difficulty=%i; satellite not simulated...'%difficulty_population[ii])
 
     # Concatenate the arrays
     print("Concatenating arrays...")
