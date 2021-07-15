@@ -104,7 +104,6 @@ def satellitePopulation(mask, nside_pix, size,
 
 ############################################################
 
-# ADW: 2019-09-01 DEPRECATED
 def satellitePopulationOrig(config, n,
                             range_distance_modulus=[16.5, 24.],
                             range_stellar_mass=[1.e2, 1.e5],
@@ -133,7 +132,9 @@ def satellitePopulationOrig(config, n,
     lon (deg), lat (deg), distance modulus, stellar mass (Msun), and
     half-light radius (kpc) for each satellite
     """
-    
+    msg = "'satellitePopulationOrig': ADW 2019-09-01"
+    DeprecationWarning(msg)
+
     if type(config) == str:
         config = ugali.utils.config.Config(config)
 
@@ -155,8 +156,8 @@ def satellitePopulationOrig(config, n,
                                          np.log10(range_stellar_mass[1]), 
                                          n)
     
-    half_light_radius_physical = 10**np.random.uniform(np.log10(range_half_light_radius_physical[0]), 
-                                                       np.log10(range_half_light_radius_physical[0]), 
+    half_light_radius_physical = 10**np.random.uniform(np.log10(range_r_physical[0]),
+                                                       np.log10(range_r_physical[1]),
                                                        n) # kpc
 
     half_light_radius = np.degrees(np.arcsin(half_light_radius_physical \

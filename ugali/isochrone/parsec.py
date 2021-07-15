@@ -370,7 +370,7 @@ class Bressan2012(ParsecIsochrone):
         try:
             columns = self.columns[self.survey.lower()]
         except KeyError as e:
-            logger.warning('Unrecognized survey: %s'%(survey))
+            logger.warning('Unrecognized survey: %s'%(self.survey))
             raise(e)
 
         # delimiter='\t' is used to be compatible with OldPadova...
@@ -455,7 +455,7 @@ class Marigo2017(ParsecIsochrone):
                 (28,('Y',float)),
                 ]),
         )
-    
+
     def _parse(self,filename):
         """Reads an isochrone file in the Padova (Marigo et al. 2017)
         format. Creates arrays with the initial stellar mass and
@@ -464,7 +464,7 @@ class Marigo2017(ParsecIsochrone):
         try:
             columns = self.columns[self.survey.lower()]
         except KeyError as e:
-            logger.warning('Unrecognized survey: %s'%(survey))
+            logger.warning('Unrecognized survey: %s'%(self.survey))
             raise(e)
 
         kwargs = dict(usecols=list(columns.keys()),dtype=list(columns.values()))

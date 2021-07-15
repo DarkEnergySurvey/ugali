@@ -134,7 +134,7 @@ class Dotter2016(Isochrone):
         try:
             columns = self.columns[self.survey.lower()]
         except KeyError as e:
-            logger.warning('Unrecognized survey: %s'%(survey))
+            logger.warning('Unrecognized survey: %s'%(self.survey))
             raise(e)
 
         kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
