@@ -50,7 +50,7 @@ The `ugali` source code is distributed with several auxiliary libraries for isoc
 
 ```
 cd $UGALIDIR
-wget https://github.com/kadrlica/ugali/releases/download/v1.7.0rc0/ugali-des-bressan2012.tar.gz
+wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-des-bressan2012.tar.gz
 tar -xzf ugali-des-bressan2012.tar.gz
 ```
 
