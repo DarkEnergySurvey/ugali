@@ -18,8 +18,6 @@ jobs:
       max-parallel: 3
       matrix:
         python-version: [2.7, 3.8]
-    #env:
-    #  UGALIDIR: "${HOME}/.ugali"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -35,10 +33,12 @@ jobs:
     - name: Create conda environment
       run: |
         conda create -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
+        # Add UGALIDIR to environment
+        conda env config vars set UGALIDIR=$HOME/.ugali
     - name: Install package
       run: |
         source activate env
-        export UGALIDIR="$HOME/.ugali"
+        #export UGALIDIR="$HOME/.ugali"
         python setup.py -q install --isochrones --catalogs --tests
     - name: Lint with flake8
       if: ${{ true }}
