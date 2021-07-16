@@ -15,12 +15,12 @@ def test_config():
     np.testing.assert_equal(len(config.filenames),768)
 
     np.testing.assert_equal(config.filenames['pix'].compressed()[0],687)
-    np.testing.assert_equal(config.filenames['catalog'].compressed()[0],
-                            './healpix/catalog_hpx0687.fits')
-    np.testing.assert_equal(config.filenames['mask_1'].compressed()[0],
-                            './mask/maglim_g_hpx0687.fits')
-    np.testing.assert_equal(config.filenames['mask_2'].compressed()[0],
-                            './mask/maglim_r_hpx0687.fits')
+    catfile = os.path.basename(config.filenames['catalog'].compressed()[0])
+    np.testing.assert_equal(catfile,'catalog_hpx0687.fits')
+    maskfile = os.path.basename(config.filenames['mask_1'].compressed()[0])
+    np.testing.assert_equal(maskfile,'maglim_g_hpx0687.fits')
+    maskfile = os.path.basename(config.filenames['mask_2'].compressed()[0])
+    np.testing.assert_equal(maskfile,'maglim_r_hpx0687.fits')
 
     np.testing.assert_equal(config.likefile,'./scan/scan_%08i_%s.fits')
     np.testing.assert_equal(config.mergefile,'./scan/merged_scan.fits')

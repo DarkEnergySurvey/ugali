@@ -592,7 +592,7 @@ class Mask(object):
         index_color = np.arange(len(self.roi.centers_color))
         # Add the cumulative leakage back into the last bin of the CMD
         leakage = (cmd_background * ~observable).sum(axis=0)
-        cmd_background[[index_mag,index_color]] += leakage
+        cmd_background[(index_mag,index_color)] += leakage
         # Zero out all non-observable bins
         cmd_background *= observable
 

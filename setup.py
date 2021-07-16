@@ -40,7 +40,7 @@ Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE_URL = URL+'/releases/download/v1.7.0'
+RELEASE_URL = URL+'/releases/download/v1.8.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISOSIZE = "~1MB" 
 CATSIZE = "~20MB"
@@ -64,7 +64,7 @@ class ProgressFileIO(io.FileIO):
     def progress_bar(count, block_size, total_size):
         block = 100*block_size/float(total_size)
         progress = count*block
-        if progress % 1 < 1.01*block:
+        if progress % 5 < 1.01*block:
             msg = '\r[{:51}] ({:d}%)'.format(int(progress//2)*'='+'>',int(progress))
             sys.stdout.write(msg)
             sys.stdout.flush()
