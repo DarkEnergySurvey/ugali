@@ -24,25 +24,27 @@ NAME = 'ugali'
 HERE = os.path.abspath(os.path.dirname(__file__))
 URL = 'https://github.com/DarkEnergySurvey/ugali'
 DESC = "Ultra-faint galaxy likelihood toolkit."
-LONG_DESC = "See %s"%URL
+LONG_DESC = "%s\n%s"%(DESC,URL)
 CLASSIFIERS = """\
-Development Status :: 3 - Alpha
+Development Status :: 4 - Beta
 Intended Audience :: Science/Research
 Intended Audience :: Developers
 License :: OSI Approved :: MIT License
 Natural Language :: English
 Operating System :: MacOS :: MacOS X
 Operating System :: POSIX :: Linux
-Programming Language :: Python :: 2.7
+Programming Language :: Python :: 2
+Programming Language :: Python :: 3
 Topic :: Scientific/Engineering
 Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE = URL+'/releases/download/v1.7.0'
+RELEASE_URL = URL+'/releases/download/v1.8.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISOSIZE = "~1MB" 
 CATSIZE = "~20MB"
+TSTSIZE = "~1MB"
 # Could find file size dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
 SURVEYS = ['des','ps1','sdss','lsst']
@@ -62,7 +64,7 @@ class ProgressFileIO(io.FileIO):
     def progress_bar(count, block_size, total_size):
         block = 100*block_size/float(total_size)
         progress = count*block
-        if progress % 1 < 1.01*block:
+        if progress % 5 < 1.01*block:
             msg = '\r[{:51}] ({:d}%)'.format(int(progress//2)*'='+'>',int(progress))
             sys.stdout.write(msg)
             sys.stdout.flush()
@@ -77,7 +79,7 @@ class TarballCommand(distutils.cmd.Command,object):
          'force installation (overwrite any existing files)')
         ]
     boolean_options = ['force']
-    release = RELEASE
+    release_url = RELEASE_URL
     _tarball = None
     _dirname = None
 
@@ -114,7 +116,7 @@ class TarballCommand(distutils.cmd.Command,object):
             os.makedirs(self.ugali_dir)
         os.chdir(self.ugali_dir)
 
-        url = os.path.join(self.release,tarball)
+        url = os.path.join(self.release_url,tarball)
 
         print("downloading %s..."%url)
         if urlopen(url).getcode() >= 400:
@@ -157,6 +159,12 @@ class CatalogCommand(TarballCommand):
     description = "install catalog files"
     _tarball = 'ugali-catalogs.tar.gz'
     _dirname = 'catalogs'
+
+class TestsCommand(TarballCommand):
+    """ Command for downloading catalog files """
+    description = "install test data"
+    _tarball = 'ugali-test-data.tar.gz'
+    _dirname = 'testdata'
 
 class IsochroneCommand(TarballCommand):
     """ Command for downloading isochrone files """
@@ -223,6 +231,7 @@ class install(_install):
     user_options = _install.user_options + [
         ('isochrones',None,"install isochrone files (%s)"%ISOSIZE),
         ('catalogs',None,"install catalog files (%s)"%CATSIZE),
+        ('tests',None,"install test data (%s)"%TSTSIZE),
         ('ugali-dir=',None,"install file directory [default: %s]"%UGALIDIR),
     ]
     boolean_options = _install.boolean_options + ['isochrones','catalogs']
@@ -232,6 +241,7 @@ class install(_install):
         self.ugali_dir = os.path.expandvars(UGALIDIR)
         self.isochrones = False
         self.catalogs = False
+        self.tests = False
 
     def run(self):
         # run superclass install
@@ -246,7 +256,10 @@ class install(_install):
 
         if self.catalogs: 
             self.install_catalogs()
-            
+
+        if self.tests:
+            self.install_tests()
+
     def install_isochrones(self):
         """
         Call to isochrone install command:
@@ -266,10 +279,21 @@ class install(_install):
         cmd_obj.force = self.force
         if self.ugali_dir: cmd_obj.ugali_dir = self.ugali_dir
         self.run_command('catalogs')
-            
+
+    def install_tests(self):
+        """
+        Call to catalog install command:
+        http://stackoverflow.com/a/24353921/4075339
+        """
+        cmd_obj = self.distribution.get_command_obj('tests')
+        cmd_obj.force = self.force
+        if self.ugali_dir: cmd_obj.ugali_dir = self.ugali_dir
+        self.run_command('tests')
+
 CMDCLASS = versioneer.get_cmdclass()
 CMDCLASS['isochrones'] = IsochroneCommand
 CMDCLASS['catalogs'] = CatalogCommand
+CMDCLASS['tests'] = TestsCommand
 CMDCLASS['install'] = install
 
 setup(
@@ -278,9 +302,11 @@ setup(
     cmdclass=CMDCLASS,
     url=URL,
     author='Keith Bechtol & Alex Drlica-Wagner',
-    author_email='bechtol@kicp.uchicago.edu, kadrlica@fnal.gov',
+    author_email='bechtol@wisc.edu, kadrlica@fnal.gov',
     scripts = [],
     install_requires=[
+        'astropy',
+        'matplotlib',
         'numpy >= 1.9.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
@@ -288,7 +314,6 @@ setup(
         'emcee >= 2.1.0',
         'corner >= 1.0.0',
         'pyyaml >= 3.10',
-        # Add astropy, fitsio, matplotlib, ...
     ],
     packages=find_packages(),
     description=DESC,

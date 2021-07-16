@@ -44,8 +44,13 @@ def test_catalog():
     """ Test ugali.observation.catalog """
     import ugali.observation.roi
     import ugali.observation.catalog
+    import ugali.utils.config
 
-    filename='healpix/catalog_hpx0687.fits'
+    # Get catalog filename
+    config = ugali.utils.config.Config(CONFIG)
+    filename = config.filenames['catalog'].compressed()[0]
+
+    # Create catalog from filename
     catalog = ugali.observation.catalog.Catalog(CONFIG,filenames=filename)
 
     roi = ugali.observation.roi.ROI(CONFIG, LON, LAT)

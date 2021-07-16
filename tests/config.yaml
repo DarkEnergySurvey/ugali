@@ -27,7 +27,7 @@ coords:
 
 catalog:
   # Color always defined as mag_1 - mag_2
-  dirname: ./healpix                    # directory of catalog files
+  dirname: ${UGALIDIR}/testdata/healpix          # directory of catalog files
   basename: "catalog_hpx%04i.fits"      # catalog file basename format
   objid_field       : COADD_OBJECT_ID   # unique object identifier
   lon_field         : RA                # name of longitude field
@@ -45,7 +45,7 @@ catalog:
   selection         : "(np.abs(self.data['WAVG_SPREAD_MODEL_I']) < 0.003)"
 
 data: 
-  dirname: ./raw
+  dirname: ${UGALIDIR}/raw
   script : ./ugali/preprocess/database.py
   survey : des
   release: y3a2
@@ -53,15 +53,10 @@ data:
   footprint: ./maps/footprint_nside4096_equ.fits.gz
 
 mask:
-  dirname    : ./mask
+  dirname    : ${UGALIDIR}/testdata/mask
   basename_1 : "maglim_g_hpx%04i.fits"
   basename_2 : "maglim_r_hpx%04i.fits"
   minimum_solid_angle: 0.1 # deg^2
-
-mangle:
-  dirname    : ./maps
-  filename_1 : 'y3a2_g_o.4096_t.32768_maglim_EQU.fits.gz'
-  filename_2 : 'y3a2_r_o.4096_t.32768_maglim_EQU.fits.gz'
 
 #ADW: Depricated in favor of 'binning'
 color:
