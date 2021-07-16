@@ -40,7 +40,7 @@ Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE_URL = URL+'/releases/download/v1.7.0'
+RELEASE_URL = URL+'/releases/download/v1.8.0rc1'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISOSIZE = "~1MB" 
 CATSIZE = "~20MB"

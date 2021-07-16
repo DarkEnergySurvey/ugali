@@ -121,7 +121,7 @@ def load_header(kwargs):
         if not keys: keys = hdr.keys()
         return {k:hdr[k] for k in keys}
     except Exception as e:
-        logger.error("Failed to load file: %(filename)s"%kwargs)
+        logger.error("Failed to load header from file: %(filename)s"%kwargs)
         raise(e)
 
 def load_headers(filenames,multiproc=False,**kwargs):

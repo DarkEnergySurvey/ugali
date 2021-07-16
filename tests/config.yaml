@@ -27,7 +27,7 @@ coords:
 
 catalog:
   # Color always defined as mag_1 - mag_2
-  dirname: ${UGALIDIR}/healpix          # directory of catalog files
+  dirname: ${UGALIDIR}/testdata/healpix          # directory of catalog files
   basename: "catalog_hpx%04i.fits"      # catalog file basename format
   objid_field       : COADD_OBJECT_ID   # unique object identifier
   lon_field         : RA                # name of longitude field
@@ -53,7 +53,7 @@ data:
   footprint: ./maps/footprint_nside4096_equ.fits.gz
 
 mask:
-  dirname    : ${UGALIDIR}/mask
+  dirname    : ${UGALIDIR}/testdata/mask
   basename_1 : "maglim_g_hpx%04i.fits"
   basename_2 : "maglim_r_hpx%04i.fits"
   minimum_solid_angle: 0.1 # deg^2
