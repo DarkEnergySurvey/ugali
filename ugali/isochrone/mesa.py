@@ -79,7 +79,7 @@ class Dotter2016(Isochrone):
             des = odict([
                 (2, ('mass_init',float)),
                 (3, ('mass_act',float)),
-                (8, ('log_lum',float)),
+                (6, ('log_lum',float)),
                 (9, ('u',float)),
                 (10,('g',float)),
                 (11,('r',float)),
