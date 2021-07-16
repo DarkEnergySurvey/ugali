@@ -172,86 +172,6 @@ class Config(dict):
             raise Exception('Unrecognized config format: %s'%ext)
         writer.close()
 
-    def _createFilenames(self,pixels=None):
-        """
-        Create a masked records array of all filenames for the given set of
-        pixels and store the existence of those files in the mask values.
-
-        Examples:
-        f = getFilenames([1,2,3])
-        # All possible catalog files
-        f['catalog'].data
-        # All existing catalog files
-        f['catalog'][~f.mask['catalog']]
-        # or
-        f['catalog'].compressed()
-        # All missing mask_1 files
-        f['mask_1'][f.mask['mask_1']]
-        # Pixels where all files exist
-        f['pix'][~f.mask['pix']]
-
-        Parameters:
-        -----------
-        pixels : If pixels is None, grab all pixels of 'nside_catalog'.
-
-        Returns:
-        --------
-        recarray : pixels and mask value
-        """
-        nside_catalog = self['coords']['nside_catalog']
-
-        if pixels is not None:
-            pixels = [pixels] if np.isscalar(pixels) else pixels
-        else:
-            pixels = np.arange(hp.nside2npix(nside_catalog))   
-
-        npix = len(pixels)
-
-        catalog_dir = self['catalog']['dirname']
-        catalog_base = self['catalog']['basename']
-         
-        mask_dir = self['mask']['dirname']
-        mask_base_1 = self['mask']['basename_1']
-        mask_base_2 = self['mask']['basename_2']
-         
-        data = np.ma.empty(npix,dtype=[('pix',int), ('catalog',object), 
-                                       ('mask_1',object), ('mask_2',object)])
-        mask = np.ma.empty(npix,dtype=[('pix',bool), ('catalog',bool), 
-                                       ('mask_1',bool), ('mask_2',bool)])
-        for ii,pix in enumerate(pixels):
-            if pix is None:
-                # DEPRECTATED: ADW 2018-06-17
-                # This is not really being used anymore
-                raise ValueError('pix cannot be None')
-                catalog = os.path.join(catalog_dir,catalog_base)
-                mask_1 = os.path.join(mask_dir,mask_base_1)
-                mask_2 = os.path.join(mask_dir,mask_base_2)
-            else:
-                catalog = os.path.join(catalog_dir,catalog_base%pix)
-                mask_1 = os.path.join(mask_dir,mask_base_1%pix)
-                mask_2 = os.path.join(mask_dir,mask_base_2%pix)
-            data[ii]['pix'] = pix if pix is not None else -1
-            data[ii]['catalog'] = catalog
-            data[ii]['mask_1']  = mask_1
-            data[ii]['mask_2']  = mask_2
-         
-            mask[ii]['catalog'] = not os.path.exists(catalog)
-            mask[ii]['mask_1']  = not os.path.exists(mask_1)
-            mask[ii]['mask_2']  = not os.path.exists(mask_2)
-
-        for name in ['catalog','mask_1','mask_2']:
-            if np.all(mask[name]): logger.warn("All '%s' files masked"%name)
-
-        # mask 'pix' if all files not present
-        mask['pix'] = mask['catalog'] | mask['mask_1'] | mask['mask_2']
-
-        if np.all(mask['pix']): logger.warn("All pixels masked")
-                
-        #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,None,None,None])
-        #return np.ma.mrecords.MaskedArray(data, mask, fill_value=[-1,'','',''])
-        return np.ma.MaskedArray(data, mask, fill_value=[-1,'','',''])
-
-
     def _createFilenames(self):
         """
         Create a masked records array of all filenames for the given set of
@@ -269,11 +189,17 @@ class Config(dict):
         npix = hp.nside2npix(nside_catalog)
         pixels = np.arange(npix)
 
-        catalog_dir = self['catalog']['dirname']
+        catalog_dir = os.path.expandvars(self['catalog']['dirname'])
+        if not os.path.isdir(catalog_dir):
+            msg = "Directory does not exist: %s"%catalog_dir
+            raise IOError(msg)
         catalog_base = self['catalog']['basename']
         catalog_path = os.path.join(catalog_dir,catalog_base)
 
-        mask_dir    = self['mask']['dirname']
+        mask_dir    = os.path.expandvars(self['mask']['dirname'])
+        if not os.path.isdir(mask_dir):
+            msg = "Directory does not exist: %s"%mask_dir
+            raise IOError(msg)
         mask_base_1 = self['mask']['basename_1']
         mask_base_2 = self['mask']['basename_2']
         mask_path_1 = os.path.join(mask_dir,mask_base_1)

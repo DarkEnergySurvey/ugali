@@ -18,6 +18,8 @@ jobs:
       max-parallel: 3
       matrix:
         python-version: [2.7, 3.8]
+    env:
+      UGALIDIR: "$HOME/.ugali"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -36,8 +38,8 @@ jobs:
     - name: Install package
       run: |
         source activate env
-        export UGALIDIR="$HOME/.ugali"
-        python setup.py -q install --isochrones --catalogs
+        #export UGALIDIR="$HOME/.ugali"
+        python setup.py -q install --isochrones --catalogs --tests
     - name: Lint with flake8
       if: ${{ true }}
       run: |
@@ -46,6 +48,7 @@ jobs:
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
     - name: Install test data
+      if: ${{ false }}
       run: |
         wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
         tar -xzf ugali-test-data.tar.gz
