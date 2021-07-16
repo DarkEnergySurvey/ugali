@@ -47,11 +47,6 @@ jobs:
         conda install -q flake8 -c conda-forge
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    - name: Install test data
-      if: ${{ false }}
-      run: |
-        wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.7.0/ugali-test-data.tar.gz -O ugali-test-data.tar.gz
-        tar -xzf ugali-test-data.tar.gz
     - name: Test with nose
       run: |
         source activate env
