@@ -279,7 +279,7 @@ class Results(object):
 
         # ADW: WARNING this is very fragile.
         # Also, this is not quite right, should cut on the CMD available space
-        kwargs = dict(richness=rich,mag_bright=16., mag_faint=23.,
+        kwargs = dict(richness=rich,mag_bright= self.config['mag'].get('min'), mag_faint=self.config['mag'].get('max'),
                       n_trials=5000,alpha=kwargs['alpha'], seed=0)
         martin = self.config['results'].get('martin')
         if martin:
