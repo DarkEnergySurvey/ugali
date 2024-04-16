@@ -166,6 +166,8 @@ class Results(object):
             results['dec'] = self.estimate('dec',**kwargs)
             results['glon'] = self.estimate('glon',**kwargs)
             results['glat'] = self.estimate('glat',**kwargs)
+            results['extension_radial'] = self.estimate('extension_radial', **kwargs)
+            
         except KeyError:
             logger.warn("Didn't find 'ra' or 'dec' in Samples...")
             if self.coordsys == 'gal':
@@ -216,9 +218,9 @@ class Results(object):
  
         # Radially symmetric extension (correct for ellipticity).
         ell,ell_err = estimate['ellipticity']
-        rext,rext_err = ext*np.sqrt(1-ell),np.array(ext_err)*np.sqrt(1-ell)
+        rext,rext_err = results['extension_radial'] #ext*np.sqrt(1-ell),np.array(ext_err)*np.sqrt(1-ell)
         rext_sigma = np.nan_to_num(np.array(rext_err) - rext)
-        results['extension_radial'] = ugali.utils.stats.interval(rext,rext_err[0],rext_err[1])
+        #results['extension_radial'] = ugali.utils.stats.interval(rext,rext_err[0],rext_err[1]) # now obsolete
         results['extension_radial_arcmin'] = ugali.utils.stats.interval(60*rext,60*rext_err[0],60*rext_err[1])
  
         # Bayes factor for ellipticity
