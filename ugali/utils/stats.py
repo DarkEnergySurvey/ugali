@@ -299,7 +299,14 @@ class Samples(np.recarray):
                 names = ['position_angle_gal','position_angle_cel']
                 arrs = [pa_gal,pa_cel]
                 out = recfuncs.append_fields(out,names,arrs,**kwargs).view(Samples)
-        
+
+            if ('extension' in out.names) and ('ellipticity' in out.names):
+                ext = out.extension
+                ellipticity = out.ellipticity
+                rext = ext * np.sqrt(1-ellipticity)
+
+                out = recfuncs.append_fields(out,['extension_radial'], [rext]).view(Samples)
+                
         return out
 
     def get(self, names=None, burn=None, clip=None):
