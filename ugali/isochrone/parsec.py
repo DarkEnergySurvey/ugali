@@ -34,6 +34,7 @@ photsys_dict = odict([
         ('ps1' ,'tab_mag_odfnew/tab_mag_panstarrs1.dat'),
         ('acs_wfc' ,'tab_mag_odfnew/tab_mag_acs_wfc.dat'),
         ('lsst', 'tab_mag_odfnew/tab_mag_lsst.dat'),
+        ('lsst_dp0', 'tab_mag_odfnew/tab_mag_lsstDP0.dat'),
 ])
 
 photname_dict = odict([
@@ -42,6 +43,7 @@ photname_dict = odict([
         ('ps1' ,'Pan-STARRS1'),
         ('acs_wfc','HST/ACS'),
         ('lsst', 'LSST'),
+        ('lsst_dp0', 'LSST'),
 ])
 
 # Commented options may need to be restored for older version/isochrones.
@@ -155,6 +157,8 @@ defaults_33 = {'cmd_version': 3.3,
                #'.cgifields': 'dust_sourceM',
                }
 
+defaults_36 = dict(defaults_33,cmd_version=3.6)
+
 class ParsecIsochrone(Isochrone):
     """ Base class for PARSEC-style isochrones. """
 
@@ -242,7 +246,7 @@ class ParsecIsochrone(Isochrone):
         urlopen(url,timeout=2)
 
         q = urlencode(params).encode('utf-8')
-        logger.debug(url+'?'+q)
+        logger.debug("%s?%s"%(url,q))
         c = str(urlopen(url, q).read())
         aa = re.compile('output\d+')
         fname = aa.findall(c)
@@ -256,48 +260,92 @@ class ParsecIsochrone(Isochrone):
         cmd = 'wget --progress dot:binary %s -O %s'%(out,outfile)
         logger.debug(cmd)
         stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)
-        logger.debug(stdout)
+        logger.debug(str(stdout))
 
         return outfile
 
     @classmethod
-    def verify(cls, filename, survey, age, metallicity):
-        age = age*1e9
-        nlines=15
+    def parse_header(cls, filename, nlines=15):
+        header = dict(
+            photname = None,
+            columns = None
+        )
+
         with open(filename,'r') as f:
             lines = [f.readline() for i in range(nlines)]
-            if len(lines) < nlines:
-                msg = "Incorrect file size"
+
+        if len(lines) < nlines:
+            msg = "Incorrect file size"
+            raise Exception(msg)
+
+        for i,l in enumerate(lines):
+            if l.startswith('# Photometric system:'): 
+                try:    header['photname'] = lines[i].split()[3]
+                except: header['photname'] = None
+            if not l.startswith('# '): break
+
+        header['columns'] = lines[i-1].split()[1:]
+
+        for k,v in header.items():
+            if v is None: 
+                msg = "File header missing: '%s'"%k
                 raise Exception(msg)
 
-            for i,l in enumerate(lines):
-                if l.startswith('# Photometric system:'): break
-            else:
-                msg = "Incorrect file header"
-                raise Exception(msg)
+        return header, lines
+    
+    @classmethod
+    def verify(cls, filename, survey, age, metallicity):
+        """Verify that the isochrone file matches the isochrone
+        parameters. Used mostly for verifying the integrity of 
+        a download.
 
-            try:
-                s = lines[i].split()[3]
-                assert photname_dict[survey] == s
-            except:
-                msg = "Incorrect survey:\n"+lines[i]
-                raise Exception(msg)
+        Parameters
+        ----------
+        filename    : the downloaded filename 
+        survey      : the survey (photometric system) of the download
+        age         : the requested age of the system
+        metallicity : the requested metallicity
 
-            try:
-                z = lines[-1].split()[0]
-                assert np.allclose(metallicity,float(z),atol=1e-5)
-            except:
-                msg = "Metallicity does not match:\n"+lines[-1]
-                raise Exception(msg)
+        Returns
+        -------
+        None
+        """
+        age = age*1e9
+        nlines=15
+        header, lines = cls.parse_header(filename,nlines=nlines)
 
-            try:
-                a = lines[-1].split()[1]
-                # Need to deal with age or log-age
-                assert (np.allclose(age,float(a),atol=1e-2) or
-                        np.allclose(np.log10(age),float(a),atol=1e-2))
-            except:
-                msg = "Age does not match:\n"+lines[-1]
-                raise Exception(msg)
+        try:
+            assert photname_dict[survey] == header['photname']
+        except:
+            msg = "Incorrect survey:\n"+header['photname']
+            raise Exception(msg)
+
+        try:
+            try: zidx = header['columns'].index('Zini')
+            except ValueError: zidx = 0
+            z = float(lines[-1].split()[zidx])
+            assert np.allclose(metallicity,z,atol=1e-5)
+        except:
+            msg = "Metallicity does not match:\n"+lines[-1]
+            raise Exception(msg)
+
+        try:
+            # Need to deal with age or log-age
+            names = ['log(age/yr)', 'logAge', 'Age']
+            for name in names:
+                try: 
+                    aidx = header['columns'].index(name)
+                    break
+                except ValueError: 
+                    aidx = 1
+            if aidx < 0: aidx = 1
+
+            a = lines[-1].split()[aidx]
+            assert (np.allclose(age,float(a),atol=1e-2) or
+                    np.allclose(np.log10(age),float(a),atol=1e-2))
+        except:
+            msg = "Age does not match:\n"+lines[-1]
+            raise Exception(msg)
 
 
 class Bressan2012(ParsecIsochrone):
@@ -403,7 +451,7 @@ class Marigo2017(ParsecIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
-    download_defaults = copy.deepcopy(defaults_31)
+    download_defaults = copy.deepcopy(defaults_36)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S_NOV13'
 
     columns = dict(
@@ -442,24 +490,38 @@ class Marigo2017(ParsecIsochrone):
                 (27,('y',float)),
                 (28,('w',float)),
                 ]),
-        lsst = odict([
-                (2, ('mass_init',float)),
-                (3, ('mass_act',float)),
-                (4, ('log_lum',float)),
-                (7, ('stage',int)),
-                (23,('u',float)),
-                (24,('g',float)),
-                (25,('r',float)),
-                (26,('i',float)),
-                (27,('z',float)),
-                (28,('Y',float)),
+        lsst_dp0 = odict([
+                (3, ('mass_init',float)),
+                (5, ('mass_act',float)),
+                (6, ('log_lum',float)),
+                (9, ('stage',int)),
+                (25,('u',float)),
+                (26,('g',float)),
+                (27,('r',float)),
+                (28,('i',float)),
+                (29,('z',float)),
+                (30,('Y',float)),
                 ]),
         )
-    
+    columns['lsst'] = copy.deepcopy(columns['lsst_dp0'])
+
+    def _find_column_numbers(self):
+        """ Map from the isochrone column names to the column numbers. """
+        header,lines = self.parse_header(self.filename)
+        columns = header['columns']
+        
     def _parse(self,filename):
-        """Reads an isochrone file in the Padova (Marigo et al. 2017)
+        """Reads an isochrone file in the Marigo et al. 2017
         format. Creates arrays with the initial stellar mass and
         corresponding magnitudes for each step along the isochrone.
+
+        Parameters:
+        -----------
+        filename : name of isochrone file to parse
+
+        Returns:
+        --------
+        None
         """
         try:
             columns = self.columns[self.survey.lower()]
@@ -471,7 +533,7 @@ class Marigo2017(ParsecIsochrone):
         self.data = np.genfromtxt(filename,**kwargs)
         # cut out anomalous point:
         # https://github.com/DarkEnergySurvey/ugali/issues/29
-        self.data = self.data[self.data['stage'] != 9]
+        self.data = self.data[~np.in1d(self.data['stage'], [9])]
 
         self.mass_init = self.data['mass_init']
         self.mass_act  = self.data['mass_act']
