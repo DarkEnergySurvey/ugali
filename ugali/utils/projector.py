@@ -258,37 +258,56 @@ def angsep(lon1,lat1,lon2,lat2):
 
 ############################################################
 
-# ADW: Reduce numpy array operations for speed
-def galToCel(ll, bb):
-    """
-    Converts Galactic (deg) to Celestial J2000 (deg) coordinates
-    """
-    bb = np.radians(bb)
-    sin_bb = np.sin(bb)
-    cos_bb = np.cos(bb)
+def gal2cel(lon, lat):
+    """Convert from Galactic coordinates (deg) to coordinates in the
+    Celestial Equatorial J2000 (deg) frame.
+    
+    Parameters:
+    -----------
+    lon : Galactic longitude (deg)
+    lat : Galactic latitude (deg)
 
-    ll = np.radians(ll)
+    Returns
+    -------
+    ra,dec : Right ascension and declination (deg,deg)
+
+    """
+    lat = np.radians(lat)
+    sin_lat = np.sin(lat)
+    cos_lat = np.cos(lat)
+
+    lon = np.radians(lon)
     ra_gp = np.radians(192.85948)
     de_gp = np.radians(27.12825)
     lcp = np.radians(122.932)
 
-    sin_lcp_ll = np.sin(lcp - ll)
-    cos_lcp_ll = np.cos(lcp - ll)
+    sin_lcp_lon = np.sin(lcp - lon)
+    cos_lcp_lon = np.cos(lcp - lon)
 
-    sin_d = (np.sin(de_gp) * sin_bb) \
-            + (np.cos(de_gp) * cos_bb * cos_lcp_ll)
-    ramragp = np.arctan2(cos_bb * sin_lcp_ll,
-                            (np.cos(de_gp) * sin_bb) \
-                            - (np.sin(de_gp) * cos_bb * cos_lcp_ll))
+    sin_d = (np.sin(de_gp) * sin_lat) \
+            + (np.cos(de_gp) * cos_lat * cos_lcp_lon)
+    ramragp = np.arctan2(cos_lat * sin_lcp_lon,
+                            (np.cos(de_gp) * sin_lat) \
+                            - (np.sin(de_gp) * cos_lat * cos_lcp_lon))
     dec = np.arcsin(sin_d)
     ra = (ramragp + ra_gp + (2. * np.pi)) % (2. * np.pi)
     return np.degrees(ra), np.degrees(dec)
 
-gal2cel = galToCel
+# DEPRECATED
+galToCel = gal2cel
 
-def celToGal(ra, dec):
-    """
-    Converts Celestial J2000 (deg) to Calactic (deg) coordinates
+def cel2gal(ra, dec):
+    """Convert coordinates in the Celestial Equatorial J2000 (deg) frame
+    to Galactic (deg) coordinates.
+
+    Parameters:
+    -----------
+    ra  : Right ascension (deg)
+    dec : Declination (deg)
+
+    Returns:
+    --------
+    lon, lat : Galactic longitude and latitude (deg, deg)
     """
     dec = np.radians(dec)
     sin_dec = np.sin(dec)
@@ -307,11 +326,12 @@ def celToGal(ra, dec):
     lcpml = np.arctan2(cos_dec * sin_ra_gp,
                           (np.cos(de_gp) * sin_dec) \
                           - (np.sin(de_gp) * cos_dec * cos_ra_gp))
-    bb = np.arcsin(sin_b)
-    ll = (lcp - lcpml + (2. * np.pi)) % (2. * np.pi)
-    return np.degrees(ll), np.degrees(bb)
+    lat = np.arcsin(sin_b)
+    lon = (lcp - lcpml + (2. * np.pi)) % (2. * np.pi)
+    return np.degrees(lon), np.degrees(lat)
 
-cel2gal = celToGal
+# DEPRECATED
+celToGal = cel2gal
 
 def estimate_angle(angle, origin, new_frame, offset=1e-7):
     """
@@ -339,51 +359,17 @@ def cel2gal_angle(ra,dec,angle,offset=1e-7):
     origin = SkyCoord(ra,dec,unit=u.deg,frame='fk5')
     return estimate_angle(angle,origin,'galactic',offset)
 
-### ADW: Probably works, remember 90-pa for kernel convention...
-### def gal2cel_angle(glon,glat,angle):
-###     """
-###     WARNING: Not vectorized
-###     """
-###     gal_angle = np.radians(angle)
-###     galproj = Projector(glon,glat)
-###     x,y = np.sin(gal_angle),np.cos(gal_angle)
-###     alon,alat = galproj.imageToSphere(0.1*x,0.1*y)
-###  
-###     ra,dec = gal2cel(glon,glat)
-###     ara,adec = gal2cel(alon,alat)
-###     celproj = Projector(ra,dec)
-###     cel_x,cel_y = celproj.sphereToImage(ara,adec)
-###     cel_angle = np.degrees(np.arctan2(cel_x,cel_y))
-###     return cel_angle + 360*(cel_angle<0)
-
-
-### ADW: WARNING DOESN'T WORK YET
-### def cel2gal_angle(ra,dec,angle):
-###     """
-###     WARNING: Not vectorized
-###     """
-###     cel_angle = np.radians(angle)
-###     celproj = Projector(ra,dec)
-###     x,y = np.sin(cel_angle),np.cos(cel_angle)
-###     angle_ra,angle_dec = celproj.imageToSphere(1e-2*x,1e-2*y)
-###  
-###     glon,glat = gal2cel(ra,dec)
-###     angle_glon,angle_glat = cel2gal(angle_ra,angle_dec)
-###     galproj = Projector(glon,glat)
-###     gal_x,gal_y = galproj.sphereToImage(angle_glon,angle_glat)
-###     gal_angle = np.degrees(np.arctan2(gal_x,gal_y))
-###     return gal_angle + 360*(gal_angle<0)
-
 
 ############################################################
 
 def dec2hms(dec):
-    """
-    ADW: This should be replaced by astropy...
+    """Convert from decimal degrees to hours-minutes-seconds.
 
+    ADW: This should be replaced by astropy...
     from astropy.coordinates import Angle
     hms = Angle(dec*u.deg).hms
     return (hms.h,hms.m,hms.s)
+
     """
     DEGREE = 360.
     HOUR = 24.
@@ -401,12 +387,13 @@ def dec2hms(dec):
     return (hour, minute, second)
 
 def dec2dms(dec):
-    """
-    ADW: This should be replaced by astropy
+    """Convert from decimal degrees to degrees-minutes-seconds.
 
+    ADW: This should be replaced by astropy
     from astropy.coordinates import Angle
     dms = Angle(dec*u.deg).dms
     return (dms.d,dms.m,dms.s)
+
     """
     DEGREE = 360.
     HOUR = 24.
@@ -429,11 +416,11 @@ def dec2dms(dec):
     return (deg, minute, second)
 
 def hms2dec(hms):
-    """
-    Convert longitude from hours,minutes,seconds in string or 3-array
+    """Convert longitude from hours,minutes,seconds in string or 3-array
     format to decimal degrees.
 
     ADW: This really should be replaced by astropy
+
     """
     DEGREE = 360.
     HOUR = 24.
@@ -449,9 +436,11 @@ def hms2dec(hms):
     return decimal
 
 def dms2dec(dms):
-    """
-    Convert latitude from degrees,minutes,seconds in string or 3-array
-   format to decimal degrees.
+    """Convert latitude from degrees,minutes,seconds in string or 3-array
+    format to decimal degrees.
+
+    ADW: This really should be replaced by astropy
+
     """
     DEGREE = 360.
     HOUR = 24.
@@ -473,9 +462,11 @@ def dms2dec(dms):
     return decimal
 
 def sr2deg(solid_angle):
+    """ Convert solid angle from steradians to square deg."""
     return np.degrees(np.degrees(solid_angle))
 
 def deg2sr(solid_angle):
+    """ Convert solid angle from square deg to steradians"""
     return np.radians(np.radians(solid_angle))
 
 ############################################################
