@@ -34,8 +34,15 @@ def getCompleteness(config):
     x = d['mag_r']
     y = d['eff_star']
 
-    x = np.insert(x, 0, 16.)
-    y = np.insert(y, 0, y[0])
+    # Extend to saturation
+    if min(x) > 16:
+        x = np.insert(x, 0, 16.)
+        y = np.insert(y, 0, y[0])
+
+    # Make efficiency go to zero at faint end
+    if y[-1] > 0:
+        x = np.insert(x, -1, x[-1]+1)
+        y = np.insert(y, -1, 0)
 
     f = scipy.interpolate.interp1d(x, y, bounds_error=False, fill_value=0.)
 
@@ -59,11 +66,13 @@ def getPhotoError(config):
     infile = config['photo_error']
     d = np.recfromcsv(infile)
 
-    x = d['mag']
+    x = d['delta_mag']
     y = d['log_mag_err']
 
-    x = np.insert(x, 0, -10.)
-    y = np.insert(y, 0, y[0])
+    # Extend on the bright end
+    if min(x) > -10.0:
+        x = np.insert(x, 0, -10.)
+        y = np.insert(y, 0, y[0])
 
     f = scipy.interpolate.interp1d(x, y, bounds_error=False, fill_value=1.)
 
@@ -145,7 +154,7 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     completeness = getCompleteness(config)
     log_photo_error = getPhotoError(config)
 
-    s = ugali.analysis.source.Source()
+    src = ugali.analysis.source.Source()
 
     # Azimuthally averaged projected half-light radius (deg)
     r_h = np.degrees(np.arcsin(r_physical / distance)) 
@@ -159,24 +168,25 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
     flag_too_extended = False
     max_extension = 5.0 # deg
     if a_h >= max_extension:
-        print 'Too extended: a_h = %.2f'%(a_h)
+        print('Too extended: a_h = %.2f'%(a_h))
         a_h = max_extension
         flag_too_extended = True
     # Elliptical kernels take the "extension" as the semi-major axis
     extension = a_h # Elliptical half-light radius
     ker.setp('extension', value=a_h, bounds=[0.0,max_extension])
-    s.set_kernel(ker)
+    src.set_kernel(ker)
 
     # Create the isochrone
     distance_modulus = ugali.utils.projector.dist2mod(distance)
-    iso = isochrone_factory('Bressan2012', survey=config['survey'], age=age, z=metal, 
+    iso = isochrone_factory(config.get('isochrone','Bressan2012'), 
+                            survey=config['survey'], age=age, z=metal, 
                             distance_modulus=distance_modulus)
-    s.set_isochrone(iso)
+    src.set_isochrone(iso)
     # Simulate takes stellar mass as an argument, NOT richness
-    mag_1, mag_2 = s.isochrone.simulate(stellar_mass) 
+    mag_1, mag_2 = src.isochrone.simulate(stellar_mass) 
 
     # Generate the positions of stars
-    lon, lat = s.kernel.sample_lonlat(len(mag_2))
+    lon, lat = src.kernel.sample_lonlat(len(mag_2))
 
     nside = hp.npix2nside(len(m_maglim_1)) # Assuming that the two maglim maps have same resolution
     pix = ugali.utils.healpix.ang2pix(nside, lon, lat)
@@ -191,12 +201,14 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
         mag_extinction_1 = 3.172 * m_ebv[pix]
         mag_extinction_2 = 2.271 * m_ebv[pix]
-    elif config['survey'] == 'lsst':
+    elif config['survey'] == 'lsst_dp0':
         # From Table 6 in Schlafly 2011 with Rv = 3.1
         # http://iopscience.iop.org/article/10.1088/0004-637X/737/2/103/pdf
         mag_extinction_1 = 3.237 * m_ebv[pix]
         mag_extinction_2 = 2.273 * m_ebv[pix] 
-
+    else:
+        msg = "Unrecognized survey: %s"%config['survey']
+        raise Exception(msg)
     
     # Photometric uncertainties are larger in the presence of interstellar dust reddening
     mag_1_error = 0.01 + 10**(log_photo_error((mag_1 + mag_extinction_1) - maglim_1))
@@ -222,15 +234,19 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (23.46 - np.clip(maglim_2, 20., 26.))))
     elif config['survey'] == 'ps1':
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2))
-    elif config['survey'] == 'lsst':
+    elif config['survey'] == 'lsst_dp0':
         cut_detect = (np.random.uniform(size=len(mag_2)) < completeness(mag_2 + mag_extinction_2 + (25.0 - np.clip(maglim_2, 20., 26.)))) # Using the psuedo mag depth of 25 for now
+    else:
+        msg = "Unrecognized survey: %s"%config['survey']
+        raise Exception(msg)
+
     n_g22 = np.sum(cut_detect & (mag_1 < 22.))
     n_g24 = np.sum(cut_detect & (mag_1 < 24.))
     print('  n_sim = %i, n_detect = %i, n_g24 = %i, n_g22 = %i'%(len(mag_1),np.sum(cut_detect),n_g24,n_g22))
     
-    richness = stellar_mass / s.isochrone.stellarMass()
-    #abs_mag = s.isochrone.absolute_magnitude()
-    #abs_mag_martin = s.isochrone.absolute_magnitude_martin(richness=richness, n_trials=10)[0] # 100 trials seems to be sufficient for rough estimate
+    richness = stellar_mass / src.isochrone.stellarMass()
+    #abs_mag = src.isochrone.absolute_magnitude()
+    #abs_mag_martin = src.isochrone.absolute_magnitude_martin(richness=richness, n_trials=10)[0] # 100 trials seems to be sufficient for rough estimate
     #print 'abs_mag_martin = %.2f mag'%(abs_mag_martin)
 
     # The more clever thing is to sum the simulated stars
@@ -243,11 +259,15 @@ def catsimSatellite(config, lon_centroid, lat_centroid, distance, stellar_mass, 
         C_0 = -0.017
         C_1 = -0.508
         v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
-    elif config['survey'] == 'lsst':
+    elif config['survey'] == 'lsst_dp0':
         # Numbers are just placeholders for now, need to figure out exact ones
         C_0 = -0.02
         C_1 = -0.50
         v = mag_1 + C_0 + C_1 * (mag_1 - mag_2)
+    else:
+        msg = "Unrecognized survey: %s"%config['survey']
+        raise Exception(msg)
+
     flux = np.sum(10**(-v/2.5))
     abs_mag = -2.5*np.log10(flux) - distance_modulus
 
@@ -310,7 +330,7 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
     if not os.path.exists(tag): os.makedirs(tag)
 
     if isinstance(config,str): config = yaml.load(open(config))
-    assert config['survey'] in ['des', 'ps1', 'lsst']
+    assert config['survey'] in ['des', 'ps1', 'lsst_dp0']
 
     infile_ebv = config['ebv']
     infile_fracdet = config['fracdet']
@@ -357,7 +377,12 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
                       choice_metal=[0.00010,0.00020],
                       plot=False)
         area, population = ugali.simulation.population.satellitePopulation(mask, nside_pix, n, **kwargs)
-
+        # Hack to duplicate RA,DEC
+        print("Hacking lon,lat...")
+        for idx in np.array_split(np.arange(len(population)), 10):
+            population['lon'][idx] = population['lon'][idx[0]]
+            population['lat'][idx] = population['lat'][idx[0]]
+        
     population['id'] += mc_source_id_start
     simulation_area = area
 
@@ -378,8 +403,8 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
     mag_extinction_2_array = []
     mc_source_id_array = []
     for ii, mc_source_id in enumerate(population['id']):
-        print 'Simulating satellite (%i/%i) ... mc_source_id = %i'%(ii + 1, n, mc_source_id)
-        print '  distance=%(distance).2e, stellar_mass=%(stellar_mass).2e, r_physical=%(r_physical).2e'%(population[ii])
+        print('Simulating satellite (%i/%i) ... mc_source_id = %i'%(ii + 1, n, mc_source_id))
+        print('  distance=%(distance).2e, stellar_mass=%(stellar_mass).2e, r_physical=%(r_physical).2e'%(population[ii]))
         satellite = catsimSatellite(config, population[ii]['lon'], population[ii]['lat'], 
                                     population[ii]['distance'], population[ii]['stellar_mass'], 
                                     population[ii]['r_physical'],population[ii]['ellipticity'],
@@ -399,8 +424,12 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
 
         # We assume that these objects would be easily detected and
         # remove them to reduce data volume
-        if (surface_brightness_population[ii]<23.5)&(n_g22_population[ii]>1e3):
-            difficulty_population[ii] |= 0b0010
+        if config['survey'] == 'lsst_dp0':
+            if (surface_brightness_population[ii]<23.5)&(n_g24_population[ii]>1e2):
+                difficulty_population[ii] |= 0b0010
+        else:
+            if (surface_brightness_population[ii]<23.5)&(n_g22_population[ii]>1e3):
+                difficulty_population[ii] |= 0b0010
 
         # ADW 2019-08-31: I don't think these were implmented
         #if (surface_brightness_population[ii]<25.)&(n_g22_population[ii]>1e2):
@@ -435,7 +464,7 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
             mag_extinction_2_array.append(satellite['mag_extinction_2'])
             mc_source_id_array.append(np.tile(mc_source_id, len(satellite['lon'])))
         else:
-            print '  difficulty=%i; satellite not simulated...'%difficulty_population[ii]
+            print('  difficulty=%i; satellite not simulated...'%difficulty_population[ii])
 
     # Concatenate the arrays
     print("Concatenating arrays...")
@@ -626,11 +655,11 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
                 ('RFPSFMAG_SFD',             [mag_2_array, 'E']),
                 ('EXTENDED_CLASS',           [np.tile(0, len(mc_source_id_array)), 'I']),
                 ])
-    elif config['survey'] == 'lsst': # Keys make to match those in the GCRCatalog native_quantities
+    elif config['survey'] == 'lsst_dp0': # Keys make to match those in the GCRCatalog native_quantities
         key_map = odict([
                 ('objectId', [coadd_object_id_array, 'K']),
-                ('coord_ra', [lon_array, 'D']),
-                ('coord_dec', [lat_array, 'D']),
+                ('ra', [lon_array, 'D']),
+                ('dec', [lat_array, 'D']),
                 ('mag_g', [mag_1_array+mag_extinction_1_array, 'E']),
                 ('mag_r', [mag_2_array+mag_extinction_2_array, 'E']),
                 ('magerr_g', [mag_1_error_array, 'D']),
@@ -639,6 +668,10 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
                 ('mag_corrected_r', [mag_2_array, 'D']), 
                 ('extended_class', [np.tile(0, len(mc_source_id_array)), 'I']), 
                 ])
+    else:
+        msg = "Unrecognized survey: %s"%config['survey']
+        raise Exception(msg)
+
     key_map['MC_SOURCE_ID'] = [mc_source_id_array, 'K']
 
     print("Writing catalog files...")
@@ -667,7 +700,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Simulate at Milky Way satellite population.')
     parser.add_argument('config',
                         help='Configuration file')
-    parser.add_argument('-s','--section',required=True,choices=['des','ps1','lsst'],
+    parser.add_argument('-s','--section',required=True,
+                        choices=['des','ps1','lsst_dc2','lsst_dp0'],
                         help='Config section for simulation parameters')
     parser.add_argument('--tag',required=True,
                         help='Descriptive tag for the simulation run')
@@ -688,7 +722,7 @@ if __name__ == "__main__":
         np.random.seed(args.seed)
 
     # Load the config and select the survey section
-    config = yaml.load(open(args.config))[args.section]
+    config = yaml.safe_load(open(args.config))[args.section]
     
     #catsimPopulation(tag, mc_source_id_start=mc_source_id_start, n=n, n_chunk=n_chunk)
     catsimPopulation(config, args.tag, mc_source_id_start=args.mc_source_id_start, n=args.n, n_chunk=args.n_chunk, known_dwarfs=args.dwarfs)
