@@ -28,6 +28,16 @@ def mad_clip(data,mad=None,mad_lower=None,mad_upper=None):
 def interval(best,lo=np.nan,hi=np.nan):
     """
     Pythonized interval for easy output to yaml
+
+    Parameters
+    ----------
+    best : best-fit estimate of the parameter
+    lo   : lower value
+    hi   : higher value
+
+    Returns
+    -------
+    [best, [lo, hi]] : list of values
     """
     return [float(best),[float(lo),float(hi)]]
 
@@ -43,6 +53,15 @@ def mean_interval(data, alpha=_alpha):
 def median_interval(data, alpha=_alpha):
     """
     Median with bayesian credible interval from percentiles.
+
+    Parameters
+    ----------
+    data  : posterior samples
+    alpha : 1 - confidence interval
+
+    Returns
+    -------
+    [med,[lo, hi]] : median, lower, and upper percentiles
     """
     q = [100*alpha/2., 50, 100*(1-alpha/2.)]
     lo,med,hi = np.percentile(data,q)

@@ -27,7 +27,7 @@ class IMF(object):
         -----------
         mass_min: minimum mass bound for integration (solar masses)
         mass_max: maximum mass bound for integration (solar masses)
-        log_mode[True]: use logarithmic steps in stellar mass as oppose to linear
+        log_mode[True]: use logarithmic steps in stellar mass as opposed to linear
         weight[False]: weight the integral by stellar mass
         steps: number of numerical integration steps
 
