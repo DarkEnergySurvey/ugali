@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 """
+DEPRECATED: ADW 2024-06-25 
+New download script in ugali/scratch/download_isochrones.py
+
 Download Padova isochrones from:
 http://stev.oapd.inaf.it/cgi-bin/cmd
 
@@ -351,9 +354,11 @@ if __name__ == "__main__":
     def run(args):
         try:
             p.download(*args)
+            return True
         except Exception as e:
             logger.warn(str(e))
             logger.error("Download failed.")
+            return False
 
     arguments = [(a,z,args.outdir,args.force) for a,z in zip(*grid)]
     if args.njobs > 1:

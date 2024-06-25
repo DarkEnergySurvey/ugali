@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 """
+DEPRECATED: ADW 2024-06-25 
+New download script in ugali/scratch/download_isochrones.py
+
 Script to automate the process of generating an isochrone library
 using the Dotter isochrones.
 
