@@ -5,7 +5,7 @@ Test ipython notebooks in skymap tutorial.
 Adapted from:
 https://blog.thedataincubator.com/2016/06/testing-jupyter-notebooks/
 """
-import os
+import os,sys
 import unittest
 import glob
 
@@ -18,11 +18,13 @@ def _notebook_run(path):
     """Execute a notebook via nbconvert and collect output.
        :returns (parsed nb object, execution errors)
     """
+    kernel_name = "python"+str(sys.version_info.major)
     with tempfile.NamedTemporaryFile(suffix=".ipynb") as fout:
         args = ["jupyter", "nbconvert", "--to", "notebook", "--execute",
-          "--ExecutePreprocessor.timeout=60",
-          "--log-level=WARN",
-          "--output", fout.name, path]
+                "--ExecutePreprocessor.timeout=60",
+                "--ExecutePreprocessor.kernel_name=%s"%(kernel_name),
+                "--log-level=WARN",
+                "--output", fout.name, path]
         subprocess.check_call(args)
 
         fout.seek(0)
