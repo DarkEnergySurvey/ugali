@@ -50,12 +50,31 @@ kbechtol_ps1:
   completeness: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_stellar_classification_summary_r.csv
   photo_error: /Users/keithbechtol/Documents/DES/external_data/pan-starrs/sim/population/ps1_photo_error_model_r.csv
 
-lsst:
-  survey: lsst
-  stellar_density: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_stellar_density_map_cel_nside_256.npy
-  fracdet: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_fracdet_n2048.fits.gz
-  maglim_g: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_depth_n32_g_maglim.fits
-  maglim_r: /global/homes/m/mcnanna/sim_inputs/dc2_pseudo_depth_n32_r_maglim.fits
-  ebv: /global/homes/m/mcnanna/sim_inputs/ebv_sfd98_fullres_nside_4096_nest_equatorial.fits.gz
-  completeness: /global/homes/m/mcnanna/sim_inputs/stellar_efficiency.csv
-  photo_error: /global/homes/m/mcnanna/sim_inputs/photoerror_r.csv
+lsst: &lsst
+  survey: lsst_dp0
+  isochrone: 'Marigo2017'
+  stellar_density: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/dc2_pseudo_stellar_density_map_cel_nside_256.npy
+  fracdet: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/supreme_dc2_dr6d_v3_gr_fracdet.fits.gz
+  maglim_g: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/supreme_dc2_dr6d_v3_g_maglim_psf_wmean.fits.gz
+  maglim_r: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/supreme_dc2_dr6d_v3_r_maglim_psf_wmean.fits.gz
+  ebv: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits
+  #completeness: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/dc2_satellite_census/data/stellar_efficiency.csv
+  completeness: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/dc2_satellite_census/data/stellar_efficiency_truth.csv
+  photo_error: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/dc2_satellite_census/data/photoerror_r.csv
+  #completeness: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/stellar_efficiency.csv
+  #photo_error: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/photoerror_r.csv
+
+#Mapping...
+lsst_dc2: *lsst
+lsst_dp0: *lsst
+
+lsst_dc2_old:
+  survey: lsst_dp0
+  isochrone: 'Bressan2012'
+  stellar_density: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/dc2_pseudo_stellar_density_map_cel_nside_256.npy
+  fracdet: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/dc2_pseudo_fracdet_n2048.fits.gz
+  maglim_g: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/dc2_pseudo_depth_n32_g_maglim.fits
+  maglim_r: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/dc2_pseudo_depth_n32_r_maglim.fits
+  ebv: /home/s1/kadrlica/projects/mw_substructure/y3a2/sim_population/inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits
+  completeness: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/stellar_efficiency.csv
+  photo_error: /home/s1/kadrlica/projects/mw_substructure/dc2/sim_population/inputs/mcnanna/photoerror_r.csv

@@ -565,7 +565,7 @@ def merge_likelihood_headers2(filenames, outfile, **kwargs):
     return data_dict
 
 
-def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
+def read_map(filename, nest=False, hdu=None, h=False, verbose=False):
     """Read a healpix map from a fits file.  Partial-sky files,
     if properly identified, are expanded to full size and filled with UNSEEN.
     Uses fitsio to mirror much (but not all) of the functionality of healpy.read_map
@@ -590,7 +590,7 @@ def read_map(filename, nest=False, hdu=None, h=False, verbose=True):
     m [, header] : array, optionally with header appended
       The map read from the file, and the header if *h* is True.
     """
-    import fitsio
+    import fitsio    
     data,hdr = fitsio.read(filename,header=True,ext=hdu)
 
     nside = int(hdr.get('NSIDE'))

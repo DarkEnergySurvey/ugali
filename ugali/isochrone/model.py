@@ -96,9 +96,9 @@ class IsochroneModel(Model):
     """ Abstract base class for dealing with isochrone models. """
 
     _params = odict([
-        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ),
+        ('distance_modulus', Parameter(15.0, [10.0, 30.0]) ), # m-M
         ('age',              Parameter(10.0, [0.1, 15.0]) ),  # Gyr
-        ('metallicity',      Parameter(0.0002, [0.0,0.02]) ),
+        ('metallicity',      Parameter(0.0002, [0.0,0.02]) ), # Z_ini
     ])
     _mapping = odict([
         ('mod','distance_modulus'),
@@ -385,7 +385,7 @@ class IsochroneModel(Model):
 
         Returns:
         --------
-        med,lo,hi : Total absolute magnitude interval
+        med,[lo,hi] : Total absolute magnitude interval
         """
         # ADW: This function is not quite right. It should restrict
         # the catalog to the obsevable space using the mask in each
@@ -397,6 +397,10 @@ class IsochroneModel(Model):
         params = {k:v.value for k,v in self._params.items()}
         params.update(band_1='g',band_2='r',survey='sdss')
         iso = self.__class__(**params)
+
+        # ADW: 2022-09-18: There are now direct transformation
+        # equations from DES to Johnson V-band...
+        # Appendix B.5: https://arxiv.org/abs/2101.05765
 
         # Analytic part (below detection threshold)
         # g, r are absolute magnitudes
@@ -440,10 +444,15 @@ class IsochroneModel(Model):
         """
         if distance_modulus is None: distance_modulus = self.distance_modulus
         # Total number of stars in system
-        n = int(round(stellar_mass / self.stellar_mass()))
-        f_1 = scipy.interpolate.interp1d(self.mass_init, self.mag_1)
-        f_2 = scipy.interpolate.interp1d(self.mass_init, self.mag_2)
-        mass_init_sample = self.imf.sample(n, np.min(self.mass_init), np.max(self.mass_init), **kwargs)
+        richness = stellar_mass / self.stellar_mass()
+        n = int(round(richness))
+        #ADW 2022-08-28: Should this really be a Poisson sample of the richness?
+        #n = scipy.stats.poisson(richness).rvs()
+
+        mass_init,mag_1,mag_2 = self.mass_init, self.mag_1, self.mag_2
+        f_1 = scipy.interpolate.interp1d(mass_init, mag_1)
+        f_2 = scipy.interpolate.interp1d(mass_init, mag_2)
+        mass_init_sample = self.imf.sample(n, np.min(mass_init), np.max(mass_init), **kwargs)
         mag_1_sample, mag_2_sample = f_1(mass_init_sample), f_2(mass_init_sample) 
         return mag_1_sample + distance_modulus, mag_2_sample + distance_modulus
 
@@ -907,8 +916,11 @@ class IsochroneModel(Model):
     
  
     def raw_separation(self,mag_1,mag_2,steps=10000):
-        """ 
-        Calculate the separation in magnitude-magnitude space between points and isochrone. Uses a dense sampling of the isochrone and calculates the metric distance from any isochrone sample point.
+        """
+        Calculate the separation in magnitude-magnitude space between
+        points and isochrone. Uses a dense sampling of the isochrone
+        and calculates the metric distance from any isochrone sample
+        point.
 
         Parameters:
         -----------
@@ -1074,11 +1086,14 @@ class Isochrone(IsochroneModel):
         if abins is None and zbins is None:
             filenames = glob.glob(self.get_dirname()+'/%s_*.dat'%(self._prefix))
             data = np.array([self.filename2params(f) for f in filenames])
-            if not len(data):
+            if len(data):
+                arange = np.unique(data[:,0])
+                zrange = np.unique(data[:,1])
+            else:
                 msg = "No isochrone files found in: %s"%self.get_dirname()
-                raise Exception(msg)
-            arange = np.unique(data[:,0])
-            zrange = np.unique(data[:,1])
+                logger.warn(msg)
+                arange = np.array([self.age])
+                zrange = np.array([self.metallicity])
         elif abins is not None and zbins is not None:            
             # Age in units of Gyr
             arange = np.linspace(abins[0],abins[1],abins[2]+1)
@@ -1110,7 +1125,11 @@ class Isochrone(IsochroneModel):
         filename = self.get_filename()
         if filename != self.filename:
             self.filename = filename
-            self._parse(self.filename)
+            if not os.path.exists(self.filename):
+                msg = "Filename does not exist: %s"%self.filename
+                logger.warn(msg)
+            else:
+                self._parse(self.filename)
 
     def _parse(self,filename):
         raise Exception("Must be implemented by subclass.")
@@ -1143,7 +1162,7 @@ class Isochrone(IsochroneModel):
         Parameters
         ----------
         age         : age in (Gyr)
-        metallicity : Z
+        metallicity : initial metallicity, Z
         outdir      : output directory (default to current directory)
         force       : force overwrite of file
 

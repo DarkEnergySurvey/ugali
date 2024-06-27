@@ -2,8 +2,12 @@
 import os
 import subprocess
 
+# ADW: It'd be better to track this in the config
 tag = 'ps1_v1' # PS1
 tag = 'des_v7' # DES
+tag = 'dc2_v1' # LSST DC2
+tag = 'lsst_dc2_v2' # LSST DP0 (DC2)
+tag = 'lsst_dp0_v1' # LSST DP0 (DC2)
 n_chunk = 100
 mc_source_id_start_global = 1
 size_batch = 1000 
@@ -23,7 +27,8 @@ parser.add_argument('-n','--nbatch',default=number_of_batches,type=int,
                     help='number of batches to submit')
 parser.add_argument('--mc_source_id',default=mc_source_id_start_global,type=int,
                     help='unique identifier')
-parser.add_argument('-s','--section',default='des',choices=['des','ps1'],
+parser.add_argument('-s','--section',default='des',
+                    choices=['des','ps1','lsst_dc2','lsst_dp0'],
                     help='section of config file')
 parser.add_argument('--dwarfs', dest='dwarfs', action='store_true', 
                     help="Simulate from known dwarfs")

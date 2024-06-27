@@ -103,8 +103,8 @@ dartmouth_defaults = {
 
 class Dotter2008(Isochrone):
     """
-    KCB: currently inheriting from PadovaIsochrone because there are 
-    several useful functions where we would basically be copying code.
+    Dartmouth isochrones from Dotter et al. 2008 (https://arxiv.org/abs/0804.4473)
+    http://stellar.dartmouth.edu
     """
     _dirname =  os.path.join(get_iso_dir(),'{survey}','dotter2008')
     #_zsolar = 0.0163 
