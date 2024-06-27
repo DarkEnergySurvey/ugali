@@ -18,11 +18,11 @@ jobs:
     strategy:
       max-parallel: 3
       matrix:
-        python-version: [2.7, 3.8]
+        python-version: ["3.7", "3.8", "3.9"]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Setup conda
@@ -33,7 +33,7 @@ jobs:
         conda info
     - name: Create conda environment
       run: |
-        conda create -y -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge -c kadrlica
+        conda create -y -q -n env python=${{ matrix.python-version }} numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner -c conda-forge
         # Add UGALIDIR to environment
         conda env config vars set UGALIDIR=$HOME/.ugali -n env
     - name: Install package
@@ -56,7 +56,7 @@ jobs:
         # Exclude notebook tests
         nosetests -v -I test_notebook.py;
     - name: Test notebooks
-      if: ${{ matrix.python-version == '2.7' }}
+      if: ${{ true }}
       run: |
         source activate env
         conda install -q jupyter nbconvert -c conda-forge
