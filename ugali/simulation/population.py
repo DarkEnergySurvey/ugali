@@ -1,9 +1,7 @@
 """
 Tool to generate a population of simulated satellite properties.
 """
-from collections import OrderedDict as odict
 import numpy as np
-import pylab
 import pandas as pd
 
 import ugali.utils.config

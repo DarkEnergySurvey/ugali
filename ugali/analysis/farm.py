@@ -3,12 +3,10 @@
 Dispatch the likelihood scan to a cluster.
 """
 
-import os,sys
-from os.path import join, exists
+import os
+from os.path import join
 import shutil
-import subprocess
 import time
-import glob
 
 import numpy as np
 import healpy as hp
@@ -17,9 +15,9 @@ import ugali.utils.config
 import ugali.utils.skymap
 import ugali.utils.batch
 
-from ugali.utils.projector import gal2cel,cel2gal
-from ugali.utils.healpix import subpixel,superpixel,query_disc
-from ugali.utils.healpix import pix2ang,ang2vec,read_partial_map
+from ugali.utils.projector import gal2cel
+from ugali.utils.healpix import query_disc
+from ugali.utils.healpix import pix2ang,ang2vec
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
 

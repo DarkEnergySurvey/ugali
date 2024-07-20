@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-import sys
 
-import numpy as np
 import pylab as plt
 
 from ugali.analysis.pipeline import Pipeline

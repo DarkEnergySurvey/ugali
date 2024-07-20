@@ -2,7 +2,6 @@ import os
 import glob
 import numpy as np
 import astropy.io.fits as pyfits
-import matplotlib.patches as patches
 import pylab
 
 pylab.ion()

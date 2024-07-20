@@ -17,7 +17,7 @@ import fitsio
 import scipy.ndimage as nd
 import scipy.misc
 
-from mpl_toolkits.axes_grid1 import AxesGrid,Grid,ImageGrid, make_axes_locatable
+from mpl_toolkits.axes_grid1 import AxesGrid, make_axes_locatable
 from matplotlib.ticker import MaxNLocator
 import mpl_toolkits.axes_grid1.axes_divider as axes_divider
 
@@ -30,7 +30,6 @@ import ugali.utils.healpix
 import ugali.isochrone
 import ugali.analysis.loglike
 
-from ugali.utils import fileio
 from ugali.utils.healpix import ang2pix, get_nside
 from ugali.utils.projector import mod2dist,gal2cel,cel2gal
 from ugali.utils.projector import sphere2image,image2sphere
