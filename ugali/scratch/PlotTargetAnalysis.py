@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 import os
-import glob
-import matplotlib
 import healpy
 import pylab as plt
 import numpy

@@ -6,7 +6,6 @@ import yaml
 import matplotlib.patheffects as patheffects
 
 import numpy as np
-import fitsio
 import astropy.io.fits as pyfits
 
 from astropy.coordinates import SkyCoord

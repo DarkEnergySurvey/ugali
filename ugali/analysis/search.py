@@ -4,19 +4,16 @@ Search for candidates in a likelihood significance map.
 """
 
 import os
-import copy
-import subprocess
 from collections import OrderedDict as odict
 import glob
 
 import healpy
 import fitsio
 import numpy as np
-import numpy
 import numpy.lib.recfunctions as recfuncs
 import scipy.ndimage as ndimage
 
-from ugali.utils.shell import mkdir, which
+from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
 from ugali.utils.binning import reverseHistogram
 from ugali.utils.projector import Projector,gal2cel,cel2gal,ang2iau,mod2dist

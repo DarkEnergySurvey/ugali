@@ -7,9 +7,7 @@ from collections import OrderedDict as odict
 
 import numpy as np
 import yaml
-import numpy.lib.recfunctions as recfuncs
 
-import astropy.coordinates
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
@@ -20,7 +18,7 @@ import ugali.utils.stats
 from ugali.utils.stats import Samples
 from ugali.utils.projector import dist2mod,mod2dist
 from ugali.utils.projector import cel2gal,gal2cel,gal2cel_angle
-from ugali.utils.projector import ang2const, ang2iau
+from ugali.utils.projector import ang2const
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
 

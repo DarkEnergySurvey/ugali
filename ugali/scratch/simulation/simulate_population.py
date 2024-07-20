@@ -3,14 +3,11 @@
 Currently this is more set up as a standalone script.
 """
 import os
-import copy
-import collections
 from collections import OrderedDict as odict
 import yaml
 import numpy as np
 import scipy.interpolate
 import healpy as hp
-import fitsio
 import astropy.io.fits as pyfits
 
 import ugali.utils.projector

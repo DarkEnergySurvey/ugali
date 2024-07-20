@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 
 import os
-import healpy
-import pylab as plt
 import numpy
 import astropy.io.fits as pyfits
-import copy
 
 import ugali.utils.skymap
 import ugali.utils.projector

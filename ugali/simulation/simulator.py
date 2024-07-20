@@ -3,7 +3,6 @@
 Module for simulation.
 """
 
-import copy
 import os
 
 import numpy as np
@@ -20,7 +19,7 @@ import ugali.utils.projector
 import ugali.utils.stats
 import ugali.analysis.scan
 
-from ugali.utils.projector import gal2cel, cel2gal, sr2deg, mod2dist
+from ugali.utils.projector import mod2dist
 from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.logger import logger
 from ugali.utils.config import Config

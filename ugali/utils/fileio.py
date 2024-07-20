@@ -4,18 +4,12 @@ Working with FITS files.
 """
 __author__ = "Alex Drlica-Wagner"
 
-import shutil
 import os
-from collections import OrderedDict as odict
-import itertools
-import warnings
 
 import fitsio
 import numpy as np
-import healpy as hp
 
 from ugali.utils.logger import logger
-import warnings
 from ugali.utils.mlab import isstring
 
 def read(filename,**kwargs):

@@ -28,14 +28,10 @@ you need each unique limit in both magnitudes.
 
 # FIXME: Need to vectorize CMD and MMD calculation
 
-import sys
 import os
-from abc import abstractmethod
 import collections
 from collections import OrderedDict as odict
-import inspect
 import glob
-from functools import wraps
 
 import numpy as np
 import scipy.interpolate
@@ -46,10 +42,9 @@ import scipy.ndimage as ndimage
 import ugali.analysis.imf
 from ugali.analysis.model import Model, Parameter
 from ugali.utils.stats import norm_cdf
-from ugali.utils.shell import mkdir, get_ugali_dir, get_iso_dir
+from ugali.utils.shell import mkdir, get_iso_dir
 from ugali.utils.projector import mod2dist
 
-from ugali.utils.config import Config
 from ugali.utils.logger import logger
 
 ############################################################

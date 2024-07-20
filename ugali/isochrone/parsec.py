@@ -3,8 +3,6 @@ Module for wrapping PARSEC isochrones.
 http://stev.oapd.inaf.it
 """
 import os
-import sys
-import glob
 import copy
 from collections import OrderedDict as odict
 
@@ -21,7 +19,6 @@ import subprocess
 import re
 
 import numpy as np
-import scipy.spatial
 
 from ugali.utils.logger import logger
 from ugali.isochrone.model import Isochrone

@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 import os,sys
-from os.path import join,abspath,split
 import inspect
 from collections import OrderedDict as odict
 
 import numpy as np
-from numpy.lib.recfunctions import stack_arrays
 import fitsio
 
 import ugali.utils.projector
 from ugali.utils.projector import gal2cel, cel2gal
 import ugali.utils.idl
-from ugali.utils.healpix import ang2pix
-from ugali.utils.shell import get_ugali_dir, get_cat_dir
+from ugali.utils.shell import get_cat_dir
 from ugali.utils.logger import logger
 
 #class Catalog(np.recarray):

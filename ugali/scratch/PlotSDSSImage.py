@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 
-import sys
-
-import numpy as np
 import pylab as plt
 
 from ugali.analysis.pipeline import Pipeline
 import ugali.utils.plotting
-from ugali.utils.logger import logger
 
 description="Plot distance modulus panels"
 components = []

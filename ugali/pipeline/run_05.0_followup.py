@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Perform MCMC follow-up fitting."""
 
-import os
 from os.path import join,exists,basename,splitext
 import shutil
 from collections import OrderedDict as odict
@@ -12,13 +11,10 @@ matplotlib.use('Agg')
 #try:             os.environ['DISPLAY']
 #except KeyError: matplotlib.use('Agg')
 
-import numpy
-import numpy as np
 import yaml
 import fitsio
 
 from ugali.analysis.pipeline import Pipeline
-from ugali.analysis.scan import Scan
 import ugali.analysis.source
 import ugali.analysis.loglike
 import ugali.analysis.results

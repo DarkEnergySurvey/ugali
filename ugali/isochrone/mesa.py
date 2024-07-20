@@ -4,8 +4,6 @@ MESA Isochrones from:
 http://waps.cfa.harvard.edu/MIST/iso_form.php
 """
 import os
-import sys
-import glob
 import copy
 import tempfile
 import subprocess

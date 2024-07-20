@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys
+import os
 import re
 import io
 import subprocess

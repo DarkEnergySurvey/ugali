@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import matplotlib
 
 import healpy
 import pylab as plt

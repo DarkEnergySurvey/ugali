@@ -9,7 +9,6 @@ import glob
 import shutil
 
 import numpy as np
-import numpy.lib.recfunctions as recfuncs
 import fitsio
 
 from ugali.analysis.pipeline import Pipeline
@@ -19,7 +18,6 @@ import ugali.utils.skymap
 
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
-from ugali.utils.healpix import pix2ang
 
 #components = ['simulate','analyze','merge','plot']
 components = ['analyze','merge']
