@@ -24,7 +24,6 @@ import mpl_toolkits.axes_grid1.axes_divider as axes_divider
 import ugali.utils.config
 import ugali.observation.roi
 import ugali.observation.catalog
-import ugali.utils.skymap
 import ugali.utils.projector
 import ugali.utils.healpix
 import ugali.isochrone
@@ -153,7 +152,7 @@ def sparseHealpixFiles(title, infiles, field='MAGLIM',**kwargs):
     Inputs: field
     """
     #map = ugali.utils.skymap.readSparseHealpixMaps(infiles,field)
-    map = ugali.utils.skymap.read_partial_map(infiles,field)
+    nside,pixels,hpxmap = ugali.utils.healpix.read_partial_map(infiles,field,fullsky=True)
     ax = hp.mollview(map=map, title=title, **kwargs)
     return ax, map
     
@@ -602,7 +601,7 @@ class BasePlotter(object):
 
 
         pix = ang2pix(self.nside, self.lon, self.lat)
-        likelihood_pix = ugali.utils.skymap.superpixel(pix,self.nside,self.config.params['coords']['nside_likelihood'])
+        likelihood_pix = ugali.utils.healpix.superpixel(pix,self.nside,self.config.params['coords']['nside_likelihood'])
         config = self.config
         scan = ugali.analysis.scan.Scan(self.config,likelihood_pix)
         likelihood = scan.likelihood
