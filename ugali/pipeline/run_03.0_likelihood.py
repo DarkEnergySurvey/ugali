@@ -98,6 +98,7 @@ def run(self):
             print("Writing %s..."%outfile)
             plt.savefig(outfile)
         # Make the movie
+        import subprocess
         cmd = "convert -delay 30 -loop 0 %s/*.png %s.gif"%(outdir,basename)
         print(cmd)
         subprocess.check_call(cmd,shell=True)
