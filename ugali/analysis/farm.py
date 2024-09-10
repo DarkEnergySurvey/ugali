@@ -128,7 +128,7 @@ class Farm:
         logger.info('=== Submit Likelihood ===')
         for ii,pix in enumerate(pixels):
             msg = '  (%i/%i) pixel=%i nside=%i; (lon, lat) = (%.2f, %.2f)'
-            msg = msg%(ii+1,len(pixels),pix, self.nside_likelihood,lon[ii],lat[ii])
+            msg = msg%(ii,len(pixels),pix, self.nside_likelihood,lon[ii],lat[ii])
             logger.info(msg)
 
             # Create outfile name
