@@ -382,11 +382,11 @@ class CandidateSearch(object):
 
         coordsys = self.config['coords']['coordsys']
         if coordsys.lower() == 'gal':
-            print("GAL coordintes")
+            print("GAL coordinates")
             objs['GLON'],objs['GLAT'] = lon,lat
             objs['RA'],objs['DEC'] = gal2cel(lon,lat)
         else:
-            print("CEL coordintes")
+            print("CEL coordinates")
             objs['RA'],objs['DEC'] = lon,lat
             objs['GLON'],objs['GLAT'] = cel2gal(lon,lat)
 
