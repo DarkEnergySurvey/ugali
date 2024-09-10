@@ -520,7 +520,7 @@ def merge_likelihood_headers(filenames, outfile, **kwargs):
     data_dict = fileio.load_headers(filenames,ext=ext,keys=keys,mulitproc=8)
     names = data_dict.dtype.names
     data_dict.dtype.names = ['PIXEL' if n=='LKDPIX' else n for n in names]
-        
+
     write_partial_map(outfile, data_dict, nside)
     return data_dict
 
