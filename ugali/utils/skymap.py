@@ -6,7 +6,8 @@ import numpy as np
 import healpy as hp
 
 import ugali.utils.projector
-from ugali.utils.healpix import superpixel,subpixel,ang2pix,pix2ang,query_disc
+from ugali.utils.healpix import superpixel,subpixel
+from ugali.utils.healpix import ang2pix,pix2ang,query_disc
 from ugali.utils.healpix import read_partial_map
 from ugali.utils.logger import logger
 from ugali.utils.config import Config

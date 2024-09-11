@@ -24,6 +24,8 @@ def run(self):
         farm.submit_all(coords=self.opts.coords,queue=self.opts.queue,debug=self.opts.debug)
 
     if 'merge' in self.opts.run:
+        import numpy as np
+
         logger.info("Running 'merge'...")
         mergefile = self.config.mergefile
         roifile = self.config.roifile
@@ -42,13 +44,13 @@ def run(self):
         for pix in np.unique(superpixel):
             outfile = mergefile%pix
             if exists(outfile) and not self.opts.force:
-                logger.warn("  Found %s; skipping..."%outfile)
+                logger.warning("  Found %s; skipping..."%outfile)
             else:
                 healpix.merge_partial_maps(infiles[superpixel == pix],
                                            outfile,multiproc=8)
 
         if exists(roifile) and not self.opts.force:
-            logger.warn("  Found %s; skipping..."%roifile)
+            logger.warning("  Found %s; skipping..."%roifile)
         else:
             logger.info("  Merging likelihood headers...")
             healpix.merge_likelihood_headers(infiles,roifile)
@@ -64,7 +66,7 @@ def run(self):
         logfile = os.path.join(logdir,'scan_tar.log')
         cmd = 'tar --remove-files -cvzf %s %s'%(tarfile,scanfile)
         if exists(tarfile) and not self.opts.force:
-            logger.warn("  Found %s; skipping..."%tarfile)
+            logger.warning("  Found %s; skipping..."%tarfile)
         else:
             logger.info("  Tarring likelihood files...")
             logger.info(cmd)
@@ -73,17 +75,33 @@ def run(self):
     if 'plot' in self.opts.run:
         # WARNING: Loading the full 3D healpix map is memory intensive.
         logger.info("Running 'plot'...")
+        import numpy as np
         # Should do this in environment variable
         import matplotlib
         matplotlib.use('Agg')
         import pylab as plt
         import ugali.utils.plotting as plotting
-        skymap = ugali.utils.skymap.readSparseHealpixMap(self.config.mergefile,'LOG_LIKELIHOOD')[1]
-        plotting.plotSkymap(skymap)
+        from skymap import DESSkymap
+
+        filenames = self.config.mergefile.split('_%')[0]+'_*.fits'
+        infiles = np.array(sorted(glob.glob(filenames)))
+        hpxmaps = ugali.utils.healpix.read_partial_map(infiles,'LOG_LIKELIHOOD',fullsky=True)[2]
+
         outdir = mkdir(self.config['output']['plotdir'])
-        basename = os.path.basename(self.config.mergefile.replace('.fits','.png'))
-        outfile = os.path.join(outdir,basename)
-        plt.savefig(outfile)
+        basename = os.path.basename(self.config.mergefile.split('_%')[0])
+        for i,hpxmap in enumerate(hpxmaps):
+            #plotting.plotSkymap(hpxmap)
+            smap = DESSkymap()
+            smap.draw_hpxmap(hpxmap, cmap='gray_r', vmax=3.5)
+            smap.draw_inset_colorbar()
+            outfile = os.path.join(outdir,basename+'_%02d.png'%i)
+            print("Writing %s..."%outfile)
+            plt.savefig(outfile)
+        # Make the movie
+        import subprocess
+        cmd = "convert -delay 30 -loop 0 %s/*.png %s.gif"%(outdir,basename)
+        print(cmd)
+        subprocess.check_call(cmd,shell=True)
 
     if 'check' in self.opts.run:
         # Check the completion fraction

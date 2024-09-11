@@ -131,6 +131,17 @@ class Results(object):
         return ret
  
     def bayes_factor(self,param,burn=None,clip=10.0,bins=50):
+        """This is a very simplistic calculation of the Bayes Factor from the
+        posterior samples of a single parameter at the specific
+        parameter value of x=0 using the Savage-Dickey method for
+        nested hypothesis. It is currently assumping a flat prior
+        since the prior is not being passed in explicitly.
+
+        More information can be found here:
+        https://www.sciencedirect.com/science/article/abs/pii/S0022249611000666
+
+        ADW 2024-09-06: This should be moved to stats.
+        """
         # CAREFUL: Assumes a flat prior...
         try: 
             data = self.samples.get(param,burn=burn,clip=clip)

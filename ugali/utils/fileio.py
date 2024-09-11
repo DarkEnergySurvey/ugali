@@ -141,7 +141,7 @@ def load_headers(filenames,multiproc=False,**kwargs):
         out = [load_header(kw) for kw in kwargs]
         
     logger.debug('Concatenating headers...')
-    return np.rec.fromrecords([o.values() for o in out],names=out[0].keys())
+    return np.rec.fromrecords([list(o.values()) for o in out], names=list(out[0].keys()))
 
 
 def load_file(kwargs):

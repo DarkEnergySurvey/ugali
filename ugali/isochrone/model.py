@@ -219,11 +219,11 @@ class IsochroneModel(Model):
             mass_init_min = self.mass_init[self.stage==self.hb_stage].min()
             mass_init_max = self.mass_init[self.stage==self.hb_stage].max()
             cut = (mass_init_array>mass_init_min)&(mass_init_array<mass_init_max)
-            if isinstance(self.hb_spread,collections.Iterable):
+            try: 
                 # Explicit dispersion spacing
                 dispersion_array = self.hb_spread
                 n = len(dispersion_array)
-            else:
+            except TypeError:
                 # Default dispersion spacing
                 dispersion = self.hb_spread
                 spacing = 0.025
@@ -280,8 +280,8 @@ class IsochroneModel(Model):
             
         d_log_mass = (np.log10(mass_max) - np.log10(mass_min)) / float(steps)
         log_mass = np.linspace(np.log10(mass_min), np.log10(mass_max), steps)
-        mass = 10.**log_mass
-
+        mass = np.clip(10.**log_mass, mass_min, mass_max)
+        
         if mass_min < np.min(self.mass_init):
             mass_act_interpolation = scipy.interpolate.interp1d(np.insert(self.mass_init, 0, mass_min),
                                                                 np.insert(self.mass_act, 0, mass_min))

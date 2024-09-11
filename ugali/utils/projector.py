@@ -8,7 +8,7 @@ import re
 import numpy as np
 
 from ugali.utils.logger import logger
-from ugali.utils.mlab import isstring
+from ugali.utils.mlab import isstring, asscalar
 
 ############################################################
 
@@ -117,7 +117,7 @@ class Projector:
         lon_rotated, lat_rotated = self.rotator.rotate(lon.flat, lat.flat)
         x, y = self.sphere_to_image_func(lon_rotated, lat_rotated)
 
-        if scalar: return np.asscalar(x), np.asscalar(y)
+        if scalar: return asscalar(x), asscalar(y)
         else:      return x.reshape(lon.shape), y.reshape(lat.shape)
 
     sphere2image = sphereToImage
@@ -129,7 +129,7 @@ class Projector:
         lon_rotated, lat_rotated = self.image_to_sphere_func(x.flat, y.flat)
         lon, lat = self.rotator.rotate(lon_rotated, lat_rotated, invert = True)
 
-        if scalar: return np.asscalar(lon), np.asscalar(lat)
+        if scalar: return asscalar(lon), asscalar(lat)
         else:      return lon.reshape(x.shape), lat.reshape(y.shape)
 
     image2sphere = imageToSphere
