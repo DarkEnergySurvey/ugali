@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os, sys
-from os.path import splitext, exists
 import subprocess
 
 def fits2ply(infile,outfile=None):

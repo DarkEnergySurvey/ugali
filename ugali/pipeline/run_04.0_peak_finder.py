@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 """Perform object finding and association."""
-import os, glob
+import os
 from os.path import exists, join
 import time
 
 import fitsio
-import numpy as np
 
 from ugali.analysis.pipeline import Pipeline
 from ugali.analysis.search import CandidateSearch
-import ugali.candidate.associate
 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir

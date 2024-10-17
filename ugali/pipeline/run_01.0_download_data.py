@@ -3,7 +3,6 @@
 from os.path import join
 
 from ugali.analysis.pipeline import Pipeline
-from ugali.preprocess.database import databaseFactory
 from ugali.utils.shell import mkdir
 
 #components = ['data','isochrone']

@@ -9,8 +9,7 @@ from collections import OrderedDict as odict
 
 import numpy as np
 
-from ugali.analysis.model import Model, Parameter
-from ugali.utils.shell import mkdir, get_ugali_dir, get_iso_dir
+from ugali.utils.shell import get_iso_dir
 from ugali.isochrone.model import Isochrone
 from ugali.isochrone.parsec import Marigo2017 as Padova
 from ugali.isochrone.parsec import defaults_27

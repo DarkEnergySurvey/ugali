@@ -4,7 +4,6 @@ For creating healpix maps from catalogs.
 """
 import os
 from os.path import join
-import shutil
 import tempfile
 import subprocess
 from collections import Counter
@@ -14,12 +13,10 @@ import fitsio
 import numpy as np
 import numpy.lib.recfunctions as recfuncs
 import healpy as hp
-from scipy.interpolate import interp1d
-from scipy.optimize import brentq
 
 import ugali.utils.skymap
 import ugali.utils.binning
-from ugali.utils.projector import cel2gal, gal2cel
+from ugali.utils.projector import gal2cel
 from ugali.utils.healpix import ang2pix, pix2ang, superpixel, read_map
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger

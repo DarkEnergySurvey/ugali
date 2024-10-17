@@ -1,30 +1,19 @@
 #!/usr/bin/env python
-import yaml 
 import numpy as np
-from os.path import join
 
 import matplotlib, os
 try:             os.environ['DISPLAY']
 except KeyError: matplotlib.use('Agg')
-from matplotlib import font_manager
 
 import pylab as plt
 
 from ugali.utils.shell import mkdir
 import ugali.analysis.loglike
-from ugali.utils.projector import cel2gal, gal2cel
 import ugali.utils.plotting
-from ugali.utils.config import Config
-from ugali.analysis.kernel import Disk
-from ugali.isochrone import Padova
 import ugali.analysis.source
 
 from dsphs.like.lnlfn import ProfileLimit
 
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.ticker import MaxNLocator
-from matplotlib import patches 
-import mpl_toolkits.axes_grid1.axes_divider as axes_divider
 from collections import OrderedDict as odict
 
 #def scan(loglike,xdict,ydict):

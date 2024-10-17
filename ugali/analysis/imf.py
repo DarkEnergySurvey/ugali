@@ -7,8 +7,6 @@ from abc import abstractmethod
 import numpy as np
 import scipy.interpolate
 
-from ugali.utils.logger import logger
-
 ############################################################
 
 class IMF(object):

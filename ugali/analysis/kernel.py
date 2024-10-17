@@ -3,8 +3,6 @@
 Spatial kernels for dwarf galaxies.
 """
 
-import sys
-import inspect
 from abc import abstractmethod
 from collections import OrderedDict as odict
 import copy
@@ -14,10 +12,9 @@ import healpy as hp
 import scipy.integrate
 import scipy.interpolate
 
-import ugali.utils.projector
 from ugali.utils.projector import Projector, angsep
 from ugali.analysis.model import Model, Parameter
-from ugali.utils.healpix import ang2vec, ang2pix, query_disc, ang2disc
+from ugali.utils.healpix import ang2vec, ang2pix, ang2disc
 
 from ugali.utils.logger import logger
 

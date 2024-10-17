@@ -3,16 +3,12 @@
 Analyze a simulated data set.
 """
 __author__ = "Alex Drlica-Wagner"
-import copy
 import os
 import time
 import resource, psutil
 from collections import OrderedDict as odict
 
-import numpy
 import numpy as np
-import scipy.interpolate
-import healpy
 import numpy.lib.recfunctions as recfuncs
 import fitsio
 
@@ -23,8 +19,6 @@ import ugali.utils.projector
 import ugali.utils.stats
 import ugali.analysis.scan
 
-from ugali.utils.projector import gal2cel, cel2gal, sr2deg, mod2dist
-from ugali.utils.healpix import ang2pix, pix2ang
 from ugali.utils.logger import logger
 from ugali.utils.config import Config
 from ugali.utils import mlab
