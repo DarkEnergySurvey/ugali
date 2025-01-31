@@ -26,7 +26,7 @@ QUEUES = odict([
     ('lsf'   ,['express','short','medium','long','xlong','xxl',
                'kipac-ibq','bulletmpi']),
     ('slurm' ,[]),
-    ('condor',['local','vanilla','universe','grid']),
+    ('condor',['local','vanilla']),
 ])
 
 # https://confluence.slac.stanford.edu/x/OaUlCw
@@ -78,9 +78,7 @@ def factory(queue,**kwargs):
     elif name in CLUSTERS['slurm']+QUEUES['slurm']:
         batch = Slurm(**kwargs)
     elif name in CLUSTERS['condor']+QUEUES['condor']:
-        # Need to learn how to use condor first...
         batch = Condor(**kwargs)
-        raise Exception("Condor cluster not implemented")
     else:
         raise TypeError('Unexpected queue name: %s'%name)
 
@@ -103,9 +101,17 @@ class Batch(object):
         self.submit_cmd = "submit %(opts)s %(command)s"
         self.jobs_cmd = "jobs"
 
+    def parse_options(self, **opts):
+        """ Parse command line options. """
+
+        # Default options for the cluster
+        options = odict(self.default_opts)
+        options.update(opts)
+        return ''.join('--%s %s '%(k,v) for k,v in options.items())
+
     def jobs(self):
         out = self.popen(self.jobs_cmd)
-        stdout = out.communicate()[0]
+        stdout = out.communicate()[0].decode()
         return stdout
 
     def njobs(self):
@@ -310,12 +316,29 @@ class Slurm(Batch):
 
 class Condor(Batch):
     """ Not implemented yet... """
+
+    _defaults = odict([
+        ('n', '50'),
+    ])
+
+    _mapping = odict([
+        ('jobname','J'),
+        ('logfile','o'),
+        ('njobs','n'),
+    ])
+    
     def __init__(self, **kwargs):
         super(Condor,self).__init__(**kwargs)
         logger.warning('Condor cluster is untested')
         
-        self.jobs_cmd = 'condor_q -u %s'%self.username
+        self.jobs_cmd = "cjobs -u %s"%(self.username)
         self.submit_cmd = "csub %(opts)s %(command)s"
+
+    def parse_options(self, **opts):
+        # Default options for the cluster
+        options = odict(self.default_opts)
+        options.update(opts)
+        return ''.join('-%s %s '%(k,v) for k,v in options.items())
 
 if __name__ == "__main__":
     import argparse

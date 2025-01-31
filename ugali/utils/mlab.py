@@ -17,6 +17,11 @@ def isstring(obj):
     """Python 2/3 compatible string check"""
     return isinstance(obj, six.string_types)
 
+def asscalar(a):
+    """Python 2/3 compatible scalar conversion"""
+    try: return np.asscalar(a)
+    except AttributeError: return a.item()
+
 def rec_append_fields(rec, names, arrs, dtypes=None):
     """
     Return a new record array with field names populated with data

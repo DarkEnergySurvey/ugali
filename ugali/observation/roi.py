@@ -152,7 +152,7 @@ class ROI(object):
 
     # ADW: Maybe these should be associated with the PixelRegion objects
     def inPixels(self,lon,lat,pixels):
-        """ Function for testing if coordintes in set of ROI pixels. """
+        """ Function for testing if coordinates in set of ROI pixels. """
         nside = self.config.params['coords']['nside_pixel']
         return ugali.utils.healpix.in_pixels(lon,lat,pixels,nside)
         
