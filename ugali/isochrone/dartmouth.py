@@ -4,12 +4,9 @@ Module for wrapping Dartmouth isochrones.
 http://stellar.dartmouth.edu/models/isolf_new.php
 """
 import os
-import sys
-import glob
 import copy
 from collections import OrderedDict as odict
 
-import re
 try:
     from urllib.parse import urlencode
     from urllib.request import urlopen
@@ -17,7 +14,6 @@ except ImportError:
     from urllib import urlencode
     from urllib2 import urlopen
 
-import tempfile
 import subprocess
 from collections import OrderedDict as odict
 

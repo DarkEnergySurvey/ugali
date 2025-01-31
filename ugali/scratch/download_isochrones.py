@@ -4,16 +4,11 @@ Script for downloading isochrone grids.
 """
 __author__ = "Alex Drlica-Wagner"
 import os
-import re
-import subprocess
 from multiprocessing import Pool
-from collections import OrderedDict as odict
-import copy
 
 import numpy as np
 
 from ugali.utils.logger import logger
-from ugali.utils.shell import mkdir
 from ugali.isochrone import factory as isochrone_factory
 
 if __name__ == "__main__":

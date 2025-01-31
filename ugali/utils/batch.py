@@ -3,15 +3,13 @@
 Cross-platform batch computing interface.
 """
 import os
-import subprocess, subprocess as sub
+import subprocess as sub
 import getpass
 from collections import OrderedDict as odict
 from itertools import chain
 import copy
 import time
 import resource
-
-import numpy as np
 
 from ugali.utils.logger import logger
 

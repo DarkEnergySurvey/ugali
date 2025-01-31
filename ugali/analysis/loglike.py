@@ -3,12 +3,9 @@
 Implementation of the (log) likelihood function.
 """
 from collections import OrderedDict as odict
-import copy
 import time
 
-import numpy
 import numpy as np
-from scipy.stats import norm
 
 import healpy as hp
 import fitsio
@@ -16,14 +13,12 @@ import fitsio
 import ugali.utils.binning
 import ugali.utils.parabola
 
-from ugali.utils.projector import angsep, gal2cel
+from ugali.utils.projector import angsep
 from ugali.utils.healpix import ang2pix,pix2ang,ang2disc
 from ugali.utils.logger import logger
 
 from ugali.utils.config import Config
 from ugali.analysis.source import Source
-
-from ugali.analysis.kernel import EllipticalDisk, ToyKernel
 
 class Observation(object):
     """

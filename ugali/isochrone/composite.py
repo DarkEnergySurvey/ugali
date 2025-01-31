@@ -4,15 +4,12 @@ Generic python script.
 """
 __author__ = "Alex Drlica-Wagner"
 
-import sys
-import os
 from collections import OrderedDict as odict
 from functools import wraps
 
 import numpy as np
 
-from ugali.analysis.model import Model, Parameter
-from ugali.utils.logger import logger
+from ugali.analysis.model import Parameter
 from ugali.isochrone.model import IsochroneModel, Isochrone
 from ugali.isochrone.mesa import Dotter2016
 from ugali.isochrone.parsec import Marigo2017

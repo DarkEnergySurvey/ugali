@@ -6,25 +6,21 @@ For pixelizing catalogs and masks.
 #FIXME: ADW This needs to be updated to use fitsio
 
 import os
-from os.path import join
-import glob
 import collections
 
 import fitsio
 import numpy as np
-import numpy.lib.recfunctions as recfuncs
 import healpy as hp
 
 #import ugali.utils.binning
 #import ugali.utils.skymap
 from ugali.utils.projector import cel2gal, gal2cel
 from ugali.utils import healpix, mlab
-from ugali.utils.healpix import ang2pix, pix2ang, superpixel
+from ugali.utils.healpix import ang2pix
 
 from ugali.utils.shell import mkdir
 from ugali.utils.logger import logger
-from ugali.utils.config import Config
-import ugali.utils.fileio
+
 
 def pixelizeCatalog(infiles, config, force=False):
     """

@@ -8,7 +8,6 @@ Functions
     someFunction
 """
 
-import os
 import numpy as np
 import healpy as hp
 import scipy.signal
@@ -20,7 +19,6 @@ import ugali.observation.roi
 from ugali.utils import healpix
 
 from ugali.utils.logger import logger
-from ugali.utils.healpix import ang2pix
 from ugali.utils.config import Config
 from ugali.utils.constants import MAGERR_PARAMS
 ############################################################

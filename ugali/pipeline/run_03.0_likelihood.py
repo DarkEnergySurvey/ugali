@@ -2,9 +2,7 @@
 """Run the likelihood search."""
 import glob
 import os
-from os.path import join, exists, basename
-
-import numpy as np
+from os.path import join, exists
 
 from ugali.analysis.farm import Farm
 from ugali.analysis.pipeline import Pipeline

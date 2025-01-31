@@ -5,8 +5,8 @@ Generic python script.
 import os
 from collections import OrderedDict as odict
 
-from ugali.analysis.model import Model, Parameter
-from ugali.utils.shell import mkdir, get_ugali_dir, get_iso_dir
+from ugali.analysis.model import Parameter
+from ugali.utils.shell import get_iso_dir
 from ugali.isochrone.parsec import PadovaIsochrone
 
 class EmpiricalPadova(PadovaIsochrone):

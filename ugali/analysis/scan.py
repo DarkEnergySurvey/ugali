@@ -2,25 +2,21 @@
 """
 Create and run an individual likelihood analysis.
 """
-import os
-import sys
+
 from collections import OrderedDict as odict
 
-import numpy
 import numpy as np
-import healpy
 import fitsio
 
 import ugali.utils.skymap
 import ugali.analysis.loglike
 from ugali.analysis.loglike import LogLikelihood, createSource, createObservation
-from ugali.analysis.source import Source
 from ugali.utils.parabola import Parabola
 
 from ugali.utils.batch import LSF
 from ugali.utils.config import Config
 from ugali.utils.logger import logger
-from ugali.utils.healpix import superpixel, subpixel, pix2ang, ang2pix
+from ugali.utils.healpix import ang2pix
 from ugali.utils.healpix import write_partial_map
 
 ############################################################

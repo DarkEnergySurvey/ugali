@@ -9,7 +9,7 @@ import ugali.utils.projector
 
 from ugali.utils.config import Config
 from ugali.utils.projector import gal2cel,cel2gal
-from ugali.utils.healpix import ang2pix,superpixel
+from ugali.utils.healpix import ang2pix
 from ugali.utils.logger import logger
 from ugali.utils.fileio import load_infiles
 from ugali.utils import mlab

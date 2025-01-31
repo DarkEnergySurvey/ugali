@@ -1,6 +1,5 @@
 DeprecationWarning("'assemble.py' should be removed")
 
-import sys
 import os
 import shutil
 import yaml
