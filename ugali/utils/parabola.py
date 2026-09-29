@@ -46,13 +46,12 @@ class Parabola:
         y_1 = self.y[index_1]
         y_2 = self.y[index_2]
 
-        # Invert matrix
-        a = np.matrix([[x_0**2, x_0, 1.],
-                          [x_1**2, x_1, 1.],
-                          [x_2**2, x_2, 1.]])
-        a_inverse = np.linalg.inv(a)
+        # Solve the 3x3 Vandermonde system for the parabola coefficients
+        a = np.array([[x_0**2, x_0, 1.],
+                      [x_1**2, x_1, 1.],
+                      [x_2**2, x_2, 1.]])
         b = np.array([y_0, y_1, y_2])
-        p = np.dot(np.array(a_inverse), b)
+        p = np.linalg.solve(a, b)
 
         self.p_2 = p[0]
         self.p_1 = p[1]

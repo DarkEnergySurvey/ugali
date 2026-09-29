@@ -17,10 +17,6 @@ from ugali.utils.logger import logger
 import ugali.utils.config # To recognize own type
 from ugali.utils.mlab import isstring
 
-#Yaml is a firm dependency
-#try: import yaml
-#except ImportError: logger.warning("YAML not found")
-
 class Config(dict):
     """
     Configuration object
@@ -50,16 +46,25 @@ class Config(dict):
         # ADW: This should be run after creating filenames
         self._validate()
 
-        # Filenames from this config (masked by existence) 
-        # ADW: We should not recreate filenames if they already exist
-        # in the input config
-        if not hasattr(self,'filenames'):
-            try:
-                self.filenames = self._createFilenames()
-            except:
-                exc_type,exc_value,exc_traceback = sys.exc_info()
-                logger.warning("%s %s"%(exc_type,exc_value))
-                logger.warning("Filenames could not be created for config.")
+        # Filenames from this config (masked by existence)
+        self._filenames = None
+
+    @property
+    def filenames(self):
+        """
+        Masked array of catalog and mask filenames for each pixel.
+        Built on first access; raises IOError if the data directories
+        do not exist.
+        """
+        # Only create the filenames once
+        if self._filenames is None:
+            self._filenames = self._createFilenames()
+        return self._filenames
+
+    @filenames.setter
+    def filenames(self, value):
+        self._filenames = value
+
 
     def __str__(self):
         return yaml.dump(self)
@@ -249,7 +254,7 @@ class Config(dict):
         else:
             return self.filenames[np.in1d(self.filenames['pix'],pixels)]
 
-        
     getCatalogFiles = getFilenames
 
+        
 ############################################################
