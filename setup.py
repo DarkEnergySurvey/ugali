@@ -154,7 +154,7 @@ class TarballCommand(distutils.cmd.Command,object):
         os.remove(tarball)
 
     def run(self):
-        if self.dry_run:
+        if getattr(self, 'dry_run', False):
             print("skipping data install")
             return
         
