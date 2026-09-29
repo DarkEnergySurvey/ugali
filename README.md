@@ -57,7 +57,7 @@ The following isochrone libraries are available. All cover ages of 1.0 - 13.5 Gy
 | `sdss`   | SDSS *ugriz*                                   | `bressan2012`, `marigo2017`, `dotter2008`, `dotter2016`   |
 | `lsst`   | LSST *ugrizy* (R1.9 throughputs, Sept 2023)    | `bressan2012`, `marigo2017`, `dotter2016`                 |
 | `roman`  | Roman 2021 filters (*F062* - *F213*)           | `bressan2012`, `marigo2017`, `dotter2016`                 |
-| `euclid` | Euclid VIS+NISP (*VIS*, *Y*, *J*, *H*)         | `bressan2012`, `marigo2017`                               |
+| `euclid` | Euclid VIS+NISP (*VIS*, *Y*, *J*, *H*)         | `bressan2012`, `marigo2017`, `dotter2016`                 |
 
 A minimal subset of all of these libraries (two ages at two metallicities) is what gets installed by the `--isochrones` option. 
 
