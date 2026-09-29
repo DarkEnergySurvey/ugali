@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""
+""" Custom argument parser.
 
 @author: Alex Drlica-Wagner <kadrlica@fnal.gov>
 """

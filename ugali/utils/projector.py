@@ -229,8 +229,17 @@ def angsep2(lon_1, lat_1, lon_2, lat_2):
 
 def angsep(lon1,lat1,lon2,lat2):
     """
-    Angular separation (deg) between two sky coordinates.
+    Fast angular separation (deg) between two sky coordinates.
     Borrowed from astropy (www.astropy.org)
+
+    Parameters
+    ----------
+    lon1, lat1 : first set of coordinates (deg)
+    lon2, lat2 : second set of coordinates (deg)
+
+    Returns
+    -------
+    sep : spherical angular separation (deg)
 
     Notes
     -----
