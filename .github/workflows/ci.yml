@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 0 1 * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    defaults:
+      run:
+        # login shell so the micromamba environment is activated in every step
+        shell: bash -el {0}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up environment
+      uses: mamba-org/setup-micromamba@v2
+      with:
+        environment-name: env
+        create-args: >-
+          -c conda-forge
+          python=${{ matrix.python-version }}
+          numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner
+          flake8 pytest jupyter nbconvert
+        init-shell: bash
+        cache-environment: true
+
+    - name: Set UGALIDIR
+      run: echo "UGALIDIR=$HOME/.ugali" >> "$GITHUB_ENV"
+
+    - name: Install package
+      run: python setup.py -q install --isochrones --catalogs --tests
+
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+    - name: Test with pytest
+      env:
+        MPLBACKEND: Agg
+      run: pytest -v tests --ignore=tests/test_notebook.py
+
+    - name: Test notebooks
+      run: pytest -v tests/test_notebook.py
