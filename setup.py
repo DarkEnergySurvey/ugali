@@ -221,7 +221,7 @@ class IsochroneCommand(TarballCommand):
             self.models = [self.model]
 
     def run(self):
-        if self.dry_run:
+        if getattr(self, 'dry_run', False):
             print("skipping data install")
             return
 
