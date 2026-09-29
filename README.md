@@ -1,4 +1,4 @@
-[![Build](https://github.com/DarkEnergySurvey/ugali/actions/workflows/python-package.yml/badge.svg)](https://github.com/DarkEnergySurvey/ugali/actions/workflows/python-package.yml)
+[![Build](https://github.com/DarkEnergySurvey/ugali/actions/workflows/ci.yml/badge.svg)](https://github.com/DarkEnergySurvey/ugali/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/ugali.svg)](https://pypi.python.org/pypi/ugali)
 [![Release](https://img.shields.io/github/release/DarkEnergySurvey/ugali.svg)](../../releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../)
@@ -16,7 +16,7 @@ Installation
 
 There are several ways to install `ugali`.
 
-The most robust way is to follow the installation procedure for the automated GitHub Actions build documented in [python-package.yml](.github/workflows/python-package.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
+The most robust way is to follow the installation procedure for the automated GitHub Actions build documented in [ci.yml](.github/workflows/ci.yml). This installation creates a `conda` environment with the necessary dependencies and installs `ugali`.
 ```bash
 # Create and activate conda environment
 conda create -n ugali-env numpy scipy matplotlib astropy healpy pyyaml emcee nose fitsio corner -c conda-forge -c kadrlica
