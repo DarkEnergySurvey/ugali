@@ -18,7 +18,8 @@ except ImportError:
     from urllib2 import urlopen
 
 import tempfile
-import subprocess
+import shutil
+import contextlib
 from collections import OrderedDict as odict
 
 import numpy as np
@@ -58,7 +59,10 @@ but we now use the input Z value for internal consistency.
 
 ###########################################################
 # Dartmouth Isochrones
-# http://stellar.dartmouth.edu/models/isolf_new.php
+# https://rcweb.dartmouth.edu/stellar/isolf_new.html
+#
+# NOTE: this used to live at http://stellar.dartmouth.edu/models, which now
+# redirects to the site root and no longer answers the old form URL.
 
 dict_clr = {
     'acs_wfc':4,
@@ -121,7 +125,7 @@ class Dotter2008(Isochrone):
     #zbins = np.arange(7e-5,2e-3 + 1e-5,1e-5)
     zbins = np.arange(1e-3, 2e-3 + 5e-5, 5e-5)
 
-    download_url = 'http://stellar.dartmouth.edu'
+    download_url = 'https://rcweb.dartmouth.edu/stellar'
     download_defaults = copy.deepcopy(dartmouth_defaults)
 
     columns = dict(
@@ -169,7 +173,7 @@ class Dotter2008(Isochrone):
             raise(e)
 
         kwargs = dict(comments='#',usecols=list(columns.keys()),dtype=list(columns.values()))
-        self.data = np.genfromtxt(filename,**kwargs)
+        self._read_data(filename,**kwargs)
 
         # KCB: Not sure whether the mass in Dotter isochrone output
         # files is initial mass or current mass
@@ -224,15 +228,12 @@ class Dotter2008(Isochrone):
         params['clr']=dict_clr[self.survey]
 
         server = self.download_url
-        url = server + '/models/isolf_new.php'
-        # First check that the server is alive
-        logger.debug("Accessing %s..."%url)
-        urlopen(url,timeout=2)
+        url = server + '/isolf_new.php'
 
         query = url + '?' + urlencode(params)
         logger.debug(query)
         response = urlopen(query)
-        page_source = str(response.read())
+        page_source = response.read().decode('utf-8',errors='replace')
         try:
             file_id = int(page_source.split('tmp/tmp')[-1].split('.iso')[0])
         except Exception as e:
@@ -240,9 +241,15 @@ class Dotter2008(Isochrone):
             msg = 'Output filename not found'
             raise RuntimeError(msg)
 
-        infile = 'http://stellar.dartmouth.edu/models/tmp/tmp%s.iso'%(file_id)
-        command = 'wget -q %s -O %s'%(infile, outfile)
-        subprocess.call(command,shell=True)
+        # NOTE: fetched with urlopen rather than by shelling out to wget, so
+        # that the download uses the same TLS configuration as the query and
+        # so that a failure raises instead of silently leaving an empty file
+        # (subprocess.call did not check its return code).
+        infile = '%s/tmp/tmp%s.iso'%(server,file_id)
+        logger.debug("Downloading %s..."%infile)
+        with contextlib.closing(urlopen(infile)) as response:
+            with open(outfile,'wb') as tmp:
+                shutil.copyfileobj(response,tmp)
 
         ## ADW: Old code to rename the output file based on Zeff ([a/Fe] corrected)
         #tmpfile = tempfile.NamedTemporaryFile().name

@@ -46,11 +46,28 @@ By default, the minimal isochrone and catalog libraries are installed into the d
 Auxiliary Libraries
 -------------------
 
-The `ugali` source code is distributed with several auxiliary libraries for isochrone generation and catalog matching. These libraries can be downloaded directly from the [releases](../../releases) page, and unpacked in your `$UGALIDIR`. For example, to install the [Bressan et al. 2012](http://adsabs.harvard.edu/abs/2012MNRAS.427..127B) isochrones for the DES survey:
+The `ugali` source code is distributed with several auxiliary libraries for isochrone generation and catalog matching. These libraries can be downloaded directly from the [releases](../../releases) page, and unpacked in your `$UGALIDIR`.
+
+The following isochrone libraries are available. All cover ages of 1.0 - 13.5 Gyr in 0.1 Gyr steps. The metallicity grid depends on the model: the PARSEC libraries (`bressan2012`, `marigo2017`) cover Z = 1e-4 - 1e-3 in 1e-5 steps (11466 isochrones), while the MIST libraries (`dotter2016`) extend an order of magnitude lower, Z = 1e-5 - 1e-3 in the same steps (12600 isochrones):
+
+| survey   | filter system                                  | distributed models                                        |
+| -------- | ---------------------------------------------- | --------------------------------------------------------- |
+| `des`    | DECam *ugrizY*                                 | `bressan2012`, `marigo2017`, `dotter2008`, `dotter2016`   |
+| `ps1`    | Pan-STARRS1 *grizyw*                           | `bressan2012`, `marigo2017`, `dotter2008`, `dotter2016`   |
+| `sdss`   | SDSS *ugriz*                                   | `bressan2012`, `marigo2017`, `dotter2008`, `dotter2016`   |
+| `lsst`   | LSST *ugrizy* (R1.9 throughputs, Sept 2023)    | `bressan2012`, `marigo2017`, `dotter2016`                 |
+| `roman`  | Roman 2021 filters (*F062* - *F213*)           | `bressan2012`, `marigo2017`, `dotter2016`                 |
+| `euclid` | Euclid VIS+NISP (*VIS*, *Y*, *J*, *H*)         | `bressan2012`, `marigo2017`                               |
+
+A minimal subset of all of these libraries (two ages at two metallicities) is what gets installed by the `--isochrones` option. 
+
+Additional LSST filter systems can be downloaded with `ugali/scratch/download_isochrones.py`, but are not distributed: `lsst_dp0` (Oct 2017 throughputs, used for the DP0/DC2 simulations) and `lsst_2012` (the original March 2012 throughputs). 
+
+For example, to install the [Bressan et al. 2012](http://adsabs.harvard.edu/abs/2012MNRAS.427..127B) isochrones for the DES survey:
 
 ```
 cd $UGALIDIR
-wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.8.0/ugali-des-bressan2012.tar.gz
+wget https://github.com/DarkEnergySurvey/ugali/releases/download/v1.9.0/ugali-des-bressan2012.tar.gz
 tar -xzf ugali-des-bressan2012.tar.gz
 ```
 
@@ -73,6 +90,9 @@ python setup.py isochrones --survey des
 
 # To install all available Bressan+ 2012 isochrones
 python setup.py isochrones --model bressan2012
+
+# To install the LSST isochrones
+python setup.py isochrones --survey lsst
 
 # To install the catalog libraries
 python setup.py catalogs

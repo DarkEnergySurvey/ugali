@@ -1131,6 +1131,178 @@ class Isochrone(IsochroneModel):
             else:
                 self._parse(self.filename)
 
+    # Columns that every isochrone file carries, mapped from the ugali name
+    # to the names that can appear in the file header. Filled in by the
+    # subclasses, which know their own file format.
+    header_names = odict()
+
+    # Bands of each photometric system, as a mapping of survey -> band list.
+    # Used to resolve the magnitude columns from the file header.
+    band_names = odict()
+
+    # Non-default dtypes for the columns in `header_names`; anything not
+    # listed is read as a float.
+    header_dtypes = odict()
+
+    # Surveys whose files are served in Vega magnitudes, as a mapping of
+    # survey -> {band: m_AB - m_Vega}. ugali works in AB throughout, so these
+    # offsets are applied as soon as a file is read. Empty for a photometric
+    # system that is already AB.
+    vega_to_ab = odict()
+
+    def _read_data(self, filename, **kwargs):
+        """ Read an isochrone file into `self.data`.
+
+        Subclasses read their files through this method rather than calling
+        `np.genfromtxt` directly. The two things that always have to follow a
+        read -- checking that the requested bands are actually in the file,
+        and converting Vega magnitudes to AB -- happen here, so a new
+        subclass cannot forget them and they cannot be skipped on one code
+        path but not another. Both have to happen before `_parse` derives
+        `mag_1`, `mag_2` and `color`, which is why this is a read helper
+        rather than something called after `_parse` returns.
+
+        Parameters
+        ----------
+        filename : the isochrone file to read
+        kwargs   : passed through to `np.genfromtxt`
+
+        Returns
+        -------
+        data : the structured array, also stored as `self.data`
+        """
+        self.data = np.genfromtxt(filename,**kwargs)
+        self._check_bands(filename)
+        self._convert_to_ab()
+        return self.data
+
+    def _check_bands(self, filename):
+        """ Check that the requested bands were found in the file. """
+        names = self.data.dtype.names or ()
+        missing = [b for b in (self.band_1,self.band_2) if b not in names]
+        if missing:
+            msg = "Band(s) %s not found for survey '%s' in %s\n"%(
+                ', '.join(repr(b) for b in missing), self.survey, filename)
+            msg += "Available bands: %s"%(', '.join(
+                n for n in names if n not in self.header_names))
+            raise ValueError(msg)
+
+    def _convert_to_ab(self):
+        """ Convert Vega magnitudes to AB magnitudes in place.
+
+        Some photometric systems are served in Vega magnitudes (PARSEC serves
+        Roman that way, while MIST serves the same filters in AB), so the
+        offsets live on the class that knows how its own files are written.
+        """
+        names = self.data.dtype.names or ()
+        offsets = self.vega_to_ab.get(self.survey.lower(), {})
+        for band, offset in offsets.items():
+            # A single-character band is also exposed in the opposite case
+            # (see _find_column_numbers), and the two are independent fields,
+            # so both copies have to be corrected or one would silently stay
+            # in Vega magnitudes.
+            aliases = [band]
+            if len(band) == 1:
+                aliases.append(band.upper() if band.islower() else band.lower())
+            for name in aliases:
+                if name in names:
+                    self.data[name] += offset
+
+    @classmethod
+    def _header_columns(cls, filename):
+        """ Column names from the file header, or None if it has none.
+
+        Implemented by the subclasses, which know where in their own file
+        format the column names live.
+        """
+        return None
+
+    @classmethod
+    def _band_column(cls, band, names, survey):
+        """ Column number of a band among the header column names.
+
+        Implemented by the subclasses, which know how their own file format
+        decorates a band name ('gmag', 'LSST_g', ...).
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def _find_column_numbers(cls, filename, survey):
+        """ Map from the isochrone column names to the column numbers.
+
+        Isochrone file formats have gained and reordered columns over the
+        years (both the CMD and the MIST output have), so hard-coded column
+        numbers are only correct for the format they were written against and
+        fail silently -- as a constant mass or a magnitude read out of the
+        wrong column -- when they are not. Resolving them from the header
+        instead means files from any modern version read correctly, and that
+        adding a photometric system only requires adding its bands to
+        `band_names`.
+
+        Parameters
+        ----------
+        filename : isochrone file to inspect
+        survey   : photometric system of the file
+
+        Returns
+        -------
+        columns : odict of column number -> (name, dtype), or None if the file
+                  does not name its columns, in which case the hard-coded
+                  `columns` must be used.
+        """
+        names = cls._header_columns(filename)
+        if names is None:
+            logger.debug("Column names not found in header: %s"%filename)
+            return None
+
+        index = odict([(n,i) for i,n in enumerate(names)])
+        columns = odict()
+
+        for name, aliases in cls.header_names.items():
+            for alias in aliases:
+                if alias in index:
+                    dtype = cls.header_dtypes.get(name,float)
+                    columns[index[alias]] = (name, dtype)
+                    break
+            else:
+                msg = "Column '%s' not found in header: %s"%(name,filename)
+                raise ValueError(msg)
+
+        bands = cls.band_names.get(survey.lower())
+        if bands is None:
+            msg = "Unrecognized survey: %s"%survey
+            logger.warning(msg)
+            raise KeyError(survey)
+
+        for band in bands:
+            idx = cls._band_column(band,names,survey)
+            if idx is None:
+                msg = "Band '%s' not found in header: %s"%(band,filename)
+                logger.warning(msg)
+                continue
+            columns[idx] = (band, float)
+            # Single-character bands are also exposed in the opposite case so
+            # that, e.g., both 'y' and 'Y' work for the LSST y band.
+            if len(band) == 1:
+                alias = band.upper() if band.islower() else band.lower()
+                columns[(idx,alias)] = (alias, float)
+
+        return columns
+
+    @staticmethod
+    def _genfromtxt_kwargs(columns):
+        """ Build the np.genfromtxt arguments for a column mapping.
+
+        Keys of `columns` are column numbers, except for the case-aliased
+        bands, whose keys are (column number, name) tuples so that the same
+        column can be read into two differently named fields.
+        """
+        usecols, dtype = [], []
+        for key, value in columns.items():
+            usecols.append(key[0] if isinstance(key,tuple) else key)
+            dtype.append(value)
+        return dict(usecols=usecols, dtype=dtype)
+
     def _parse(self,filename):
         raise Exception("Must be implemented by subclass.")
 

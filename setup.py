@@ -40,15 +40,29 @@ Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE_URL = URL+'/releases/download/v1.8.0'
+RELEASE_URL = URL+'/releases/download/v1.9.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
-ISOSIZE = "~1MB" 
+ISOSIZE = "~2MB"
 CATSIZE = "~20MB"
 TSTSIZE = "~1MB"
 # Could find file size dynamically, but it's a bit slow...
 # int(urllib.urlopen(ISOCHRONES).info().getheaders("Content-Length")[0])/1024**2
-SURVEYS = ['des','ps1','sdss','lsst']
+SURVEYS = ['des','ps1','sdss','lsst','roman','euclid']
 MODELS = ['bressan2012','marigo2017','dotter2008','dotter2016']
+
+# Not every survey has a library for every model. Requesting all the
+# libraries for a survey should install what exists rather than fail on the
+# first combination that does not.
+SURVEY_MODELS = {
+    'des'    : MODELS,
+    'ps1'    : MODELS,
+    'sdss'   : MODELS,
+    # Dartmouth (dotter2008) has no LSST, Roman or Euclid filter set, and
+    # MIST (dotter2016) has no Euclid, so those combinations do not exist.
+    'lsst'   : ['bressan2012','marigo2017','dotter2016'],
+    'roman'  : ['bressan2012','marigo2017','dotter2016'],
+    'euclid' : ['bressan2012','marigo2017'],
+}
 
 class ProgressFileIO(io.FileIO):
     def __init__(self, path, *args, **kwargs):
@@ -217,11 +231,24 @@ class IsochroneCommand(TarballCommand):
             super(IsochroneCommand,self).run()
             return
         
+        requested = []
         for survey in self.surveys:
             for model in self.models:
-                self.tarball = "ugali-%s-%s.tar.gz"%(survey,model)
-                self.dirname = "isochrones/%s/%s"%(survey,model)
-                super(IsochroneCommand,self).run()
+                if model not in SURVEY_MODELS.get(survey,MODELS):
+                    msg = "No %s library for survey '%s'; skipping..."
+                    # Only worth mentioning if the user asked for it by name
+                    if self.model is not None: print(msg%(model,survey))
+                    continue
+                requested.append((survey,model))
+
+        if not requested:
+            msg = "No isochrone libraries available for survey=%s, model=%s"
+            raise Exception(msg%(self.survey,self.model))
+
+        for survey,model in requested:
+            self.tarball = "ugali-%s-%s.tar.gz"%(survey,model)
+            self.dirname = "isochrones/%s/%s"%(survey,model)
+            super(IsochroneCommand,self).run()
 
 
 class install(_install):

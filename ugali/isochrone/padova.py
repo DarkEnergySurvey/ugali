@@ -74,7 +74,7 @@ class Girardi2002(Padova):
             raise(e)
 
         kwargs = dict(delimiter='\t',usecols=list(columns.keys()),dtype=list(columns.values()))
-        self.data = np.genfromtxt(filename,**kwargs)
+        self._read_data(filename,**kwargs)
         
         self.mass_init = self.data['mass_init']
         self.mass_act  = self.data['mass_act']

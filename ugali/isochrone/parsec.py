@@ -17,7 +17,8 @@ except ImportError:
     from urllib import urlencode
     from urllib2 import urlopen, URLError
 
-import subprocess
+import shutil
+import contextlib
 import re
 
 import numpy as np
@@ -28,14 +29,23 @@ from ugali.isochrone.model import Isochrone
 from ugali.isochrone.model import get_iso_dir
 
 # survey system
+#
+# Keys are the ugali survey names, values are the photometric system files
+# served by the CMD web interface. Note that 'lsst' is the current LSST total
+# throughput set (R1.9, Sept 2023); these are the LSST isochrones that ugali
+# distributes. The older throughput sets remain available under explicit
+# names: 'lsst_dp0' (Oct 2017, used for the DP0/DC2 simulations) and
+# 'lsst_2012' (March 2012, the original tab_mag_lsst.dat). 'lsst_r1p9' is
+# retained as a deprecated alias for 'lsst'.
 photsys_dict = odict([
         ('des' ,'tab_mag_odfnew/tab_mag_decam.dat'),
         ('sdss','tab_mag_odfnew/tab_mag_sloan.dat'),
         ('ps1' ,'tab_mag_odfnew/tab_mag_panstarrs1.dat'),
         ('acs_wfc' ,'tab_mag_odfnew/tab_mag_acs_wfc.dat'),
-        ('lsst', 'tab_mag_odfnew/tab_mag_lsst.dat'),
-        ('lsst_dp0', 'tab_mag_odfnew/tab_mag_lsstDP0.dat'),
+        ('lsst', 'tab_mag_odfnew/tab_mag_lsstR1.9.dat'),
         ('lsst_r1p9', 'tab_mag_odfnew/tab_mag_lsstR1.9.dat'),
+        ('lsst_dp0', 'tab_mag_odfnew/tab_mag_lsstDP0.dat'),
+        ('lsst_2012', 'tab_mag_odfnew/tab_mag_lsst.dat'),
         ('roman', 'tab_mag_odfnew/tab_mag_Roman2021.dat'),
         ('euclid', 'tab_mag_odfnew/tab_mag_euclid_nisp.dat'),
 ])
@@ -46,10 +56,51 @@ photname_dict = odict([
         ('ps1' ,'Pan-STARRS1'),
         ('acs_wfc','HST/ACS'),
         ('lsst', 'LSST'),
-        ('lsst_dp0', 'LSST'),
         ('lsst_r1p9', 'LSST'),
+        ('lsst_dp0', 'LSST'),
+        ('lsst_2012', 'LSST'),
         ('roman', 'Roman'),
         ('euclid', 'Euclid'),
+])
+
+# Bands of each photometric system. These are used to resolve the magnitude
+# columns from the names in the file header (see
+# ParsecIsochrone._find_column_numbers), which is more robust than the
+# hard-coded column numbers in `Isochrone.columns` because the CMD column
+# layout has changed between versions. Single-character band names are also
+# made available in the opposite case (i.e. both 'y' and 'Y').
+bands_dict = odict([
+        ('des' ,['u','g','r','i','z','Y']),
+        ('sdss',['u','g','r','i','z']),
+        ('ps1' ,['g','r','i','z','y','w']),
+        ('acs_wfc',['F435W','F475W','F555W','F606W','F625W','F775W','F814W']),
+        ('lsst', ['u','g','r','i','z','y']),
+        ('lsst_r1p9', ['u','g','r','i','z','y']),
+        ('lsst_dp0', ['u','g','r','i','z','y']),
+        ('lsst_2012', ['u','g','r','i','z','y']),
+        ('roman', ['F062','F087','F106','F129','F158','F184','F146','F213']),
+        ('euclid', ['VIS','Y','Blue','J','Red','H']),
+])
+
+# CMD names its magnitude columns '<band>mag', but not uniformly: the
+# Pan-STARRS1 columns carry a filter-set suffix ('gP1mag'). Prefixed names
+# (the current DECam table uses 'DES-gmag' and 'DECam-umag') are handled
+# without any per-survey configuration, see ParsecIsochrone._match_band.
+band_suffix_dict = odict([
+        ('ps1','P1'),
+])
+
+# Photometric systems that the CMD server returns in Vega magnitudes. ugali
+# works in AB magnitudes, so these offsets (m_AB - m_Vega) are applied when
+# the isochrone is parsed. The Roman values come from Roman-STScI-000825 and
+# match the conversion that was previously applied downstream in
+# LSSTDESC/streamobs.
+vega_to_ab_dict = odict([
+        ('roman', odict([
+                ('F062',0.153), ('F087',0.481), ('F106',0.660),
+                ('F129',1.051), ('F146',1.164), ('F158',1.315),
+                ('F184',1.556), ('F213',1.837),
+                ])),
 ])
 
 # Commented options may need to be restored for older version/isochrones.
@@ -170,7 +221,11 @@ defaults_39 = dict(defaults_33,cmd_version=3.9)
 class ParsecIsochrone(Isochrone):
     """ Base class for PARSEC-style isochrones. """
 
-    download_url = "http://stev.oapd.inaf.it"
+    # NOTE: must be https. The server 301-redirects http -> https, and
+    # urllib downgrades a redirected POST to a GET, so the query is dropped
+    # and the response is the blank form rather than an isochrone -- which
+    # surfaces as the unhelpful 'Output filename not found'.
+    download_url = "https://stev.oapd.inaf.it"
     download_defaults = copy.deepcopy(defaults_27)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
@@ -256,7 +311,7 @@ class ParsecIsochrone(Isochrone):
         q = urlencode(params).encode('utf-8')
         logger.debug("%s?%s"%(url,q))
         c = str(urlopen(url, q).read())
-        aa = re.compile('output\d+')
+        aa = re.compile(r'output\d+')
         fname = aa.findall(c)
         
         if len(fname) == 0:
@@ -264,13 +319,91 @@ class ParsecIsochrone(Isochrone):
             raise RuntimeError(msg)
 
         out = '{0}/tmp/{1}.dat'.format(server, fname[0])
-        
-        cmd = 'wget --progress dot:binary %s -O %s'%(out,outfile)
-        logger.debug(cmd)
-        stdout = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)
-        logger.debug(str(stdout))
+
+        # NOTE: fetched with urlopen rather than by shelling out to wget, so
+        # that the download uses the same TLS configuration as the query
+        # above. The CMD server has been seen to serve an incomplete
+        # certificate chain, and the usual fix (pointing SSL_CERT_FILE at a
+        # bundle carrying the missing intermediate) reaches Python but not a
+        # wget subprocess, which would fail the download after a successful
+        # query. It also drops a shell dependency.
+        logger.debug("Downloading %s..."%out)
+        with contextlib.closing(urlopen(out)) as response:
+            with open(outfile,'wb') as tmp:
+                shutil.copyfileobj(response,tmp)
 
         return outfile
+
+    # Map from the ugali column names to the names used in the header of a
+    # modern (cmd_3.3 and later) CMD file.
+    header_names = odict([
+            ('mass_init', ['Mini']),
+            ('mass_act' , ['Mass']),
+            ('log_lum'  , ['logL']),
+            ('stage'    , ['label']),
+            ])
+
+    # Bands and Vega->AB offsets for the CMD photometric systems. These are
+    # module-level so that they can be extended without subclassing; the
+    # class attributes are what the shared read path in Isochrone uses.
+    band_names = bands_dict
+    vega_to_ab = vega_to_ab_dict
+    header_dtypes = odict([('stage',int)])
+
+    @classmethod
+    def _header_columns(cls, filename):
+        """ Column names from the header of a CMD file.
+
+        Returns None for the legacy cmd_2.7 format, which does not name its
+        columns and has to fall back to the hard-coded `columns`.
+        """
+        names = None
+        with open(filename,'r') as f:
+            for line in f:
+                if not line.startswith('#'): break
+                tokens = line.lstrip('#').split()
+                # The column line of a modern file names the magnitudes with
+                # a 'mag' suffix ('mbolmag', 'gmag', ...); the legacy format
+                # names them 'mbol', 'g', ... and is not self-describing.
+                if any(t.endswith('mag') for t in tokens) and 'Mini' in tokens:
+                    names = tokens
+        return names
+
+    @classmethod
+    def _band_column(cls, band, names, survey):
+        """ Column of a band, using this survey's filter-set suffix. """
+        return cls._match_band(band,names,
+                               band_suffix_dict.get(survey.lower(),''))
+
+    @staticmethod
+    def _match_band(band, names, suffix=''):
+        """ Find the column of a band among the CMD header column names.
+
+        The magnitude columns are named '<band>mag', but the band can carry a
+        filter-set suffix ('gP1mag' for Pan-STARRS1) or a prefix ('DES-gmag'
+        and 'DECam-umag' in the current DECam table). Matches are tried from
+        most to least specific.
+
+        Parameters
+        ----------
+        band   : the ugali band name
+        names  : the column names from the file header
+        suffix : filter-set suffix for this photometric system
+
+        Returns
+        -------
+        index : column number of the band, or None if it is not present
+        """
+        cores = [n[:-3].lower() if n.lower().endswith('mag') else None
+                 for n in names]
+
+        for candidate in [band.lower(), (band+suffix).lower()]:
+            if candidate in cores: return cores.index(candidate)
+
+        for i,core in enumerate(cores):
+            if core and core.split('-')[-1] == band.lower(): return i
+
+        return None
 
     @classmethod
     def parse_header(cls, filename, nlines=15):
@@ -328,6 +461,12 @@ class ParsecIsochrone(Isochrone):
             msg = "Incorrect survey:\n"+header['photname']
             raise Exception(msg)
 
+        # A fresh download always comes from a modern CMD version, so the
+        # columns must be resolvable from the header (see #104).
+        if cls._find_column_numbers(filename,survey) is None:
+            msg = "Unrecognized column format:\n"+header['columns'][0]
+            raise Exception(msg)
+
         try:
             try: zidx = header['columns'].index('Zini')
             except ValueError: zidx = 0
@@ -365,8 +504,12 @@ class Bressan2012(ParsecIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
-    #download_defaults = copy.deepcopy(defaults_27)
-    download_defaults = copy.deepcopy(defaults_31)
+    # The cmd_3.1 form no longer returns data for the cmd_2.7-era parameter
+    # set, so query the current interface instead. PARSEC v1.2S without
+    # COLIBRI (i.e. Bressan+ 2012) is selected with track_colibri='no';
+    # 'isoc_kind' is only read by cmd_2.7/3.1 and is kept for reference.
+    download_defaults = copy.deepcopy(defaults_39)
+    download_defaults['track_colibri'] = 'no'
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S'
 
     columns = dict(
@@ -422,18 +565,23 @@ class Bressan2012(ParsecIsochrone):
         format. Creates arrays with the initial stellar mass and
         corresponding magnitudes for each step along the isochrone.
         """
-        #http://stev.oapd.inaf.it/cgi-bin/cmd_2.7
-        try:
-            columns = self.columns[self.survey.lower()]
-        except KeyError as e:
-            logger.warning('Unrecognized survey: %s'%(self.survey))
-            raise(e)
+        columns = self._find_column_numbers(filename,self.survey)
+        if columns is not None:
+            # Modern (cmd_3.3+) whitespace-delimited file with named columns
+            kwargs = self._genfromtxt_kwargs(columns)
+        else:
+            # Legacy (cmd_2.7/3.1) file; fall back to hard-coded columns.
+            # delimiter='\t' is used to be compatible with OldPadova...
+            # ADW: This should be updated, but be careful of column numbering
+            try:
+                columns = self.columns[self.survey.lower()]
+            except KeyError as e:
+                logger.warning('Unrecognized survey: %s'%(self.survey))
+                raise(e)
+            kwargs = dict(delimiter='\t',usecols=list(columns.keys()),
+                          dtype=list(columns.values()))
 
-        # delimiter='\t' is used to be compatible with OldPadova...
-        # ADW: This should be updated, but be careful of column numbering
-        kwargs = dict(delimiter='\t',usecols=list(columns.keys()),
-                      dtype=list(columns.values()))
-        self.data = np.genfromtxt(filename,**kwargs)
+        self._read_data(filename,**kwargs)
 
         self.mass_init = self.data['mass_init']
         self.mass_act  = self.data['mass_act']
@@ -459,6 +607,8 @@ class Marigo2017(ParsecIsochrone):
         ('hb_spread',0.1,'Intrinisic spread added to horizontal branch'),
         )
 
+    # PARSEC v1.2S + COLIBRI (i.e. Marigo+ 2017) is the default track_colibri
+    # of defaults_39; 'isoc_kind' is only read by cmd_2.7/3.1.
     download_defaults = copy.deepcopy(defaults_39)
     download_defaults['isoc_kind'] = 'parsec_CAF09_v1.2S_NOV13'
 
@@ -538,11 +688,6 @@ class Marigo2017(ParsecIsochrone):
     columns['lsst'] = copy.deepcopy(columns['lsst_dp0'])
     columns['lsst_r1p9'] = copy.deepcopy(columns['lsst_dp0'])
 
-    def _find_column_numbers(self):
-        """ Map from the isochrone column names to the column numbers. """
-        header,lines = self.parse_header(self.filename)
-        columns = header['columns']
-
     def _parse(self,filename):
         """Reads an isochrone file in the Marigo et al. 2017
         format. Creates arrays with the initial stellar mass and
@@ -556,14 +701,19 @@ class Marigo2017(ParsecIsochrone):
         --------
         None
         """
-        try:
-            columns = self.columns[self.survey.lower()]
-        except KeyError as e:
-            logger.warning('Unrecognized survey: %s'%(self.survey))
-            raise(e)
+        columns = self._find_column_numbers(filename,self.survey)
+        if columns is not None:
+            kwargs = self._genfromtxt_kwargs(columns)
+        else:
+            try:
+                columns = self.columns[self.survey.lower()]
+            except KeyError as e:
+                logger.warning('Unrecognized survey: %s'%(self.survey))
+                raise(e)
+            kwargs = dict(usecols=list(columns.keys()),
+                          dtype=list(columns.values()))
 
-        kwargs = dict(usecols=list(columns.keys()),dtype=list(columns.values()))
-        self.data = np.genfromtxt(filename,**kwargs)
+        self._read_data(filename,**kwargs)
         # cut out anomalous point:
         # https://github.com/DarkEnergySurvey/ugali/issues/29
         self.data = self.data[~np.isin(self.data['stage'], [9])]
