@@ -40,7 +40,7 @@ Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE_URL = URL+'/releases/download/v1.9.0'
+RELEASE_URL = URL+'/releases/download/v1.8.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
 ISOSIZE = "~2MB"
 CATSIZE = "~20MB"
@@ -61,7 +61,7 @@ SURVEY_MODELS = {
     # MIST (dotter2016) has no Euclid, so those combinations do not exist.
     'lsst'   : ['bressan2012','marigo2017','dotter2016'],
     'roman'  : ['bressan2012','marigo2017','dotter2016'],
-    'euclid' : ['bressan2012','marigo2017'],
+    'euclid' : ['bressan2012','marigo2017','dotter2016'],
 }
 
 class ProgressFileIO(io.FileIO):
