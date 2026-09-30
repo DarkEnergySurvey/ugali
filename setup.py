@@ -116,35 +116,35 @@ class TarballCommand(Command):
         if not os.path.exists(self.ugali_dir):
             print("creating %s"%self.ugali_dir)
             os.makedirs(self.ugali_dir)
-        os.chdir(self.ugali_dir)
-
-        url = os.path.join(self.release_url,tarball)
+        base = os.path.realpath(self.ugali_dir)
+        tarpath = os.path.join(base, tarball)
+        
+        url = self.release_url.rstrip('/') + '/' + tarball
 
         print("downloading %s..."%url)
         if urlopen(url).getcode() >= 400:
             raise Exception('url does not exist')
 
-        urlretrieve(url,tarball,reporthook=ProgressFileIO.progress_bar)
+        urlretrieve(url,tarpath,reporthook=ProgressFileIO.progress_bar)
         print('')
-        if not os.path.exists(tarball):
-            raise HTTPError()
+        if not os.path.exists(tarpath)
+            raise IOError("download failed: %s"%url)
             
-        print("extracting %s..."%tarball)
+        print("extracting %s..."%tarpath)
         with tarfile.open(fileobj=ProgressFileIO(tarball), mode='r:gz') as tar:
             if hasattr(tarfile, 'data_filter'):
                 # PEP 706: rejects absolute paths, '..', unsafe links, device files
-                tar.extractall(filter='data')
+                tar.extractall(path=base, filter='data')
             else:
-                base = os.path.realpath('.')
                 for m in tar.getmembers():
                     target = os.path.realpath(os.path.join(base, m.name))
                     if os.path.commonpath([base, target]) != base or m.issym() or m.islnk():
                         raise RuntimeError("Unsafe member in %s: %s" % (tarball, m.name))
-                tar.extractall()
+                tar.extractall(path=base)
             print('')
 
-        print("removing %s"%tarball)
-        os.remove(tarball)
+        print("removing %s"%tarpath)
+        os.remove(tarpath)
 
     def run(self):
         if getattr(self, 'dry_run', False):
