@@ -151,7 +151,7 @@ def run(self):
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
         try:      shutil.copy(self.opts.config,self.outdir)
-        except Exception as e: logger.warning(e.message)
+        except Exception as e: logger.warning(str(e))
 
         for config,name,label,coord in args:
             glon,glat,radius = coord
@@ -208,9 +208,9 @@ def run(self):
         params = odict()
         for config,name,label,coord in args:
             srcfile = make_filenames(self.config,name)['srcfile']
-            results[name] = yaml.load(open(srcfile))['results']
-            srcmdl[name] = yaml.load(open(srcfile))['source']
-            params[name] = yaml.load(open(srcfile))['params']
+            results[name] = yaml.safe_load(open(srcfile))['results']
+            srcmdl[name] = yaml.safe_load(open(srcfile))['source']
+            params[name] = yaml.safe_load(open(srcfile))['params']
 
         for base,output in [('results.yaml',results),('srcmdl.yaml',srcmdl),('params.yaml',params)]:
             outfile = join(self.outdir,base)

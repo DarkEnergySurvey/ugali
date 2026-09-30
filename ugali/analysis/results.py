@@ -151,7 +151,7 @@ class Results(object):
  
         bmin,bmax = self.source.params[param].bounds
         bins = np.linspace(bmin,bmax,bins)
-        n,b = np.histogram(data,bins=bins,normed=True)
+        n,b = np.histogram(data,bins=bins,density=True)
         prior = 1.0/(bmax-bmin)
         posterior = n[0]
         # Excluding the null hypothesis

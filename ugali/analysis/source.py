@@ -99,7 +99,7 @@ class Source(object):
     def load(self,srcmdl,section=None):
         # This is to get around string checking python2/3 issues
         try: 
-            params = yaml.load(open(srcmdl))
+            params = yaml.safe_load(open(srcmdl))
         except TypeError:
             params = copy.deepcopy(srcmdl)
 

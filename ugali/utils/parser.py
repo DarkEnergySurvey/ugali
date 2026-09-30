@@ -139,7 +139,8 @@ class Parser(argparse.ArgumentParser):
             #data = np.genfromtxt(filename,unpack=True,usecols=list(range(5)),dtype=object,names=True)
         elif (ext=='.yaml'):
             import yaml
-            data = [(k,v['kernel']['lon']['value'],v['kernel']['lat']['value'],0.5,'CEL') for k,v in yaml.load(open(filename)).items()]
+            d = yaml.safe_load(open(filename))
+            data = [(k,v['kernel']['lon']['value'],v['kernel']['lat']['value'],0.5,'CEL') for k,v in d.items()]
             data = np.rec.fromrecords(data,names=['name','lon','lat','radius','coord'])
         else:
             msg = "Unrecognized file type: %s"%filename
