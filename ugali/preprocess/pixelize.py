@@ -85,7 +85,7 @@ def pixelizeCatalog(infiles, config, force=False):
             arrs  += [cat_pix,pix_pix]
             data=mlab.rec_append_fields(data,names=names,arrs=arrs)
         except ValueError as e:
-            logger.warn(str(e)+'; not adding column.')
+            logger.warning(str(e)+'; not adding column.')
             #data[cat_pix_name] = cat_pix
             #data[pix_pix_name] = pix_pix
                                

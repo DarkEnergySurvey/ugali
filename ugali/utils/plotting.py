@@ -717,13 +717,13 @@ class BasePlotter(object):
 
         # To draw DSS image
         #try: plt.sca(axes[0]); self.drawImage()
-        #except IOError as e: logger.warn(str(e))
+        #except IOError as e: logger.warning(str(e))
 
         plt.sca(axes[0]); self.drawFracdet()
         plt.sca(axes[1]); self.drawStellarDensity()
         plt.sca(axes[2]); self.drawMaglim()
         try: plt.sca(axes[3]); self.drawTS()
-        except IOError as e: logger.warn(str(e))
+        except IOError as e: logger.warning(str(e))
             
         axes[0].set_xlim(self.radius,-self.radius)
         axes[0].set_ylim(-self.radius,self.radius)

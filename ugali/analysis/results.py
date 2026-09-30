@@ -180,7 +180,7 @@ class Results(object):
             results['extension_radial'] = self.estimate('extension_radial', **kwargs)
             
         except KeyError:
-            logger.warn("Didn't find 'ra' or 'dec' in Samples...")
+            logger.warning("Didn't find 'ra' or 'dec' in Samples...")
             if self.coordsys == 'gal':
                 results['glon'] = results['lon']
                 results['glat'] = results['lat']
@@ -283,7 +283,7 @@ class Results(object):
             results['Mv'] = ugali.utils.stats.interval(Mv,Mv_lo,Mv_hi)
         except ValueError as e:
             logger.warning("Skipping absolute magnitude")
-            logger.warn(str(e))
+            logger.warning(str(e))
             Mv = np.nan
             results['Mv'] = Mv
 

@@ -180,7 +180,7 @@ def load_files(filenames,multiproc=False,**kwargs):
     for i,d in enumerate(out):
         if d.dtype != dtype: 
             # ADW: Not really safe...
-            logger.warn("Casting input data to same type.")
+            logger.warning("Casting input data to same type.")
             out[i] = d.astype(dtype,copy=False)
 
     logger.debug('Concatenating arrays...')
@@ -211,7 +211,7 @@ def load_infiles(infiles,columns=None,multiproc=False):
     for i,d in enumerate(out):
         if d.dtype != dtype: 
             # ADW: Not really safe...
-            logger.warn("Casting input data to same type.")
+            logger.warning("Casting input data to same type.")
             out[i] = d.astype(dtype)
 
     logger.debug('Concatenating arrays...')

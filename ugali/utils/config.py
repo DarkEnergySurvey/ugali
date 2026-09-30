@@ -227,12 +227,12 @@ class Config(dict):
         mask['mask_2']  = ~np.isin(data['mask_2'],glob.glob(mask_dir+'/*'))
 
         for name in ['catalog','mask_1','mask_2']:
-            if np.all(mask[name]): logger.warn("All '%s' files masked"%name)
+            if np.all(mask[name]): logger.warning("All '%s' files masked"%name)
 
         # mask 'pix' if all files not present
         mask['pix'] = mask['catalog'] | mask['mask_1'] | mask['mask_2']
 
-        if np.all(mask['pix']): logger.warn("All pixels masked")
+        if np.all(mask['pix']): logger.warning("All pixels masked")
 
         return np.ma.MaskedArray(data, mask, fill_value=[-1,'','',''])
 

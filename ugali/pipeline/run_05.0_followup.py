@@ -151,7 +151,7 @@ def run(self):
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
         try:      shutil.copy(self.opts.config,self.outdir)
-        except Exception as e: logger.warn(e.message)
+        except Exception as e: logger.warning(e.message)
 
         for config,name,label,coord in args:
             glon,glat,radius = coord
@@ -165,7 +165,7 @@ def run(self):
 
             if srcmdl is not None:
                 try:      shutil.copy(srcmdl,self.outdir)
-                except Exception as e: logger.warn(e.message)
+                except Exception as e: logger.warning(e.message)
                 logger.info('%s (%s)'%(name,srcmdl))
                 cmd='%s %s --name %s --srcmdl %s %s' % (
                     script,self.opts.config,name,srcmdl,outfile)

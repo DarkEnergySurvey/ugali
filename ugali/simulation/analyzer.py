@@ -242,7 +242,7 @@ class Analyzer(object):
                 self.runone(i)
             except MemoryError as e:
                 msg = "Memory usage exceeded %.3f GB"%(self.mlimit/GB)
-                logger.warn(msg)
+                logger.warning(msg)
                 self.results[i]['FLAG'] |= FLAG_MEM
             except Exception as e:
                 logger.error(str(e))
@@ -295,7 +295,7 @@ class Analyzer(object):
         
         if params['EBV'] > 0.2:
             msg = "High reddening region; skipping..."
-            logger.warn(msg)
+            logger.warning(msg)
             results[i]['FLAG'] |= FLAG_EBV
             #raise Exception(msg)
             #results[i]['TS'] = np.nan
@@ -325,7 +325,7 @@ class Analyzer(object):
         # too many catalog stars
         if len(loglike.catalog) > 5e5: # 1e5
             msg = "Large catalog (N_CATALOG = %i)."%len(loglike.catalog)
-            logger.warn(msg)
+            logger.warning(msg)
             results[i]['FLAG'] |= FLAG_NOBJ
 
         grid = ugali.analysis.scan.GridSearch(self.config,loglike)

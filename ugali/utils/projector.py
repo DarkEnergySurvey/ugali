@@ -108,7 +108,7 @@ class Projector:
             self.sphere_to_image_func = cartesianSphereToImage
             self.image_to_sphere_func = cartesianImageToSphere
         else:
-            logger.warn('%s not recognized'%(proj_type))
+            logger.warning('%s not recognized'%(proj_type))
 
     def sphereToImage(self, lon, lat):
         scalar = np.isscalar(lon)

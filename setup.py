@@ -334,7 +334,7 @@ setup(
     install_requires=[
         'astropy',
         'matplotlib',
-        'numpy >= 1.9.0',
+        'numpy >= 1.13.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
         'fitsio >= 0.9.10',
