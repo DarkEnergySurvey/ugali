@@ -1,21 +1,9 @@
-from __future__ import print_function
-
 import sys
 import os
 import io
 
-try: 
-    from setuptools import setup, find_packages
-    from setuptools.command.install import install as _install
-except ImportError: 
-    from distutils.core import setup
-    from distutils.command.install import install as _install
-    def find_packages():
-        return ['ugali','ugali.analysis','ugali.config','ugali.observation',
-                'ugali.preprocess','ugali.simulation','ugali.candidate',
-                'ugali.utils']
-
-import distutils.cmd
+from setuptools import setup, find_packages, Command
+from setuptools.command.install import install as _install
 
 import versioneer
 VERSION = versioneer.get_version()
@@ -83,7 +71,7 @@ class ProgressFileIO(io.FileIO):
             sys.stdout.write(msg)
             sys.stdout.flush()
 
-class TarballCommand(distutils.cmd.Command,object):
+class TarballCommand(Command):
     """ Command for downloading data files """
     description = "install data files"
     user_options = [
@@ -193,12 +181,12 @@ class IsochroneCommand(TarballCommand):
     _dirname = 'isochrones'
 
     def initialize_options(self):
-        super(IsochroneCommand,self).initialize_options()
+        super().initialize_options()
         self.survey = None
         self.model = None
 
     def finalize_options(self):
-        super(IsochroneCommand,self).finalize_options()
+        super().finalize_options()
         self._build_surveys()
         self._build_models()
 
@@ -228,7 +216,7 @@ class IsochroneCommand(TarballCommand):
         if (self.survey is None) and (self.model is None):
             self.tarball = self._tarball
             self.dirname = self._dirname
-            super(IsochroneCommand,self).run()
+            super().run()
             return
         
         requested = []
@@ -248,7 +236,7 @@ class IsochroneCommand(TarballCommand):
         for survey,model in requested:
             self.tarball = "ugali-%s-%s.tar.gz"%(survey,model)
             self.dirname = "isochrones/%s/%s"%(survey,model)
-            super(IsochroneCommand,self).run()
+            super().run()
 
 
 class install(_install):
