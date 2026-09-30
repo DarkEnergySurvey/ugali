@@ -28,9 +28,9 @@ Topic :: Scientific/Engineering :: Astronomy
 Topic :: Scientific/Engineering :: Physics
 """
 
-RELEASE_URL = URL+'/releases/download/v1.8.0'
+RELEASE_URL = URL+'/releases/download/v1.9.0'
 UGALIDIR = os.getenv("UGALIDIR","$HOME/.ugali")
-ISOSIZE = "~2MB"
+ISOSIZE = "~3MB"
 CATSIZE = "~20MB"
 TSTSIZE = "~1MB"
 # Could find file size dynamically, but it's a bit slow...
