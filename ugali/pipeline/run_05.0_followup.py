@@ -165,7 +165,7 @@ def run(self):
 
             if srcmdl is not None:
                 try:      shutil.copy(srcmdl,self.outdir)
-                except Exception as e: logger.warning(e.message)
+                except Exception as e: logger.warning(str(e))
                 logger.info('%s (%s)'%(name,srcmdl))
                 cmd='%s %s --name %s --srcmdl %s %s' % (
                     script,self.opts.config,name,srcmdl,outfile)
