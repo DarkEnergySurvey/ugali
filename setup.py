@@ -130,12 +130,17 @@ class TarballCommand(Command):
             raise HTTPError()
             
         print("extracting %s..."%tarball)
-        with tarfile.open(fileobj=ProgressFileIO(tarball),mode='r:gz') as tar:
-            ## Check if the directory exists?
-            #if os.path.exists(tar.next().name) and not self.force:
-            #    print("directory found; skipping installation")
-            tar.extractall()
-            tar.close()
+        with tarfile.open(fileobj=ProgressFileIO(tarball), mode='r:gz') as tar:
+            if hasattr(tarfile, 'data_filter'):
+                # PEP 706: rejects absolute paths, '..', unsafe links, device files
+                tar.extractall(filter='data')
+            else:
+                base = os.path.realpath('.')
+                for m in tar.getmembers():
+                    target = os.path.realpath(os.path.join(base, m.name))
+                    if os.path.commonpath([base, target]) != base or m.issym() or m.islnk():
+                        raise RuntimeError("Unsafe member in %s: %s" % (tarball, m.name))
+                tar.extractall()
             print('')
 
         print("removing %s"%tarball)
