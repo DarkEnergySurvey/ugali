@@ -30,7 +30,7 @@ jobs:
           -c conda-forge
           python=${{ matrix.python-version }}
           numpy scipy matplotlib astropy healpy pyyaml emcee fitsio corner
-          flake8 pytest jupyter nbconvert
+          flake8 pytest jupyter nbconvert setuptools
         init-shell: bash
         cache-environment: true
 
