@@ -225,11 +225,11 @@ def insert_columns(filename,data,ext=1,force=False,colnum=None):
 
     fits = fitsio.FITS(filename,'rw')
     names = fits[ext].get_colnames()
-    overlap = np.in1d(data.dtype.names,names)
+    overlap = np.isin(data.dtype.names,names)
 
     test = None
     if np.any(~overlap):
-        idx = np.argmax(np.in1d(names,data.dtype.names))
+        idx = np.argmax(np.isin(names,data.dtype.names))
         test = names[idx]
         orig = fits[ext].read(columns=[test])
 

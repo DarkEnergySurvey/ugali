@@ -118,7 +118,7 @@ class Config(dict):
                 ])  
 
         keys = np.array(list(sections.keys()))
-        found = np.in1d(keys,list(self.keys()))
+        found = np.isin(keys,list(self.keys()))
 
         if not np.all(found):
             msg = 'Missing sections: '+str(keys[~found])
@@ -126,7 +126,7 @@ class Config(dict):
 
         for section,keys in sections.items():
             keys = np.array(keys)
-            found = np.in1d(keys,list(self[section].keys()))
+            found = np.isin(keys,list(self[section].keys()))
             if not np.all(found):
                 msg = 'Missing keys in %s: '%(section)+str(keys[~found])
                 raise Exception(msg)
@@ -222,9 +222,9 @@ class Config(dict):
         data['mask_2']  = np.char.mod(mask_path_2,pixels)
 
         # Build the mask of existing files using glob
-        mask['catalog'] = ~np.in1d(data['catalog'],glob.glob(catalog_dir+'/*'))
-        mask['mask_1']  = ~np.in1d(data['mask_1'],glob.glob(mask_dir+'/*'))
-        mask['mask_2']  = ~np.in1d(data['mask_2'],glob.glob(mask_dir+'/*'))
+        mask['catalog'] = ~np.isin(data['catalog'],glob.glob(catalog_dir+'/*'))
+        mask['mask_1']  = ~np.isin(data['mask_1'],glob.glob(mask_dir+'/*'))
+        mask['mask_2']  = ~np.isin(data['mask_2'],glob.glob(mask_dir+'/*'))
 
         for name in ['catalog','mask_1','mask_2']:
             if np.all(mask[name]): logger.warn("All '%s' files masked"%name)
@@ -252,7 +252,7 @@ class Config(dict):
         if pixels is None:
             return self.filenames
         else:
-            return self.filenames[np.in1d(self.filenames['pix'],pixels)]
+            return self.filenames[np.isin(self.filenames['pix'],pixels)]
 
     getCatalogFiles = getFilenames
 

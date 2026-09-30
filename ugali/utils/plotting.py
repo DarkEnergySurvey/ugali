@@ -354,7 +354,7 @@ class BasePlotter(object):
         else:
             catalog = self.get_objects()
             stars = self.get_stars()
-            cut = ~np.in1d(catalog.objid,stars.objid)
+            cut = ~np.isin(catalog.objid,stars.objid)
             self.galaxies = catalog.applyCut(cut)
         return self.galaxies
 

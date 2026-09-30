@@ -332,11 +332,11 @@ class Samples(np.recarray):
         if names is None: names = list(self.dtype.names)
         names = np.array(names,ndmin=1)
 
-        missing = names[~np.in1d(names,self.dtype.names)]
+        missing = names[~np.isin(names,self.dtype.names)]
         if len(missing):
             msg = "field(s) named %s not found"%(missing)
             raise ValueError(msg)
-        #idx = np.where(np.in1d(self.dtype.names,names))[0]
+        #idx = np.where(np.isin(self.dtype.names,names))[0]
         idx = np.array([self.dtype.names.index(n) for n in names])
 
         # Remove zero entries

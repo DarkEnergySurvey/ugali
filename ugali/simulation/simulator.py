@@ -303,7 +303,7 @@ class Simulator(object):
         epsilon = np.degrees(hp.max_pixrad(self.nside_pixel)) # Pad roi radius to cover edge healpix
         subpix = ugali.utils.healpix.query_disc(self.nside_subpixel,self.roi.vec,self.roi_radius+epsilon)
         superpix = ugali.utils.healpix.superpixel(subpix,self.nside_subpixel,self.nside_pixel)
-        self.subpix = subpix[np.in1d(superpix,self.roi.pixels)]
+        self.subpix = subpix[np.isin(superpix,self.roi.pixels)]
 
     def _setup_cmd(self,mode='cloud-in-cells'):
         """

@@ -678,7 +678,7 @@ def catsimPopulation(config, tag, mc_source_id_start=1, n=5000, n_chunk=100,
     for mc_source_id_chunk in np.split(np.arange(mc_source_id_start, mc_source_id_start + n), n//n_chunk):
         outfile = '%s/sim_catalog_%s_mc_source_id_%07i-%07i.fits'%(tag, tag, mc_source_id_chunk[0], mc_source_id_chunk[-1])
         print('  '+outfile)
-        sel = np.in1d(mc_source_id_array, mc_source_id_chunk)
+        sel = np.isin(mc_source_id_array, mc_source_id_chunk)
         columns = [pyfits.Column(name=k, format=v[1], array=v[0][sel]) for k,v in key_map.items()]
         tbhdu = pyfits.BinTableHDU.from_columns(columns)
         tbhdu.header.set('AREA', simulation_area, 'Simulation area (deg^2)')

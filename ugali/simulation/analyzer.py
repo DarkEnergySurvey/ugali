@@ -202,7 +202,7 @@ class Analyzer(object):
             mc_source_id = np.unique(self.catalog.mc_source_id)
 
         # Select only systems that are in the catalog
-        sel = np.in1d(self.population['MC_SOURCE_ID'],mc_source_id)
+        sel = np.isin(self.population['MC_SOURCE_ID'],mc_source_id)
         
         if not sel.sum():
             msg = "Requested MC_SOURCE_IDs not found in population."
@@ -215,7 +215,7 @@ class Analyzer(object):
             # create the results
             self.results = self.create_results(population=self.population[sel])
         
-        if not np.in1d(mc_source_id,self.results['MC_SOURCE_ID']).all():
+        if not np.isin(mc_source_id,self.results['MC_SOURCE_ID']).all():
             msg = "Requested MC_SOURCE_IDs not found in results."
             raise ValueError(msg)
     

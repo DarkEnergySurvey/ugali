@@ -211,7 +211,7 @@ def in_pixels(lon,lat,pixels,nside):
     inpix : boolean array for inclusion
     """
     pix = ang2pix(nside,lon,lat)
-    return np.in1d(pix,pixels)
+    return np.isin(pix,pixels)
 
 
 def index_pix_in_pixels(pix,pixels,sort=False,outside=-1):
@@ -237,10 +237,10 @@ def index_pix_in_pixels(pix,pixels,sort=False,outside=-1):
     # Assumes that 'pixels' is pre-sorted, otherwise...???
     index = np.searchsorted(pixels,pix)
     if np.isscalar(index):
-        if not np.in1d(pix,pixels).any(): index = outside
+        if not np.isin(pix,pixels).any(): index = outside
     else:
         # Find objects that are outside the pixels
-        index[~np.in1d(pix,pixels)] = outside
+        index[~np.isin(pix,pixels)] = outside
     return index
 
 def index_lonlat_in_pixels(lon,lat,pixels,nside,sort=False,outside=-1):
@@ -273,11 +273,11 @@ index_pixels = index_lonlat_in_pixels
 #    # pixels should be pre-sorted, otherwise...???
 #    index = np.searchsorted(pixels,pix)
 #    if np.isscalar(index):
-#        if not np.in1d(pix,pixels).any(): index = -1
+#        if not np.isin(pix,pixels).any(): index = -1
 #    else:
 #        # Find objects that are outside the roi
 #        #index[np.take(pixels,index,mode='clip')!=pix] = -1
-#        index[~np.in1d(pix,pixels)] = -1
+#        index[~np.isin(pix,pixels)] = -1
 #    return index
 
 

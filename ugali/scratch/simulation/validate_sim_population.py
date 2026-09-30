@@ -38,7 +38,7 @@ def getCatalogFile(catalog_dir, mc_source_id):
     catalog_infile_index_array = np.concatenate(catalog_infile_index_array)
 
     assert len(mc_source_id_array) == len(np.unique(mc_source_id_array)), 'Found non-unique MC_SOURCE_ID values in filenames'
-    assert np.in1d(mc_source_id, mc_source_id_array).all(), 'Requested MC_SOURCE_ID value not among files'
+    assert np.isin(mc_source_id, mc_source_id_array).all(), 'Requested MC_SOURCE_ID value not among files'
     mc_source_id_index = np.nonzero(mc_source_id == mc_source_id_array)[0]
     return catalog_infiles[catalog_infile_index_array[mc_source_id_index]]
 

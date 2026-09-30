@@ -124,7 +124,7 @@ class ToyKernel(Kernel):
         return self._norm
 
     def _pdf(self,pix):
-        return  np.in1d(pix,self.pix)
+        return  np.isin(pix,self.pix)
         
     def pdf(self,lon,lat):
         pix = ang2pix(self.nside,lon,lat)

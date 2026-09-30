@@ -124,7 +124,7 @@ def run(self):
         foot = pixels[inFootprint(self.config,pixels)]
 
         # And find the pixels that haven't been processed
-        undone = ~np.in1d(foot,done)
+        undone = ~np.isin(foot,done)
         hpxmap = np.zeros(len(pixels))
         hpxmap[foot[undone]] = True
 

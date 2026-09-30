@@ -23,7 +23,7 @@ distance_actual = ugali.utils.projector.distanceModulusToDistance(data_actual['d
 r_physical_actual = distance_actual * np.tan(np.radians(data_actual['rhalf_major'] / 60.)) * np.sqrt(1. - data_actual['ellipticity']) # Azimuthally averaged half-light radius in kpc; note that rhalf_major in arcmin
 abs_mag_actual = data_actual['apparent_magnitude'] - data_actual['distance_modulus']
 
-cut_hsc = np.in1d(data_actual['galaxy_key'], ['virgo_1', 'cetus_3'])
+cut_hsc = np.isin(data_actual['galaxy_key'], ['virgo_1', 'cetus_3'])
 
 #########
 
@@ -62,8 +62,8 @@ pylab.xlim(pylab.xlim()[::-1])
 #index = np.nonzero(data_sim['MC_SOURCE_ID'] == 8)[0][0]
 #print data_sim['RA'][index], data_sim['DEC'][index]
 
-#cut_detected = np.where(np.in1d(np.arange(len(data_sim)), match_sim), True, False)
-cut_detect = np.in1d(data_sim['MC_SOURCE_ID'], data_search['MC_SOURCE_ID'])
+#cut_detected = np.where(np.isin(np.arange(len(data_sim)), match_sim), True, False)
+cut_detect = np.isin(data_sim['MC_SOURCE_ID'], data_search['MC_SOURCE_ID'])
 
 cut_why_not = (data_sim['surface_brightness'] < 27.) & (data_sim['n_g24'] > 50.) & ~cut_detect # First version
 #cut_why_not = (data_sim['surface_brightness'] < 30.) & (data_sim['n_g24'] > 25.) & ~cut_detect # First version
