@@ -127,7 +127,7 @@ class TarballCommand(Command):
 
         urlretrieve(url,tarpath,reporthook=ProgressFileIO.progress_bar)
         print('')
-        if not os.path.exists(tarpath)
+        if not os.path.exists(tarpath):
             raise IOError("download failed: %s"%url)
             
         print("extracting %s..."%tarpath)
