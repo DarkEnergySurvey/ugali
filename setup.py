@@ -131,7 +131,7 @@ class TarballCommand(Command):
             raise IOError("download failed: %s"%url)
             
         print("extracting %s..."%tarpath)
-        with tarfile.open(fileobj=ProgressFileIO(tarball), mode='r:gz') as tar:
+        with tarfile.open(fileobj=ProgressFileIO(tarpath), mode='r:gz') as tar:
             if hasattr(tarfile, 'data_filter'):
                 # PEP 706: rejects absolute paths, '..', unsafe links, device files
                 tar.extractall(path=base, filter='data')
