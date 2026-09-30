@@ -745,13 +745,13 @@ class MaskBand(object):
                 pass
             else:
                 msg = "Unrecognized fractype: %s"%fractype
-                logger.warn(msg)
+                logger.warning(msg)
                 
             self.frac_roi_sparse = np.clip(frac[self.roi.pixels],0.0,1.0)
         except ValueError as e:
             # No detection fraction present
             msg = "No 'FRACDET' column found in masks; assuming FRACDET = 1.0"
-            logger.warn(msg)
+            logger.warning(msg)
 
         # Explicitly zero the maglim of pixels with fracdet < fracmin
         self.mask_roi_sparse[self.frac_roi_sparse == 0] = 0.0

@@ -45,7 +45,7 @@ class Maglims(object):
         try: 
             self.footprint = fitsio.read(self.footfile)['I'].ravel()
         except:
-            logger.warn("Couldn't open %s; will pass through."%self.footfile)
+            logger.warning("Couldn't open %s; will pass through."%self.footfile)
             self.footprint = self.footfile
 
 
@@ -83,7 +83,7 @@ class Maglims(object):
         #try: 
         #    footprint = fitsio.read(footfile)['I'].ravel()
         #except:
-        #    logger.warn("Couldn't open %s; will try again."%footfile)
+        #    logger.warning("Couldn't open %s; will try again."%footfile)
         #    footprint = footfile
 
         mag_column = self.config['catalog']['mag_%i_field'%field]

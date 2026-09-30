@@ -161,7 +161,7 @@ class GridSearch:
 
             # No objects, continue
             if len(self.loglike.catalog) == 0: 
-                logger.warn("No catalog objects")
+                logger.warning("No catalog objects")
                 continue
 
             # Set distance_modulus once to save time

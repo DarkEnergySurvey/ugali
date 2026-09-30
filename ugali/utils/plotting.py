@@ -354,7 +354,7 @@ class BasePlotter(object):
         else:
             catalog = self.get_objects()
             stars = self.get_stars()
-            cut = ~np.in1d(catalog.objid,stars.objid)
+            cut = ~np.isin(catalog.objid,stars.objid)
             self.galaxies = catalog.applyCut(cut)
         return self.galaxies
 
@@ -717,13 +717,13 @@ class BasePlotter(object):
 
         # To draw DSS image
         #try: plt.sca(axes[0]); self.drawImage()
-        #except IOError as e: logger.warn(str(e))
+        #except IOError as e: logger.warning(str(e))
 
         plt.sca(axes[0]); self.drawFracdet()
         plt.sca(axes[1]); self.drawStellarDensity()
         plt.sca(axes[2]); self.drawMaglim()
         try: plt.sca(axes[3]); self.drawTS()
-        except IOError as e: logger.warn(str(e))
+        except IOError as e: logger.warning(str(e))
             
         axes[0].set_xlim(self.radius,-self.radius)
         axes[0].set_ylim(-self.radius,self.radius)
@@ -1333,7 +1333,7 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False,color='r'):
     centers = (bins[1:]+bins[:-1])/2.
 
     ax.set_xscale('linear')
-    ax.set_yscale('log',nonposy='clip')
+    ax.set_yscale('log',nonpositive='clip')
 
     dof = 1
     patches,labels = [],[]
@@ -1346,7 +1346,8 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False,color='r'):
         #fudge = 1/1.4
         #ax.plot(x,(1-chi2.cdf(x,dof))/2.*fudge,**kwargs)
         # Histogram is normalized so first bin = 1 
-        n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,normed=True,log=True,histtype='step',color=color)
+        n,b,p = ax.hist(clip_ts,cumulative=-1,bins=bins,density=True,
+                        log=True,histtype='step',color=color)
     else:
         num,b = np.histogram(clip_ts,bins=bins)
         c = (b[1:]+b[:-1])/2.
@@ -1357,7 +1358,7 @@ def drawChernoff(ax,ts,bands='smooth',pdf=False,color='r'):
         yerr = [np.where(err>=n,0.9999*n,err),err]
         # Histogram is normalized so n = num/(len(x)*dbin)
         ax.errorbar(c,n,yerr=yerr,fmt='_',color=color,zorder=0)
-        n,b,p = ax.hist(clip_ts,bins=bins,normed=True,log=True,color=color)
+        n,b,p = ax.hist(clip_ts,bins=bins,density=True,log=True,color=color)
 
     idx = np.argmax(n==0)
     n = n[1:idx]; b=b[1:idx+1]
@@ -1453,7 +1454,7 @@ def plotTriangle(srcfile,samples,burn=0,**kwargs):
     source = ugali.analysis.source.Source()
     source.load(srcfile,section='source')
     params = source.get_params()
-    results = yaml.load(open(srcfile))['results']
+    results = yaml.safe_load(open(srcfile))['results']
     samples = ugali.analysis.mcmc.Samples(samples)
 
     names = samples.names

@@ -255,14 +255,14 @@ def fast_kde(x, y, gridsize=(200,200), extents=None, nocorrelation=False, weight
 
     # First, determine how big the kernel needs to be
     std_devs = np.diag(np.sqrt(cov))
-    kern_nx, kern_ny = np.round(scotts_factor * 2 * np.pi * std_devs)
+    kern_nx, kern_ny = np.round(scotts_factor * 2 * np.pi * std_devs).astype(int)
 
     # Determine the bandwidth to use for the gaussian kernel
     inv_cov = np.linalg.inv(cov * scotts_factor**2) 
 
     # x & y (pixel) coords of the kernel grid, with <x,y> = <0,0> in center
-    xx = np.arange(kern_nx, dtype=np.float) - kern_nx / 2.0
-    yy = np.arange(kern_ny, dtype=np.float) - kern_ny / 2.0
+    xx = np.arange(kern_nx) - kern_nx / 2.0
+    yy = np.arange(kern_ny) - kern_ny / 2.0
     xx, yy = np.meshgrid(xx, yy)
 
     # Then evaluate the gaussian function on the kernel grid

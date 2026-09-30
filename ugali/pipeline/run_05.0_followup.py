@@ -151,7 +151,7 @@ def run(self):
     if 'mcmc' in self.opts.run:
         logger.info("Running 'mcmc'...")
         try:      shutil.copy(self.opts.config,self.outdir)
-        except Exception as e: logger.warn(e.message)
+        except Exception as e: logger.warning(str(e))
 
         for config,name,label,coord in args:
             glon,glat,radius = coord
@@ -165,7 +165,7 @@ def run(self):
 
             if srcmdl is not None:
                 try:      shutil.copy(srcmdl,self.outdir)
-                except Exception as e: logger.warn(e.message)
+                except Exception as e: logger.warning(str(e))
                 logger.info('%s (%s)'%(name,srcmdl))
                 cmd='%s %s --name %s --srcmdl %s %s' % (
                     script,self.opts.config,name,srcmdl,outfile)
@@ -208,9 +208,9 @@ def run(self):
         params = odict()
         for config,name,label,coord in args:
             srcfile = make_filenames(self.config,name)['srcfile']
-            results[name] = yaml.load(open(srcfile))['results']
-            srcmdl[name] = yaml.load(open(srcfile))['source']
-            params[name] = yaml.load(open(srcfile))['params']
+            results[name] = yaml.safe_load(open(srcfile))['results']
+            srcmdl[name] = yaml.safe_load(open(srcfile))['source']
+            params[name] = yaml.safe_load(open(srcfile))['params']
 
         for base,output in [('results.yaml',results),('srcmdl.yaml',srcmdl),('params.yaml',params)]:
             outfile = join(self.outdir,base)

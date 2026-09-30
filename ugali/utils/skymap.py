@@ -81,7 +81,7 @@ def inFootprint(config, pixels, nside=None):
     # Run the subpixels
     subpix = np.intersect1d(subpix1,subpix2)
     superpix = np.unique(superpixel(subpix,nside_pixel,nside))
-    inside |= np.in1d(pixels, superpix)
+    inside |= np.isin(pixels, superpix)
     
     return inside
 

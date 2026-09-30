@@ -199,7 +199,7 @@ class LogLikelihood(object):
 
         # All objects interior to the background annulus
         logger.debug("Creating interior catalog...")
-        cut_interior = np.in1d(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
+        cut_interior = np.isin(ang2pix(self.config['coords']['nside_pixel'], self.catalog_roi.lon, self.catalog_roi.lat), 
                                   self.roi.pixels_interior)
         #cut_interior = self.roi.inInterior(self.catalog_roi.lon,self.catalog_roi.lat)
         self.catalog_interior = self.catalog_roi.applyCut(cut_interior)

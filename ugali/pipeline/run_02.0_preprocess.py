@@ -16,7 +16,7 @@ defaults = ['pixelize','density','simple']
 
 def run(self):
     # The three mask options are (semi-)mutually exclusive
-    if np.in1d(['maglims','simple','split'],self.opts.run).sum() > 1:
+    if np.isin(['maglims','simple','split'],self.opts.run).sum() > 1:
         raise Exception("Too many 'mask' run options.")
 
     if 'pixelize' in self.opts.run:

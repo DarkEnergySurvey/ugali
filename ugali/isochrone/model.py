@@ -1091,7 +1091,7 @@ class Isochrone(IsochroneModel):
                 zrange = np.unique(data[:,1])
             else:
                 msg = "No isochrone files found in: %s"%self.get_dirname()
-                logger.warn(msg)
+                logger.warning(msg)
                 arange = np.array([self.age])
                 zrange = np.array([self.metallicity])
         elif abins is not None and zbins is not None:            
@@ -1127,7 +1127,7 @@ class Isochrone(IsochroneModel):
             self.filename = filename
             if not os.path.exists(self.filename):
                 msg = "Filename does not exist: %s"%self.filename
-                logger.warn(msg)
+                logger.warning(msg)
             else:
                 self._parse(self.filename)
 
@@ -1361,7 +1361,7 @@ class Isochrone(IsochroneModel):
                 return
             except Exception as e:
                 msg = "Overwriting corrupted %s..."%(outfile)
-                logger.warn(msg)
+                logger.warning(msg)
                 os.remove(outfile)
                 
         mkdir(outdir)

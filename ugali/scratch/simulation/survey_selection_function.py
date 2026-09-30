@@ -187,7 +187,7 @@ class surveySelectionFunction:
                                       self.data_sim['DIFFICULTY'] == 0), np.logical_or(self.data_sim['DIFFICULTY'] == 1, self.data_sim['DIFFICULTY'] == 4)))
         
         mc_source_id_detect = self.data_sim['MC_SOURCE_ID'][cut_detect_sim_results_sig & cut_detect_sim_results_ts]
-        cut_detect = np.in1d(self.data_population['MC_SOURCE_ID'], mc_source_id_detect)
+        cut_detect = np.isin(self.data_population['MC_SOURCE_ID'], mc_source_id_detect)
 
         features = []
         for key, operation in self.config['operation']['params_intrinsic']:

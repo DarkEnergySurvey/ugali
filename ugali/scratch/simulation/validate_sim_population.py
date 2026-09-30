@@ -38,7 +38,7 @@ def getCatalogFile(catalog_dir, mc_source_id):
     catalog_infile_index_array = np.concatenate(catalog_infile_index_array)
 
     assert len(mc_source_id_array) == len(np.unique(mc_source_id_array)), 'Found non-unique MC_SOURCE_ID values in filenames'
-    assert np.in1d(mc_source_id, mc_source_id_array).all(), 'Requested MC_SOURCE_ID value not among files'
+    assert np.isin(mc_source_id, mc_source_id_array).all(), 'Requested MC_SOURCE_ID value not among files'
     mc_source_id_index = np.nonzero(mc_source_id == mc_source_id_array)[0]
     return catalog_infiles[catalog_infile_index_array[mc_source_id_index]]
 
@@ -195,7 +195,7 @@ pylab.xlim(pylab.xlim()[::-1])
 """
 counts_mc_source_id = np.histogram(data_catalog['MC_SOURCE_ID'],bins=np.arange(np.max(data_catalog['MC_SOURCE_ID']) + 1))[0]
 pylab.figure()
-pylab.yscale('log', nonposy='clip')
+pylab.yscale('log', nonpositive='clip')
 counts, edges = pylab.hist(counts_mc_source_id, bins=np.linspace(0, np.max(counts_mc_source_id) + 1, 101))[0:2]
 
 centers = 0.5 * (edges[:-1] + edges[1:])
@@ -288,8 +288,8 @@ pylab.ylim(0., 1.)
 
 bins = np.linspace(0., 1., 41.)
 pylab.figure()
-pylab.hist(y_pred[:,1][y], bins=bins, color='green', alpha=0.5, normed=True, label='Detected')
-pylab.hist(y_pred[:,1][~y], bins=bins, color='red', alpha=0.5, normed=True, label='Not Detected')
+pylab.hist(y_pred[:,1][y], bins=bins, color='green', alpha=0.5, density=True, label='Detected')
+pylab.hist(y_pred[:,1][~y], bins=bins, color='red', alpha=0.5, density=True, label='Not Detected')
 pylab.xlabel('ML Predicted Detection Probability')
 pylab.ylabel('PDF')
 pylab.legend(loc='upper center')

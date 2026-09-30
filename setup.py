@@ -1,21 +1,9 @@
-from __future__ import print_function
-
 import sys
 import os
 import io
 
-try: 
-    from setuptools import setup, find_packages
-    from setuptools.command.install import install as _install
-except ImportError: 
-    from distutils.core import setup
-    from distutils.command.install import install as _install
-    def find_packages():
-        return ['ugali','ugali.analysis','ugali.config','ugali.observation',
-                'ugali.preprocess','ugali.simulation','ugali.candidate',
-                'ugali.utils']
-
-import distutils.cmd
+from setuptools import setup, find_packages, Command
+from setuptools.command.install import install as _install
 
 import versioneer
 VERSION = versioneer.get_version()
@@ -83,7 +71,7 @@ class ProgressFileIO(io.FileIO):
             sys.stdout.write(msg)
             sys.stdout.flush()
 
-class TarballCommand(distutils.cmd.Command,object):
+class TarballCommand(Command):
     """ Command for downloading data files """
     description = "install data files"
     user_options = [
@@ -128,30 +116,35 @@ class TarballCommand(distutils.cmd.Command,object):
         if not os.path.exists(self.ugali_dir):
             print("creating %s"%self.ugali_dir)
             os.makedirs(self.ugali_dir)
-        os.chdir(self.ugali_dir)
-
-        url = os.path.join(self.release_url,tarball)
+        base = os.path.realpath(self.ugali_dir)
+        tarpath = os.path.join(base, tarball)
+        
+        url = self.release_url.rstrip('/') + '/' + tarball
 
         print("downloading %s..."%url)
         if urlopen(url).getcode() >= 400:
             raise Exception('url does not exist')
 
-        urlretrieve(url,tarball,reporthook=ProgressFileIO.progress_bar)
+        urlretrieve(url,tarpath,reporthook=ProgressFileIO.progress_bar)
         print('')
-        if not os.path.exists(tarball):
-            raise HTTPError()
+        if not os.path.exists(tarpath):
+            raise IOError("download failed: %s"%url)
             
-        print("extracting %s..."%tarball)
-        with tarfile.open(fileobj=ProgressFileIO(tarball),mode='r:gz') as tar:
-            ## Check if the directory exists?
-            #if os.path.exists(tar.next().name) and not self.force:
-            #    print("directory found; skipping installation")
-            tar.extractall()
-            tar.close()
+        print("extracting %s..."%tarpath)
+        with tarfile.open(fileobj=ProgressFileIO(tarpath), mode='r:gz') as tar:
+            if hasattr(tarfile, 'data_filter'):
+                # PEP 706: rejects absolute paths, '..', unsafe links, device files
+                tar.extractall(path=base, filter='data')
+            else:
+                for m in tar.getmembers():
+                    target = os.path.realpath(os.path.join(base, m.name))
+                    if os.path.commonpath([base, target]) != base or m.issym() or m.islnk():
+                        raise RuntimeError("Unsafe member in %s: %s" % (tarball, m.name))
+                tar.extractall(path=base)
             print('')
 
-        print("removing %s"%tarball)
-        os.remove(tarball)
+        print("removing %s"%tarpath)
+        os.remove(tarpath)
 
     def run(self):
         if getattr(self, 'dry_run', False):
@@ -193,12 +186,12 @@ class IsochroneCommand(TarballCommand):
     _dirname = 'isochrones'
 
     def initialize_options(self):
-        super(IsochroneCommand,self).initialize_options()
+        super().initialize_options()
         self.survey = None
         self.model = None
 
     def finalize_options(self):
-        super(IsochroneCommand,self).finalize_options()
+        super().finalize_options()
         self._build_surveys()
         self._build_models()
 
@@ -228,7 +221,7 @@ class IsochroneCommand(TarballCommand):
         if (self.survey is None) and (self.model is None):
             self.tarball = self._tarball
             self.dirname = self._dirname
-            super(IsochroneCommand,self).run()
+            super().run()
             return
         
         requested = []
@@ -248,7 +241,7 @@ class IsochroneCommand(TarballCommand):
         for survey,model in requested:
             self.tarball = "ugali-%s-%s.tar.gz"%(survey,model)
             self.dirname = "isochrones/%s/%s"%(survey,model)
-            super(IsochroneCommand,self).run()
+            super().run()
 
 
 class install(_install):
@@ -334,7 +327,7 @@ setup(
     install_requires=[
         'astropy',
         'matplotlib',
-        'numpy >= 1.9.0',
+        'numpy >= 1.13.0',
         'scipy >= 0.14.0',
         'healpy >= 1.6.0',
         'fitsio >= 0.9.10',

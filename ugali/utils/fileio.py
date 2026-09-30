@@ -180,7 +180,7 @@ def load_files(filenames,multiproc=False,**kwargs):
     for i,d in enumerate(out):
         if d.dtype != dtype: 
             # ADW: Not really safe...
-            logger.warn("Casting input data to same type.")
+            logger.warning("Casting input data to same type.")
             out[i] = d.astype(dtype,copy=False)
 
     logger.debug('Concatenating arrays...')
@@ -211,7 +211,7 @@ def load_infiles(infiles,columns=None,multiproc=False):
     for i,d in enumerate(out):
         if d.dtype != dtype: 
             # ADW: Not really safe...
-            logger.warn("Casting input data to same type.")
+            logger.warning("Casting input data to same type.")
             out[i] = d.astype(dtype)
 
     logger.debug('Concatenating arrays...')
@@ -225,11 +225,11 @@ def insert_columns(filename,data,ext=1,force=False,colnum=None):
 
     fits = fitsio.FITS(filename,'rw')
     names = fits[ext].get_colnames()
-    overlap = np.in1d(data.dtype.names,names)
+    overlap = np.isin(data.dtype.names,names)
 
     test = None
     if np.any(~overlap):
-        idx = np.argmax(np.in1d(names,data.dtype.names))
+        idx = np.argmax(np.isin(names,data.dtype.names))
         test = names[idx]
         orig = fits[ext].read(columns=[test])
 

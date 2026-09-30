@@ -314,7 +314,7 @@ if __name__ == "__main__":
     #    from emcee.utils import MPIPool
     #    pool = MPIPool(loadbalance=True)
     #except (ImportError,ValueError) as e:
-    #    logger.warn(e.message)
+    #    logger.warning(e.message)
     #    pool = None
     # 
     #if pool and not pool.is_master():

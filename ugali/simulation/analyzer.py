@@ -202,7 +202,7 @@ class Analyzer(object):
             mc_source_id = np.unique(self.catalog.mc_source_id)
 
         # Select only systems that are in the catalog
-        sel = np.in1d(self.population['MC_SOURCE_ID'],mc_source_id)
+        sel = np.isin(self.population['MC_SOURCE_ID'],mc_source_id)
         
         if not sel.sum():
             msg = "Requested MC_SOURCE_IDs not found in population."
@@ -215,7 +215,7 @@ class Analyzer(object):
             # create the results
             self.results = self.create_results(population=self.population[sel])
         
-        if not np.in1d(mc_source_id,self.results['MC_SOURCE_ID']).all():
+        if not np.isin(mc_source_id,self.results['MC_SOURCE_ID']).all():
             msg = "Requested MC_SOURCE_IDs not found in results."
             raise ValueError(msg)
     
@@ -242,7 +242,7 @@ class Analyzer(object):
                 self.runone(i)
             except MemoryError as e:
                 msg = "Memory usage exceeded %.3f GB"%(self.mlimit/GB)
-                logger.warn(msg)
+                logger.warning(msg)
                 self.results[i]['FLAG'] |= FLAG_MEM
             except Exception as e:
                 logger.error(str(e))
@@ -295,7 +295,7 @@ class Analyzer(object):
         
         if params['EBV'] > 0.2:
             msg = "High reddening region; skipping..."
-            logger.warn(msg)
+            logger.warning(msg)
             results[i]['FLAG'] |= FLAG_EBV
             #raise Exception(msg)
             #results[i]['TS'] = np.nan
@@ -325,7 +325,7 @@ class Analyzer(object):
         # too many catalog stars
         if len(loglike.catalog) > 5e5: # 1e5
             msg = "Large catalog (N_CATALOG = %i)."%len(loglike.catalog)
-            logger.warn(msg)
+            logger.warning(msg)
             results[i]['FLAG'] |= FLAG_NOBJ
 
         grid = ugali.analysis.scan.GridSearch(self.config,loglike)

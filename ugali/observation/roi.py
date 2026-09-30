@@ -99,8 +99,8 @@ class ROI(object):
 
         # Boolean arrays for selecting given pixels 
         # (Careful, this works because pixels are pre-sorted by query_disc before in1d)
-        self.pixel_interior_cut = np.in1d(self.pixels, self.pixels_interior)
-        self.pixel_annulus_cut  = np.in1d(self.pixels, self.pixels_annulus)
+        self.pixel_interior_cut = np.isin(self.pixels, self.pixels_interior)
+        self.pixel_annulus_cut  = np.isin(self.pixels, self.pixels_annulus)
 
         # Some pixel properties
         self.area_pixel = hp.nside2pixarea(self.config.params['coords']['nside_pixel'],degrees=True) # deg^2
