@@ -47,7 +47,7 @@ import numpy as np
 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-from ugali.isochrone.mesa import Dotter2016, dict_output
+from ugali.isochrone.mesa import Dotter2016, dict_output, dict_version, mesa_defaults
 
 SERVER = 'https://mist.science'
 
@@ -72,7 +72,9 @@ def request_range(survey, feh, ages):
     text : contents of the '.iso.<system>' file in the returned archive
     """
     output = dict_output[survey]
-    params = dict(version='MIST1', v_div_vcrit='vvcrit0.4',
+    version = dict_version.get(survey, mesa_defaults['version'])
+    vvcrit = mesa_defaults.get('v_div_vcrit', 'vvcrit0.4')
+    params = dict(version=version, v_div_vcrit=vvcrit,
                   age_scale='linear', age_type='range',
                   age_range_low=ages.min() * 1e9,
                   age_range_high=ages.max() * 1e9,
@@ -231,7 +233,7 @@ if __name__ == "__main__":
                         help='sweeps to make, to pick up transient failures')
     args = parser.parse_args()
 
-    surveys = args.survey if args.survey else ['lsst', 'roman']
+    surveys = args.survey if args.survey else ['lsst', 'roman', 'euclid']
     from ugali.isochrone.model import get_iso_dir
 
     for survey in surveys:

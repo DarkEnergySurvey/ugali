@@ -39,53 +39,64 @@ from ugali.isochrone.model import get_iso_dir
 
 # Photometric system, as the 'output' value of the MIST form
 dict_output = odict([
-        ('des','DECam'),
-        ('sdss','SDSSugriz'),
-        ('ps1','PanSTARRS'),
-        ('lsst','LSST'),
-        ('roman','Roman'),
+    ('des','DECam'),
+    ('sdss','SDSSugriz'),
+    ('ps1','PanSTARRS'),
+    ('lsst','LSST'),
+    ('roman','Roman'),
+    ('euclid', 'Euclid')
 ])
 
 # Prefix that MIST puts on the magnitude columns of each photometric system.
 # This is *not* always the 'output' value of the form ('SDSSugriz' produces
 # 'SDSS_u', 'PanSTARRS' produces 'PS_g'), so it is tabulated separately.
 band_prefix_dict = odict([
-        ('des','DECam'),
-        ('sdss','SDSS'),
-        ('ps1','PS'),
-        ('lsst','LSST'),
-        ('roman','Roman'),
+    ('des','DECam'),
+    ('sdss','SDSS'),
+    ('ps1','PS'),
+    ('lsst','LSST'),
+    ('roman','Roman'),
+    ('euclid','Euclid'),
 ])
 
 # Bands of each photometric system. Used to resolve the magnitude columns
 # from the file header; see Isochrone._find_column_numbers.
 bands_dict = odict([
-        ('des' ,['u','g','r','i','z','Y']),
-        ('sdss',['u','g','r','i','z']),
-        ('ps1' ,['g','r','i','z','y','w']),
-        ('lsst',['u','g','r','i','z','y']),
-        ('roman',['F062','F087','F106','F129','F146','F158','F184','F213']),
+    ('des' ,['u','g','r','i','z','Y']),
+    ('sdss',['u','g','r','i','z']),
+    ('ps1' ,['g','r','i','z','y','w']),
+    ('lsst',['u','g','r','i','z','y']),
+    ('roman',['F062','F087','F106','F129','F146','F158','F184','F213']),
+    ('euclid',['VIS','Y','J','H']),
 ])
 
 # NOTE: MIST serves every photometric system in AB magnitudes -- the header
 # of each file says so explicitly ('LSST (AB)', 'Roman (AB)') -- so unlike
 # the CMD/PARSEC Roman tables no Vega->AB conversion is needed here.
 
+# MIST version requested for each survey; anything not listed uses
+# mesa_defaults['version'] ('MIST1' = v1.2).
+dict_version = odict([
+    ('lsst','MIST2'),
+    ('roman','MIST2'),
+    ('euclid','MIST2'),
+])
+
 mesa_defaults = {
-        'version':'MIST1',   # 'MIST1' = v1.2, 'MIST2' = v2.5
-        'v_div_vcrit':'vvcrit0.4',
-        'age_scale':'linear',
-        'age_type':'single',
-        'age_value':10e9, # yr if scale='linear'; log10(yr) if scale='log10'
-        'age_range_low':'',
-        'age_range_high':'',
-        'age_range_delta':'',
-        'age_list':'',
-        'FeH_value':-3.0,
-        'alpha_value':'p0', # [a/Fe]; 'p0' is scaled-solar
-        'output_option':'photometry',
-        'output':'DECam',
-        'Av_value':0,
+    'version':'MIST1',   # 'MIST1' = v1.2, 'MIST2' = v2.5
+    'v_div_vcrit':'vvcrit0.4',
+    'age_scale':'linear',
+    'age_type':'single',
+    'age_value':10e9, # yr if scale='linear'; log10(yr) if scale='log10'
+    'age_range_low':'',
+    'age_range_high':'',
+    'age_range_delta':'',
+    'age_list':'',
+    'FeH_value':-3.0,
+    'alpha_value':'p0', # [a/Fe]; 'p0' is scaled-solar
+    'output_option':'photometry',
+    'output':'DECam',
+    'Av_value':0,
 }
 
 mesa_defaults_10 = dict(mesa_defaults,version='MIST1')
@@ -110,11 +121,11 @@ class Dotter2016(Isochrone):
 
     # Map from the ugali column names to the MIST header names.
     header_names = odict([
-            ('mass_init', ['initial_mass']),
-            ('mass_act' , ['star_mass']),
-            ('log_lum'  , ['log_L']),
-            ('stage'    , ['phase']),
-            ])
+        ('mass_init', ['initial_mass']),
+        ('mass_act' , ['star_mass']),
+        ('log_lum'  , ['log_L']),
+        ('stage'    , ['phase']),
+    ])
 
     band_names = bands_dict
 
@@ -278,6 +289,7 @@ class Dotter2016(Isochrone):
 
         params = dict(self.download_defaults)
         params['output'] = dict_output[self.survey]
+        params['version'] = dict_version.get(self.survey, params['version'])
         params['FeH_value'] = feh
         params['age_value'] = age * 1e9
         if params['age_scale'] == 'log10':
