@@ -71,17 +71,15 @@ def request_range(survey, feh, ages):
     -------
     text : contents of the '.iso.<system>' file in the returned archive
     """
-    output = dict_output[survey]
-    version = dict_version.get(survey, mesa_defaults['version'])
-    vvcrit = mesa_defaults.get('v_div_vcrit', 'vvcrit0.4')
-    params = dict(version=version, v_div_vcrit=vvcrit,
-                  age_scale='linear', age_type='range',
+    params = iso.download_params
+    params.update(age_type='range',
                   age_range_low=ages.min() * 1e9,
                   age_range_high=ages.max() * 1e9,
                   age_range_delta=(ages[1] - ages[0]) * 1e9,
-                  FeH_value=feh, alpha_value='p0',
-                  output_option='photometry', output=output, Av_value=0)
-
+                  FeH_value=feh
+                  )
+    output = params['output']
+    
     query = urlencode(params).encode('utf-8')
     with contextlib.closing(urlopen(SERVER + '/iso_form.php', query)) as r:
         response = r.read().decode('utf-8', errors='replace')

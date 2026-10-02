@@ -44,7 +44,7 @@ dict_output = odict([
     ('ps1','PanSTARRS'),
     ('lsst','LSST'),
     ('roman','Roman'),
-    ('euclid', 'Euclid')
+    ('euclid', 'Euclid'),
 ])
 
 # Prefix that MIST puts on the magnitude columns of each photometric system.
@@ -74,16 +74,22 @@ bands_dict = odict([
 # of each file says so explicitly ('LSST (AB)', 'Roman (AB)') -- so unlike
 # the CMD/PARSEC Roman tables no Vega->AB conversion is needed here.
 
-# MIST version requested for each survey; anything not listed uses
-# mesa_defaults['version'] ('MIST1' = v1.2).
+# MIST version requested for each survey. Listed explicitly for every survey so
+# that adding one forces a choice. The released DES/PS1/SDSS libraries are
+# MIST v1.0, which the form no longer serves; 'MIST1' (v1.2) is the closest it
+# can regenerate. LSST/Roman match the v2.5 libraries released in v1.9.0, and
+# Euclid photometry only exists for v2.5 (accepted by the form although not
+# offered in its dropdown).
 dict_version = odict([
-    ('lsst','MIST2'),
+    ('des','MIST1'), # 'MIST1' = v1.2
+    ('sdss','MIST1'),
+    ('ps1','MIST1'),
+    ('lsst','MIST2'), # 'MIST2' = v2.5
     ('roman','MIST2'),
     ('euclid','MIST2'),
 ])
 
 mesa_defaults = {
-    'version':'MIST1',   # 'MIST1' = v1.2, 'MIST2' = v2.5
     'v_div_vcrit':'vvcrit0.4',
     'age_scale':'linear',
     'age_type':'single',
@@ -95,11 +101,10 @@ mesa_defaults = {
     'FeH_value':-3.0,
     'alpha_value':'p0', # [a/Fe]; 'p0' is scaled-solar
     'output_option':'photometry',
-    'output':'DECam',
     'Av_value':0,
 }
-
-mesa_defaults_10 = dict(mesa_defaults,version='MIST1')
+    #'output':'DECam',
+    #'version':'MIST1',   
 
 class Dotter2016(Isochrone):
     """ MESA isochrones from Dotter 2016:
@@ -114,7 +119,7 @@ class Dotter2016(Isochrone):
         )
 
     download_url = 'https://mist.science'
-    download_defaults = copy.deepcopy(mesa_defaults_10)
+    download_defaults = copy.deepcopy(mesa_defaults)
 
     abins = np.arange(1., 13.5+0.1, 0.1)
     zbins = np.arange(1e-5, 1e-3+1e-5, 1e-5)
@@ -135,9 +140,9 @@ class Dotter2016(Isochrone):
     # at index 5, shifting the luminosity, the magnitudes and the phase by
     # one. Files with a column header are resolved from that header instead
     # (see Isochrone._find_column_numbers); these are only the fallback for
-    # a file that has none. There is deliberately no 'lsst' or 'roman' entry:
-    # no v1.0 file exists for either, so a headerless file of those surveys
-    # should fail loudly rather than be read with the wrong columns.
+    # a file that has none. There is deliberately no 'lsst', 'roman', 'euclid'
+    # entry: no v1.0 file exists, so a headerless file of those surveys
+    # should fail loudly rather than be read with the wrong columns.    
     columns = dict(
             des = odict([
                 (2, ('mass_init',float)),
@@ -175,6 +180,14 @@ class Dotter2016(Isochrone):
                 ]),
             )
 
+    @property
+    def download_params(self):
+        """ MIST form parameters for this isochrone's survey. """
+        params = copy.deepcopy(self.download_defaults)
+        params['output'] = dict_output[self.survey]
+        params['version'] = dict_version[self.survey]
+        return params
+    
     @classmethod
     def _header_columns(cls, filename):
         """ Column names from the header of a MIST photometry file.
@@ -287,9 +300,7 @@ class Dotter2016(Isochrone):
         z = metallicity
         feh = self.z2feh(z)
 
-        params = dict(self.download_defaults)
-        params['output'] = dict_output[self.survey]
-        params['version'] = dict_version.get(self.survey, params['version'])
+        params = self.download_params
         params['FeH_value'] = feh
         params['age_value'] = age * 1e9
         if params['age_scale'] == 'log10':

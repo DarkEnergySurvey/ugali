@@ -24,7 +24,7 @@ isochrones = padova + dotter
 survey = ['des','sdss']
 
 # Libraries that are installed by default, and the models that exist for
-# each. The LSST, Roman and Euclid libraries are Marigo+ 2017 only.
+# each.
 survey_models = {
     'des'    : ['Bressan2012','Marigo2017','Dotter2008','Dotter2016'],
     'ps1'    : ['Bressan2012','Marigo2017','Dotter2008','Dotter2016'],
