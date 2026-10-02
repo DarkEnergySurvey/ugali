@@ -31,7 +31,7 @@ survey_models = {
     'sdss'   : ['Bressan2012','Marigo2017','Dotter2008','Dotter2016'],
     'lsst'   : ['Bressan2012','Marigo2017','Dotter2016'],
     'roman'  : ['Bressan2012','Marigo2017','Dotter2016'],
-    'euclid' : ['Bressan2012','Marigo2017'],
+    'euclid' : ['Bressan2012','Marigo2017','Dotter2016'],
 }
 
 # Bands to use for each photometric system
