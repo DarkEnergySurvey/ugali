@@ -58,12 +58,12 @@ def log(msg):
     sys.stdout.flush()
 
 
-def request_range(survey, feh, ages):
+def request_range(iso, feh, ages):
     """ Ask for every age at one metallicity; return the photometry file text.
 
     Parameters
     ----------
-    survey : ugali survey name
+    iso    : instantiated isochrone
     feh    : [Fe/H] of the isochrones
     ages   : ages (Gyr) wanted; only the endpoints and spacing are sent
 
@@ -181,7 +181,7 @@ def build(survey, outdir, delay=5.0, force=False,
         wait = backoff
         for attempt in range(1, tries + 1):
             try:
-                text = request_range(survey, feh, ages)
+                text = request_range(iso, feh, ages)
                 blocks = split_isochrones(text, ages)
                 if len(blocks) != len(ages):
                     raise RuntimeError('got %d isochrones, expected %d'
