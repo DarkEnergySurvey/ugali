@@ -50,7 +50,7 @@ LIBRARIES = odict([
     ('sdss'  , ['bressan2012', 'marigo2017', 'dotter2008', 'dotter2016']),
     ('lsst'  , ['bressan2012', 'marigo2017', 'dotter2016']),
     ('roman' , ['bressan2012', 'marigo2017', 'dotter2016']),
-    ('euclid', ['bressan2012', 'marigo2017']),
+    ('euclid', ['bressan2012', 'marigo2017', 'dotter2016']),
 ])
 
 
