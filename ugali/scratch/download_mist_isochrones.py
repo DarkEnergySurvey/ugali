@@ -47,7 +47,7 @@ import numpy as np
 
 from ugali.utils.logger import logger
 from ugali.utils.shell import mkdir
-from ugali.isochrone.mesa import Dotter2016, dict_output
+from ugali.isochrone.mesa import Dotter2016, dict_output, dict_version, mesa_defaults
 
 SERVER = 'https://mist.science'
 
@@ -58,12 +58,12 @@ def log(msg):
     sys.stdout.flush()
 
 
-def request_range(survey, feh, ages):
+def request_range(iso, feh, ages):
     """ Ask for every age at one metallicity; return the photometry file text.
 
     Parameters
     ----------
-    survey : ugali survey name
+    iso    : instantiated isochrone
     feh    : [Fe/H] of the isochrones
     ages   : ages (Gyr) wanted; only the endpoints and spacing are sent
 
@@ -71,15 +71,15 @@ def request_range(survey, feh, ages):
     -------
     text : contents of the '.iso.<system>' file in the returned archive
     """
-    output = dict_output[survey]
-    params = dict(version='MIST1', v_div_vcrit='vvcrit0.4',
-                  age_scale='linear', age_type='range',
+    params = iso.download_params
+    params.update(age_type='range',
                   age_range_low=ages.min() * 1e9,
                   age_range_high=ages.max() * 1e9,
                   age_range_delta=(ages[1] - ages[0]) * 1e9,
-                  FeH_value=feh, alpha_value='p0',
-                  output_option='photometry', output=output, Av_value=0)
-
+                  FeH_value=feh
+                  )
+    output = params['output']
+    
     query = urlencode(params).encode('utf-8')
     with contextlib.closing(urlopen(SERVER + '/iso_form.php', query)) as r:
         response = r.read().decode('utf-8', errors='replace')
@@ -181,7 +181,7 @@ def build(survey, outdir, delay=5.0, force=False,
         wait = backoff
         for attempt in range(1, tries + 1):
             try:
-                text = request_range(survey, feh, ages)
+                text = request_range(iso, feh, ages)
                 blocks = split_isochrones(text, ages)
                 if len(blocks) != len(ages):
                     raise RuntimeError('got %d isochrones, expected %d'
@@ -231,7 +231,7 @@ if __name__ == "__main__":
                         help='sweeps to make, to pick up transient failures')
     args = parser.parse_args()
 
-    surveys = args.survey if args.survey else ['lsst', 'roman']
+    surveys = args.survey if args.survey else ['lsst', 'roman', 'euclid']
     from ugali.isochrone.model import get_iso_dir
 
     for survey in surveys:

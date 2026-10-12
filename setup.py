@@ -45,8 +45,7 @@ SURVEY_MODELS = {
     'des'    : MODELS,
     'ps1'    : MODELS,
     'sdss'   : MODELS,
-    # Dartmouth (dotter2008) has no LSST, Roman or Euclid filter set, and
-    # MIST (dotter2016) has no Euclid, so those combinations do not exist.
+    # Dartmouth (dotter2008) has no LSST, Roman or Euclid filter set.
     'lsst'   : ['bressan2012','marigo2017','dotter2016'],
     'roman'  : ['bressan2012','marigo2017','dotter2016'],
     'euclid' : ['bressan2012','marigo2017','dotter2016'],
