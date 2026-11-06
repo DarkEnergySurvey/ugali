@@ -55,7 +55,8 @@ class Farm:
         cmd = '%(script)s %(config)s %(outfile)s --hpx %(nside)i %(pix)i %(verbose)s'%params
         return cmd
         
-    def submit_all(self, coords=None, queue=None, debug=False):
+    def submit_all(self, coords=None, queue=None, debug=False,
+                   minpix=None, maxpix=None, hpxlist=None, pixfile=None):
         """
         Submit likelihood analyses on a set of coordinates. If
         coords is `None`, submit all coordinates in the footprint.
@@ -64,6 +65,10 @@ class Farm:
         coords : Array of target locations in Galactic coordinates. 
         queue  : Overwrite submit queue.
         debug  : Don't run.
+        minpix : Only submit pixels >= minpix
+        maxpix : Only submit pixels < maxpix
+        hpxlist: File (txt or npy) of pixel indices; only submit these.
+        pixfile: If set, write the selected pixels to this file and don't submit.
         """
         if coords is None:
             pixels = np.arange(hp.nside2npix(self.nside_likelihood))
@@ -95,7 +100,24 @@ class Farm:
         configfile = join(outdir,os.path.basename(self.config.filename))
 
         pixels = pixels[inside]
+
+        # Optional subsetting of the pixels (useful for chunking a
+        # full-footprint scan across several batch submissions).
+        if minpix is not None: pixels = pixels[pixels >= minpix]
+        if maxpix is not None: pixels = pixels[pixels <  maxpix]
+        if hpxlist is not None:
+            if hpxlist.endswith('.npy'): hpx = np.load(hpxlist)
+            else: hpx = np.loadtxt(hpxlist,dtype=int,ndmin=1)
+            pixels = pixels[np.isin(pixels, hpx)]
+        logger.info("Selected %i pixels"%len(pixels))
+
+        if pixfile is not None:
+            np.savetxt(pixfile, pixels, fmt='%d')
+            logger.info("Wrote pixels to %s"%pixfile)
+            return pixels
+
         self.submit(pixels,queue=queue,debug=debug,configfile=configfile)
+        return pixels
 
     def submit(self, pixels, queue=None, debug=False, configfile=None):
         """
@@ -225,8 +247,11 @@ if __name__ == "__main__":
     parser.add_debug()
     parser.add_queue()
     parser.add_verbose()
-    parser.add_coords(required=True,radius=True,targets=True)
+    parser.add_pixels()
+    parser.add_coords(required=False,radius=True,targets=True)
     opts = parser.parse_args()
 
     farm = Farm(opts.config,verbose=opts.verbose)
-    x = farm.submit_all(coords=opts.coords,queue=opts.queue,debug=opts.debug)
+    x = farm.submit_all(coords=opts.coords,queue=opts.queue,debug=opts.debug,
+                        minpix=opts.minpix,maxpix=opts.maxpix,
+                        hpxlist=opts.hpxlist,pixfile=opts.pixfile)

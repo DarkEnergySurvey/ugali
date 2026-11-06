@@ -164,8 +164,6 @@ def knownPopulation(dwarfs, mask, nside_pix, size):
         r_physical = dwarf['r12']/1000.
         kwargs['range_r_physical'] = [r_physical,r_physical]
         stellar_mass = np.interp(dwarf['M_V'],abs_mag_interp,stellar_mass_interp)
-        print("WARNING: Zeroing stellar mass...")
-        stellar_mass = 0.01
         kwargs['range_stellar_mass'] = [stellar_mass, stellar_mass]      
         kwargs['range_ellipticity'] = [dwarf['ellipticity'],dwarf['ellipticity']]
         kwargs['range_position_angle']=[0.0, 180.0]
@@ -175,9 +173,6 @@ def knownPopulation(dwarfs, mask, nside_pix, size):
         num = nsim if i < (len(dwarfs)-1) else nlast
         area,pop = satellitePopulation(coarse_mask, nside_pix, num, **kwargs)
         pop['name'] = dwarf['abbreviation']
-        print("WARNING: Fixing location...")
-        pop['lon'] = dwarf['ra']
-        pop['lat'] = dwarf['dec']
         results += [pop]
 
     population = np.hstack(results)

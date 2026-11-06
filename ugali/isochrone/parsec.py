@@ -588,6 +588,10 @@ class Bressan2012(ParsecIsochrone):
         self.luminosity = 10**self.data['log_lum']
         self.mag_1 = self.data[self.band_1]
         self.mag_2 = self.data[self.band_2]
+        # Optional extra bands (used by simulate_griz); None if not parsed
+        names = self.data.dtype.names
+        self.mag_3 = self.data[self.band_3] if self.band_3 in names else None
+        self.mag_4 = self.data[self.band_4] if self.band_4 in names else None
         self.stage = self.data['stage']
 
         self.mass_init_upper_bound = np.max(self.mass_init)
@@ -723,6 +727,10 @@ class Marigo2017(ParsecIsochrone):
         self.luminosity = 10**self.data['log_lum']
         self.mag_1 = self.data[self.band_1]
         self.mag_2 = self.data[self.band_2]
+        # Optional extra bands (used by simulate_griz); None if not parsed
+        names = self.data.dtype.names
+        self.mag_3 = self.data[self.band_3] if self.band_3 in names else None
+        self.mag_4 = self.data[self.band_4] if self.band_4 in names else None
         self.stage = self.data['stage']
 
         self.mass_init_upper_bound = np.max(self.mass_init)

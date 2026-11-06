@@ -115,6 +115,8 @@ class IsochroneModel(Model):
         ('dirname',get_iso_dir(),'Directory name for isochrone files'),
         ('band_1','g','Field name for magnitude one'),
         ('band_2','r','Field name for magnitude two'),
+        ('band_3','i','Field name for magnitude three (optional)'),
+        ('band_4','z','Field name for magnitude four (optional)'),
         ('band_1_detection',True,'Band one is detection band'),
         ('imf_type','Chabrier2003','Initial mass function'),
         ('hb_stage',None,'Horizontal branch stage name'),
@@ -455,6 +457,36 @@ class IsochroneModel(Model):
         mass_init_sample = self.imf.sample(n, np.min(mass_init), np.max(mass_init), **kwargs)
         mag_1_sample, mag_2_sample = f_1(mass_init_sample), f_2(mass_init_sample) 
         return mag_1_sample + distance_modulus, mag_2_sample + distance_modulus
+
+    def simulate_griz(self, stellar_mass, distance_modulus=None, **kwargs):
+        """
+        Simulate a set of stellar magnitudes (no uncertainty) in four
+        bands (band_1..band_4, nominally g,r,i,z) for a satellite of a
+        given stellar mass and distance. Requires the isochrone to have
+        parsed `mag_3` and `mag_4` (see e.g. Bressan2012._parse).
+
+        Parameters:
+        -----------
+        stellar_mass : the total stellar mass of the system (Msun)
+        distance_modulus : distance modulus of the system (if None takes from isochrone)
+        kwargs : passed to iso.imf.sample
+
+        Returns:
+        --------
+        mag_1, mag_2, mag_3, mag_4 : simulated magnitudes with length stellar_mass/iso.stellar_mass()
+        """
+        if distance_modulus is None: distance_modulus = self.distance_modulus
+        if getattr(self,'mag_3',None) is None or getattr(self,'mag_4',None) is None:
+            msg = "Isochrone has no mag_3/mag_4 (bands %s,%s)"%(self.band_3,self.band_4)
+            raise AttributeError(msg)
+        richness = stellar_mass / self.stellar_mass()
+        n = int(round(richness))
+
+        mass_init = self.mass_init
+        funcs = [scipy.interpolate.interp1d(mass_init, m)
+                 for m in (self.mag_1, self.mag_2, self.mag_3, self.mag_4)]
+        mass_init_sample = self.imf.sample(n, np.min(mass_init), np.max(mass_init), **kwargs)
+        return tuple(f(mass_init_sample) + distance_modulus for f in funcs)
 
     def observableFractionCMDX(self, mask, distance_modulus, mass_min=0.1):
         """

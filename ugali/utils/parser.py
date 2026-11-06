@@ -66,6 +66,17 @@ class Parser(argparse.ArgumentParser):
         self.add_argument('-f','--force',action='store_true',
                           help='Force the overwrite of files',**kwargs)
 
+    def add_pixels(self,**kwargs):
+        """ Options for selecting a subset of likelihood pixels to submit. """
+        self.add_argument('--minpix',default=None,type=int,
+                          help='Minimum likelihood pixel index (inclusive).')
+        self.add_argument('--maxpix',default=None,type=int,
+                          help='Maximum likelihood pixel index (exclusive).')
+        self.add_argument('--hpxlist',default=None,
+                          help='File of likelihood pixel indices to submit (txt or npy).')
+        self.add_argument('--pixfile',default=None,
+                          help='Write the selected pixels to this file instead of submitting.')
+
     def add_seed(self,**kwargs):
         self.add_argument('--seed',default=None,type=int,
                           help='Random seed.',**kwargs)
